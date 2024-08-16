@@ -3,9 +3,9 @@ import Image from 'next/image';
 const Hero = () => {
   return (
     <div
-      className={`flex select-none items-center relative px-5 justify-between w-full mx-auto
+      className={`flex select-none items-center relative px-5  w-full mx-auto
         mt-[200px] md:mt-[225px] lg:mt-[150px]
-        max-w-[full] min-h-[12rem]
+        max-w-[500px] min-h-[12rem]
         md:max-w-[570px] md:min-h-[13rem] 
         lg:max-w-[750px] lg:min-h-[17rem]
         overflow-hidden`}
@@ -24,7 +24,7 @@ const Hero = () => {
         fill
         alt='Hero Logo Image'
         src='/media/img/general/logo-main.svg'
-        className={`!w-[12rem] md:!w-[18rem] lg:!w-[22rem] !left-[unset] `}
+        className={`!w-[12rem] md:!w-[18rem] lg:!w-[22rem] !left-[unset] !r-0`}
       />
     </div>
   );
