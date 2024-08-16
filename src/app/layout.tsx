@@ -18,7 +18,7 @@ const OCR_ext = localFont({
 
 export const metadata: Metadata = {
   title: 'Codex Christi',
-  description: 'A Hub for Christian developers',
+  description: 'A Hub for Christian Creatives',
 };
 
 export default function RootLayout({
@@ -27,10 +27,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang='en'>
+    <html lang='en' className='!overflow-x-hidden'>
       <body
         className={cn(
-          ` font-nico bg-black overflow-x-hidden`,
+          ` font-nico bg-black text-white !overflow-x-hidden w-full max-w-full`,
           nicoMoji.variable,
           OCR_ext.variable
         )}

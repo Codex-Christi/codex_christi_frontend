@@ -24,14 +24,16 @@ const Logo: FC<{ with_text?: boolean | undefined }> = ({ with_text }) => {
           event.preventDefault();
         }}
       />
-      <span
-        className={`max-w-[50px] flex flex-col items-center 
+      {needs_text && (
+        <span
+          className={`max-w-[50px] flex flex-col items-center 
         !font-ocr font-[900] mb-[0.3rem] 
         -ml-[.75rem] text-[1.275rem]`}
-      >
-        <span>Codex</span>
-        <span>Christi</span>
-      </span>
+        >
+          <span>Codex</span>
+          <span>Christi</span>
+        </span>
+      )}
     </section>
   );
 };
