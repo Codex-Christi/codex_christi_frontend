@@ -1,1 +1,0 @@
-self.__NEXT_FONT_MANIFEST="{\"pages\":{},\"app\":{\"/home/santorz/devProjects/codex_christi/frontend/src/app/layout\":[\"static/media/394f21e9cd6bc923-s.p.woff\",\"static/media/8d53c5dd36073568-s.p.ttf\"]},\"appUsingSizeAdjust\":true,\"pagesUsingSizeAdjust\":false}"
