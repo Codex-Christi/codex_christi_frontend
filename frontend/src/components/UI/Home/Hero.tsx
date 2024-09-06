@@ -7,7 +7,7 @@ const Hero = () => {
         mt-[200px] md:mt-[225px] lg:mt-[150px]
         max-w-[500px] min-h-[12rem]
         md:max-w-[570px] md:min-h-[13rem] 
-        lg:max-w-[750px] lg:min-h-[17rem]
+        lg:max-w-[675px] lg:min-h-[17rem]
         overflow-hidden`}
     >
       <section

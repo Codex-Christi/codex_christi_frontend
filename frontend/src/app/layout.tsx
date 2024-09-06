@@ -30,7 +30,7 @@ export default function RootLayout({
     <html lang='en' className='!overflow-x-hidden'>
       <body
         className={cn(
-          ` font-nico bg-black text-white !overflow-x-hidden w-full max-w-full !relative`,
+          ` font-nico bg-black text-white !overflow-x-hidden !overflow-y-auto w-full min-h-screen !relative `,
           nicoMoji.variable,
           OCR_ext.variable
         )}

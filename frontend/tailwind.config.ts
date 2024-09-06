@@ -68,10 +68,15 @@ const config = {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: '0' },
         },
+        'ltr-linear-infinite': {
+          from: { 'background-position': '0 0' },
+          to: { 'background-position': '-400vw 1000vw' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'ltr-linear-infinite': 'ltr-linear-infinite 1000s linear infinite',
       },
       fontFamily: {
         nico: ['var(--font-nico)', ...fontFamily.sans],
