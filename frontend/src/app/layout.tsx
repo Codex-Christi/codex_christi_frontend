@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
+import { Montserrat } from 'next/font/google';
 
 import { cn } from '@/lib/utils';
 
@@ -14,6 +15,10 @@ const nicoMoji = localFont({
 const OCR_ext = localFont({
   src: '../res/fonts/OCR-ext.ttf',
   variable: '--font-ocr',
+});
+const MontserratFont = Montserrat({
+  subsets: ['latin'],
+  variable: '--font-montserrat',
 });
 
 export const metadata: Metadata = {
@@ -32,7 +37,8 @@ export default function RootLayout({
         className={cn(
           ` font-nico bg-black text-white !overflow-x-hidden !overflow-y-auto w-full min-h-screen !relative `,
           nicoMoji.variable,
-          OCR_ext.variable
+          OCR_ext.variable,
+          MontserratFont.variable
         )}
       >
         <MainNav />

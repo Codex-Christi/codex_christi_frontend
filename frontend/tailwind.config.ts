@@ -76,11 +76,12 @@ const config = {
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
-        'ltr-linear-infinite': 'ltr-linear-infinite 1000s linear infinite',
+        'ltr-linear-infinite': 'ltr-linear-infinite 500s linear infinite',
       },
       fontFamily: {
         nico: ['var(--font-nico)', ...fontFamily.sans],
         ocr: ['var(--font-ocr)', 'sans-serif'],
+        montserrat: ['var(--font-montserrat)', 'sans-serif'],
       },
     },
   },
