@@ -76,7 +76,7 @@ const config = {
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
-        'ltr-linear-infinite': 'ltr-linear-infinite 500s linear infinite',
+        'ltr-linear-infinite': 'ltr-linear-infinite forwards 500s infinite',
       },
       fontFamily: {
         nico: ['var(--font-nico)', ...fontFamily.sans],

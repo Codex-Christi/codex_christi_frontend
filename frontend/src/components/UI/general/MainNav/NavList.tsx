@@ -1,36 +1,23 @@
-import Link from 'next/link';
-import { BsCaretRightFill } from 'react-icons/bs';
+import ActiveLink from './ActiveLink';
 
-const navListArr = ['feed', 'community', 'messages', 'live', 'shop'] as const;
+export const navListArr = [
+  'feed',
+  'community',
+  'messages',
+  'live',
+  'shop',
+] as const;
 
 const NavList = () => {
   return (
     <section
-      className={`hidden md:flex md:gap-3.5 lg:gap-5 text-lg !font-montserrat font-semibold`}
+      className={`hidden md:flex md:gap-6 lg:gap-[2rem] text-[1.05rem] !font-montserrat font-bold`}
     >
-      {navListArr.map((linkText: (typeof navListArr)[number]) => {
-        if (linkText === 'live') {
-          return (
-            <Link
-              href={linkText}
-              className='flex items-center gap-1'
-              key={linkText}
-            >
-              {linkText.toLocaleUpperCase()}
-              <BsCaretRightFill />
-            </Link>
-          );
-        }
-        return (
-          <Link href={linkText} key={linkText}>
-            {linkText.toLocaleUpperCase()}
-          </Link>
-        );
-      })}
+      {navListArr.map((linkText: (typeof navListArr)[number]) => (
+        <ActiveLink linkText={linkText} key={linkText} href={linkText} />
+      ))}
     </section>
   );
 };
-
-//  CREATE ACTIVELINK COMPONENT AND PASS IN PROPS LIKE TEXTNAME, CHILDREN AND EXTEND STYLEPROPS
 
 export default NavList;
