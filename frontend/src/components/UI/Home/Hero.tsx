@@ -8,11 +8,11 @@ const Hero = () => {
         max-w-[500px] min-h-[12rem]
         md:max-w-[570px] md:min-h-[13rem] 
         lg:max-w-[675px] lg:min-h-[17rem]
-        overflow-hidden`}
+       `}
     >
       <section
         className={`flex flex-col gap-[1px] text-[2rem] md:text-[2.75rem] lg:text-[3.5rem] relative
-            !leading-tight`}
+            !leading-tight text-shadow-lg shadow-white`}
       >
         <h2>CREATE</h2>
         <h2>CONNECT</h2>

@@ -1,5 +1,6 @@
 import type { Config } from 'tailwindcss';
 const { fontFamily } = require('tailwindcss/defaultTheme');
+import plugin from 'tailwindcss/plugin';
 
 const config = {
   darkMode: ['class'],
@@ -83,9 +84,26 @@ const config = {
         ocr: ['var(--font-ocr)', 'sans-serif'],
         montserrat: ['var(--font-montserrat)', 'sans-serif'],
       },
+      textShadow: {
+        sm: '0 .07rem .125rem var(--tw-shadow-color)',
+        DEFAULT: '0 .125rem .25rem var(--tw-shadow-color)',
+        lg: '0 .25rem 1rem var(--tw-shadow-color)',
+      },
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [
+    require('tailwindcss-animate'),
+    plugin(function ({ matchUtilities, theme }) {
+      matchUtilities(
+        {
+          'text-shadow': (value: string) => ({
+            textShadow: value,
+          }),
+        },
+        { values: theme('textShadow') }
+      );
+    }),
+  ],
 } satisfies Config;
 
 export default config;

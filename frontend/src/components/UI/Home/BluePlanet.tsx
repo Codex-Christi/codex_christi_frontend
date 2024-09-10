@@ -11,7 +11,7 @@ const BluePlanet = () => {
       className={`w-[80%] max-w-[550px] h-[8.5rem] right-[-4rem] top-[-1.25rem]
         md:w-[65%] md:max-w-[500px] md:h-[9rem] md:right-[-4.5rem]
         lg:w-[35%] lg:max-w-[470px] lg:h-[200px] lg:right-0 lg:top-[-.1rem]
-        absolute z-[-1]  `}
+        absolute z-[-1] `}
     />
   );
 };

@@ -6,7 +6,7 @@ export default function Home() {
     <>
       <BluePlanet />
 
-      <main className='w-full max-w-full'>
+      <main className='w-full max-w-full pb-10'>
         <HomePageComponent />
       </main>
     </>

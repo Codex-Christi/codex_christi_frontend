@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
 import { Montserrat } from 'next/font/google';
@@ -26,16 +26,21 @@ export const metadata: Metadata = {
   description: 'A Hub for Christian Creatives',
 };
 
+export const viewport: Viewport = {
+  minimumScale: 1,
+  width: 'device-width',
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang='en' className='!overflow-x-hidden'>
+    <html lang='en' className='!overflow-x-hidden !overflow-y-auto !w-screen'>
       <body
         className={cn(
-          ` font-nico bg-black text-white !overflow-x-hidden !overflow-y-auto w-full min-h-screen !relative `,
+          ` font-nico bg-black text-white !max-w-full !overflow-x-hidden `,
           nicoMoji.variable,
           OCR_ext.variable,
           MontserratFont.variable

@@ -2,6 +2,7 @@
 import { FC } from 'react';
 import Image from 'next/image';
 import { MouseEvent } from 'react';
+import Link from 'next/link';
 
 // Main Component
 const Logo: FC<{ with_text?: boolean | undefined }> = ({ with_text }) => {
@@ -10,7 +11,7 @@ const Logo: FC<{ with_text?: boolean | undefined }> = ({ with_text }) => {
 
   // Main JSX
   return (
-    <section className='flex items-end'>
+    <Link href='/' className='flex items-end'>
       <Image
         priority
         width={112}
@@ -34,7 +35,7 @@ const Logo: FC<{ with_text?: boolean | undefined }> = ({ with_text }) => {
           <span>Christi</span>
         </span>
       )}
-    </section>
+    </Link>
   );
 };
 
