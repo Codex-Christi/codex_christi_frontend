@@ -20,8 +20,8 @@ const Hero = () => {
       </section>
 
       <Image
-        objectFit='cover'
         fill
+        style={{ objectFit: 'cover' }}
         alt='Hero Logo Image'
         src='/media/img/general/logo-main.svg'
         className={`!w-[12rem] md:!w-[18rem] lg:!w-[22rem] !left-[unset] !r-0`}
