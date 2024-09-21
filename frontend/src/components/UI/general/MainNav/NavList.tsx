@@ -1,3 +1,5 @@
+'use client';
+
 import ActiveLink from './ActiveLink';
 
 export const navListArr = [
@@ -9,14 +11,19 @@ export const navListArr = [
 ] as const;
 
 const NavList = () => {
+  // Main JSX
   return (
-    <section
-      className={`hidden md:flex md:gap-6 lg:gap-[2rem] text-[1.05rem] !font-montserrat font-bold`}
-    >
-      {navListArr.map((linkText: (typeof navListArr)[number]) => (
-        <ActiveLink linkText={linkText} key={linkText} href={linkText} />
-      ))}
-    </section>
+    <>
+      {
+        <section
+          className={`flex lg:gap-[2rem] text-[1.05rem] !font-montserrat font-bold`}
+        >
+          {navListArr.map((linkText: (typeof navListArr)[number]) => (
+            <ActiveLink linkText={linkText} key={linkText} href={linkText} />
+          ))}
+        </section>
+      }
+    </>
   );
 };
 

@@ -4,9 +4,9 @@ import BluePlanet from '@/components/UI/Home/BluePlanet';
 export default function Home() {
   return (
     <>
-      <BluePlanet />
+      <main className='w-full max-w-full !min-h-[100vh] pb-10 !overflow-x-hidden relative'>
+        <BluePlanet />
 
-      <main className='w-full max-w-full pb-10'>
         <HomePageComponent />
       </main>
     </>

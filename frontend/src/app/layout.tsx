@@ -40,10 +40,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang='en' className='!overflow-x-hidden !overflow-y-auto !w-screen'>
+    <html lang='en' className='!overflow-x-hidden !overflow-y-auto '>
+      {/* !w-screen */}
       <body
         className={cn(
-          ` font-nico bg-black text-white !max-w-full !overflow-x-hidden `,
+          ` font-montserrat bg-black text-white !max-w-full !overflow-x-hidden antialiased`,
           nicoMoji.variable,
           OCR_ext.variable,
           MontserratFont.variable

@@ -21,7 +21,7 @@ const ActiveLink: FC<ActiveLinkInterface> = (props) => {
           ? 'flex items-center gap-1'
           : 'flex items-center '
       }
-      ${linkText === 'community' ? 'md:!hidden lg:!flex' : ''}
+      ${linkText === 'community' ? 'lg:!flex' : ''}
       ${linkText === 'shop' ? 'bg-white text-black py-1 px-2 rounded-md' : ''}
      `} // end of className
       href={href}
