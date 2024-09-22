@@ -4,6 +4,8 @@ import Image from 'next/image';
 const BluePlanet = () => {
   return (
     <Image
+      priority={false}
+      loading='lazy'
       alt='Blue Planet'
       height={0}
       width={0}

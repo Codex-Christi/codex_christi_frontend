@@ -1,28 +1,69 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import ActiveLink from './ActiveLink';
 
 export const navListArr = [
-  'feed',
-  'community',
-  'messages',
-  'live',
-  'shop',
+  { linkText: 'Home', href: '/' },
+  { linkText: 'Podcasts', href: '/podcasts' },
+  { linkText: 'Community', href: '/community' },
+  { linkText: 'ABOUT US', href: '/about-us' },
+  { linkText: 'DONATE', href: '/donate' },
+  { linkText: 'SHOP', href: '/shop' },
+  { linkText: 'FREELANCING', href: '/freelancing' },
 ] as const;
 
 const NavList = () => {
+  // Hooks
+
+  // State values
+  // const [navListMobileWidth, setNavListMobileWidth] = useState<number>();
+
+  // Refs
+  const firstSectionRef = useRef<HTMLElement>(null);
+
+  // useEffects
+  // useEffect(() => {
+  //   const childrenHeights: number[] = [];
+
+  //   if (firstSectionRef.current) {
+  //     Array.from(firstSectionRef.current.children).map((child) =>
+  //       childrenHeights.push(child.scrollWidth)
+  //     );
+  //   }
+
+  //   setNavListMobileWidth(Math.max(...childrenHeights));
+  // }, []);
+
+  // Values
+  // const width = navListMobileWidth ? `${navListMobileWidth + 10}px` : '100%';
+
   // Main JSX
   return (
     <>
-      {
-        <section
-          className={`flex lg:gap-[2rem] text-[1.05rem] !font-montserrat font-bold`}
-        >
-          {navListArr.map((linkText: (typeof navListArr)[number]) => (
-            <ActiveLink linkText={linkText} key={linkText} href={linkText} />
-          ))}
-        </section>
-      }
+      <section
+        ref={firstSectionRef}
+        className={`flex flex-col lg:flex-row !font-montserrat  w-[]70px] lg:w-auto mx-auto lg:mx-0
+            text-[1.6rem] gap-8 pb-12 border-white/80 border-b
+            lg:text-[1rem] lg:gap-6 lg:pb-0 lg:border-none
+            `}
+      >
+        {navListArr.slice(0, 5).map((linkObj, index) => {
+          const { linkText, href } = linkObj;
+
+          return (
+            <ActiveLink
+              linkText={linkText}
+              key={linkText}
+              href={href}
+              index={index}
+            />
+          );
+        })}
+      </section>
+
+      {/* // Freelance and Shop section */}
+      <section></section>
     </>
   );
 };

@@ -3,32 +3,63 @@
 import Link, { LinkProps } from 'next/link';
 import { FC, ReactNode } from 'react';
 import { navListArr } from './NavList';
-import { BsCaretRightFill } from 'react-icons/bs';
+import { BsCaretLeftFill, BsCaretDownFill } from 'react-icons/bs';
+import useResponsiveSSR from '@/lib/useResponsiveSSR';
 
 interface ActiveLinkInterface extends LinkProps {
+  index: number;
   children?: ReactNode;
-  linkText: (typeof navListArr)[number];
+  linkText: (typeof navListArr)[number]['linkText'];
 }
 
 const ActiveLink: FC<ActiveLinkInterface> = (props) => {
+  // Hooks
+  const { isDesktopOnly } = useResponsiveSSR();
+
   // Props Destructuring
-  const { children, href, linkText } = props;
+  const { children, href, linkText, index } = props;
 
   return (
     <Link
       className={`${
-        linkText === 'live' || linkText === 'shop'
+        linkText === 'ABOUT US' ||
+        linkText === 'SHOP' ||
+        linkText === 'FREELANCING'
           ? 'flex items-center gap-1'
           : 'flex items-center '
+      } 
+
+      ${linkText === 'SHOP' ? 'bg-white text-black py-1 px-2 rounded-md' : ''}
+
+      ${
+        linkText === 'DONATE' &&
+        ' px-[1.3rem] py-3.5 lg:px-1.5 lg:py-1 border-white border-[1.5px] rounded-2xl lg:rounded-lg'
       }
-      ${linkText === 'community' ? 'lg:!flex' : ''}
-      ${linkText === 'shop' ? 'bg-white text-black py-1 px-2 rounded-md' : ''}
-     `} // end of className
-      href={href}
+
+      ${
+        index >= 3 && index <= 7
+          ? 'font-bold text-white'
+          : 'font-semibold text-white/70'
+      }
+
+      lg:ml-0 lg:text-center mx-auto
+
+     `}
+      //
+      // end of className
+      //
+      href={href.toString().toLowerCase()}
     >
-      {linkText.toLocaleUpperCase()}
-      {linkText === 'live' && <BsCaretRightFill />}
-      {linkText === 'shop' && (
+      {linkText === 'ABOUT US' && !isDesktopOnly && (
+        <BsCaretLeftFill className='!h-[45%]' />
+      )}
+      {/* ↑↑↑↑ Caret for Mobiles only ↑↑↑↑ */}
+      {linkText} {/* ⟸⟸⟸⟸ the Text of each Link */}
+      {linkText === 'ABOUT US' && isDesktopOnly && (
+        <BsCaretDownFill className='!h-[45%]' />
+      )}
+      {/* ↑↑↑↑ Caret for Desktop only ↑↑↑↑ */}
+      {linkText === 'SHOP' && (
         <svg
           xmlns='http://www.w3.org/2000/svg'
           width='20.796'
@@ -47,7 +78,6 @@ const ActiveLink: FC<ActiveLinkInterface> = (props) => {
           </g>
         </svg>
       )}
-
       {/* If any extra children, render here */}
       {children}
     </Link>
