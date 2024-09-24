@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { FC } from 'react';
 import ActiveLink from './ActiveLink';
 
 export const navListArr = [
@@ -13,36 +13,19 @@ export const navListArr = [
   { linkText: 'FREELANCING', href: '/freelancing' },
 ] as const;
 
-const NavList = () => {
+const NavList: FC = () => {
   // Hooks
 
   // State values
-  // const [navListMobileWidth, setNavListMobileWidth] = useState<number>();
 
   // Refs
-  const firstSectionRef = useRef<HTMLElement>(null);
 
   // useEffects
-  // useEffect(() => {
-  //   const childrenHeights: number[] = [];
-
-  //   if (firstSectionRef.current) {
-  //     Array.from(firstSectionRef.current.children).map((child) =>
-  //       childrenHeights.push(child.scrollWidth)
-  //     );
-  //   }
-
-  //   setNavListMobileWidth(Math.max(...childrenHeights));
-  // }, []);
-
-  // Values
-  // const width = navListMobileWidth ? `${navListMobileWidth + 10}px` : '100%';
 
   // Main JSX
   return (
     <>
       <section
-        ref={firstSectionRef}
         className={`flex flex-col lg:flex-row !font-montserrat  w-[]70px] lg:w-auto mx-auto lg:mx-0
             text-[1.6rem] gap-8 pb-12 border-white/80 border-b
             lg:text-[1rem] lg:gap-6 lg:pb-0 lg:border-none
