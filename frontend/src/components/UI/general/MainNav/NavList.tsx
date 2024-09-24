@@ -26,9 +26,9 @@ const NavList: FC = () => {
   return (
     <>
       <section
-        className={`flex flex-col lg:flex-row !font-montserrat  w-[]70px] lg:w-auto mx-auto lg:mx-0
-            text-[1.6rem] gap-8 pb-12 border-white/80 border-b
-            lg:text-[1rem] lg:gap-6 lg:pb-0 lg:border-none
+        className={`flex flex-col lg:flex-row !font-montserrat  w-full max-w-[200px] lg:w-auto mx-auto lg:mx-0
+            text-[1.4rem] gap-7 pb-8 border-white/80 border-b border-r-0 pr-0
+            lg:text-[1rem] lg:gap-6 lg:pb-0 lg:border-b-0 lg:border-r lg:pr-[2.5rem]
             `}
       >
         {navListArr.slice(0, 5).map((linkObj, index) => {
@@ -46,7 +46,25 @@ const NavList: FC = () => {
       </section>
 
       {/* // Freelance and Shop section */}
-      <section></section>
+      <section
+        className={`flex flex-col lg:flex-row !font-montserrat    
+            text-[1.4rem] gap-7 w-full mx-auto mt-8
+            lg:text-[1rem] lg:gap-6 lg:w-auto lg:mx-0 lg:mt-0
+            `}
+      >
+        {navListArr.slice(5).map((linkObj, index) => {
+          const { linkText, href } = linkObj;
+
+          return (
+            <ActiveLink
+              linkText={linkText}
+              key={linkText}
+              href={href}
+              index={index}
+            />
+          );
+        })}
+      </section>
     </>
   );
 };

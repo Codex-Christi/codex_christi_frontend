@@ -19,8 +19,9 @@ const MainNav: FC = () => {
     <>
       <nav
         role='navigation'
-        className={`!z-[99] absolute top-[0] flex w-full py-2 px-5 justify-between items-center
-    !bg-transparent !text-white !select-none`}
+        className={`!z-[99] absolute top-[0] flex w-full pt-8 px-6 md:px-8 lg:py-2 lg:px-0 
+          justify-between lg:justify-around items-center !bg-transparent
+           !text-white !select-none`}
       >
         <Logo with_text />
         {/* Mobile Hamburger */}
