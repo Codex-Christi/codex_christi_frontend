@@ -25,20 +25,20 @@ export const metadata: Metadata = {
   title: 'Codex Christi',
   description: 'A Hub for Christian Creatives',
 
-  icons: {
-    icon: [
-      {
-        media: '(prefers-color-scheme: light)',
-        url: '/media/favicons/favicon-light-mode.ico',
-        href: '/media/favicons/favicon-light-mode.ico',
-      },
-      {
-        media: '(prefers-color-scheme: dark)',
-        url: '/media/favicons/favicon-dark-mode.ico',
-        href: '/media/favicons/favicon-dark-mode.ico',
-      },
-    ],
-  },
+  // icons: {
+  //   icon: [
+  //     {
+  //       media: '(prefers-color-scheme: light)',
+  //       url: '/media/favicons/favicon-light-mode.ico',
+  //       href: '/media/favicons/favicon-light-mode.ico',
+  //     },
+  //     {
+  //       media: '(prefers-color-scheme: dark)',
+  //       url: '/media/favicons/favicon-dark-mode.ico',
+  //       href: '/media/favicons/favicon-dark-mode.ico',
+  //     },
+  //   ],
+  // },
 };
 
 export const viewport: Viewport = {
