@@ -26,9 +26,9 @@ const NavList: FC = () => {
   return (
     <>
       <section
-        className={`flex flex-col lg:flex-row !font-montserrat  w-full max-w-[200px] lg:w-auto mx-auto lg:mx-0
-            text-[1.4rem] gap-7 pb-8 border-white/80 border-b border-r-0 pr-0
-            lg:text-[1rem] lg:gap-6 lg:pb-0 lg:border-b-0 lg:border-r lg:pr-[2.5rem]
+        className={`flex flex-col lg:flex-row !font-montserrat mx-auto lg:mx-0
+            text-[1.4rem] gap-7 pb-8 border-white/80 border-b border-r-0 pr-0  w-full max-w-[200px]
+            lg:text-[1rem] lg:gap-6 lg:pb-0 lg:border-b-0 lg:border-r lg:pr-[2.5rem] lg:w-auto lg:max-w-max 
             `}
       >
         {navListArr.slice(0, 5).map((linkObj, index) => {
