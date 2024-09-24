@@ -8,6 +8,7 @@ import {
   DrawerTitle,
   DrawerDescription,
 } from '@/components/ui/drawer';
+import { BsCaretLeftFill } from 'react-icons/bs';
 import useResponsiveSSR from '@/lib/useResponsiveSSR';
 import NavList from './NavList';
 
@@ -42,6 +43,11 @@ const SideDrawer: FC<SideDrawerInterface> = ({
             <DrawerTitle className='!invisible'>
               <DrawerDescription>Fixed the warning</DrawerDescription>
             </DrawerTitle>
+
+            <DrawerClose className=' ml-6 mt-2 mb-4 text-[2.5rem]'>
+              <BsCaretLeftFill />
+            </DrawerClose>
+
             {/* ...... */}
             <NavList />
 
