@@ -34,3 +34,44 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+
+#Django gitignore
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+develop-eggs/
+sdist/
+wheels/
+.eggs/
+
+# Environments
+.env
+.venv
+venv/
+ENV/
+env/
+Lib/
+bin/
+Include/
+Scripts/
+.tox/
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+static/
+
+# IDE-specific files
+.idea/
+.vscode/
