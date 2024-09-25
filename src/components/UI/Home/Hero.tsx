@@ -21,6 +21,7 @@ const Hero = () => {
 
       <Image
         fill
+        priority
         style={{ objectFit: 'cover' }}
         alt='Hero Logo Image'
         src='/media/img/general/logo-main.svg'

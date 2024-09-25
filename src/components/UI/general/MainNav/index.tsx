@@ -26,6 +26,8 @@ const MainNav: FC = () => {
         <Logo with_text />
         {/* Mobile Hamburger */}
         <button
+          name='Mobile hamburger button'
+          aria-label='Mobile hamburger button'
           onClick={() => {
             setIsSideDrawerOpen((state) => !state);
           }}

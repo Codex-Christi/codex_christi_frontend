@@ -1,6 +1,7 @@
 import { FC } from 'react';
 import Hero from './Hero';
-import CometsContainer from './Comets';
+import dynamic from 'next/dynamic';
+const CometsContainer = dynamic(() => import('./Comets'), { ssr: false });
 import WaitlistButton from './WaitlistButton';
 
 const Home: FC = () => {
