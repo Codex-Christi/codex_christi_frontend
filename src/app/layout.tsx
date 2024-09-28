@@ -6,7 +6,6 @@ import { Montserrat } from 'next/font/google';
 import { cn } from '@/lib/utils';
 
 // Components Import
-import MainNav from '@/components/UI/general/MainNav';
 
 const nicoMoji = localFont({
   src: '../res/fonts/Nico-Moji.woff',
@@ -43,8 +42,6 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   initialScale: 1,
-  // minimumScale: 1,
-  maximumScale: 1,
   viewportFit: 'cover',
   width: 'device-width',
 };
@@ -65,7 +62,6 @@ export default function RootLayout({
           MontserratFont.variable
         )}
       >
-        <MainNav />
         {children}
       </body>
     </html>

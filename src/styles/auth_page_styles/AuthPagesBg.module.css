@@ -1,0 +1,11 @@
+.auth_page_bg {
+  background-image: url('/media/img/auth_pages/signup_bg_mobile.jpg');
+  background-image: -webkit-image-set(
+    url('/media/img/auth_pages/signup_bg_mobile.avif') type('image/avif')
+      url('/media/img/auth_pages/signup_bg_mobile.jpg') type('image/jpeg')
+  );
+  background-image: image-set(
+    url('/media/img/auth_pages/signup_bg_mobile.avif') type('image/avif')
+      url('/media/img/auth_pages/signup_bg_mobile.jpg') type('image/jpeg')
+  );
+}
