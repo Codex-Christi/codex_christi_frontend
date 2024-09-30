@@ -1,11 +1,38 @@
 .auth_page_bg {
-  background-image: url('/media/img/auth_pages/signup_bg_mobile.jpg');
-  background-image: -webkit-image-set(
-    url('/media/img/auth_pages/signup_bg_mobile.avif') type('image/avif')
-      url('/media/img/auth_pages/signup_bg_mobile.jpg') type('image/jpeg')
-  );
+  background-color: #000008;
+  background-image: url('/media/img/auth_pages/signup_bg_mobile.png');
   background-image: image-set(
-    url('/media/img/auth_pages/signup_bg_mobile.avif') type('image/avif')
-      url('/media/img/auth_pages/signup_bg_mobile.jpg') type('image/jpeg')
+    url('/media/img/auth_pages/signup_bg_mobile.avif') type('image/avif'),
+    url('/media/img/auth_pages/signup_bg_mobile.png') type('image/png')
   );
+  min-height: 100vh;
+  background-position: right top 15px;
+  background-size: 150% 100%;
+  background-repeat: no-repeat;
+}
+
+/* Tablets */
+@media (min-width: 768px) {
+  .auth_page_bg {
+    background-image: url('/media/img/auth_pages/signup_bg_tablet.png');
+    background-image: image-set(
+      url('/media/img/auth_pages/signup_bg_tablet.avif') type('image/avif'),
+      url('/media/img/auth_pages/signup_bg_tablet.png') type('image/png')
+    );
+    background-position: right top -25px;
+    background-size: 95% 125%;
+  }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  .auth_page_bg {
+    background-image: url('/media/img/auth_pages/signup_bg_desktop.png');
+    background-image: image-set(
+      url('/media/img/auth_pages/signup_bg_desktop.avif') type('image/avif'),
+      url('/media/img/auth_pages/signup_bg_desktop.png') type('image/png')
+    );
+    background-position: unset !important;
+    background-size: cover !important;
+  }
 }

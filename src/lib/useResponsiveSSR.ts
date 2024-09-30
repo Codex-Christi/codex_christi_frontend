@@ -5,20 +5,20 @@ function useResponsiveSSR() {
   const [isClient, setIsClient] = useState(false);
 
   const isMobile = useMediaQuery({
-    maxWidth: '48em',
+    maxWidth: '767px',
   });
 
   const isTabletOnly = useMediaQuery({
-    minWidth: '48.1em',
-    maxWidth: '61.9em',
+    minWidth: '768px',
+    maxWidth: '1023px',
   });
 
   const isTabletAndAbove = useMediaQuery({
-    minWidth: '48em',
+    minWidth: '768px',
   });
 
   const isDesktopOnly = useMediaQuery({
-    minWidth: '62em',
+    minWidth: '1024px',
   });
 
   useLayoutEffect(() => {
