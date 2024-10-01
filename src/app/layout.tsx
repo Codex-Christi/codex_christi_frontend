@@ -4,6 +4,7 @@ import './globals.css';
 import { Montserrat } from 'next/font/google';
 
 import { cn } from '@/lib/utils';
+import { headers } from 'next/headers';
 
 // Components Import
 
@@ -21,6 +22,8 @@ const MontserratFont = Montserrat({
 });
 
 export const metadata: Metadata = {
+  // dynamically get the host from the Next headers
+  metadataBase: new URL(`https://${headers().get('host')}`),
   title: 'Codex Christi',
   description: 'A Hub for Christian Creatives',
 };
