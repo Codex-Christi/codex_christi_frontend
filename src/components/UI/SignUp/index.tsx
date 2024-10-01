@@ -1,10 +1,11 @@
 import { FC } from 'react';
 import AuthPagesBGWrapper from '../general/auth_pages/AuthPagesBGWrapper';
+import FormContainer from './FormContainer';
 
 const SignUpMainComponent: FC = () => {
   return (
     <AuthPagesBGWrapper>
-      <h1>Sign up</h1>
+      <FormContainer />
     </AuthPagesBGWrapper>
   );
 };
