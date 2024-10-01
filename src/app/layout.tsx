@@ -21,12 +21,14 @@ const MontserratFont = Montserrat({
   variable: '--font-montserrat',
 });
 
-export const metadata: Metadata = {
-  // dynamically get the host from the Next headers
-  metadataBase: new URL(`https://${headers().get('host')}`),
-  title: 'Codex Christi',
-  description: 'A Hub for Christian Creatives',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    // dynamically get the host from the Next headers
+    metadataBase: new URL(`https://${headers().get('host')}`),
+    title: 'Codex Christi',
+    description: 'A Hub for Christian Creatives',
+  };
+}
 
 export const viewport: Viewport = {
   initialScale: 1,
