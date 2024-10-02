@@ -79,3 +79,17 @@ html,
 body {
   overflow: hidden !important;
 }
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  /* Revert text color */
+  -webkit-text-fill-color: white !important;
+  color: white !important;
+  caret-color: white !important;
+  background-color: transparent !important;
+
+  /* Revert background color */
+  transition: background-color 5000s ease-in-out 0s;
+}

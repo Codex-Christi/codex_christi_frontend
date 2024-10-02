@@ -1,14 +1,10 @@
-'use client';
-
 import HomePageComponent from '@/components/UI/Home';
 import BluePlanet from '@/components/UI/Home/BluePlanet';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
-import useTheme from '@/lib/useThemeChange';
 
 // Main Page / page-specific component
 export default function Home() {
   // Hooks
-  useTheme();
 
   // Main JSX
   return (

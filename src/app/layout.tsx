@@ -2,11 +2,11 @@ import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
 import { Montserrat } from 'next/font/google';
-
 import { cn } from '@/lib/utils';
 import { headers } from 'next/headers';
 
 // Components Import
+import FaviconUpdater from '@/components/UI/general/Helpers/FaviconUpdater';
 
 const nicoMoji = localFont({
   src: '../res/fonts/Nico-Moji.woff',
@@ -54,6 +54,7 @@ export default function RootLayout({
           MontserratFont.variable
         )}
       >
+        <FaviconUpdater />
         {children}
       </body>
     </html>

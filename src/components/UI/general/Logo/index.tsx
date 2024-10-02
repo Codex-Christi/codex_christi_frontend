@@ -4,14 +4,19 @@ import Image from 'next/image';
 import { MouseEvent } from 'react';
 import Link from 'next/link';
 
+interface LogoInterface {
+  with_text?: boolean | undefined;
+  className?: string;
+}
+
 // Main Component
-const Logo: FC<{ with_text?: boolean | undefined }> = ({ with_text }) => {
+const Logo: FC<LogoInterface> = ({ with_text, className }) => {
   // Props
   const needs_text = with_text === true || undefined ? true : false;
 
   // Main JSX
   return (
-    <Link href='/' className='flex items-end'>
+    <Link href='/' className={`flex items-end ${className}`}>
       <Image
         priority
         width={91}

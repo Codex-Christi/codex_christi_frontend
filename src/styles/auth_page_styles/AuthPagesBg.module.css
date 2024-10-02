@@ -9,10 +9,13 @@
   background-position: right top 15px;
   background-size: 150% 100%;
   background-repeat: no-repeat;
+  margin-top: 0px !important;
+  display: block !important;
+  position: relative !important;
 }
 
-/* Tablets */
-@media (min-width: 768px) {
+/* Phablets and Tablets  */
+@media (min-width: 640px) {
   .auth_page_bg {
     background-image: url('/media/img/auth_pages/signup_bg_tablet.png');
     background-image: image-set(
