@@ -6,7 +6,7 @@ const FormContainer: FC = () => {
   return (
     <>
       <section
-        className='pt-8 mx-auto flex flex-col gap-6
+        className='mx-auto flex flex-col gap-6 -mt-[90px] !select-none
         w-[83%] max-w-[385px]
         sm:w-[73%] sm:max-w-[430px]
         md:w-[53%] md:max-w-[440px]

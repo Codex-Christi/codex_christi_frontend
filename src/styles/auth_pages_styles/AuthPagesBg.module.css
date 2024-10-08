@@ -10,7 +10,10 @@
   background-size: 150% 100%;
   background-repeat: no-repeat;
   margin-top: 0px !important;
-  display: block !important;
+  display: flex !important;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
   position: relative !important;
 }
 

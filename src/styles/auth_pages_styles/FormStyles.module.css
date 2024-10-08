@@ -1,0 +1,64 @@
+/* First fields setdefault class */
+.firstFormFieldSet {
+  position: relative;
+  flex-grow: 1 !important;
+  min-width: -webkit-fill-available !important;
+  min-width: -moz-available !important;
+  /* display: block; */
+}
+/* Second fields set default class */
+.secondFormFieldSetHiddenState {
+  position: relative;
+  flex-grow: 1 !important;
+  min-width: -webkit-fill-available !important;
+  min-width: -moz-available !important;
+  left: 40vw;
+}
+
+/* Sencond fields set when revealed */
+.secondFormFieldSetVisibleState {
+  position: relative;
+  flex-grow: 1 !important;
+  min-width: -webkit-fill-available !important;
+  min-width: -moz-available !important;
+  left: 0;
+}
+
+/* Move out first fields sets left */
+.moveOutFirstFieldsSetLeft {
+  animation: disappearFirstFieldSet 0.25s linear;
+}
+
+/* Bring in second fields sets */
+.bringInSecondFieldSetsLeft {
+  animation: appearSecondFieldSet 0.25s linear;
+}
+
+/* Disappear first fields set */
+@keyframes disappearFirstFieldSet {
+  0% {
+    left: 0;
+  }
+  50% {
+    left: -20vw;
+  }
+  99% {
+    left: -40vw;
+  }
+  100% {
+    display: none;
+  }
+}
+
+/* Appear second fields sets */
+@keyframes appearSecondFieldSet {
+  0% {
+    left: 40vw;
+  }
+  50% {
+    left: 20vw;
+  }
+  100% {
+    left: 0;
+  }
+}
