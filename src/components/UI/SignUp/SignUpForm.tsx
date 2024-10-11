@@ -7,20 +7,24 @@ import {
   signUpFormSchema,
   SignUpFormSchemaType,
 } from '@/lib/formSchemas/signUpFormSchema';
-import { Button } from '@/components/ui/button';
-import { EmailInput, NameInput } from './FormFields';
-import { RxCaretRight } from 'react-icons/rx';
+import { useCallback, useRef } from 'react';
+import { ContinueButton, SubmitButton } from './FormActionButtons';
+import { EmailInput, NameInput, PasswordInput } from './FormFields';
 
 // Styles import
 import styles from '@/styles/auth_pages_styles/FormStyles.module.css';
-import { useCallback, useRef } from 'react';
-import { ContinueButton, SubmitButton } from './FormActionButtons';
 
 const SignUpForm = () => {
   // Define form
   const signupZodForm = useForm<SignUpFormSchemaType>({
     resolver: zodResolver(signUpFormSchema),
-    defaultValues: { firstname: '', lastname: '' },
+    defaultValues: {
+      firstname: '',
+      lastname: '',
+      email: '',
+      password: '',
+      confirm_password: '',
+    },
     mode: 'all',
     reValidateMode: 'onBlur',
   });
@@ -113,8 +117,14 @@ const SignUpForm = () => {
           {/* Email Input*/}
           <EmailInput currentZodForm={signupZodForm} inputName='email' />
 
-          {/* Last Name Input*/}
-          {/* <NameInput currentZodForm={signupZodForm} inputName='lastname' /> */}
+          {/* First Password Input*/}
+          <PasswordInput currentZodForm={signupZodForm} inputName='password' />
+
+          {/* Confirm Password Input*/}
+          <PasswordInput
+            currentZodForm={signupZodForm}
+            inputName='confirm_password'
+          />
 
           <SubmitButton textValue={'Continue'} />
         </div>

@@ -25,7 +25,17 @@ interface NameInputInterface {
   currentZodForm: zodFormType;
 }
 
-// Name Inputs
+interface EmailInputProps {
+  inputName: 'email';
+  currentZodForm: zodFormType;
+}
+
+interface PasswordInputProps {
+  inputName: 'password' | 'confirm_password';
+  currentZodForm: zodFormType;
+}
+
+// Name Input
 export const NameInput: FC<NameInputInterface> = (props) => {
   //   Props
 
@@ -62,12 +72,7 @@ export const NameInput: FC<NameInputInterface> = (props) => {
   );
 };
 
-interface EmailInputProps {
-  inputName: 'email';
-  currentZodForm: zodFormType;
-}
-
-// Email Inputs
+// Email Input
 export const EmailInput: FC<EmailInputProps> = (props) => {
   // Props
   const { inputName, currentZodForm } = props;
@@ -94,3 +99,44 @@ export const EmailInput: FC<EmailInputProps> = (props) => {
     />
   );
 };
+
+// Password Input
+
+export const PasswordInput: FC<PasswordInputProps> = (props) => {
+  // Props
+  const { currentZodForm, inputName } = props;
+
+  // Bools
+  const isConfirmPaswwordField = inputName === 'confirm_password';
+
+  // Main JSX
+  return (
+    <FormField
+      control={currentZodForm.control}
+      name={inputName}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel className='text-white'>
+            {isConfirmPaswwordField ? 'Confirm Password' : 'Password'}
+          </FormLabel>
+          <FormControl>
+            <Input
+              className={`bg-transparent border border-white focus:!border-none focus:!outline-0
+                    focus-visible:!ring-0 autofill:!bg-transparent rounded-3xl !mt-0 placeholder:!text-white/75`}
+              placeholder={
+                isConfirmPaswwordField
+                  ? 'Confirm Password'
+                  : 'Enter your password'
+              }
+              {...field}
+              type='password'
+            />
+          </FormControl>
+          <CustomFormMessage className='text-red-400' />
+        </FormItem>
+      )}
+    />
+  );
+};
+
+// CheckBox Input
