@@ -42,7 +42,7 @@ const LockIcon: React.FC<LockIconInterface> = (props) => {
   );
 };
 
-// Input With Icon Main
+// Input With Icon Main Component
 const InputWithIcon = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, startIcon, endIcon, iconProps = {}, ...props }, ref) => {
     const [show, setShow] = React.useState(false);
