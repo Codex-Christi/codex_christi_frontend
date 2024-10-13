@@ -6,15 +6,15 @@ import {
   FormItem,
   FormLabel,
 } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { FC } from 'react';
-import CustomFormMessage from '../general/auth_pages/forms/CustomFormMessage';
-import {
-  signUpFormSchema,
-  SignUpFormSchemaType,
-} from '@/lib/formSchemas/signUpFormSchema';
-import { useForm, UseFormReturn } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { InputWithIcon } from '@/components/UI/auth_pages/forms/InputWithIcon';
+import { FC, ReactNode } from 'react';
+import CustomFormMessage from '../auth_pages/forms/CustomFormMessage';
+import { SignUpFormSchemaType } from '@/lib/formSchemas/signUpFormSchema';
+import { UseFormReturn } from 'react-hook-form';
+import { Checkbox } from '@/components/ui/checkbox';
+
+// Styles
+import styles from '@/styles/auth_pages_styles/FormStyles.module.css';
 
 // General Types
 type zodFormType = UseFormReturn<SignUpFormSchemaType>;
@@ -33,6 +33,12 @@ interface EmailInputProps {
 interface PasswordInputProps {
   inputName: 'password' | 'confirm_password';
   currentZodForm: zodFormType;
+}
+
+interface CheckBoxInputProps {
+  name: 'terms_and_policy';
+  currentZodForm: zodFormType;
+  children?: ReactNode;
 }
 
 // Name Input
@@ -57,8 +63,8 @@ export const NameInput: FC<NameInputInterface> = (props) => {
             inPutNamePt1.charAt(0).toUpperCase() + inPutNamePt1.slice(1)
           }name`}</FormLabel>
           <FormControl>
-            <Input
-              className={`bg-transparent border border-white focus:!border-none focus:!outline-0
+            <InputWithIcon
+              className={`bg-transparent border border-white focus:!outline-0 
                     focus-visible:!ring-0 autofill:!bg-transparent rounded-3xl !mt-0 placeholder:!text-white/75`}
               placeholder={`Enter your ${inPutNamePt1} name...`}
               {...field}
@@ -86,8 +92,8 @@ export const EmailInput: FC<EmailInputProps> = (props) => {
         <FormItem>
           <FormLabel className='text-white'>Email</FormLabel>
           <FormControl>
-            <Input
-              className={`bg-transparent border border-white focus:!border-none focus:!outline-0
+            <InputWithIcon
+              className={`bg-transparent border border-white focus:!outline-0
                     focus-visible:!ring-0 autofill:!bg-transparent rounded-3xl !mt-0 placeholder:!text-white/75`}
               placeholder={`Enter your email`}
               {...field}
@@ -120,8 +126,8 @@ export const PasswordInput: FC<PasswordInputProps> = (props) => {
             {isConfirmPaswwordField ? 'Confirm Password' : 'Password'}
           </FormLabel>
           <FormControl>
-            <Input
-              className={`bg-transparent border border-white focus:!border-none focus:!outline-0
+            <InputWithIcon
+              className={`bg-transparent border border-white focus:!outline-0
                     focus-visible:!ring-0 autofill:!bg-transparent rounded-3xl !mt-0 placeholder:!text-white/75`}
               placeholder={
                 isConfirmPaswwordField
@@ -140,3 +146,39 @@ export const PasswordInput: FC<PasswordInputProps> = (props) => {
 };
 
 // CheckBox Input
+
+export const CheckBoxInput: FC<CheckBoxInputProps> = (props) => {
+  // Props
+  const { currentZodForm, name, children } = props;
+  const {
+    formState: { errors },
+  } = currentZodForm;
+  const { terms_and_policy: isThereError } = errors;
+
+  return (
+    <FormField
+      control={currentZodForm.control}
+      name={name}
+      render={({ field }) => (
+        <FormItem
+          className={`flex flex-row items-center gap-4 space-y-0 rounded-md py-1 ${
+            isThereError ? `${styles.shakeAnimation}` : ''
+          }`}
+        >
+          <FormControl>
+            <Checkbox
+              className={`w-[1.15rem] h-[1.15rem] ${
+                isThereError ? `border-red-400` : 'border-white'
+              }`}
+              checked={field.value}
+              onCheckedChange={field.onChange}
+            />
+          </FormControl>
+          <FormLabel className={`${isThereError && `text-red-400 `}`}>
+            {children}
+          </FormLabel>
+        </FormItem>
+      )}
+    />
+  );
+};

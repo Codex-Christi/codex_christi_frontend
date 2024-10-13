@@ -9,7 +9,12 @@ import {
 } from '@/lib/formSchemas/signUpFormSchema';
 import { useCallback, useRef } from 'react';
 import { ContinueButton, SubmitButton } from './FormActionButtons';
-import { EmailInput, NameInput, PasswordInput } from './FormFields';
+import {
+  CheckBoxInput,
+  EmailInput,
+  NameInput,
+  PasswordInput,
+} from './FormFields';
 
 // Styles import
 import styles from '@/styles/auth_pages_styles/FormStyles.module.css';
@@ -24,6 +29,7 @@ const SignUpForm = () => {
       email: '',
       password: '',
       confirm_password: '',
+      terms_and_policy: undefined,
     },
     mode: 'all',
     reValidateMode: 'onBlur',
@@ -125,6 +131,11 @@ const SignUpForm = () => {
             currentZodForm={signupZodForm}
             inputName='confirm_password'
           />
+
+          {/* Terms and Provacy Part */}
+          <CheckBoxInput currentZodForm={signupZodForm} name='terms_and_policy'>
+            I agree with the Terms and Privacy Policy
+          </CheckBoxInput>
 
           <SubmitButton textValue={'Continue'} />
         </div>

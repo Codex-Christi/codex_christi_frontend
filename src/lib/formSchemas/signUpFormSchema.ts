@@ -54,12 +54,9 @@ export const signUpFormSchema = z
         message:
           'Must also contain an uppercase letter, a number, and a symbol',
       }),
-    terms_and_policy: z
-      .boolean({
-        required_error: 'Accept terms and conditions to proceed',
-        invalid_type_error: 'Terms and Policy Must be a boolean',
-      })
-      .default(false),
+    terms_and_policy: z.literal(true).refine((val) => val === true, {
+      message: 'Accept terms and conditions to proceed',
+    }),
   })
   .refine((data) => data.password === data.confirm_password, {
     message: "Passwords don't match",
