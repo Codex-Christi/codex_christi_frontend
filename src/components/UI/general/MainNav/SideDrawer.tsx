@@ -9,7 +9,7 @@ import {
   DrawerDescription,
 } from '@/components/ui/drawer';
 import { BsCaretLeftFill } from 'react-icons/bs';
-import useResponsiveSSR from '@/lib/useResponsiveSSR';
+import useResponsiveSSR from '@/lib/hooks/useResponsiveSSR';
 import NavList from './NavList';
 
 // Interfaces

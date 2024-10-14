@@ -4,7 +4,7 @@ import Link, { LinkProps } from 'next/link';
 import { FC, ReactNode } from 'react';
 import { navListArr } from './NavList';
 import { BsCaretLeftFill, BsCaretDownFill } from 'react-icons/bs';
-import useResponsiveSSR from '@/lib/useResponsiveSSR';
+import useResponsiveSSR from '@/lib/hooks/useResponsiveSSR';
 
 interface ActiveLinkInterface extends LinkProps {
   index: number;

@@ -9,7 +9,7 @@ export const signUpFormSchema = z
       })
       .min(3, { message: 'Must be 3 or more characters long' })
       .trim()
-      .regex(/^[A-Za-zÀ-ÿ]+(?:[.'-]?[A-Za-zÀ-ÿ]+)*\s?$/gm, {
+      .regex(/^[A-Za-zÀ-ÖØ-öø-ÿ'\- ]{1,50}( [A-Za-zÀ-ÖØ-öø-ÿ'\- ]{1,50})?$/gm, {
         message: 'Invalid first name format.',
       }),
     lastname: z
@@ -19,7 +19,7 @@ export const signUpFormSchema = z
       })
       .min(3, { message: 'Must be 3 or more characters long' })
       .trim()
-      .regex(/^[A-Za-zÀ-ÿ]+(?:[.'-]?[A-Za-zÀ-ÿ]+)*\s?$/gm, {
+      .regex(/^[A-Za-zÀ-ÖØ-öø-ÿ'\- ]{1,50}( [A-Za-zÀ-ÖØ-öø-ÿ'\- ]{1,50})?$/gm, {
         message: 'Invalid last name format.',
       }),
     email: z

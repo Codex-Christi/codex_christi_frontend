@@ -53,7 +53,7 @@ const InputWithIcon = React.forwardRef<HTMLInputElement, InputProps>(
     if (type === 'password') {
       return (
         <div className='w-full relative'>
-          <div className='absolute left-2.5 top-1/2 transform -translate-y-1/2'>
+          <div className='absolute left-6 top-1/2 transform -translate-y-1/2'>
             <LockIcon
               size={18}
               className={cn('text-white/75', iconClassName)}
@@ -65,10 +65,11 @@ const InputWithIcon = React.forwardRef<HTMLInputElement, InputProps>(
             type={!show ? type : 'text'}
             className={cn(
               `flex h-10 w-full rounded-md border border-input bg-background py-2 
-              px-8 text-sm ring-offset-background file:border-0 file:bg-transparent 
+              px-14 text-sm ring-offset-background file:border-0 file:bg-transparent 
               file:text-sm file:font-medium focus-visible:outline-none 
-              focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:cursor-not-allowed 
-              disabled:opacity-50 ${className}`
+              focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0 
+              disabled:cursor-not-allowed disabled:opacity-50
+              } ${className}`
             )}
             ref={ref}
             {...props}
@@ -91,7 +92,7 @@ const InputWithIcon = React.forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className='w-full relative'>
         {StartIcon && (
-          <div className='absolute left-2.5 top-1/2 transform -translate-y-1/2'>
+          <div className='absolute left-6 top-1/2 transform -translate-y-1/2'>
             <StartIcon size={18} className='text-white/75' />
           </div>
         )}
@@ -102,7 +103,7 @@ const InputWithIcon = React.forwardRef<HTMLInputElement, InputProps>(
             text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm 
             file:font-medium focus-visible:outline-none focus-visible:ring-1 
             focus-visible:ring-ring focus-visible:ring-offset-0 disabled:cursor-not-allowed 
-            disabled:opacity-50 ${startIcon ? 'pl-8' : ''} ${
+            disabled:opacity-50 ${startIcon ? 'pl-14' : ''} ${
               endIcon ? 'pr-8' : ''
             } ${className}`
           )}

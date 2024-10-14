@@ -1,6 +1,6 @@
 'use client';
 
-import useTheme from '@/lib/useThemeChange';
+import useTheme from '@/lib/hooks/useThemeChange';
 
 const FaviconUpdater = () => {
   // Hooks

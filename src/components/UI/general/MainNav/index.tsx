@@ -4,7 +4,7 @@ import { FC, useState } from 'react';
 import Logo from '../Logo';
 import NavList from './NavList';
 import SideDrawer from './SideDrawer';
-import useResponsiveSSR from '@/lib/useResponsiveSSR';
+import useResponsiveSSR from '@/lib/hooks/useResponsiveSSR';
 
 // Main Nav Component
 const MainNav: FC = () => {
