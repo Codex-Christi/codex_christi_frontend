@@ -15,11 +15,15 @@ import {
   NameInput,
   PasswordInput,
 } from './FormFields';
+import { useRegularSignUp } from '@/lib/hooks/authHooks/useSignUp';
 
 // Styles import
 import styles from '@/styles/auth_pages_styles/FormStyles.module.css';
 
 const SignUpForm = () => {
+  // Hooks
+  const { signUp } = useRegularSignUp();
+
   // Define form
   const signupZodForm = useForm<SignUpFormSchemaType>({
     resolver: zodResolver(signUpFormSchema),
@@ -78,15 +82,25 @@ const SignUpForm = () => {
   }, [signupZodForm]);
 
   //   Signup form submit handler
-  const signUpFormSubmitHandler: SubmitHandler<SignUpFormSchemaType> = (
+  const signUpFormSubmitHandler: SubmitHandler<SignUpFormSchemaType> = async (
     fieldValues,
     event
   ) => {
     // Prevent default first
     event?.preventDefault();
-    const { firstname, lastname, email } = fieldValues;
+    const { firstname, lastname, email, password } = fieldValues;
 
-    alert(firstname.trim());
+    // Format names well
+
+    const userSendData = {
+      name: `${firstname.trim()} ${lastname.trim()}`,
+      email,
+      password,
+    };
+
+    const serverResponse = await signUp(userSendData);
+
+    console.log(serverResponse);
   };
 
   // Main JSX

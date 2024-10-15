@@ -31,11 +31,9 @@ export const useRegularSignUp = () => {
   const signUp = useCallback(async (userDetails: UserDataSendType) => {
     setLoginProcessState;
     try {
-      const signUpRes = await client
-        .post(`/users`, { ...userDetails })
-        .then((response: AxiosResponse<UserDataReturnType>) => response.data);
-
-      return signUpRes;
+      const signUpRes: AxiosResponse<UserDataReturnType, UserDataReturnType> =
+        await client.post(`/users`, { ...userDetails });
+      return signUpRes.data;
     } catch (err: AxiosError | any) {
       return err.message;
     }
