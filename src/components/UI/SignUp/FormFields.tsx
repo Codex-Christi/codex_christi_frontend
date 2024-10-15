@@ -5,13 +5,13 @@ import {
   FormField,
   FormItem,
   FormLabel,
-} from '@/components/ui/form';
+} from '@/components/UI/primitives/form';
 import { InputWithIcon } from '@/components/UI/auth_pages/forms/InputWithIcon';
 import { FC, ReactNode } from 'react';
 import CustomFormMessage from '../auth_pages/forms/CustomFormMessage';
 import { SignUpFormSchemaType } from '@/lib/formSchemas/signUpFormSchema';
 import { UseFormReturn } from 'react-hook-form';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Checkbox } from '@/components/UI/primitives/checkbox';
 import { IconType } from 'react-icons/lib';
 
 // Styles

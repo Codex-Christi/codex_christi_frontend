@@ -1,7 +1,9 @@
 import { useCallback, useState } from 'react';
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, AxiosResponse } from 'axios';
 
-const baseUrl = 'https://saintproject.onrender.com/api/v1';
+const client = axios.create({
+  baseURL: 'https://saintproject.onrender.com/api/v1',
+});
 
 // Types and Interfaces
 type UserDataSendType = { name: string; email: string; password: string };
@@ -27,13 +29,17 @@ export const useRegularSignUp = () => {
     useState<SignupHookInterface>(defaultSignUpProcessState);
 
   const signUp = useCallback(async (userDetails: UserDataSendType) => {
-    await axios
-      .post<UserDataReturnType>(`${baseUrl}/users`, {
-        ...userDetails,
-      })
-      .then((response) => response.data)
-      .catch((err: AxiosError | any) => err.message);
+    setLoginProcessState;
+    try {
+      const signUpRes = await client
+        .post(`/users`, { ...userDetails })
+        .then((response: AxiosResponse<UserDataReturnType>) => response.data);
+
+      return signUpRes;
+    } catch (err: AxiosError | any) {
+      return err.message;
+    }
   }, []);
 
-  return { ...loginProcessState };
+  return { ...loginProcessState, signUp };
 };

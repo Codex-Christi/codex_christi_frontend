@@ -1,4 +1,4 @@
-import { Button, ButtonProps } from '@/components/ui/button';
+import { Button, ButtonProps } from '@/components/UI/primitives/button';
 import { FC, MouseEventHandler } from 'react';
 import { RxCaretRight } from 'react-icons/rx';
 

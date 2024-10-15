@@ -7,7 +7,7 @@ import {
   DrawerContent,
   DrawerTitle,
   DrawerDescription,
-} from '@/components/ui/drawer';
+} from '@/components/UI/primitives/drawer';
 import { BsCaretLeftFill } from 'react-icons/bs';
 import useResponsiveSSR from '@/lib/hooks/useResponsiveSSR';
 import NavList from './NavList';

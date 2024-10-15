@@ -3,7 +3,7 @@
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
-import { useFormField } from '@/components/ui/form';
+import { useFormField } from '@/components/UI/primitives/form';
 
 const CustomFormMessage = React.forwardRef<
   HTMLParagraphElement,
