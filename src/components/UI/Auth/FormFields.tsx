@@ -10,6 +10,7 @@ import { InputWithIcon } from '@/components/UI/auth_pages/forms/InputWithIcon';
 import { FC, ReactNode } from 'react';
 import CustomFormMessage from '../auth_pages/forms/CustomFormMessage';
 import { SignUpFormSchemaType } from '@/lib/formSchemas/signUpFormSchema';
+import { signInSchemeType } from '@/lib/formSchemas/signInSchema';
 import { UseFormReturn } from 'react-hook-form';
 import { Checkbox } from '@/components/UI/primitives/checkbox';
 import { IconType } from 'react-icons/lib';
@@ -18,7 +19,7 @@ import { IconType } from 'react-icons/lib';
 import styles from '@/styles/auth_pages_styles/FormStyles.module.css';
 
 // General Types
-type zodFormType = UseFormReturn<SignUpFormSchemaType>;
+type zodFormType = UseFormReturn<SignUpFormSchemaType | signInSchemeType>;
 
 // Interfaces
 interface NameInputInterface {
@@ -130,7 +131,7 @@ export const NameInput: FC<NameInputInterface> = (props) => {
           <FormControl>
             <InputWithIcon
               startIcon={UserIcon}
-              className={`bg-transparent border border-white focus:!outline-0 
+              className={`bg-transparent border border-white focus:!outline-0
                     focus-visible:!ring-0 autofill:!bg-transparent rounded-3xl !mt-0 placeholder:!text-white/75`}
               placeholder={`Enter your ${inPutNamePt1} name...`}
               {...field}
