@@ -4,6 +4,7 @@ import './globals.css';
 import { Montserrat } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import { headers } from 'next/headers';
+import { Toaster } from '@/components/UI/primitives/toaster';
 
 // Components Import
 import FaviconUpdater from '@/components/UI/general/Helpers/FaviconUpdater';
@@ -55,6 +56,7 @@ export default function RootLayout({
         )}
       >
         <FaviconUpdater />
+        <Toaster />
         {children}
       </body>
     </html>
