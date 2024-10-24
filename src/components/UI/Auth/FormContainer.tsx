@@ -1,6 +1,7 @@
 import AuthPagesBGWrapper from "@/components/UI/auth_pages/AuthPagesBGWrapper";
 import Logo from "../general/Logo";
 import { FC } from "react";
+import CometsContainer from "../Home/Comets";
 
 interface IFormContainer {
 	children: React.ReactNode;
@@ -9,8 +10,10 @@ interface IFormContainer {
 const FormContainer: FC<IFormContainer> = ({ children }) => {
 	return (
 		<AuthPagesBGWrapper>
+            <CometsContainer />
+
 			<section
-				className="mx-auto flex flex-col gap-6 -mt-[90px] !select-none
+				className="mx-auto flex flex-col gap-6 !select-none
                 w-[83%] max-w-[385px]
                 sm:w-[73%] sm:max-w-[430px]
                 md:w-[53%] md:max-w-[440px]

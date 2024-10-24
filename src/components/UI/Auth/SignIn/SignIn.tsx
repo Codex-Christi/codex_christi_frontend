@@ -3,18 +3,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { Form } from "@/components/UI/primitives/form";
-import { signInSchema, signInSchemaType } from "@/lib/formSchemas/signInSchema";
+import { signInSchema, signInSchemeType } from "@/lib/formSchemas/signInSchema";
 import { EmailInput, PasswordInput } from "@/components/UI/Auth/FormFields";
 import { SubmitButton } from "@/components/UI/Auth/FormActionButtons";
-import { useLogin } from "@/lib/hooks/authHooks/useSignUp";
-
-// Styles import
-import styles from "@/styles/auth_pages_styles/FormStyles.module.css";
+import { useLogin } from '@/lib/hooks/authHooks/useLogin';
 
 const SignIn = () => {
 	const { login } = useLogin();
 
-	const signInForm = useForm<signInSchemaType>({
+	const signInForm = useForm<signInSchemeType>({
 		resolver: zodResolver(signInSchema),
 		defaultValues: {
 			email: "",
@@ -25,7 +22,7 @@ const SignIn = () => {
 	});
 
 	//   Signup form submit handler
-	const signInFormSubmitHandler: SubmitHandler<signInSchemaType> = async (
+	const signInFormSubmitHandler: SubmitHandler<signInSchemeType> = async (
 		fieldValues,
 		event,
 	) => {
@@ -40,8 +37,6 @@ const SignIn = () => {
 		};
 
 		const serverResponse = await login(userSendData);
-
-		console.log(serverResponse);
 	};
 
 	return (
@@ -64,7 +59,7 @@ const SignIn = () => {
                     inputName="password"
                 />
 
-                <SubmitButton textValue="Continue" />
+                <SubmitButton textValue="Log In" />
             </form>
         </Form>
 	);

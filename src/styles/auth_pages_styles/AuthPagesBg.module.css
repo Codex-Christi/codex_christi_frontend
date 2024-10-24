@@ -1,10 +1,10 @@
 .auth_page_bg {
-  background-color: #000008;
+  /* background-color: #000008;
   background-image: url('/media/img/auth_pages/signup_bg_mobile.png');
   background-image: image-set(
     url('/media/img/auth_pages/signup_bg_mobile.avif') type('image/avif'),
     url('/media/img/auth_pages/signup_bg_mobile.png') type('image/png')
-  );
+  ); */
   min-height: 100vh;
   background-position: right top 15px;
   background-size: 150% 100%;
@@ -15,10 +15,12 @@
   align-items: center;
   flex-direction: column;
   position: relative !important;
+  padding: 2rem 0;
+  background-attachment: fixed;
 }
 
 /* Phablets and Tablets  */
-@media (min-width: 640px) {
+/* @media (min-width: 640px) {
   .auth_page_bg {
     background-image: url('/media/img/auth_pages/signup_bg_tablet.png');
     background-image: image-set(
@@ -28,10 +30,10 @@
     background-position: right top -25px;
     background-size: 95% 125%;
   }
-}
+} */
 
 /* Desktop */
-@media (min-width: 1024px) {
+/* @media (min-width: 1024px) {
   .auth_page_bg {
     background-image: url('/media/img/auth_pages/signup_bg_desktop.png');
     background-image: image-set(
@@ -41,4 +43,4 @@
     background-position: unset !important;
     background-size: cover !important;
   }
-}
+} */
