@@ -6,13 +6,6 @@ const client = axios.create({
   baseURL: 'https://saintproject.onrender.com/api/v1',
 });
 
-const tokenClient = axios.create({
-  baseURL: 'https://saintproject.onrender.com/api/',
-});
-
-// Types and Interfaces
-type loginType = { email: string; password: string };
-
 type UserDataSendType = { name: string; email: string; password: string };
 type UserDataReturnType = { id: Number; name: string; email: string };
 interface SignupHookInterface {
