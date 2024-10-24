@@ -16,11 +16,14 @@ import {
 	PasswordInput,
 } from "../FormFields";
 import { useRegularSignUp } from "@/lib/hooks/authHooks/useSignUp";
+import { useRouter } from "next/navigation";
 
 // Styles import
 import styles from "@/styles/auth_pages_styles/FormStyles.module.css";
 
 const SignUpForm = () => {
+    const router = useRouter();
+
 	// Hooks
 	const { signUp } = useRegularSignUp();
 
@@ -102,7 +105,9 @@ const SignUpForm = () => {
 
 		const serverResponse = await signUp(userSendData);
 
-		console.log(serverResponse);
+        if (serverResponse?.email === email) {
+            router.replace(`/auth/verify-otp?email=${serverResponse?.email}`);
+        }
 	};
 
 	// Main JSX

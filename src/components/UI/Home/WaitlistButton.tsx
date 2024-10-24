@@ -10,7 +10,7 @@ const WaitlistButton = () => {
   // Main JSX
   return (
     <Button
-      onClick={() => router.push('/signup?waitlist=true')}
+      onClick={() => router.push('/auth/signup?waitlist=true')}
       variant='secondary'
       className={`mt-[150px] md:mt-[144px] lg:mt-[136px] !mx-auto block font-montserrat
          bg-white text-black font-bold text-[1.15rem] py-3 !h-[unset]`}
