@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { Form } from "@/components/UI/primitives/form";
@@ -151,7 +152,7 @@ const SignUpForm = () => {
                 {/* Second Set of Fields */}
                 <div
                     ref={secondFormFieldSetRef}
-                    className={`${styles.secondFormFieldSetHiddenState} `}
+                    className={`${styles.secondFormFieldSetHiddenState}`}
                 >
                     {/* Email Input*/}
                     <EmailInput

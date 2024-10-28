@@ -84,7 +84,7 @@ const VerifyOTP = () => {
 
                 <p className="w-full text-center mb-4">
                     If you didn’t receive a code, <button className="text-white font-semibold" type="button" onClick={async () => {
-                        const res = await resendOTP({email: email});
+                        const res = await resendOTP({email: email ?? ""});
 
                         console.log(res)
                     }}>Resend</button>

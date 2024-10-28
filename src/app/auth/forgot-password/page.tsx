@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 
 export const metadata: Metadata = {
     title: 'Forgot Password | Codex Christi',
-    description: 'Sign up as a renonwned Christian Creative',
+    description: 'Enter your email to reset your password',
 };
 
 const Index = (): JSX.Element => {
