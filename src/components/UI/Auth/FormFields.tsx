@@ -20,11 +20,12 @@ import styles from '@/styles/auth_pages_styles/FormStyles.module.css';
 
 // General Types
 type zodFormType = UseFormReturn<signInSchemaType | SignUpFormSchemaType>;
+type signupZodFormType = UseFormReturn<SignUpFormSchemaType>;
 
 // Interfaces
 interface NameInputInterface {
   inputName: 'firstname' | 'lastname';
-  currentZodForm: zodFormType;
+  currentZodForm: signupZodFormType;
 }
 
 interface EmailInputProps {
@@ -40,7 +41,7 @@ interface PasswordInputProps {
 
 interface CheckBoxInputProps {
   name: 'terms_and_policy';
-  currentZodForm: zodFormType;
+  currentZodForm: signupZodFormType;
   children?: ReactNode;
 }
 
