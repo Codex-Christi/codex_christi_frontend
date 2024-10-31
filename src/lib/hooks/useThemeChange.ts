@@ -10,9 +10,11 @@ function useTheme() {
       'link[rel=icon]'
     ) as HTMLLinkElement;
 
-    linkElement.href = `/media/favicons/favicon-${
-      isDarkMode ? 'dark' : 'light'
-    }-mode.ico`;
+    if (linkElement) {
+      linkElement.href = `/media/favicons/favicon-${
+        isDarkMode ? 'dark' : 'light'
+      }-mode.ico`;
+    }
   }, []);
 
   const isDarkMode = useMediaQuery(
