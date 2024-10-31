@@ -10,7 +10,7 @@ import { InputWithIcon } from '@/components/UI/auth_pages/forms/InputWithIcon';
 import { FC, ReactNode } from 'react';
 import CustomFormMessage from '../auth_pages/forms/CustomFormMessage';
 import { SignUpFormSchemaType } from '@/lib/formSchemas/signUpFormSchema';
-import { signInSchemeType } from '@/lib/formSchemas/signInSchema';
+import { signInSchemaType } from '@/lib/formSchemas/signInSchema';
 import { UseFormReturn } from 'react-hook-form';
 import { Checkbox } from '@/components/UI/primitives/checkbox';
 import { IconType } from 'react-icons/lib';
@@ -19,7 +19,7 @@ import { IconType } from 'react-icons/lib';
 import styles from '@/styles/auth_pages_styles/FormStyles.module.css';
 
 // General Types
-type zodFormType = UseFormReturn<signInSchemeType | SignUpFormSchemaType>;
+type zodFormType = UseFormReturn<signInSchemaType | SignUpFormSchemaType>;
 
 // Interfaces
 interface NameInputInterface {
@@ -29,8 +29,8 @@ interface NameInputInterface {
 
 interface EmailInputProps {
   inputName: 'email';
-    currentZodForm: zodFormType;
-    label?: string
+  currentZodForm: zodFormType;
+  label?: string;
 }
 
 interface PasswordInputProps {
@@ -149,7 +149,7 @@ export const NameInput: FC<NameInputInterface> = (props) => {
 // Email Input
 export const EmailInput: FC<EmailInputProps> = (props) => {
   // Props
-  const { inputName, currentZodForm, label = "Email" } = props;
+  const { inputName, currentZodForm, label = 'Email' } = props;
 
   // Main JSX
   return (
