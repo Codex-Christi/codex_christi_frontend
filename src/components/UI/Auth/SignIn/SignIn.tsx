@@ -7,6 +7,10 @@ import { signInSchema, signInSchemaType } from '@/lib/formSchemas/signInSchema';
 import { EmailInput, PasswordInput } from '@/components/UI/Auth/FormFields';
 import { SubmitButton } from '@/components/UI/Auth/FormActionButtons';
 import { useLogin } from '@/lib/hooks/authHooks/useLogin';
+import Link from 'next/link';
+import GoogleIcon from '@/components/GoogleIcon';
+import AppleIcon from '@/components/AppleIcon';
+import GitHubIcon from '@/components/GitHubIcon';
 
 const SignIn = () => {
   const { login } = useLogin();
@@ -37,6 +41,8 @@ const SignIn = () => {
     };
 
     const serverResponse = await login(userSendData);
+
+    console.log(serverResponse);
   };
 
   return (
@@ -54,6 +60,37 @@ const SignIn = () => {
         <PasswordInput currentZodForm={signInForm} inputName='password' />
 
         <SubmitButton textValue='Log In' />
+
+        <div className='mt-12 space-y-12 text-center'>
+          <div className='space-y-4 lg:w-1/2 lg:mx-auto'>
+            <p>or Sign In with</p>
+
+            <div className='flex place-content-center justify-between gap-4 mx-auto'>
+              <Link href=''>
+                <GoogleIcon />
+              </Link>
+
+              <Link href=''>
+                <AppleIcon />
+              </Link>
+
+              <Link href=''>
+                <GitHubIcon />
+              </Link>
+            </div>
+          </div>
+
+          <p className='w-full text-center'>
+            Don’t have an account?{' '}
+            <Link
+              className='text-white font-semibold'
+              type='button'
+              href='/auth/signup'
+            >
+              Sign Up
+            </Link>
+          </p>
+        </div>
       </form>
     </Form>
   );

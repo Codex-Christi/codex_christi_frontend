@@ -53,7 +53,7 @@ const ForgotPassword = () => {
                     mx-auto relative`}
 			>
                 <h1 className="text-bold text-3xl text-center mb-8">
-                    Forgot Change
+                    Password Change
                 </h1>
 
 				<ResetPasswordLogo />
