@@ -1,5 +1,6 @@
 'use client';
 
+import { PasswordResetLogo } from '@/components/AuthLogo';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { Form } from '@/components/UI/primitives/form';
@@ -7,12 +8,8 @@ import { signInSchema, signInSchemaType } from '@/lib/formSchemas/signInSchema';
 import { EmailInput, PasswordInput } from '@/components/UI/Auth/FormFields';
 import { SubmitButton } from '@/components/UI/Auth/FormActionButtons';
 import { useLogin } from '@/lib/hooks/authHooks/useLogin';
-import Link from 'next/link';
-import GoogleIcon from '@/components/GoogleIcon';
-import AppleIcon from '@/components/AppleIcon';
-import GitHubIcon from '@/components/GitHubIcon';
 
-const SignIn = () => {
+const ForgotPassword = () => {
   const { login } = useLogin();
 
   const signInForm = useForm<signInSchemaType>({
@@ -55,45 +52,20 @@ const SignIn = () => {
                     lg:w-[100%] lg:max-w-[425px]
                     mx-auto relative`}
       >
-        <EmailInput currentZodForm={signInForm} inputName='email' />
+        <h1 className='text-bold text-3xl text-center mb-8'>Forgot Password</h1>
 
-        <PasswordInput currentZodForm={signInForm} inputName='password' />
+        <PasswordResetLogo />
 
-        <SubmitButton textValue='Log In' />
+        <EmailInput
+          currentZodForm={signInForm}
+          inputName='email'
+          label='Enter your email address'
+        />
 
-        <div className='mt-12 space-y-12 text-center'>
-          <div className='space-y-4 lg:w-1/2 lg:mx-auto'>
-            <p>or Sign In with</p>
-
-            <div className='flex place-content-center justify-between gap-4 mx-auto'>
-              <Link href=''>
-                <GoogleIcon />
-              </Link>
-
-              <Link href=''>
-                <AppleIcon />
-              </Link>
-
-              <Link href=''>
-                <GitHubIcon />
-              </Link>
-            </div>
-          </div>
-
-          <p className='w-full text-center'>
-            Don’t have an account?{' '}
-            <Link
-              className='text-white font-semibold'
-              type='button'
-              href='/auth/signup'
-            >
-              Sign Up
-            </Link>
-          </p>
-        </div>
+        <SubmitButton textValue='Next' />
       </form>
     </Form>
   );
 };
 
-export default SignIn;
+export default ForgotPassword;

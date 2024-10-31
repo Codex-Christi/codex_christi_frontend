@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SubmitHandler, useForm } from "react-hook-form";
 import { Form } from "@/components/UI/primitives/form";
@@ -16,11 +17,14 @@ import {
 	PasswordInput,
 } from "../FormFields";
 import { useRegularSignUp } from "@/lib/hooks/authHooks/useSignUp";
+import { useRouter } from "next/navigation";
 
 // Styles import
 import styles from "@/styles/auth_pages_styles/FormStyles.module.css";
 
 const SignUpForm = () => {
+    const router = useRouter();
+
 	// Hooks
 	const { signUp } = useRegularSignUp();
 
@@ -102,7 +106,9 @@ const SignUpForm = () => {
 
 		const serverResponse = await signUp(userSendData);
 
-		console.log(serverResponse);
+        if (serverResponse?.email === email) {
+            router.replace(`/auth/verify-otp?email=${serverResponse?.email}`);
+        }
 	};
 
 	// Main JSX
@@ -146,7 +152,7 @@ const SignUpForm = () => {
                 {/* Second Set of Fields */}
                 <div
                     ref={secondFormFieldSetRef}
-                    className={`${styles.secondFormFieldSetHiddenState} `}
+                    className={`${styles.secondFormFieldSetHiddenState}`}
                 >
                     {/* Email Input*/}
                     <EmailInput
