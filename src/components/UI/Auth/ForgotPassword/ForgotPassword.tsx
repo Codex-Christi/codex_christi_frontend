@@ -4,48 +4,56 @@ import { PasswordResetLogo } from '@/components/AuthLogo';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { Form } from '@/components/UI/primitives/form';
-import { signInSchema, signInSchemaType } from '@/lib/formSchemas/signInSchema';
-import { EmailInput, PasswordInput } from '@/components/UI/Auth/FormFields';
+import { EmailInput } from '@/components/UI/Auth/FormFields';
 import { SubmitButton } from '@/components/UI/Auth/FormActionButtons';
 import { useLogin } from '@/lib/hooks/authHooks/useLogin';
+import { z } from 'zod';
+
+const forgotPasswordSchema = z.object({
+  email: z
+    .string({ required_error: 'Email is required' })
+    .email({
+      message: 'Invalid email address.',
+    })
+    .trim(),
+});
+
+export type ForgotPasswordSchemaType = z.infer<typeof forgotPasswordSchema>;
 
 const ForgotPassword = () => {
   const { login } = useLogin();
 
-  const signInForm = useForm<signInSchemaType>({
-    resolver: zodResolver(signInSchema),
+  const forgotPasswordForm = useForm<ForgotPasswordSchemaType>({
+    resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
       email: '',
-      password: '',
     },
     mode: 'all',
     reValidateMode: 'onBlur',
   });
 
   //   Signup form submit handler
-  const signInFormSubmitHandler: SubmitHandler<signInSchemaType> = async (
-    fieldValues,
-    event
-  ) => {
+  const forgotPasswordFormSubmitHandler: SubmitHandler<
+    ForgotPasswordSchemaType
+  > = async (fieldValues, event) => {
     // Prevent default first
     event?.preventDefault();
 
-    const { email, password } = fieldValues;
+    const { email } = fieldValues;
 
     const userSendData = {
       email,
-      password,
     };
 
-    const serverResponse = await login(userSendData);
-
-    console.log(serverResponse);
+    console.log(userSendData);
   };
 
   return (
-    <Form {...signInForm}>
+    <Form {...forgotPasswordForm}>
       <form
-        onSubmit={signInForm.handleSubmit(signInFormSubmitHandler)}
+        onSubmit={forgotPasswordForm.handleSubmit(
+          forgotPasswordFormSubmitHandler
+        )}
         className={`mt-12 px-4 sm:px-0 !font-montserrat
                     sm:w-[70%] sm:max-w-[400px]
                     md:w-[50%] md:max-w-[410px]
@@ -57,7 +65,7 @@ const ForgotPassword = () => {
         <PasswordResetLogo />
 
         <EmailInput
-          currentZodForm={signInForm}
+          currentZodForm={forgotPasswordForm}
           inputName='email'
           label='Enter your email address'
         />

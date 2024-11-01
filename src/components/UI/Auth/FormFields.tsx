@@ -12,6 +12,7 @@ import CustomFormMessage from '../auth_pages/forms/CustomFormMessage';
 import { SignUpFormSchemaType } from '@/lib/formSchemas/signUpFormSchema';
 import { signInSchemaType } from '@/lib/formSchemas/signInSchema';
 import { resetPasswordSchemaType } from '@/lib/formSchemas/resetPasswordSchema';
+import { ForgotPasswordSchemaType } from './ForgotPassword/ForgotPassword';
 import { UseFormReturn } from 'react-hook-form';
 import { Checkbox } from '@/components/UI/primitives/checkbox';
 import { IconType } from 'react-icons/lib';
@@ -20,7 +21,7 @@ import { IconType } from 'react-icons/lib';
 import styles from '@/styles/auth_pages_styles/FormStyles.module.css';
 
 type zodFormType = UseFormReturn<
-  SignUpFormSchemaType | resetPasswordSchemaType
+  SignUpFormSchemaType | resetPasswordSchemaType | ForgotPasswordSchemaType
 >;
 type signupZodFormType = UseFormReturn<SignUpFormSchemaType>;
 
