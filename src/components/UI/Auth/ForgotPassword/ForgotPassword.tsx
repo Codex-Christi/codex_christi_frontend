@@ -8,14 +8,14 @@ import { EmailInput } from '@/components/UI/Auth/FormFields';
 import { SubmitButton } from '@/components/UI/Auth/FormActionButtons';
 import { useLogin } from '@/lib/hooks/authHooks/useLogin';
 import { z } from 'zod';
+import {
+  SignUpFormSchemaWithRefine,
+  SignUpFormSchema,
+} from '@/lib/formSchemas/signUpFormSchema';
 
-const forgotPasswordSchema = z.object({
-  email: z
-    .string({ required_error: 'Email is required' })
-    .email({
-      message: 'Invalid email address.',
-    })
-    .trim(),
+const forgotPasswordSchema = SignUpFormSchema.pick({
+  email: true,
+  password: undefined,
 });
 
 export type ForgotPasswordSchemaType = z.infer<typeof forgotPasswordSchema>;

@@ -9,7 +9,7 @@ import {
 import { InputWithIcon } from '@/components/UI/auth_pages/forms/InputWithIcon';
 import { FC, ReactNode } from 'react';
 import CustomFormMessage from '../auth_pages/forms/CustomFormMessage';
-import { SignUpFormSchemaType } from '@/lib/formSchemas/signUpFormSchema';
+import { SignUpFormSchemaWithRefineType } from '@/lib/formSchemas/signUpFormSchema';
 import { signInSchemaType } from '@/lib/formSchemas/signInSchema';
 import { resetPasswordSchemaType } from '@/lib/formSchemas/resetPasswordSchema';
 import { ForgotPasswordSchemaType } from './ForgotPassword/ForgotPassword';
@@ -21,12 +21,12 @@ import { IconType } from 'react-icons/lib';
 import styles from '@/styles/auth_pages_styles/FormStyles.module.css';
 
 type zodFormType = UseFormReturn<
-  SignUpFormSchemaType | resetPasswordSchemaType | ForgotPasswordSchemaType
+  SignUpFormSchemaWithRefineType | resetPasswordSchemaType | ForgotPasswordSchemaType | signInSchemaType
 >;
 type zodFormWithoutForgotPaswordType = UseFormReturn<
-  SignUpFormSchemaType | resetPasswordSchemaType
+  SignUpFormSchemaWithRefineType | resetPasswordSchemaType | signInSchemaType
 >;
-type signupZodFormType = UseFormReturn<SignUpFormSchemaType>;
+type signupZodFormType = UseFormReturn<SignUpFormSchemaWithRefineType>;
 
 // Interfaces
 interface NameInputInterface {
@@ -36,7 +36,7 @@ interface NameInputInterface {
 
 interface EmailInputProps {
   inputName: 'email';
-  currentZodForm: zodFormType;
+  currentZodForm: zodFormWithoutForgotPaswordType;
   label?: string;
 }
 
