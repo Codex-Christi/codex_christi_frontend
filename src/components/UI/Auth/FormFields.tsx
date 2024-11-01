@@ -23,6 +23,9 @@ import styles from '@/styles/auth_pages_styles/FormStyles.module.css';
 type zodFormType = UseFormReturn<
   SignUpFormSchemaType | resetPasswordSchemaType | ForgotPasswordSchemaType
 >;
+type zodFormWithoutForgotPaswordType = UseFormReturn<
+  SignUpFormSchemaType | resetPasswordSchemaType
+>;
 type signupZodFormType = UseFormReturn<SignUpFormSchemaType>;
 
 // Interfaces
@@ -39,7 +42,7 @@ interface EmailInputProps {
 
 interface PasswordInputProps {
   inputName: 'password' | 'confirm_password';
-  currentZodForm: zodFormType;
+  currentZodForm: zodFormWithoutForgotPaswordType;
 }
 
 interface CheckBoxInputProps {
