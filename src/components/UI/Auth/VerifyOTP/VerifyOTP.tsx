@@ -7,8 +7,7 @@ import {
 	verifyOTPSchema,
 	verifyOTPSchemaType,
 } from '@/lib/formSchemas/verifyOTPSchema';
-import { useVerifyOTP } from '@/lib/hooks/authHooks/useVerifyOTP';
-import { useResendOTP } from '@/lib/hooks/authHooks/useVerifyOTP';
+import { useVerifyOTP, useResendOTP } from '@/lib/hooks/authHooks/useVerifyOTP';
 import { useSearchParams } from 'next/navigation';
 import {
 	InputOTP,
@@ -17,10 +16,13 @@ import {
 	InputOTPSlot,
 } from '@/components/UI/primitives/input-otp';
 import { SubmitButton } from '@/components/UI/Auth/FormActionButtons';
+import { useCustomToast } from '@/lib/hooks/useCustomToast';
 
 const VerifyOTP = () => {
-	const { verifyOTP } = useVerifyOTP();
-	const { resendOTP } = useResendOTP();
+	const { verifyOTP, isError, userData, errorMsg } = useVerifyOTP();
+    const { resendOTP, isError: error, userData: data, errorMsg: msg } = useResendOTP();
+
+    const { triggerCustomToast } = useCustomToast();
 
 	const searchParams = useSearchParams();
 	const email = searchParams.get('email');
@@ -47,9 +49,19 @@ const VerifyOTP = () => {
 			otp,
 		};
 
-		const serverResponse = await verifyOTP(userSendData);
+		await verifyOTP(userSendData);
 
-		console.log(serverResponse);
+        if (isError&& !userData) {
+			triggerCustomToast('error', errorMsg);
+		}
+
+		if (!isError && userData) {
+			triggerCustomToast(
+				'success',
+				'Account verified successfully.',
+				'Account verified successfully.',
+			);
+		}
 	};
 
 	return (
@@ -84,9 +96,19 @@ const VerifyOTP = () => {
 
                 <p className="w-full text-center mb-4">
                     If you didn’t receive a code, <button className="text-white font-semibold" type="button" onClick={async () => {
-                        const res = await resendOTP({email: email ?? ""});
+                        await resendOTP({ email: email ?? "" });
 
-                        console.log(res)
+                        if (error && !data) {
+							triggerCustomToast('error', msg);
+						}
+
+						if (!error && data) {
+							triggerCustomToast(
+								'success',
+								'OTP resent successfully',
+								'OTP resent successfully'
+							);
+						}
                     }}>Resend</button>
                 </p>
 				<SubmitButton textValue='Verify' />
