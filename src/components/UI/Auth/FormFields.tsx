@@ -7,54 +7,39 @@ import {
 	FormLabel,
 } from '@/components/UI/primitives/form';
 import { InputWithIcon } from '@/components/UI/auth_pages/forms/InputWithIcon';
-import { FC, ReactNode } from 'react';
+import { ReactNode } from 'react';
 import CustomFormMessage from '../auth_pages/forms/CustomFormMessage';
-import { SignUpFormSchemaWithRefineType } from '@/lib/formSchemas/signUpFormSchema';
-import { signInSchemaType } from '@/lib/formSchemas/signInSchema';
-import { resetPasswordSchemaType } from '@/lib/formSchemas/resetPasswordSchema';
-import { ForgotPasswordSchemaType } from './ForgotPassword/ForgotPassword';
-import { UseFormReturn } from 'react-hook-form';
+import { UseFormReturn, FieldValues, Path } from 'react-hook-form';
 import { Checkbox } from '@/components/UI/primitives/checkbox';
 import { IconType } from 'react-icons/lib';
-import { z } from "zod";
 
 // Styles
 import styles from '@/styles/auth_pages_styles/FormStyles.module.css';
 
-type zodFormType = UseFormReturn<
-	| SignUpFormSchemaWithRefineType
-	| resetPasswordSchemaType
-	| ForgotPasswordSchemaType
-	| signInSchemaType
->;
-type zodFormWithoutForgotPaswordType = UseFormReturn<
-	SignUpFormSchemaWithRefineType | resetPasswordSchemaType | signInSchemaType
->;
-type signupZodFormType = UseFormReturn<SignUpFormSchemaWithRefineType>;
-type signinZodFormType = UseFormReturn<signInSchemaType>;
-
-// console.log(z.infer<zodFormType>);
-
-// Interfaces
-interface NameInputInterface {
-	inputName: 'firstname' | 'lastname';
-	currentZodForm: zodFormType;
+interface BaseInputProps<T extends FieldValues> {
+	currentZodForm: UseFormReturn<T>;
 }
 
-interface EmailInputProps {
+// Interfaces
+interface NameInputInterface<T extends FieldValues> extends BaseInputProps<T> {
+	inputName: 'firstname' | 'lastname';
+	currentZodForm: UseFormReturn<T>;
+}
+
+interface EmailInputProps<T extends FieldValues> extends BaseInputProps<T> {
 	inputName: 'email';
-	currentZodForm: zodFormType;
+	currentZodForm: UseFormReturn<T>;
 	label?: string;
 }
 
-interface PasswordInputProps {
+interface PasswordInputProps<T extends FieldValues> extends BaseInputProps<T> {
 	inputName: 'password' | 'confirm_password';
-	currentZodForm: zodFormType;
+	currentZodForm: UseFormReturn<T>;
 }
 
-interface CheckBoxInputProps {
+interface CheckBoxInputProps<T extends FieldValues> extends BaseInputProps<T> {
 	name: 'terms_and_policy';
-	currentZodForm: zodFormType;
+	currentZodForm: UseFormReturn<T>;
 	children?: ReactNode;
 }
 
@@ -138,7 +123,9 @@ const EmailIcon: IconType = () => (
 );
 
 // Name Input
-export const NameInput: FC<NameInputInterface> = (props) => {
+export const NameInput = <T extends FieldValues>(
+	props: NameInputInterface<T>,
+) => {
 	//   Props
 
 	const { inputName, currentZodForm } = props;
@@ -152,7 +139,7 @@ export const NameInput: FC<NameInputInterface> = (props) => {
 	return (
 		<FormField
 			control={currentZodForm.control}
-			name={inputName}
+			name={inputName as Path<T>}
 			render={({ field }) => (
 				<FormItem>
 					<FormLabel className='text-white'>{`${
@@ -162,8 +149,7 @@ export const NameInput: FC<NameInputInterface> = (props) => {
 					<FormControl>
 						<InputWithIcon
 							startIcon={UserIcon}
-							className={`bg-transparent border border-white focus:!outline-0
-                    focus-visible:!ring-0 autofill:!bg-transparent rounded-3xl !mt-0 placeholder:!text-white/75`}
+							className={`bg-transparent border border-white focus:!outline-0 focus-visible:!ring-0 autofill:!bg-transparent rounded-3xl !mt-0 placeholder:!text-white/75`}
 							placeholder={`Enter your ${inPutNamePt1} name...`}
 							{...field}
 						/>
@@ -177,7 +163,9 @@ export const NameInput: FC<NameInputInterface> = (props) => {
 };
 
 // Email Input
-export const EmailInput: FC<EmailInputProps> = (props) => {
+export const EmailInput = <T extends FieldValues>(
+	props: EmailInputProps<T>,
+) => {
 	// Props
 	const { inputName, currentZodForm, label = 'Email' } = props;
 
@@ -185,15 +173,14 @@ export const EmailInput: FC<EmailInputProps> = (props) => {
 	return (
 		<FormField
 			control={currentZodForm.control}
-			name={inputName}
+			name={inputName as Path<T>}
 			render={({ field }) => (
 				<FormItem>
 					<FormLabel className='text-white'>{label}</FormLabel>
 					<FormControl>
 						<InputWithIcon
 							startIcon={EmailIcon}
-							className={`bg-transparent border border-white focus:!outline-0
-                    focus-visible:!ring-0 autofill:!bg-transparent rounded-3xl !mt-0 placeholder:!text-white/75`}
+							className={`bg-transparent border border-white focus:!outline-0 focus-visible:!ring-0 autofill:!bg-transparent rounded-3xl !mt-0 placeholder:!text-white/75`}
 							placeholder={`Enter your email`}
 							{...field}
 						/>
@@ -206,8 +193,9 @@ export const EmailInput: FC<EmailInputProps> = (props) => {
 };
 
 // Password Input
-
-export const PasswordInput: FC<PasswordInputProps> = (props) => {
+export const PasswordInput = <T extends FieldValues>(
+	props: PasswordInputProps<T>,
+) => {
 	// Props
 	const { currentZodForm, inputName } = props;
 
@@ -218,7 +206,7 @@ export const PasswordInput: FC<PasswordInputProps> = (props) => {
 	return (
 		<FormField
 			control={currentZodForm.control}
-			name={inputName}
+			name={inputName as Path<T>}
 			render={({ field }) => (
 				<FormItem>
 					<FormLabel className='text-white'>
@@ -228,8 +216,7 @@ export const PasswordInput: FC<PasswordInputProps> = (props) => {
 					</FormLabel>
 					<FormControl>
 						<InputWithIcon
-							className={`bg-transparent border border-white focus:!outline-0
-                    focus-visible:!ring-0 autofill:!bg-transparent rounded-3xl !mt-0 placeholder:!text-white/75`}
+							className={`bg-transparent border border-white focus:!outline-0 focus-visible:!ring-0 autofill:!bg-transparent rounded-3xl !mt-0 placeholder:!text-white/75`}
 							placeholder={
 								isConfirmPaswwordField
 									? 'Confirm Password'
@@ -247,8 +234,9 @@ export const PasswordInput: FC<PasswordInputProps> = (props) => {
 };
 
 // CheckBox Input
-
-export const CheckBoxInput: FC<CheckBoxInputProps> = (props) => {
+export const CheckBoxInput = <T extends FieldValues>(
+	props: CheckBoxInputProps<T>,
+) => {
 	// Props
 	const { currentZodForm, name, children } = props;
 	const {
@@ -259,7 +247,7 @@ export const CheckBoxInput: FC<CheckBoxInputProps> = (props) => {
 	return (
 		<FormField
 			control={currentZodForm.control}
-			name={name}
+			name={name as Path<T>}
 			render={({ field }) => (
 				<FormItem
 					className={`flex flex-row items-center gap-4 space-y-0 rounded-md py-1 ${

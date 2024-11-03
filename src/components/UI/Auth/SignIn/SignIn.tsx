@@ -14,9 +14,9 @@ import GitHubIcon from '@/components/GitHubIcon';
 import { useCustomToast } from '@/lib/hooks/useCustomToast';
 
 const SignIn = () => {
-    const { login, isError, errorMsg, userData } = useLogin();
+	const { login, isError, errorMsg, userData } = useLogin();
 
-    const { triggerCustomToast } = useCustomToast();
+	const { triggerCustomToast } = useCustomToast();
 
 	const signInForm = useForm<signInSchemaType>({
 		resolver: zodResolver(signInSchema),
@@ -43,13 +43,13 @@ const SignIn = () => {
 			password,
 		};
 
-        await login(userSendData);
+		await login(userSendData);
 
-        if (isError && !userData) {
+		if (isError && !userData) {
 			triggerCustomToast('error', errorMsg);
 		}
 
-        if (!isError && userData) {
+		if (!isError && userData) {
 			triggerCustomToast(
 				'success',
 				'Login successful.',

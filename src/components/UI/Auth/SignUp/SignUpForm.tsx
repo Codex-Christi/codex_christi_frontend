@@ -26,9 +26,9 @@ const SignUpForm = () => {
 	const router = useRouter();
 
 	// Hooks
-    const { signUp, userData, isError, errorMsg } = useRegularSignUp();
+	const { signUp, userData, isError, errorMsg } = useRegularSignUp();
 
-    const { triggerCustomToast } = useCustomToast();;
+	const { triggerCustomToast } = useCustomToast();
 
 	// Define form
 	const signupZodForm = useForm<SignUpFormSchemaWithRefineType>({
@@ -105,13 +105,13 @@ const SignUpForm = () => {
 			password,
 		};
 
-        await signUp(userSendData);
+		await signUp(userSendData);
 
-        if (isError) {
-            triggerCustomToast("error", errorMsg);
-        }
+		if (isError) {
+			triggerCustomToast('error', errorMsg);
+		}
 
-        if (!isError) {
+		if (!isError) {
 			triggerCustomToast('success', 'Account creation successful.');
 		}
 

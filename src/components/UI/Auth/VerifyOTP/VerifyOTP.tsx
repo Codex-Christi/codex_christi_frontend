@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SubmitHandler, useForm } from 'react-hook-form';
@@ -20,9 +20,14 @@ import { useCustomToast } from '@/lib/hooks/useCustomToast';
 
 const VerifyOTP = () => {
 	const { verifyOTP, isError, userData, errorMsg } = useVerifyOTP();
-    const { resendOTP, isError: error, userData: data, errorMsg: msg } = useResendOTP();
+	const {
+		resendOTP,
+		isError: error,
+		userData: data,
+		errorMsg: msg,
+	} = useResendOTP();
 
-    const { triggerCustomToast } = useCustomToast();
+	const { triggerCustomToast } = useCustomToast();
 
 	const searchParams = useSearchParams();
 	const email = searchParams.get('email');
@@ -51,7 +56,7 @@ const VerifyOTP = () => {
 
 		await verifyOTP(userSendData);
 
-        if (isError&& !userData) {
+		if (isError && !userData) {
 			triggerCustomToast('error', errorMsg);
 		}
 
@@ -91,26 +96,32 @@ const VerifyOTP = () => {
 							<InputOTPSlot index={5} />
 						</InputOTPGroup>
 					</InputOTP>
-
 				</div>
 
-                <p className="w-full text-center mb-4">
-                    If you didn’t receive a code, <button className="text-white font-semibold" type="button" onClick={async () => {
-                        await resendOTP({ email: email ?? "" });
+				<p className='w-full text-center mb-4'>
+					If you didn’t receive a code,{' '}
+					<button
+						className='text-white font-semibold'
+						type='button'
+						onClick={async () => {
+							await resendOTP({ email: email ?? '' });
 
-                        if (error && !data) {
-							triggerCustomToast('error', msg);
-						}
+							if (error && !data) {
+								triggerCustomToast('error', msg);
+							}
 
-						if (!error && data) {
-							triggerCustomToast(
-								'success',
-								'OTP resent successfully',
-								'OTP resent successfully'
-							);
-						}
-                    }}>Resend</button>
-                </p>
+							if (!error && data) {
+								triggerCustomToast(
+									'success',
+									'OTP resent successfully',
+									'OTP resent successfully',
+								);
+							}
+						}}
+					>
+						Resend
+					</button>
+				</p>
 				<SubmitButton textValue='Verify' />
 			</form>
 		</Form>

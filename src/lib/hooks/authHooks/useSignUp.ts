@@ -5,9 +5,9 @@ const client = axios.create({
 	baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}/v1`,
 });
 
-type UserDataSendType = { name: string; email: string; password: string; };
+type UserDataSendType = { name: string; email: string; password: string };
 
-type UserDataReturnType = { id: Number; name: string; email: string; };
+type UserDataReturnType = { id: Number; name: string; email: string };
 
 interface SignupHookInterface {
 	isLoading: boolean;
@@ -67,7 +67,7 @@ export const useRegularSignUp = () => {
 					isError: true,
 					errorMsg:
 						(err as AxiosError).message || 'An error occurred', // Handle error message
-                }));
+				}));
 
 				return (err as AxiosError).message; // Return error message
 			}

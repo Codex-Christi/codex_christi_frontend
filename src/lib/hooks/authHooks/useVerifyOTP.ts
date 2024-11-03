@@ -41,17 +41,17 @@ export const useVerifyOTP = () => {
 			});
 
 			return verifyOTPRes.data;
-        } catch (err: AxiosError | any) {
-            const { data } = err.response;
+		} catch (err: AxiosError | any) {
+			const { data } = err.response;
 
 			setVerifyOTPProcessState((prev) => ({
 				...prev,
 				isLoading: false,
 				isError: true,
 				errorMsg: data.non_field_errors[0],
-            }));
+			}));
 
-			return  data.non_field_errors[0];
+			return data.non_field_errors[0];
 		}
 	};
 
@@ -76,8 +76,8 @@ export const useResendOTP = () => {
 			});
 
 			return resendOTPRes.data;
-        } catch (err: AxiosError | any) {
-            const { data } = err.response;
+		} catch (err: AxiosError | any) {
+			const { data } = err.response;
 
 			setVerifyOTPProcessState((prev) => ({
 				...prev,
