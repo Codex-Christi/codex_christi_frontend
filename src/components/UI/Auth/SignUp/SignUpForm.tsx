@@ -106,9 +106,16 @@ const SignUpForm = () => {
           password,
         };
 
-        await signUp(userSendData); //Start signup here
+        const serverResponse = await signUp(userSendData); //Start signup here
+
+        if (
+          typeof serverResponse !== 'string' &&
+          serverResponse.email === email
+        ) {
+          router.replace(`/auth/verify-otp?email=${serverResponse?.email}`);
+        }
       },
-      [signUp]
+      [router, signUp]
     );
 
   // useEffects
