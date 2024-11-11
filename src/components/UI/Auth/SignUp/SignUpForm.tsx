@@ -138,7 +138,7 @@ const SignUpForm = () => {
     <Form {...signupZodForm}>
       <form
         onSubmit={signupZodForm.handleSubmit(signUpFormSubmitHandler)}
-        className={`mt-12 !font-montserrat
+        className={`w-[80%] max-w-[375px] mt-12 !font-montserrat
                     sm:w-[70%] sm:max-w-[400px]
                     md:w-[50%] md:max-w-[410px]
                     lg:w-full lg:max-w-[425px]
