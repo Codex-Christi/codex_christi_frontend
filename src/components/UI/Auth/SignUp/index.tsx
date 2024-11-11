@@ -7,35 +7,39 @@ import { FC } from "react";
 
 const SignUpMainComponent: FC = () => {
     return (
-        <>
-            <SignUpForm />
+		<>
+			<SignUpForm />
 
-            <div className="-mt-20 space-y-12 text-center">
-                <div className="space-y-4 lg:w-4/5 lg:mx-auto">
-                    <p>
-                        or Sign Up with
-                    </p>
+			<div className='space-y-8 text-center'>
+				<div className='space-y-4 lg:w-4/5 lg:mx-auto'>
+					<p>or Sign Up with</p>
 
-                    <div className="flex place-content-center justify-between gap-4 mx-auto">
-                        <Link href="">
-                            <GoogleIcon />
-                        </Link>
+					<div className='flex place-content-center justify-between gap-4 mx-auto'>
+						<Link href=''>
+							<GoogleIcon />
+						</Link>
 
-                        <Link href="">
-                            <AppleIcon />
-                        </Link>
+						<Link href=''>
+							<AppleIcon />
+						</Link>
 
-                        <Link href="">
-                            <GitHubIcon />
-                        </Link>
-                    </div>
-                </div>
+						<Link href=''>
+							<GitHubIcon />
+						</Link>
+					</div>
+				</div>
 
-                <p>
-                    Already have an account? <Link className="font-bold" href="/auth/sign-in">Login</Link>
-                </p>
-            </div>
-        </>
+				<p>
+					Already have an account?{' '}
+					<Link
+						className='font-bold'
+						href='/auth/sign-in'
+					>
+						Login
+					</Link>
+				</p>
+			</div>
+		</>
 	);
 };
 

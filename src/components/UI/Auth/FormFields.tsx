@@ -19,6 +19,9 @@ import styles from '@/styles/auth_pages_styles/FormStyles.module.css';
 interface BaseInputProps<T extends FieldValues> {
   currentZodForm: UseFormReturn<T>;
 }
+interface BaseInputProps<T extends FieldValues> {
+  currentZodForm: UseFormReturn<T>;
+}
 
 // Interfaces
 interface NameInputInterface<T extends FieldValues> extends BaseInputProps<T> {
@@ -108,6 +111,7 @@ const EmailIcon: IconType = () => (
 );
 
 // Name Input
+
 export const NameInput = <T extends FieldValues>(
   props: NameInputInterface<T>
 ) => {
@@ -177,6 +181,7 @@ export const EmailInput = <T extends FieldValues>(
 };
 
 // Password Input
+
 export const PasswordInput = <T extends FieldValues>(
   props: PasswordInputProps<T>
 ) => {
@@ -216,6 +221,7 @@ export const PasswordInput = <T extends FieldValues>(
 };
 
 // CheckBox Input
+
 export const CheckBoxInput = <T extends FieldValues>(
   props: CheckBoxInputProps<T>
 ) => {
