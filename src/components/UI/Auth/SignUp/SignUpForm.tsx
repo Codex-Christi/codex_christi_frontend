@@ -1,14 +1,13 @@
 'use client';
 
-import Link from 'next/link';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { Form } from '@/components/UI/primitives/form';
 import {
   SignUpFormSchemaWithRefine,
   SignUpFormSchemaWithRefineType,
-} from '@/lib/formSchemas/SignUpFormSchemaWithRefine';
-import { useCallback, useRef } from 'react';
+} from '@/lib/formSchemas/signUpFormSchema';
+import { useCallback, useEffect, useRef } from 'react';
 import { ContinueButton, SubmitButton } from '../FormActionButtons';
 import {
   CheckBoxInput,
@@ -16,17 +15,23 @@ import {
   NameInput,
   PasswordInput,
 } from '../FormFields';
-import { useRegularSignUp } from '@/lib/hooks/authHooks/useSignUp';
+import {
+  useRegularSignUp,
+  UserDataReturnType,
+} from '@/lib/hooks/authHooks/useSignUp';
 import { useRouter } from 'next/navigation';
 
 // Styles import
 import styles from '@/styles/auth_pages_styles/FormStyles.module.css';
+import { useCustomToast } from '@/lib/hooks/useCustomToast';
 
 const SignUpForm = () => {
   const router = useRouter();
 
   // Hooks
-  const { signUp } = useRegularSignUp();
+  const { signUp, userData, isError, errorMsg, isLoading } = useRegularSignUp();
+
+  const { triggerCustomToast } = useCustomToast();
 
   // Define form
   const signupZodForm = useForm<SignUpFormSchemaWithRefineType>({
@@ -86,43 +91,56 @@ const SignUpForm = () => {
   }, [signupZodForm]);
 
   //   Signup form submit handler
-  const signUpFormSubmitHandler: SubmitHandler<
-    SignUpFormSchemaWithRefineType
-  > = async (fieldValues, event) => {
-    // Prevent default first
-    event?.preventDefault();
-    const { firstname, lastname, email, password } = fieldValues;
+  const signUpFormSubmitHandler: SubmitHandler<SignUpFormSchemaWithRefineType> =
+    useCallback(
+      async (fieldValues, event) => {
+        // Prevent default first
+        event?.preventDefault();
+        const { firstname, lastname, email, password } = fieldValues;
 
-    // Format names well
+        // Format names well
 
-    const userSendData = {
-      name: `${firstname.trim()} ${lastname.trim()}`,
-      email,
-      password,
-    };
+        const userSendData = {
+          name: `${firstname.trim()} ${lastname.trim()}`,
+          email,
+          password,
+        };
 
-    const serverResponse = await signUp(userSendData);
+        await signUp(userSendData); //Start signup here
+      },
+      [signUp]
+    );
 
-    if (serverResponse?.email === email) {
-      router.replace(`/auth/verify-otp?email=${serverResponse?.email}`);
+  // useEffects
+  useEffect(() => {
+    if (isLoading) {
+      triggerCustomToast('processs', 'Please wait moment', 'Processing...');
     }
-  };
+
+    if (isError === true) {
+      triggerCustomToast('error', errorMsg);
+    }
+
+    if (isError === false && userData !== null) {
+      triggerCustomToast('success', 'Account creation successful.');
+    }
+  }, [errorMsg, isError, isLoading, triggerCustomToast, userData]);
 
   // Main JSX
   return (
     <Form {...signupZodForm}>
       <form
         onSubmit={signupZodForm.handleSubmit(signUpFormSubmitHandler)}
-        className={`w-[80%] max-w-[375px] mt-12 !font-montserrat
+        className={`mt-12 !font-montserrat
                     sm:w-[70%] sm:max-w-[400px]
                     md:w-[50%] md:max-w-[410px]
-                    lg:w-[45%] lg:max-w-[425px]
-                    mx-auto relative flex`}
+                    lg:w-full lg:max-w-[425px]
+                    mx-auto relative flex -mb-12`}
       >
         {/* First set of fields */}
         <div
           ref={firstFormFieldSetRef}
-          className={`${styles.firstFormFieldSet} `}
+          className={`${styles.firstFormFieldSet}`}
         >
           {/* First Name Input*/}
           <NameInput currentZodForm={signupZodForm} inputName='firstname' />
@@ -156,7 +174,10 @@ const SignUpForm = () => {
             I agree with the Terms and Privacy Policy
           </CheckBoxInput>
 
-          <SubmitButton textValue={'Continue'} />
+          <SubmitButton
+            textValue={'Continue'}
+            disabled={isLoading === true ? true : false}
+          />
         </div>
         {/*  */}
       </form>
