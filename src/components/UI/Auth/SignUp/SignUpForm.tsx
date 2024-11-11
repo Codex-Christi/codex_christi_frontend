@@ -7,7 +7,7 @@ import { Form } from '@/components/UI/primitives/form';
 import {
   SignUpFormSchemaWithRefine,
   SignUpFormSchemaWithRefineType,
-} from '@/lib/formSchemas/SignUpFormSchemaWithRefine';
+} from '@/lib/formSchemas/signUpFormSchema';
 import { useCallback, useRef } from 'react';
 import { ContinueButton, SubmitButton } from '../FormActionButtons';
 import {

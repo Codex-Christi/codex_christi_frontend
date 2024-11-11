@@ -21,7 +21,10 @@ import { IconType } from 'react-icons/lib';
 import styles from '@/styles/auth_pages_styles/FormStyles.module.css';
 
 type zodFormType = UseFormReturn<
-  SignUpFormSchemaWithRefineType | resetPasswordSchemaType | ForgotPasswordSchemaType | signInSchemaType
+  | SignUpFormSchemaWithRefineType
+  | resetPasswordSchemaType
+  | ForgotPasswordSchemaType
+  | signInSchemaType
 >;
 type zodFormWithoutForgotPaswordType = UseFormReturn<
   SignUpFormSchemaWithRefineType | resetPasswordSchemaType | signInSchemaType
