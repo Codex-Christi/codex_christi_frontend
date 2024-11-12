@@ -25,7 +25,7 @@ const MontserratFont = Montserrat({
 export async function generateMetadata(): Promise<Metadata> {
   return {
     // dynamically get the host from the Next headers
-    metadataBase: new URL(`https://${headers().get('host')}`),
+    metadataBase: new URL(`https://${(await headers()).get('host')}`),
     title: 'Codex Christi',
     description:
       'A Hub for Christian Creatives to connect, share, and glorify God.',

@@ -28,7 +28,10 @@ const DrawerOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Overlay
     ref={ref}
-    className={cn('fixed inset-0 z-50 bg-black/80', className)}
+    className={cn(
+      'fixed inset-0 !z-[100] bg-black/[0.01] backdrop-blur-[10px]',
+      className
+    )}
     {...props}
   />
 ));
@@ -43,14 +46,12 @@ const DrawerContent = React.forwardRef<
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background',
+        'fixed bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background',
         className
       )}
       {...props}
     >
-      {/* Disable this for side drawers, but enable later through props if 
-      other drawer types will be needed. */}
-      {/* <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" /> */}
+      {/* <div className='mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted' /> */}
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>
