@@ -6,7 +6,9 @@
     "dev": "next dev --turbo",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "format": "prettier --check './**/*.{js,jsx,ts,tsx,css,md,json}' --config ./.prettierrc",
+    "format:fix": "prettier --write './**/*.{js,jsx,ts,tsx,css,md,json}' --config ./.prettierrc"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -18,9 +20,9 @@
     "axios": "^1.7.7",
     "class-variance-authority": "^0.7.0",
     "input-otp": "^1.2.4",
-    "lucide-react": "^0.379.0",
-    "next": "^14.2.4",
-    "next-themes": "^0.3.0",
+    "lucide-react": "^0.456.0",
+    "next": "^15.0.3",
+    "next-themes": "^0.4.3",
     "react": "^18",
     "react-dom": "^18",
     "react-hook-form": "^7.53.0",
@@ -32,12 +34,19 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@eslint/eslintrc": "^3.1.0",
+    "@eslint/js": "^9.14.0",
+    "@types/node": "^22.9.0",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.14.0",
+    "@typescript-eslint/parser": "^8.14.0",
+    "eslint": "^9.14.0",
+    "eslint-config-next": "15.0.3",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.2.1",
     "postcss": "^8",
+    "prettier": "^3.0.0",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
   }
