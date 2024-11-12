@@ -17,6 +17,7 @@ import {
 } from '@/components/UI/primitives/input-otp';
 import { SubmitButton } from '@/components/UI/Auth/FormActionButtons';
 import { useCustomToast } from '@/lib/hooks/useCustomToast';
+import { Suspense } from 'react';
 
 const VerifyOTP = () => {
 	const { verifyOTP, isError, userData, errorMsg } = useVerifyOTP();
@@ -70,61 +71,63 @@ const VerifyOTP = () => {
 	};
 
 	return (
-		<Form {...verifyOTPForm}>
-			<form
-				onSubmit={handleSubmit(verifyOTPSubmitHandler)}
-				className='mt-12 px-4 sm:px-0 !font-montserrat sm:w-[70%] sm:max-w-[400px] md:w-[50%] md:max-w-[410px] lg:w-[100%] lg:max-w-[425px] mx-auto relative'
-			>
-				<div className='flex place-content-center mb-8'>
-					<InputOTP
-						maxLength={6}
-						value={verifyOTPForm.watch('otp')}
-						onChange={(otp) => setValue('otp', otp)}
-					>
-						<InputOTPGroup>
-							<InputOTPSlot index={0} />
-							<InputOTPSlot index={1} />
-						</InputOTPGroup>
-						<InputOTPSeparator />
-						<InputOTPGroup>
-							<InputOTPSlot index={2} />
-							<InputOTPSlot index={3} />
-						</InputOTPGroup>
-						<InputOTPSeparator />
-						<InputOTPGroup>
-							<InputOTPSlot index={4} />
-							<InputOTPSlot index={5} />
-						</InputOTPGroup>
-					</InputOTP>
-				</div>
+        <Suspense>
+            <Form {...verifyOTPForm}>
+                <form
+                    onSubmit={handleSubmit(verifyOTPSubmitHandler)}
+                    className='mt-12 px-4 sm:px-0 !font-montserrat sm:w-[70%] sm:max-w-[400px] md:w-[50%] md:max-w-[410px] lg:w-[100%] lg:max-w-[425px] mx-auto relative'
+                >
+                    <div className='flex place-content-center mb-8'>
+                        <InputOTP
+                            maxLength={6}
+                            value={verifyOTPForm.watch('otp')}
+                            onChange={(otp) => setValue('otp', otp)}
+                        >
+                            <InputOTPGroup>
+                                <InputOTPSlot index={0} />
+                                <InputOTPSlot index={1} />
+                            </InputOTPGroup>
+                            <InputOTPSeparator />
+                            <InputOTPGroup>
+                                <InputOTPSlot index={2} />
+                                <InputOTPSlot index={3} />
+                            </InputOTPGroup>
+                            <InputOTPSeparator />
+                            <InputOTPGroup>
+                                <InputOTPSlot index={4} />
+                                <InputOTPSlot index={5} />
+                            </InputOTPGroup>
+                        </InputOTP>
+                    </div>
 
-				<p className='w-full text-center mb-4'>
-					If you didn’t receive a code,{' '}
-					<button
-						className='text-white font-semibold'
-						type='button'
-						onClick={async () => {
-							await resendOTP({ email: email ?? '' });
+                    <p className='w-full text-center mb-4'>
+                        If you didn’t receive a code,{' '}
+                        <button
+                            className='text-white font-semibold'
+                            type='button'
+                            onClick={async () => {
+                                await resendOTP({ email: email ?? '' });
 
-							if (error && !data) {
-								triggerCustomToast('error', msg);
-							}
+                                if (error && !data) {
+                                    triggerCustomToast('error', msg);
+                                }
 
-							if (!error && data) {
-								triggerCustomToast(
-									'success',
-									'OTP resent successfully',
-									'OTP resent successfully',
-								);
-							}
-						}}
-					>
-						Resend
-					</button>
-				</p>
-				<SubmitButton textValue='Verify' />
-			</form>
-		</Form>
+                                if (!error && data) {
+                                    triggerCustomToast(
+                                        'success',
+                                        'OTP resent successfully',
+                                        'OTP resent successfully',
+                                    );
+                                }
+                            }}
+                        >
+                            Resend
+                        </button>
+                    </p>
+                    <SubmitButton textValue='Verify' />
+                </form>
+            </Form>
+        </Suspense>
 	);
 };
 

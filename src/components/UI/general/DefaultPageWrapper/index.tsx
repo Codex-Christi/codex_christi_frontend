@@ -2,25 +2,25 @@ import { FC, ReactNode } from 'react';
 import MainNav from '../MainNav';
 
 interface DefaultPageWrapperInterface {
-  children?: ReactNode;
-  hasMainNav?: boolean | undefined;
+	children?: ReactNode;
+	hasMainNav?: boolean | undefined;
 }
 
 const DefaultPageWrapper: FC<DefaultPageWrapperInterface> = ({
-  children,
-  hasMainNav,
+	children,
+	hasMainNav,
 }) => {
-  // Vars
+	// Vars
 
-  hasMainNav === undefined || true ? true : false;
+	hasMainNav === undefined || true ? true : false;
 
-  // Main JSX
-  return (
-    <>
-      {hasMainNav && <MainNav />}
-      {children}
-    </>
-  );
+	// Main JSX
+	return (
+		<>
+			{hasMainNav && <MainNav />}
+			{children}
+		</>
+	);
 };
 
 export default DefaultPageWrapper;
