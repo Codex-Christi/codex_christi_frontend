@@ -1,8 +1,8 @@
 'use client';
 
 import { FC, useState } from 'react';
-import Image from "next/image";
-import Link from "next/link";
+// import Image from "next/image";
+// import Link from "next/link";
 import Logo from '../Logo';
 import NavList from './NavList';
 import SideDrawer from './SideDrawer';
@@ -21,15 +21,27 @@ const MainNav: FC = () => {
 		<>
 			<nav
 				role='navigation'
-				className={`!z-[99] absolute top-[0] flex w-full pt-4 px-6 md:px-8 lg:py-2 lg:px-0 justify-between lg:justify-around items-center !bg-transparent !text-white !select-none`}
+				className={`!z-[99] absolute top-[0] flex w-full pt-4 px-6 md:px-8 lg:py-2 justify-between lg:justify-around items-center !bg-transparent !text-white !select-none`}
 			>
 				<Logo />
 
-                <div>
+                {/* <div className='flex items-center justify-between gap-12 w-full'>
                     <Link href="/">
                         <Image src="/media/img/general/home-icon.svg" alt="Home" width={24} height={24} />
                     </Link>
-                </div>
+
+                    <Link href="/">
+                        <Image src="/media/img/general/podcast-icon.svg" alt="Podcast" width={24} height={24} />
+                    </Link>
+
+                    <Link href="/">
+                        <Image src="/media/img/general/notifications-icon.svg" alt="Notifications" width={24} height={24} />
+                    </Link>
+
+                    <Link href="/">
+                        <Image src="/media/img/general/community-icon.svg" alt="Community" width={24} height={24} />
+                    </Link>
+                </div> */}
 
 				{/* Mobile Hamburger */}
 				<button
@@ -63,7 +75,7 @@ const MainNav: FC = () => {
 				</button>
 
 				{/*  NavList for Desktop only*/}
-				{/* {isDesktopOnly && <NavList />} */}
+				{isDesktopOnly && <NavList />}
 			</nav>
 
 			{/* Drawer */}
