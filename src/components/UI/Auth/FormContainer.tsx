@@ -1,5 +1,6 @@
 import AuthPagesBGWrapper from "@/components/UI/auth_pages/AuthPagesBGWrapper";
-import Logo from "../general/Logo";
+import Link from "next/link";
+import Image from "next/image";
 import { FC } from "react";
 import CometsContainer from "../Home/Comets";
 
@@ -19,10 +20,9 @@ const FormContainer: FC<IFormContainer> = ({ children }) => {
                 md:w-[53%] md:max-w-[440px]
                 lg:w-[48%] lg:max-w-[455px]"
 			>
-				<Logo
-					with_text
-					className="scale-[1.1] lg:scale-[.95] !mx-auto !w-max"
-				/>
+                <Link className="mx-auto" href="/">
+                    <Image src="/media/img/general/auth-logo.svg" width={200} height={200} alt="Codex Christi" />
+                </Link>
 
 				<div
                     className={

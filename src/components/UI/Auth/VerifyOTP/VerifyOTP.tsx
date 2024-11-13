@@ -17,14 +17,17 @@ import {
 } from '@/components/UI/primitives/input-otp';
 import { SubmitButton } from '@/components/UI/Auth/FormActionButtons';
 import { useCustomToast } from '@/lib/hooks/useCustomToast';
+import { useEffect } from "react";
 
 const VerifyOTP = () => {
-	const { verifyOTP, isError, userData, errorMsg } = useVerifyOTP();
+    const { verifyOTP, isError, userData, errorMsg, isLoading } = useVerifyOTP();
+
 	const {
 		resendOTP,
 		isError: error,
 		userData: data,
-		errorMsg: msg,
+        errorMsg: msg,
+        isLoading: loading
 	} = useResendOTP();
 
 	const { triggerCustomToast } = useCustomToast();
@@ -55,8 +58,14 @@ const VerifyOTP = () => {
 		};
 
 		await verifyOTP(userSendData);
+	};
 
-		if (isError && !userData) {
+	useEffect(() => {
+		if (isLoading) {
+			triggerCustomToast('processs', 'Please wait moment');
+        }
+
+        if (isError && !userData) {
 			triggerCustomToast('error', errorMsg);
 		}
 
@@ -67,7 +76,25 @@ const VerifyOTP = () => {
 				'Account verified successfully.',
 			);
 		}
-	};
+	}, [errorMsg, isError, isLoading, triggerCustomToast, userData]);
+
+    useEffect(() => {
+		if (loading) {
+			triggerCustomToast('processs', 'Please wait moment');
+        }
+
+        if (error && !data) {
+			triggerCustomToast('error', msg);
+        }
+
+        if (!error && data) {
+			triggerCustomToast(
+				'success',
+				'OTP Resent Successfully.',
+				'OTP resent successfully..',
+			);
+		}
+	}, [triggerCustomToast, msg, data, error, loading]);
 
 	return (
 		<Form {...verifyOTPForm}>

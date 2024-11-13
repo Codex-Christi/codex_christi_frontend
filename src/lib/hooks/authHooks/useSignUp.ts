@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 
 const client = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}/api/v1`,
+  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}/v1`,
 });
 
 export type UserDataSendType = {
