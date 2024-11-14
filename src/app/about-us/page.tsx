@@ -35,7 +35,7 @@ const AboutUsPage = () => {
 
 			<CometsContainer />
 
-			<main className='w-full max-w-full pb-10 !overflow-x-hidden relative space-y-4 px-6 pt-10 md:pt-0 md:px-10'>
+			<main className='w-full max-w-full pb-10 !overflow-x-hidden relative space-y-4 px-6 pt-10 md:pt-0 md:px-10 lg:space-y-8'>
 				<AboutUs />
 			</main>
 
