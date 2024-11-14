@@ -8,17 +8,19 @@ import { EmailInput, PasswordInput } from '@/components/UI/Auth/FormFields';
 import { SubmitButton } from '@/components/UI/Auth/FormActionButtons';
 import { useLogin } from '@/lib/hooks/authHooks/useLogin';
 import Link from 'next/link';
-import GoogleIcon from '@/components/GoogleIcon';
-import AppleIcon from '@/components/AppleIcon';
-import GitHubIcon from '@/components/GitHubIcon';
+import GoogleIcon from '@/components/UI/general/IconComponents/GoogleIcon';
+import AppleIcon from '@/components/UI/general/IconComponents/AppleIcon';
+import GitHubIcon from '@/components/UI/general/IconComponents/GitHubIcon';
 import { useCustomToast } from '@/lib/hooks/useCustomToast';
 import { useEffect } from 'react';
+import useAuthStore from '@/store/authStore';
 
+// Main Component
 const SignIn = () => {
-  const { login, isError, errorMsg, userData, isLoading } = useLogin();
-
+  // Hooks
+  const { login, isError, errorMsg, loginSuccessData, isLoading } = useLogin();
   const { triggerCustomToast } = useCustomToast();
-
+  const setLoginState = useAuthStore((state) => state.setLoginState);
   const signInForm = useForm<signInSchemaType>({
     resolver: zodResolver(signInSchema),
     defaultValues: {
@@ -57,12 +59,21 @@ const SignIn = () => {
       triggerCustomToast('error', errorMsg);
     }
 
-    if (isError === false && userData !== null) {
+    if (isError === false && loginSuccessData !== null) {
       triggerCustomToast('success', 'Login successful.');
+      const { access, refresh } = loginSuccessData;
+      setTimeout(() => {
+        setLoginState(access, refresh);
+      }, 500);
     }
-
-    console.log(userData);
-  }, [errorMsg, isError, isLoading, triggerCustomToast, userData]);
+  }, [
+    errorMsg,
+    isError,
+    isLoading,
+    triggerCustomToast,
+    loginSuccessData,
+    setLoginState,
+  ]);
 
   // Main JSX
   return (

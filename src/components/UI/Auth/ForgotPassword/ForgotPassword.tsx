@@ -1,17 +1,13 @@
 'use client';
 
-import { PasswordResetLogo } from '@/components/AuthLogo';
+import { PasswordResetLogo } from '@/components/UI/general/IconComponents/AuthLogo';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { Form } from '@/components/UI/primitives/form';
 import { EmailInput } from '@/components/UI/Auth/FormFields';
 import { SubmitButton } from '@/components/UI/Auth/FormActionButtons';
-import { useLogin } from '@/lib/hooks/authHooks/useLogin';
 import { z } from 'zod';
-import {
-  SignUpFormSchemaWithRefine,
-  SignUpFormSchema,
-} from '@/lib/formSchemas/signUpFormSchema';
+import { SignUpFormSchema } from '@/lib/formSchemas/signUpFormSchema';
 
 const forgotPasswordSchema = SignUpFormSchema.pick({
   email: true,
@@ -21,8 +17,6 @@ const forgotPasswordSchema = SignUpFormSchema.pick({
 export type ForgotPasswordSchemaType = z.infer<typeof forgotPasswordSchema>;
 
 const ForgotPassword = () => {
-  const { login } = useLogin();
-
   const forgotPasswordForm = useForm<ForgotPasswordSchemaType>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
