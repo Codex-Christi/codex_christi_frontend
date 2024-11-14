@@ -1,5 +1,6 @@
 import SignIn from '@/components/UI/Auth/SignIn/SignIn';
 import { Metadata } from 'next';
+import LoggedinProvider from '@/components/UI/Providers/LoggedinProvider';
 
 export const metadata: Metadata = {
   title: 'Sign In | Codex Christi',
@@ -7,7 +8,11 @@ export const metadata: Metadata = {
 };
 
 const SignInPage = (): JSX.Element => {
-  return <SignIn />;
+  return (
+    <LoggedinProvider>
+      <SignIn />
+    </LoggedinProvider>
+  );
 };
 
 export default SignInPage;

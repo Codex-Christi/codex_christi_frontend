@@ -1,6 +1,6 @@
 'use client';
 
-import { ResetPasswordLogo } from '@/components/AuthLogo';
+import { ResetPasswordLogo } from '@/components/UI/general/IconComponents/AuthLogo';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { Form } from '@/components/UI/primitives/form';
