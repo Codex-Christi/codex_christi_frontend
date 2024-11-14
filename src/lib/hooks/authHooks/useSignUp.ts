@@ -20,11 +20,11 @@ interface SignupHookInterface {
   errorMsg: string;
   userData: UserDataReturnType | null;
 }
-interface SignUpResponse {
-  user: UserDataReturnType; // Assuming response includes a user object
-  message?: string; // Optional message for success/error
-  email?: string;
-}
+// interface SignUpResponse {
+//   user: UserDataReturnType; // Assuming response includes a user object
+//   message?: string; // Optional message for success/error
+//   email?: string;
+// }
 
 // Default values
 const defaultSignUpProcessState: SignupHookInterface = {

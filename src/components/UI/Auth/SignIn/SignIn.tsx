@@ -66,53 +66,54 @@ const SignIn = () => {
 
   // Main JSX
   return (
-    <Form {...signInForm}>
-      <form
-        onSubmit={signInForm.handleSubmit(signInFormSubmitHandler)}
-        className={`mt-12 px-4 sm:px-0 !font-montserrat
+    <>
+      <Form {...signInForm}>
+        <form
+          onSubmit={signInForm.handleSubmit(signInFormSubmitHandler)}
+          className={`w-[80%] max-w-[375px] mt-12 !font-montserrat
                     sm:w-[70%] sm:max-w-[400px]
                     md:w-[50%] md:max-w-[410px]
-                    lg:w-[100%] lg:max-w-[425px]
-                    mx-auto relative`}
-      >
-        <EmailInput currentZodForm={signInForm} inputName='email' />
+                    lg:w-full lg:max-w-[425px]
+                    mx-auto relative mb-12`}
+        >
+          <EmailInput currentZodForm={signInForm} inputName='email' />
 
-        <PasswordInput currentZodForm={signInForm} inputName='password' />
+          <PasswordInput currentZodForm={signInForm} inputName='password' />
 
-        <SubmitButton textValue='Log In' />
+          <SubmitButton textValue='Log In' />
+        </form>
+      </Form>
+      <div className='mt-16 space-y-12 text-center'>
+        <div className='space-y-4 lg:w-1/2 lg:mx-auto'>
+          <p>or Sign In with</p>
 
-        <div className='mt-16 space-y-12 text-center'>
-          <div className='space-y-4 lg:w-1/2 lg:mx-auto'>
-            <p>or Sign In with</p>
-
-            <div className='flex place-content-center justify-between gap-4 mx-auto'>
-              <Link href=''>
-                <GoogleIcon />
-              </Link>
-
-              <Link href=''>
-                <AppleIcon />
-              </Link>
-
-              <Link href=''>
-                <GitHubIcon />
-              </Link>
-            </div>
-          </div>
-
-          <p className='w-full text-center'>
-            Don’t have an account?{' '}
-            <Link
-              className='text-white font-semibold'
-              type='button'
-              href='/auth/signup'
-            >
-              Sign Up
+          <div className='flex place-content-center justify-between gap-4 mx-auto'>
+            <Link href=''>
+              <GoogleIcon />
             </Link>
-          </p>
+
+            <Link href=''>
+              <AppleIcon />
+            </Link>
+
+            <Link href=''>
+              <GitHubIcon />
+            </Link>
+          </div>
         </div>
-      </form>
-    </Form>
+
+        <p className='w-full text-center'>
+          Don’t have an account?{' '}
+          <Link
+            className='text-white font-semibold'
+            type='button'
+            href='/auth/signup'
+          >
+            Sign Up
+          </Link>
+        </p>
+      </div>
+    </>
   );
 };
 
