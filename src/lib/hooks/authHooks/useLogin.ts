@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 const tokenClient = axios.create({
 	baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
@@ -43,20 +43,48 @@ export const useLogin = () => {
 				userData: loginRes.data,
 			});
 
-			return loginRes.data;
-		} catch (err: AxiosError | any) {
-			const { data } = err.response;
+      return loginRes.data;
+    } catch (err: AxiosError | any) {
+      const { data } = err.response;
 
-			setLoginProcessState((prev) => ({
-				...prev,
-				isLoading: false,
-				isError: true,
-				errorMsg: data.detail || 'An error occurred',
-			}));
+      setLoginProcessState((prev) => ({
+        ...prev,
+        isLoading: false,
+        isError: true,
+        errorMsg: data.detail || 'An error occurred',
+      }));
 
-			return data.detail ? data.detail : 'An error occurred';
-		}
-	};
+      return data.detail ? data.detail : 'An error occurred';
+    }
+  };
 
 	return { ...loginProcessState, login };
+};
+
+export const properlyReturnAnyError = (error: AxiosError) => {
+  if (axios.isAxiosError(error)) {
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      // Return responseText
+      const responseTextObj = JSON.parse(error.response.request.responseText);
+      if (typeof responseTextObj === 'object') {
+        const responseTextObjArr = Object.values(
+          responseTextObj
+        )[0] as string[];
+        return responseTextObjArr;
+      } else {
+        return responseTextObj;
+      }
+    } else if (error.request) {
+      // The request was made but no response was received
+      return `${error.message}`;
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      return `Error:, ${error.message}`;
+    }
+  } else {
+    // Non-Axios error
+    return `An error occured!`;
+  }
 };

@@ -3,7 +3,7 @@ import axios, { AxiosError, AxiosResponse } from 'axios';
 import { useState } from 'react';
 
 const tokenClient = axios.create({
-	baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}/v1`,
+  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}/v1`,
 });
 
 type otpType = { email: string; otp: string };
@@ -11,17 +11,17 @@ type resendOTPType = { email: string };
 type UserDataReturnType = { id: number; name: string; email: string };
 
 interface IVerifyOTP {
-	isLoading: boolean;
-	isError: boolean;
-	errorMsg: string;
-	userData: UserDataReturnType | null;
+  isLoading: boolean;
+  isError: boolean;
+  errorMsg: string;
+  userData: UserDataReturnType | null;
 }
 
 const defaultVerifyOTPProcessState: IVerifyOTP = {
-	isLoading: false,
-	isError: false,
-	errorMsg: '',
-	userData: null,
+  isLoading: false,
+  isError: false,
+  errorMsg: '',
+  userData: null,
 };
 
 export const useVerifyOTP = () => {

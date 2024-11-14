@@ -17,7 +17,7 @@ export interface InputProps
   iconProps?: IconBaseProps;
 }
 
-interface LockIconInterface extends IconBaseProps {}
+type LockIconInterface = IconBaseProps;
 
 const LockIcon: React.FC<LockIconInterface> = (props) => {
   return (
