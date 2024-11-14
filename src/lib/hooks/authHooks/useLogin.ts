@@ -1,8 +1,8 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 const tokenClient = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
+  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}/api/`,
 });
 
 type loginType = { email: string; password: string };
@@ -26,11 +26,13 @@ export const useLogin = () => {
   const [loginProcessState, setLoginProcessState] =
     useState<SignInHookInterface>(defaultSignUpProcessState);
 
-  const login = async (userDetails: loginType) => {
-    setLoginProcessState;
+  const login = useCallback(async (userDetails: loginType) => {
+    setLoginProcessState((prev) => {
+      return { ...prev, isLoading: true };
+    });
     try {
       const loginRes: AxiosResponse<UserDataReturnType> =
-        await tokenClient.post(`/api/token/`, { ...userDetails });
+        await tokenClient.post(`/token/`, { ...userDetails });
 
       setLoginProcessState({
         isLoading: false,
@@ -40,19 +42,47 @@ export const useLogin = () => {
       });
 
       return loginRes.data;
-    } catch (err: AxiosError | any) {
-      const { data } = err.response;
-
+    } catch (err: unknown) {
+      // Handle error case and set loading to false
       setLoginProcessState((prev) => ({
         ...prev,
         isLoading: false,
         isError: true,
-        errorMsg: data.detail || 'An error occurred',
+        errorMsg:
+          properlyReturnAnyError(err as AxiosError) || 'An error occurred', // Handle error message
       }));
 
-      return data.detail ? data.detail : 'An error occurred';
+      return properlyReturnAnyError(err as AxiosError); // Return error message
     }
-  };
+  }, []);
 
   return { ...loginProcessState, login };
+};
+
+export const properlyReturnAnyError = (error: AxiosError) => {
+  if (axios.isAxiosError(error)) {
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      // Return responseText
+      const responseTextObj = JSON.parse(error.response.request.responseText);
+      if (typeof responseTextObj === 'object') {
+        const responseTextObjArr = Object.values(
+          responseTextObj
+        )[0] as string[];
+        return responseTextObjArr;
+      } else {
+        return responseTextObj;
+      }
+    } else if (error.request) {
+      // The request was made but no response was received
+      return `${error.message}`;
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      return `Error:, ${error.message}`;
+    }
+  } else {
+    // Non-Axios error
+    return `An error occured!`;
+  }
 };

@@ -15,10 +15,7 @@ import {
   NameInput,
   PasswordInput,
 } from '../FormFields';
-import {
-  useRegularSignUp,
-  UserDataReturnType,
-} from '@/lib/hooks/authHooks/useSignUp';
+import { useRegularSignUp } from '@/lib/hooks/authHooks/useSignUp';
 import { useRouter } from 'next/navigation';
 
 // Styles import
@@ -142,7 +139,7 @@ const SignUpForm = () => {
                     sm:w-[70%] sm:max-w-[400px]
                     md:w-[50%] md:max-w-[410px]
                     lg:w-full lg:max-w-[425px]
-                    mx-auto relative flex -mb-12`}
+                    mx-auto relative flex`}
       >
         {/* First set of fields */}
         <div

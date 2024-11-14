@@ -4,7 +4,6 @@ import CometsContainer from '@/components/UI/Home/Comets';
 import Image from 'next/image';
 import Footer from '@/components/UI/Footer';
 import { Metadata } from 'next/types';
-import { headers } from 'next/headers';
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
