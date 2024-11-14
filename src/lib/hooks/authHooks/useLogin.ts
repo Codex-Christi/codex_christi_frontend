@@ -2,7 +2,7 @@ import axios, { AxiosError, AxiosResponse } from 'axios';
 import { useCallback, useState } from 'react';
 
 const tokenClient = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}/api/`,
+  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
 });
 
 type loginType = { email: string; password: string };
