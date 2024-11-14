@@ -8,11 +8,10 @@ import {
 	verifyOTPSchemaType,
 } from '@/lib/formSchemas/verifyOTPSchema';
 import { useVerifyOTP, useResendOTP } from '@/lib/hooks/authHooks/useVerifyOTP';
-import { useSearchParams } from 'next/navigation';
+import { permanentRedirect, useSearchParams } from 'next/navigation';
 import {
 	InputOTP,
 	InputOTPGroup,
-	InputOTPSeparator,
 	InputOTPSlot,
 } from '@/components/UI/primitives/input-otp';
 import { SubmitButton } from '@/components/UI/Auth/FormActionButtons';
@@ -61,11 +60,7 @@ const VerifyOTP = () => {
 	};
 
 	useEffect(() => {
-		if (isLoading) {
-			triggerCustomToast('processs', 'Please wait moment');
-        }
-
-        if (isError && !userData) {
+		if (isError && !userData) {
 			triggerCustomToast('error', errorMsg);
 		}
 
@@ -75,26 +70,30 @@ const VerifyOTP = () => {
 				'Account verified successfully.',
 				'Account verified successfully.',
 			);
+
+            permanentRedirect(`/auth/sign-in?email=${email}`);
 		}
-	}, [errorMsg, isError, isLoading, triggerCustomToast, userData]);
+	}, [errorMsg, isError, isLoading, triggerCustomToast, userData, email]);
 
     useEffect(() => {
-		if (loading) {
-			triggerCustomToast('processs', 'Please wait moment');
-        }
-
-        if (error && !data) {
+		if (error && !data) {
 			triggerCustomToast('error', msg);
         }
 
-        if (!error && data) {
+        if (data) {
 			triggerCustomToast(
 				'success',
 				'OTP Resent Successfully.',
-				'OTP resent successfully..',
+				'OTP resent successfully.',
 			);
+        }
+    }, [triggerCustomToast, msg, data, error, loading]);
+
+    useEffect(() => {
+		if (loading === true || isLoading === true) {
+			triggerCustomToast('processs', 'Please wait moment');
 		}
-	}, [triggerCustomToast, msg, data, error, loading]);
+	}, [loading, isLoading, triggerCustomToast]);
 
 	return (
 		<Form {...verifyOTPForm}>
@@ -106,19 +105,14 @@ const VerifyOTP = () => {
 					<InputOTP
 						maxLength={6}
 						value={verifyOTPForm.watch('otp')}
-						onChange={(otp) => setValue('otp', otp)}
+                        onChange={(otp) => setValue('otp', otp)}
+                        autoFocus
 					>
 						<InputOTPGroup>
 							<InputOTPSlot index={0} />
 							<InputOTPSlot index={1} />
-						</InputOTPGroup>
-						<InputOTPSeparator />
-						<InputOTPGroup>
 							<InputOTPSlot index={2} />
 							<InputOTPSlot index={3} />
-						</InputOTPGroup>
-						<InputOTPSeparator />
-						<InputOTPGroup>
 							<InputOTPSlot index={4} />
 							<InputOTPSlot index={5} />
 						</InputOTPGroup>
@@ -136,7 +130,7 @@ const VerifyOTP = () => {
 									email ??
 									prompt('Enter email: ')?.trim() ??
 									('' as string),
-							});
+                            });
 						}}
 					>
 						Resend

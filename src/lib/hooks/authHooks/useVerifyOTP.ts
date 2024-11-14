@@ -28,7 +28,12 @@ export const useVerifyOTP = () => {
 	const [verifyOTPProcessState, setVerifyOTPProcessState] =
 		useState<IVerifyOTP>(defaultVerifyOTPProcessState);
 
-	const verifyOTP = async (userDetails: otpType) => {
+    const verifyOTP = async (userDetails: otpType) => {
+        setVerifyOTPProcessState((prev) => ({
+			...prev,
+			isLoading: true,
+		}));
+
 		try {
 			const verifyOTPRes: AxiosResponse<UserDataReturnType> =
 				await tokenClient.post(`/verify-otp/`, { ...userDetails });
@@ -63,6 +68,11 @@ export const useResendOTP = () => {
 		useState<IVerifyOTP>(defaultVerifyOTPProcessState);
 
 	const resendOTP = async (userDetails: resendOTPType) => {
+        setVerifyOTPProcessState((prev) => ({
+			...prev,
+			isLoading: true,
+        }));
+
 		try {
 			const resendOTPRes: AxiosResponse<UserDataReturnType> =
 				await tokenClient.post(`/resend-otp/`, { ...userDetails });
