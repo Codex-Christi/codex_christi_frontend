@@ -7,7 +7,7 @@ const AboutUs = () => {
 				<section className='bg-[linear-gradient(180deg,_#3D3D3D_0%,_rgba(0,_24,_140,_0.5)_100%)] p-8 rounded-[20px] space-y-4'>
 					<h2 className='text-2xl leading-6 font-nico'>
 						OUR <br />
-						VISSION
+						VISION
 					</h2>
 
 					<p>
@@ -63,11 +63,11 @@ const AboutUs = () => {
 			</div>
 
 			<section className='bg-[linear-gradient(90deg,_rgba(31,_34,_72,_0.5)_1.52%,_rgba(51,_40,_109,_0.5)_100%)] p-8 rounded-[20px] space-y-12'>
-				<h2 className='text-[40px] leading-10 text-center font-nico'>
+				<h2 className='text-2xl lg:text-[40px] leading-10 text-center font-nico'>
 					MEET THE TEAM
 				</h2>
 
-				<div className='mx-auto grid grid-cols-2 gap-10 lg:grid-cols-4'>
+				<div className='mx-auto grid grid-cols-2 gap-4 lg:gap-10 lg:grid-cols-4'>
 					<div className='space-y-4'>
 						<Image
 							className='mx-auto'
@@ -78,7 +78,7 @@ const AboutUs = () => {
 						/>
 
 						<div className='text-center'>
-							<p className='text-2xl font-semibold text-white'>
+							<p className='text-lg lg:text-2xl font-semibold text-white'>
 								Saint Tarila Brisbe
 							</p>
 
@@ -96,7 +96,7 @@ const AboutUs = () => {
 						/>
 
 						<div className='text-center'>
-							<p className='text-2xl font-semibold text-white'>
+							<p className='text-lg lg:text-2xl font-semibold text-white'>
 								Adebisi Ade
 							</p>
 
@@ -108,14 +108,14 @@ const AboutUs = () => {
 						<Image
 							className='mx-auto'
 							src='/media/img/general/kennedy-barile.svg'
-							alt='Kennedy Barile'
+							alt='Kennedy Kebarile'
 							width={72}
 							height={72}
 						/>
 
 						<div className='text-center'>
-							<p className='text-2xl font-semibold text-white'>
-								Kennedy Barile
+							<p className='text-lg lg:text-2xl font-semibold text-white'>
+								Kennedy Kebarile
 							</p>
 
 							<p>Co founder/Design</p>
@@ -132,7 +132,7 @@ const AboutUs = () => {
 						/>
 
 						<div className='text-center'>
-							<p className='text-2xl font-semibold text-white'>
+							<p className='text-lg lg:text-2xl font-semibold text-white'>
 								Lionel Messi
 							</p>
 

@@ -17,7 +17,7 @@ const AboutUsPage = () => {
 	return (
 		<DefaultPageWrapper hasMainNav>
 			<div className='relative'>
-				<h1 className='text-3xl leading-6 font-nico w-auto inline-block absolute top-1/3 z-50 mx-12 md:mx-20'>
+				<h1 className='text-2xl lg:text-3xl leading-6 font-nico w-auto inline-block absolute top-[70%] lg:top-1/3 z-50 mx-12 md:mx-20'>
 					About <br />{' '}
 					<span className='text-right ml-auto block w-full'>Us</span>
 				</h1>
