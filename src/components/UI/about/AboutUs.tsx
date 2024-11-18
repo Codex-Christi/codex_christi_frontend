@@ -82,7 +82,7 @@ const AboutUs = () => {
 								Saint Tarila Brisbe
 							</p>
 
-							<p>Co Founder/Dev team</p>
+							<p>Co founder/Dev team</p>
 						</div>
 					</div>
 

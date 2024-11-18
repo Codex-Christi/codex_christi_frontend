@@ -3,7 +3,7 @@ import Image from "next/image";
 
 const Footer = () => {
     return (
-        <footer className="bg-[#3d3d3d] text-white flex justify-between flex-wrap gap-4 p-8">
+        <footer className="bg-[#3d3d3d] text-white flex justify-between flex-wrap gap-4 p-8 relative z-50">
             <div className="flex items-center gap-7 flex-wrap">
                 <Link className="font-bold text-lg lg:text-2xl lg:border-r lg:border-white pr-3.5" href="/contact-us">
                     Contact Us
