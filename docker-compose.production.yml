@@ -4,11 +4,12 @@ services:
   nginx:
     image: 'nginx:1.27.3-bookworm'
     volumes:
-      - ./nginx/production.conf:/etc/nginx/nginx.conf
+      # - ./nginx/production.conf:/etc/nginx/nginx.conf
+      - '/etc/nginx/sites-available/codexchristi.org'
     command: ['nginx', '-g', 'daemon off;']
     restart: always
     ports:
-      - 9000:80
+      - 80:80
     networks:
       - public
     depends_on:
