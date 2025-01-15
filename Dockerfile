@@ -1,8 +1,6 @@
 # The base image
 FROM node:20.16.0-bookworm-slim AS base
 
-
-
 # The "dependencies" stage
 # It's good to install dependencies in a separate stage to be explicit about
 # the files that make it into production stage to avoid image bloat
@@ -14,7 +12,8 @@ RUN corepack enable
 # The application directory
 WORKDIR /app
 
-# Copy fiels for package management
+
+# Copy files for package management
 COPY package.json yarn.lock .yarnrc.yml ./
 
 # Install packages
@@ -42,7 +41,8 @@ RUN mkdir -p /app/.next && chown -R nextjs:nodejs /app
 COPY --from=deps --chown=nextjs:nodejs /app/yarn.lock /app/yarn.lock
 
 # Copy the rest of the application files
-COPY --chown=nextjs:nodejs . .
+COPY --chown=nextjs:nodejs . /app/
+
 
 # Enable production mode
 ENV NODE_ENV=production
@@ -53,6 +53,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Configure application port
 ENV PORT=3000
 
+# ENV NEXT_PRIVATE_STANDALONE=true
+
+
 # Let image users know what port the app is going to listen on
 EXPOSE 3000
 
@@ -61,3 +64,5 @@ USER nextjs:nodejs
 
 # Make sure dependencies are picked up correctly
 RUN yarn install --immutable --inline-builds
+
+RUN cd /app/src/components/UI/about && ls
