@@ -64,5 +64,3 @@ USER nextjs:nodejs
 
 # Make sure dependencies are picked up correctly
 RUN yarn install --immutable --inline-builds
-
-RUN cd /app/src/components/UI/about && ls
