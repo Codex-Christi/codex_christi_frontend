@@ -25,7 +25,7 @@ jobs:
           ssh -i vps_key.pem "${{ secrets.VPS_SSH_USERNAME }}@${{ secrets.VPS_IP }}" bash -c "'
             set -eo pipefail
 
-            cd app
+            cd apps/codexchristi
             git pull origin main
 
             nohup ./production.sh > "deploy-${DATE}.log" 2> "deploy-${DATE}.log" &
