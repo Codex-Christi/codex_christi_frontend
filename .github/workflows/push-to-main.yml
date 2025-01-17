@@ -1,0 +1,32 @@
+name: Push to main
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Clone the repo
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare SSH key
+        run: |
+          echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > vps_key.pem
+          chmod 0600 vps_key.pem
+      - name: Prepare the known_hosts
+        run: |
+          mkdir ~/.ssh/ && touch ~/.ssh/known_hosts
+          echo "${{ secrets.VPS_SSH_HOST_KEYS }}" | base64 -d >> ~/.ssh/known_hosts
+      - name: Start the deployment of the latest version in the background
+        run: |
+          DATE=$(date "+%Y%m%d%H%M%S")
+
+          ssh -i vps_key.pem "${{ secrets.VPS_SSH_USERNAME }}@${{ secrets.VPS_IP }}" bash -c "'
+            set -eo pipefail
+
+            cd app
+            git pull origin main
+
+            nohup ./production.sh > "deploy-${DATE}.log" 2> "deploy-${DATE}.log" &
+          '"
