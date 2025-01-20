@@ -4,7 +4,7 @@ set -exo pipefail
 
 # Build and run the latest version of the app
 docker compose -f docker-compose.production.yml down
-docker compose --file docker-compose.production.yml up --build --detach nginx
+docker compose --file docker-compose.production.yml up --build --detach nginx >fe_logs.txt
 
 # Remove the unused containers
 docker system prune --force
