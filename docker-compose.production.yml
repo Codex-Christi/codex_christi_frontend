@@ -32,7 +32,9 @@ services:
       - .env.production
     volumes:
       - 'app_build:/app/.next'
-    command: ['sh', '-c', 'yarn', 'start', '|', 'npx', 'pino-pretty']
+    # command: ['sh', '-c', 'yarn', 'start', '|', 'npx', 'pino-pretty', '-y']
+    command: ['yarn', 'start']
+
     restart: always
     networks:
       - public
