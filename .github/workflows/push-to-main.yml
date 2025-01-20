@@ -28,5 +28,5 @@ jobs:
             cd apps/codexchristi
             git pull origin main
 
-            nohup ./production.sh > "deploy-${DATE}.log" 2> "deploy-${DATE}.log" &
+            nohup ./devScripts/production.sh > "deploy-${DATE}.log" 2> "deploy-${DATE}.log" &
           '"
