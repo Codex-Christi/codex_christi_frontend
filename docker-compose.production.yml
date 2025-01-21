@@ -48,21 +48,21 @@ services:
     context: .
     dockerfile: Dockerfile
     target: production
-  env_file:
-    - .env.production
-  volumes:
-    - 'app_build:/app/.next'
-    # command: ['sh', '-c', 'yarn', 'start', '|', 'npx', 'pino-pretty', '-y']
-  command: ['yarn', 'start']
+    extends: app
 
-  restart: always
-  ports: -3001:3000
-  networks:
-    - public
-    - internal
-  depends_on:
-    app_build:
-      condition: service_completed_successfully
+  # volumes:
+  #   - 'app_build:/app/.next'
+  #   # command: ['sh', '-c', 'yarn', 'start', '|', 'npx', 'pino-pretty', '-y']
+  # command: ['yarn', 'start']
+
+  # restart: always
+  # ports: -3001:3000
+  # networks:
+  #   - public
+  #   - internal
+  # depends_on:
+  #   app_build:
+  #     condition: service_completed_successfully
 
   # The one-off container that builds the application
   app_build:
