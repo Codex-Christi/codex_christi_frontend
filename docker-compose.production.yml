@@ -42,7 +42,6 @@ services:
     depends_on:
       app_build:
         condition: service_completed_successfully
-  #
 
   # The one-off container that builds the application
   app_build:
