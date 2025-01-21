@@ -44,11 +44,11 @@ services:
         condition: service_completed_successfully
   # The shop app
   shop-app:
-  build:
-    context: .
-    dockerfile: Dockerfile
-    target: production
-    extends: app
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+      extends: app
 
   # volumes:
   #   - 'app_build:/app/.next'
