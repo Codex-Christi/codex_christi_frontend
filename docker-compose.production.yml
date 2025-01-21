@@ -1,28 +1,32 @@
 services:
-  # The reverse proxy - the main entrypoint into the application. Holds the TLS
-  # certificates.
   nginx:
     image: 'nginx:1.27.3-bookworm'
     volumes:
-      - ./nginx/production.conf:/etc/nginx/nginx.conf
-      - ./certs:/certs # Add certificates volume
-    command: ['nginx', '-g', 'daemon off;']
+      - './nginx/production.conf:/etc/nginx/nginx.conf'
+      - './certs:/certs'
+    command:
+      - nginx
+      - '-g'
+      - daemon off;
     restart: always
     ports:
-      - 443:443 # Expose port 443 instead of 80
+      - '443:443'
     networks:
       - public
     depends_on:
       app:
         condition: service_started
     healthcheck:
-      test: ['CMD', 'service', 'nginx', 'status']
+      test:
+        - CMD
+        - service
+        - nginx
+        - status
       interval: 30s
       timeout: 5s
       retries: 5
       start_period: 10s
       start_interval: 1s
-  # The main application service
   app:
     build:
       context: .
@@ -32,9 +36,9 @@ services:
       - .env.production
     volumes:
       - 'app_build:/app/.next'
-    # command: ['sh', '-c', 'yarn', 'start', '|', 'npx', 'pino-pretty', '-y']
-    command: ['yarn', 'start']
-
+    command:
+      - yarn
+      - start
     restart: always
     networks:
       - public
@@ -42,29 +46,26 @@ services:
     depends_on:
       app_build:
         condition: service_completed_successfully
-  # The shop app
-  shop-app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
-      extends: app
-
-  # volumes:
-  #   - 'app_build:/app/.next'
-  #   # command: ['sh', '-c', 'yarn', 'start', '|', 'npx', 'pino-pretty', '-y']
-  # command: ['yarn', 'start']
-
-  # restart: always
-  # ports: -3001:3000
-  # networks:
-  #   - public
-  #   - internal
-  # depends_on:
-  #   app_build:
-  #     condition: service_completed_successfully
-
-  # The one-off container that builds the application
+  shop-app: null
+  build:
+    context: .
+    dockerfile: Dockerfile
+    target: production
+  env_file:
+    - .env.production
+  volumes:
+    - 'app_build:/app/.next'
+  command:
+    - yarn
+    - start
+  restart: always
+  ports: '-3001:3000'
+  networks:
+    - public
+    - internal
+  depends_on:
+    app_build:
+      condition: service_completed_successfully
   app_build:
     build:
       context: .
@@ -74,16 +75,11 @@ services:
       - .env.production
     volumes:
       - 'app_build:/app/.next'
-    command: ['yarn', 'build']
+    command:
+      - yarn
+      - build
 volumes:
-  # The volume that is going to store the .next directory where the built
-  # application is located
   app_build: {}
 networks:
-  # The network for services to which NGINX is connected, meant for services
-  # that have to be exposed to the outside (e.g. the Next.js application or an
-  # API server).
   public: {}
-  # The network for services that are not meant to be exposed to the outside
-  # e.g. Postgres database, Redis cache.
   internal: {}
