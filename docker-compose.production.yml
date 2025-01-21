@@ -71,8 +71,6 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    env_file:
-      - .env.production
     volumes:
       - 'app_build:/app/.next'
     command:
