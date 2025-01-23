@@ -37,9 +37,9 @@ services:
     ports:
       - 3000:3000 # Expose port 443 instead of 80
     restart: always
-    # networks:
-    #   - public
-    #   - internal
+    networks:
+      - public
+      - internal
     depends_on:
       app_build:
         condition: service_completed_successfully
@@ -59,11 +59,11 @@ volumes:
   # The volume that is going to store the .next directory where the built
   # application is located
   app_build: {}
-# networks:
-#   # The network for services to which NGINX is connected, meant for services
-#   # that have to be exposed to the outside (e.g. the Next.js application or an
-#   # API server).
-#   public: {}
-#   # The network for services that are not meant to be exposed to the outside
-#   # e.g. Postgres database, Redis cache.
-#   internal: {}
+networks:
+  # The network for services to which NGINX is connected, meant for services
+  # that have to be exposed to the outside (e.g. the Next.js application or an
+  # API server).
+  public: {}
+  # The network for services that are not meant to be exposed to the outside
+  # e.g. Postgres database, Redis cache.
+  internal: {}
