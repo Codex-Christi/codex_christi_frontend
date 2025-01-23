@@ -44,3 +44,7 @@ next-env.d.ts
 
 # Certificates
 certs
+
+# Next.js serverlogs 
+serverlogs.txt
+deploy-*.log

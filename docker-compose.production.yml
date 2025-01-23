@@ -32,7 +32,9 @@ services:
       - .env.production
     volumes:
       - 'app_build:/app/.next'
+    # command: ['sh', '-c', 'yarn', 'start', '|', 'npx', 'pino-pretty', '-y']
     command: ['yarn', 'start']
+
     restart: always
     networks:
       - public
@@ -40,6 +42,7 @@ services:
     depends_on:
       app_build:
         condition: service_completed_successfully
+
   # The one-off container that builds the application
   app_build:
     build:
