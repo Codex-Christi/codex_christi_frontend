@@ -59,7 +59,7 @@ ENV PORT=3000
 # Let image users know what port the app is going to listen on
 EXPOSE 3000
 
-RUN apt install curl
+RUN apt-get install curl
 # Change the user
 USER nextjs:nodejs
 
