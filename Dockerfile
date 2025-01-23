@@ -59,7 +59,6 @@ ENV PORT=3000
 # Let image users know what port the app is going to listen on
 EXPOSE 3000
 
-RUN yum install curl
 # Change the user
 USER nextjs:nodejs
 
