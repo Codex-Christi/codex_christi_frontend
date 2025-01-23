@@ -34,7 +34,8 @@ services:
       - 'app_build:/app/.next'
     # command: ['sh', '-c', 'yarn', 'start', '|', 'npx', 'pino-pretty', '-y']
     command: ['yarn', 'start']
-
+    ports:
+      - 3000:3000 # Expose port 443 instead of 80
     restart: always
     networks:
       - public
@@ -54,6 +55,8 @@ services:
     volumes:
       - 'app_build:/app/.next'
     command: ['yarn', 'build']
+    ports:
+      - 3000:3000
 volumes:
   # The volume that is going to store the .next directory where the built
   # application is located
