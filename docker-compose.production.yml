@@ -38,9 +38,9 @@ services:
     ports:
       - 3000:3000 # Expose port 443 instead of 80
     restart: always
-    networks:
-      - public
-      - internal
+    # networks:
+    #   - public
+    #   - internal
     depends_on:
       app_build:
         condition: service_completed_successfully
