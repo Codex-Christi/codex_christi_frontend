@@ -28,6 +28,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
+    container_name: codex-con-app-start
     env_file:
       - .env.production
     volumes:
@@ -50,13 +51,14 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
+    container_name: codex-con-app-build
     env_file:
       - .env.production
     volumes:
       - 'app_build:/app/.next'
     command: ['yarn', 'build']
-    ports:
-      - 3000:3000
+    # ports:
+    #   - 3000:3000
 volumes:
   # The volume that is going to store the .next directory where the built
   # application is located
