@@ -19,11 +19,12 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico, sitemap.xml, robots.txt (metadata files)
      */
-    {
-      source:
-        '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
-      has: [{ type: 'header', key: 'x-present' }],
-      missing: [{ type: 'header', key: 'x-missing', value: 'prefetch' }],
-    },
+    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+    // {
+    //   source:
+    //     '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+    //   has: [{ type: 'header', key: 'x-present' }],
+    //   missing: [{ type: 'header', key: 'x-missing', value: 'prefetch' }],
+    // },
   ],
 };
