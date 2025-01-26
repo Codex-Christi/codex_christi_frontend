@@ -11,7 +11,7 @@ export function middleware(req: NextRequest) {
 
   if (hostname) {
     logger.info(`Middleware triggered for ${url.pathname}`);
-    console.log(`Middleware triggered for ${url.pathname}`);
+    console.log(`Middleware triggered for ${hostname}`);
   }
 
   if (hostname === 'codexchristi.shop') {
