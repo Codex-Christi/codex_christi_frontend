@@ -9,33 +9,29 @@ export function middleware(req: NextRequest) {
     return NextResponse.next(); // Fallback if no host header exists
   }
 
-  if (hostname) {
-    // logger.info(`Middleware triggered for ${url.pathname}`);
-    console.log(`Middleware triggered for ${hostname} - hostname exists`);
-  }
-
+  // Custom logic for codexchristi.shop (domain.shop)
   if (hostname === 'codexchristi.shop') {
-    logger.info(`Middleware triggered for ${url.pathname} - cdx.shop here!!!`);
-    // Serve /shop and its child routes without rewriting the URL in the browser
-    if (!url.pathname.startsWith('/shop')) {
-      url.pathname = `/shop${url.pathname}`;
-      return NextResponse.rewrite(url); // Rewrite to serve /shop content
-    }
+    logger.info(
+      `Middleware triggered for ${url.pathname} on codexchristi.shop`
+    );
+
+    // You can add more custom logic here, e.g., user authentication, logging, etc.
+    // For now, we'll just pass all requests through as normal.
   }
 
   return NextResponse.next();
 }
 
 // Matcher for filtering middleware
-// export const config = {
-//   matcher: [
-//     /*
-//      * Match all request paths except for the ones starting with:
-//      * - api (API routes)
-//      * - _next/static (static files)
-//      * - _next/image (image optimization files)
-//      * - favicon.ico, sitemap.xml, robots.txt (metadata files)
-//      */
-//     '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
-//   ],
-// };
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico, sitemap.xml, robots.txt (metadata files)
+     */
+    '/((?!api|_next/static|_next/image|wp-admin|favicon.ico|sitemap.xml|robots.txt).*)',
+  ],
+};
