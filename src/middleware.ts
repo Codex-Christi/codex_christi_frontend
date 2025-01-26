@@ -9,7 +9,7 @@ export function middleware(req: NextRequest) {
     return NextResponse.next(); // Fallback if no host header exists
   }
 
-  if (hostname === 'domain.shop') {
+  if (hostname === 'codexchristi.shop') {
     logger.info(`Middleware triggered for ${url.pathname}`);
     // Serve /shop and its child routes without rewriting the URL in the browser
     if (!url.pathname.startsWith('/shop')) {
@@ -32,11 +32,5 @@ export const config = {
      * - favicon.ico, sitemap.xml, robots.txt (metadata files)
      */
     '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
-    // {
-    //   source:
-    //     '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
-    //   has: [{ type: 'header', key: 'x-present' }],
-    //   missing: [{ type: 'header', key: 'x-missing', value: 'prefetch' }],
-    // },
   ],
 };
