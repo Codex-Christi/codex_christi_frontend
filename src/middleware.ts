@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import logger from './logger';
 
 export function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
@@ -8,6 +9,9 @@ export function middleware(req: NextRequest) {
     // Rewrite all requests from codexchristi.shop to serve /shop but keep the domain.shop structure
     if (!url.pathname.startsWith('/shop')) {
       url.pathname = `/shop${url.pathname}`;
+      logger.info(
+        `Middleware triggered for ${url.pathname} on codexchristi.shop`
+      );
       return NextResponse.rewrite(url); // Rewrite without redirecting
     }
   }
