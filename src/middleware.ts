@@ -15,7 +15,7 @@ export function middleware(req: NextRequest) {
     console.log(`Middleware triggered for ${hostname}`);
   }
 
-  if (hostname === 'codexchristi.shop') {
+  if (hostname === 'shopdomain') {
     logger.info(`Middleware triggered for ${url.pathname}`);
     // Serve /shop and its child routes without rewriting the URL in the browser
     if (!url.pathname.startsWith('/shop')) {
