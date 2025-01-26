@@ -11,12 +11,11 @@ export function middleware(req: NextRequest) {
 
   if (hostname) {
     // logger.info(`Middleware triggered for ${url.pathname}`);
-    logger.info(req);
-    console.log(`Middleware triggered for ${hostname}`);
+    console.log(`Middleware triggered for ${hostname} - hostname exists`);
   }
 
-  if (hostname === 'shopdomain') {
-    logger.info(`Middleware triggered for ${url.pathname}`);
+  if (hostname === 'codexchristi.shop') {
+    logger.info(`Middleware triggered for ${url.pathname} - cdx.shop here!!!`);
     // Serve /shop and its child routes without rewriting the URL in the browser
     if (!url.pathname.startsWith('/shop')) {
       url.pathname = `/shop${url.pathname}`;
