@@ -9,6 +9,11 @@ export function middleware(req: NextRequest) {
     return NextResponse.next(); // Fallback if no host header exists
   }
 
+  if (hostname) {
+    logger.info(`Middleware triggered for ${url.pathname}`);
+    console.log(`Middleware triggered for ${url.pathname}`);
+  }
+
   if (hostname === 'codexchristi.shop') {
     logger.info(`Middleware triggered for ${url.pathname}`);
     // Serve /shop and its child routes without rewriting the URL in the browser
