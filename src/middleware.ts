@@ -2,9 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import logger from './logger';
 
 export function middleware(req: NextRequest) {
-  logger.info(`Middleware triggered for ${req.nextUrl.pathname}`);
-  logger.info({ name: 'Saint', age: 21, boy: true });
-  console.log('Hello');
+  const url = req.nextUrl.clone();
+  const hostname = req.headers.get('host'); // Get the incoming hostname
+
+  if (!hostname) {
+    return NextResponse.next(); // Fallback if no host header exists
+  }
+
+  if (hostname === 'domain.shop') {
+    logger.info(`Middleware triggered for ${url.pathname}`);
+    // Serve /shop and its child routes without rewriting the URL in the browser
+    if (!url.pathname.startsWith('/shop')) {
+      url.pathname = `/shop${url.pathname}`;
+      return NextResponse.rewrite(url); // Rewrite to serve /shop content
+    }
+  }
 
   return NextResponse.next();
 }
