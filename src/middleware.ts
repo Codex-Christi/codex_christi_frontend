@@ -10,7 +10,8 @@ export function middleware(req: NextRequest) {
   }
 
   if (hostname) {
-    logger.info(`Middleware triggered for ${url.pathname}`);
+    // logger.info(`Middleware triggered for ${url.pathname}`);
+    logger.info(req);
     console.log(`Middleware triggered for ${hostname}`);
   }
 
