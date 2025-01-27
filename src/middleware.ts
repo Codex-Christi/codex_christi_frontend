@@ -37,8 +37,11 @@ export function middleware(req: NextRequest) {
  */
 export const config = {
   matcher: [
-    // Match all paths except for specific static paths and image requests (like .jpg, .jpeg, .png)
-    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\.(jpg|jpeg|png|gif|webp|svg)).*)',
+    // Match all paths except for specific static paths
+    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+
+    // Exclude image requests from the middleware
+    '/**/*.{jpg,jpeg,png,gif,webp,svg}',
 
     {
       // Match requests that are missing specific headers (e.g., prefetch headers)
