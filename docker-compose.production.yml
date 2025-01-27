@@ -63,4 +63,3 @@ volumes:
   # application is located
   app_build: {}
   app_static:
-    external: true
