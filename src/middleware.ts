@@ -6,6 +6,10 @@ export function middleware(req: NextRequest) {
   const hostname = req.headers.get('host'); // Get the hostname of the incoming request
 
   if (hostname === 'codexchristi.shop') {
+    // Do not rewrite requests for static OpenGraph images
+    if (url.pathname.endsWith('.jpg')) {
+      return NextResponse.next();
+    }
     // Rewrite all requests from codexchristi.shop to serve /shop but keep the domain.shop structure
     if (!url.pathname.startsWith('/shop')) {
       url.pathname = `/shop${url.pathname}`;
