@@ -43,8 +43,9 @@ export const config = {
     {
       source:
         '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
-      has: [{ type: 'header', key: 'x-present' }],
-      missing: [{ type: 'header', key: 'x-missing', value: 'prefetch' }],
+
+      // has: [{ type: 'header', key: 'x-present' }],
+      // missing: [{ type: 'header', key: 'x-missing', value: 'prefetch' }],
     },
   ],
 };
