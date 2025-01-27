@@ -42,11 +42,9 @@ export const config = {
     // - Image extensions (.jpg, .jpeg, .png, .gif, .webp, .svg)
     {
       source:
-        '/((?!api|_next/static|_next/image|wp-admin|favicon.ico|sitemap.xml|robots.txt).*)',
-      missing: [
-        { type: 'header', key: 'next-router-prefetch' }, // Missing 'next-router-prefetch'
-        { type: 'header', key: 'purpose', value: 'prefetch' }, // Missing 'purpose: prefetch'
-      ],
+        '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+      has: [{ type: 'header', key: 'x-present' }],
+      missing: [{ type: 'header', key: 'x-missing', value: 'prefetch' }],
     },
   ],
 };
