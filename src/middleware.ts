@@ -24,12 +24,18 @@ export function middleware(req: NextRequest) {
 // Config for middleware matcher
 export const config = {
   matcher: [
+    // Match all paths except for the ones starting with:
+    // - api (API routes)
+    // - _next/static (static files)
+    // - _next/image (image optimization files)
+    // - favicon.ico, sitemap.xml, robots.txt (metadata files)
+    // - Image extensions (.jpg, .jpeg, .png, .gif, .webp, .svg)
     {
       source:
-        '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\.(jpg|jpeg|png|gif|webp|svg)).*)', // Exclude images and static files
+        '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\.(jpg|jpeg|png|gif|webp|svg)).*)',
       missing: [
-        { type: 'header', key: 'next-router-prefetch' },
-        { type: 'header', key: 'purpose', value: 'prefetch' },
+        { type: 'header', key: 'next-router-prefetch' }, // Missing 'next-router-prefetch'
+        { type: 'header', key: 'purpose', value: 'prefetch' }, // Missing 'purpose: prefetch'
       ],
     },
   ],
