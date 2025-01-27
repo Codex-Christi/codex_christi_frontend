@@ -7,6 +7,10 @@ export function middleware(req: NextRequest) {
 
   if (hostname === 'codexchristi.shop') {
     // Do not rewrite requests for static OpenGraph images
+    logger.info(
+      `Middleware triggered for ${url.pathname} on codexchristi.shop`
+    );
+
     if (url.pathname.endsWith('.jpg')) {
       return NextResponse.next();
     }
@@ -24,15 +28,24 @@ export function middleware(req: NextRequest) {
 }
 
 // Matcher for filtering middleware
+/*
+ * Match all request paths except for the ones starting with:
+ * - api (API routes)
+ * - _next/static (static files)
+ * - _next/image (image optimization files)
+ * - favicon.ico, sitemap.xml, robots.txt (metadata files)
+ */
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico, sitemap.xml, robots.txt (metadata files)
-     */
-    '/((?!api|_next/static|_next/image|wp-admin|favicon.ico|sitemap.xml|robots.txt).*)',
+    // Match all paths except for specific static paths and image requests (like .jpg, .jpeg, .png)
+    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\.(jpg|jpeg|png|gif|webp|svg)).*)',
+
+    {
+      // Match requests that are missing specific headers (e.g., prefetch headers)
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' }, // Missing 'next-router-prefetch'
+        { type: 'header', key: 'purpose', value: 'prefetch' }, // Missing 'purpose: prefetch'
+      ],
+    },
   ],
 };
