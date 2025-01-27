@@ -5,26 +5,30 @@ export function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
   const hostname = req.headers.get('host'); // Get the hostname of the incoming request
 
+  // Check if the hostname is 'codexchristi.shop'
   if (hostname === 'codexchristi.shop') {
-    // Do not rewrite requests for static OpenGraph images
-    logger.info(
-      `Middleware triggered for ${url.pathname} on codexchristi.shop`
+    // Logging to track the middleware activity
+    logger.info(`Middleware triggered for ${url.pathname} on ${hostname}`);
+
+    // Checking if the request is for an image (jpg, jpeg, png, etc.)
+    const isImageRequest = /\.(jpg|jpeg|png|gif|webp|svg)(\?|\b|$)/i.test(
+      url.pathname
     );
 
-    if (url.pathname.endsWith('.jpg')) {
-      return NextResponse.next();
+    // If it's an image request, skip the middleware (pass through the request)
+    if (isImageRequest) {
+      return NextResponse.next(); // Allow image requests to bypass middleware
     }
-    // Rewrite all requests from codexchristi.shop to serve /shop but keep the domain.shop structure
+
+    // Serve /shop and its child routes without rewriting the URL in the browser
     if (!url.pathname.startsWith('/shop')) {
       url.pathname = `/shop${url.pathname}`;
-      logger.info(
-        `Middleware triggered for ${url.pathname} on codexchristi.shop`
-      );
-      return NextResponse.rewrite(url); // Rewrite without redirecting
+      logger.info(`Rewriting URL for ${url.pathname}`);
+      return NextResponse.rewrite(url); // Rewrite to serve /shop content
     }
   }
 
-  return NextResponse.next();
+  return NextResponse.next(); // Proceed with the default Next.js response
 }
 
 // Matcher for filtering middleware
@@ -38,15 +42,7 @@ export function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     // Match all paths except for specific static paths
-    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
-
-    // Exclude image requests (jpg, jpeg, png, gif, webp, svg) from the middleware
-    '/**/*.jpg$',
-    '/**/*.jpeg$',
-    '/**/*.png$',
-    '/**/*.gif$',
-    '/**/*.webp$',
-    '/**/*.svg$',
+    '/((?!api|_next/static|_next/image|wp-admin|favicon.ico|sitemap.xml|robots.txt).*)',
 
     {
       // Match requests that are missing specific headers (e.g., prefetch headers)
