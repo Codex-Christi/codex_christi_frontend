@@ -21,7 +21,7 @@ export function middleware(req: NextRequest) {
     }
 
     // Serve /shop and its child routes without rewriting the URL in the browser
-    if (!url.pathname.startsWith('/shop')) {
+    if (!url.pathname.startsWith('/shop/')) {
       url.pathname = `/shop${url.pathname}`;
       logger.info(`Rewriting URL for ${url.pathname}`);
       return NextResponse.rewrite(url); // Rewrite to serve /shop content
@@ -39,7 +39,6 @@ export const config = {
     // - _next/static (static files)
     // - _next/image (image optimization files)
     // - favicon.ico, sitemap.xml, robots.txt (metadata files)
-    // - Image extensions (.jpg, .jpeg, .png, .gif, .webp, .svg)
     {
       source:
         '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
