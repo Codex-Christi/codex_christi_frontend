@@ -62,5 +62,4 @@ volumes:
   # The volume that is going to store the .next directory where the built
   # application is located
   app_build: {}
-  app_static:
-    external: true
+  app_static: {}
