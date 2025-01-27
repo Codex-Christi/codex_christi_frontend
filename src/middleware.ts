@@ -40,8 +40,13 @@ export const config = {
     // Match all paths except for specific static paths
     '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
 
-    // Exclude image requests from the middleware
-    '/**/*.{jpg,jpeg,png,gif,webp,svg}',
+    // Exclude image requests (jpg, jpeg, png, gif, webp, svg) from the middleware
+    '/**/*.jpg',
+    '/**/*.jpeg',
+    '/**/*.png',
+    '/**/*.gif',
+    '/**/*.webp',
+    '/**/*.svg',
 
     {
       // Match requests that are missing specific headers (e.g., prefetch headers)
