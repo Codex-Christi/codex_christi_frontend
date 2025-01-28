@@ -1,6 +1,6 @@
 import AboutUs from '@/components/UI/about/AboutUs';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
-import CometsContainer from '@/components/UI/Home/Comets';
+import CometsContainer from '@/components/UI/general/CometsContainer';
 import Image from 'next/image';
 import Footer from '@/components/UI/general/Footer';
 import { Metadata } from 'next/types';

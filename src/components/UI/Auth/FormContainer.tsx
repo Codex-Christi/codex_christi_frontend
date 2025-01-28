@@ -1,7 +1,7 @@
 import AuthPagesBGWrapper from '@/components/UI/auth_pages/AuthPagesBGWrapper';
 import Logo from '../general/Logo';
 import { FC } from 'react';
-import CometsContainer from '../Home/Comets';
+import CometsContainer from '../general/CometsContainer';
 
 interface IFormContainer {
   children: React.ReactNode;
