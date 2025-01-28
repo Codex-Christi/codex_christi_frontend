@@ -33,7 +33,6 @@ services:
       - .env.production
     volumes:
       - 'app_build:/app/.next'
-      - 'app_static:/app/.next/static'
     command: ['yarn', 'start']
     ports:
       - 3000:3000
@@ -62,4 +61,3 @@ volumes:
   # The volume that is going to store the .next directory where the built
   # application is located
   app_build: {}
-  app_static: {}
