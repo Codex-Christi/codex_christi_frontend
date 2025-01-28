@@ -9,13 +9,6 @@ export function middleware(req: NextRequest) {
   if (hostname === 'codexchristi.shop') {
     // Logging to track the middleware activity
     logger.info(`Middleware triggered for ${url.pathname} on ${hostname}`);
-
-    // Serve /shop and its child routes without rewriting the URL in the browser
-    if (!url.pathname.startsWith('/shop')) {
-      url.pathname = `/shop${url.pathname}`;
-      logger.info(`Rewriting URL for ${url.pathname} to ${url}`);
-      return NextResponse.rewrite(url); // Rewrite to serve /shop content
-    }
   }
 
   return NextResponse.next(); // Proceed with the default Next.js response
@@ -31,7 +24,7 @@ export const config = {
     // - favicon.ico, sitemap.xml, robots.txt (metadata files)
     {
       source:
-        '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+        '/((?!api|_next/static|wp-admin|wordpress|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
 
       // has: [{ type: 'header', key: 'x-present' }],
       // missing: [{ type: 'header', key: 'x-missing', value: 'prefetch' }],
