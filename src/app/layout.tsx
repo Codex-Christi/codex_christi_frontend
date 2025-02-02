@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
-import { Montserrat } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import { headers } from 'next/headers';
 import { Toaster } from '@/components/UI/primitives/toaster';
@@ -17,9 +17,9 @@ const OCR_ext = localFont({
   src: '../res/fonts/OCR-ext.ttf',
   variable: '--font-ocr',
 });
-const MontserratFont = Montserrat({
+const InterFont = Inter({
   subsets: ['latin'],
-  variable: '--font-montserrat',
+  variable: '--font-inter',
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -49,10 +49,10 @@ export default function RootLayout({
       {/* !w-screen */}
       <body
         className={cn(
-          ` font-montserrat bg-black text-white !max-w-full !overflow-x-hidden antialiased`,
+          ` font-inter bg-black text-white !max-w-full !overflow-x-hidden antialiased`,
           nicoMoji.variable,
           OCR_ext.variable,
-          MontserratFont.variable
+          InterFont.variable
         )}
       >
         <FaviconUpdater />

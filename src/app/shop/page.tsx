@@ -1,7 +1,7 @@
 import { FC } from 'react';
 
 const Shop: FC = () => {
-  return <h2>Shop Home Page</h2>;
+  return <div className='relative'>Shop Home Page</div>;
 };
 
 export default Shop;

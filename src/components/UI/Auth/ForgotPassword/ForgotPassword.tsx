@@ -48,7 +48,7 @@ const ForgotPassword = () => {
         onSubmit={forgotPasswordForm.handleSubmit(
           forgotPasswordFormSubmitHandler
         )}
-        className={`mt-12 px-4 sm:px-0 !font-montserrat
+        className={`mt-12 px-4 sm:px-0 !font-inter
                     sm:w-[70%] sm:max-w-[400px]
                     md:w-[50%] md:max-w-[410px]
                     lg:w-[100%] lg:max-w-[425px]

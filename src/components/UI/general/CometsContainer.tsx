@@ -25,7 +25,7 @@ const CometsContainer: FC<CometsContainerInterface> = (props) => {
 
       {children ? (
         <div
-          className={`relative top-0 bottom-0 left-0 right-0 w-full h-full !z-[1]`}
+          className={`!pointer-events-auto absolute top-0 bottom-0 left-0 right-0 w-full h-full !z-[1]`}
         >
           {children}
         </div>

@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { ReactNode } from 'react';
 import dynamic from 'next/dynamic';
+import ShopNav from '@/components/UI/Shop/Navbar';
 const CometsContainer = dynamic(
   () => import('@/components/UI/general/CometsContainer')
 );
@@ -18,5 +19,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function ShopRootLayout({ children }: { children: ReactNode }) {
-  return <CometsContainer>{children}</CometsContainer>;
+  return (
+    <CometsContainer>
+      <ShopNav />
+      {children}
+    </CometsContainer>
+  );
 }
