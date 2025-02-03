@@ -4,8 +4,9 @@ import logger from './logger';
 export function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
   const hostname = req.headers.get('host'); // Get the incoming hostname
+  const response = NextResponse.next();
 
-  logger.info(`for ${url.pathname}`);
+  logger.info(`stat = ${response.status}`);
 
   // Check if the hostname is 'codexchristi.shop'
   if (hostname === 'codexchristi.shop') {
@@ -13,8 +14,7 @@ export function middleware(req: NextRequest) {
     logger.info(`Middleware triggered for ${url.pathname} on ${hostname}`);
   }
 
-  // **Handle 404 Cases**: If the route doesn't exist, redirect to `/shop/404`
-  return NextResponse.rewrite(new URL('/shop/404', req.url));
+  return NextResponse.next(); // Proceed with the default Next.js response
 }
 
 // Config for middleware matcher
