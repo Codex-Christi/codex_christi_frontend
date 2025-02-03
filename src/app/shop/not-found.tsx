@@ -55,7 +55,7 @@ export default function NotFound() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
-            className='text-lg sm:text-xl text-gray-300 mb-6 sm:mb-8 font-ocr'
+            className='text-lg sm:text-xl text-gray-300 mb-6 sm:mb-8 font-ocr font-semibold'
           >
             Product not found in our quantum inventory
           </motion.p>
@@ -69,7 +69,7 @@ export default function NotFound() {
             <Button
               variant='outline'
               className={`bg-transparent border-cyan-400/50 text-cyan-400 hover:bg-cyan-400/30 hover:text-white 
-               font-ocr px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base`}
+               font-ocr !font-bold px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base`}
             >
               Return to Home
             </Button>
