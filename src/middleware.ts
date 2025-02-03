@@ -4,14 +4,21 @@ import logger from './logger';
 export function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
   const hostname = req.headers.get('host'); // Get the incoming hostname
-  const response = NextResponse.next();
-
-  logger.info(`stat = ${response.status}`);
 
   // Check if the hostname is 'codexchristi.shop'
   if (hostname === 'codexchristi.shop') {
     // Logging to track the middleware activity
     logger.info(`Middleware triggered for ${url.pathname} on ${hostname}`);
+
+    const statusCode = req.headers.get('X-Status-Code');
+
+    // Handle cases where the header is missing or invalid
+    if (!statusCode) {
+      logger.warn('X-Status-Code header is missing.');
+      return NextResponse.next(); // Continue with the normal flow
+    } else {
+      logger.info(`Status code is ${statusCode}`);
+    }
   }
 
   return NextResponse.next(); // Proceed with the default Next.js response
