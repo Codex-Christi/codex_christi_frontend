@@ -5,6 +5,8 @@ export function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
   const hostname = req.headers.get('host'); // Get the incoming hostname
 
+  logger.info(`for ${url.pathname}`);
+
   // Check if the hostname is 'codexchristi.shop'
   if (hostname === 'codexchristi.shop') {
     // Logging to track the middleware activity
