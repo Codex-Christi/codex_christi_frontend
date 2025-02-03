@@ -13,7 +13,8 @@ export function middleware(req: NextRequest) {
     logger.info(`Middleware triggered for ${url.pathname} on ${hostname}`);
   }
 
-  return NextResponse.next(); // Proceed with the default Next.js response
+  // **Handle 404 Cases**: If the route doesn't exist, redirect to `/shop/404`
+  return NextResponse.rewrite(new URL('/shop/404', req.url));
 }
 
 // Config for middleware matcher
