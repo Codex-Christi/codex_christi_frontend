@@ -12,11 +12,11 @@ const CometsContainer: FC<CometsContainerInterface> = (props) => {
   return (
     <div
       className={`${children ? 'relative' : 'absolute'} top-0 bottom-0 left-0 right-0 w-full 
-      ${children ? '!-z-[1]' : '!-z-[5]'} `}
+      ${children ? '!-z-[0]' : '!-z-[1]'} `}
     >
       <div
         className={`relative top-0 bottom-0 left-0 right-0 w-full h-full 
-          ${children ? '!-z-[1]' : '!-z-[5]'} ${children ? 'min-h-dvh' : 'min-h-[auto]'}
+          ${children ? '!-z-[0]' : '!-z-[1]'} ${children ? 'min-h-dvh' : 'min-h-[auto]'}
           bg-[url('/media/img/home/comets_mobile.svg')]
           md:bg-[url('/media/img/home/comets_tablet.svg')]
           lg:bg-[url('/media/img/home/comets_ desktop.svg')]
@@ -25,7 +25,7 @@ const CometsContainer: FC<CometsContainerInterface> = (props) => {
 
       {children ? (
         <div
-          className={`!pointer-events-auto absolute top-0 bottom-0 left-0 right-0 w-full h-full !z-[1]`}
+          className={`!pointer-events-auto absolute top-0 bottom-0 left-0 right-0 w-full h-full !z-[0]`}
         >
           {children}
         </div>

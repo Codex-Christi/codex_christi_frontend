@@ -11,15 +11,12 @@ export default function NotFound() {
   const [matrixRain, setMatrixRain] = useState<
     { id: number; left: string; symbol: string; duration: number }[]
   >([]);
-  const [hydrationComplete, setHydrationComplete] = useState(false); // Ensures hydration mismatch doesn't occur
+  const [hydrationComplete, setHydrationComplete] = useState(false);
 
   useEffect(() => {
-    // Mark hydration as complete (prevents SSR-client mismatch)
     setHydrationComplete(true);
-
     audioRef.current = new Audio('/sounds/beep.wav');
 
-    // Generate matrix rain dynamically on the client
     const rain = Array.from({ length: 50 }).map((_, i) => ({
       id: i,
       left: `${Math.random() * 100}%`,
@@ -49,7 +46,8 @@ export default function NotFound() {
 
   return (
     <div
-      className='relative flex flex-col items-center justify-center h-screen bg-black text-white overflow-hidden'
+      className={`relative flex flex-col items-center justify-center h-screen w-full bg-black text-white 
+       !select-none text-center overflow-hidden px-4`}
       onClick={enableAudio}
     >
       {/* Matrix Rain Effect (Client-Only to Prevent Hydration Mismatch) */}
@@ -58,7 +56,7 @@ export default function NotFound() {
           {matrixRain.map((drop) => (
             <motion.div
               key={drop.id}
-              className='absolute text-neon-green opacity-70'
+              className='absolute text-neon-green opacity-70 font-ocr'
               initial={{ y: '-100%' }}
               animate={{ y: '110%' }}
               transition={{
@@ -68,7 +66,7 @@ export default function NotFound() {
               }}
               style={{
                 left: drop.left,
-                fontSize: '1.5rem',
+                fontSize: '1rem',
                 transform: 'rotate(-20deg)',
               }}
             >
@@ -78,9 +76,9 @@ export default function NotFound() {
         </div>
       )}
 
-      {/* Glitching 404 Text */}
+      {/* Glitching 404 Text (Fully Centered) */}
       <motion.h1
-        className='text-9xl font-extrabold text-neon-purple glitch-effect font-ocr'
+        className='text-7xl sm:text-9xl font-extrabold text-neon-purple glitch-effect font-ocr leading-tight'
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 1 }}
@@ -88,9 +86,9 @@ export default function NotFound() {
         404
       </motion.h1>
 
-      {/* Glitching Subtitle */}
+      {/* Subtitle (Centered & Scales on Mobile) */}
       <motion.p
-        className='text-lg text-gray-400 mt-4 glitch-effect font-ocr'
+        className='text-lg sm:text-2xl text-gray-400 mt-4 glitch-effect font-ocr'
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5, duration: 0.5 }}
@@ -98,9 +96,9 @@ export default function NotFound() {
         You’ve entered the void. This page doesn’t exist.
       </motion.p>
 
-      {/* Floating Cyber Orb */}
+      {/* Floating Cyber Orb (Mobile-Optimized) */}
       <motion.div
-        className='absolute top-24 left-1/2 transform -translate-x-1/2 bg-neon-purple rounded-full'
+        className='absolute top-20 sm:top-24 left-1/2 transform -translate-x-1/2 bg-neon-purple rounded-full'
         animate={{
           scale: [1, 1.2, 1],
           rotate: [0, 360],
@@ -109,13 +107,13 @@ export default function NotFound() {
         }}
         transition={{ repeat: Infinity, duration: 5, ease: 'easeInOut' }}
         style={{
-          width: '80px',
-          height: '80px',
+          width: '60px',
+          height: '60px',
           boxShadow: '0 0 15px rgba(173, 51, 255, 0.8)',
         }}
       />
 
-      {/* Neon Glow Button */}
+      {/* Neon Glow Button (Centered & Scales on Mobile) */}
       <motion.div
         className='mt-6'
         initial={{ opacity: 0, scale: 0.8 }}
@@ -124,16 +122,16 @@ export default function NotFound() {
       >
         <Link
           href='/'
-          className='px-6 py-3 text-white text-lg font-semibold bg-neon-blue rounded-lg shadow-neon hover:shadow-neon-glow transition-all'
+          className='px-6 py-3 text-white text-lg font-semibold bg-neon-blue rounded-lg shadow-neon hover:shadow-neon-glow transition-all font-ocr'
           onMouseEnter={playSound}
         >
           Return to Reality
         </Link>
       </motion.div>
 
-      {/* Interactive Cursor */}
+      {/* Interactive Cursor (Hidden on Mobile for Performance) */}
       <motion.div
-        className='absolute rounded-full w-12 h-12 bg-neon-purple z-50 pointer-events-none'
+        className='absolute rounded-full w-8 h-8 sm:w-12 sm:h-12 bg-neon-purple z-50 pointer-events-none hidden sm:block'
         style={{
           left: `${cursorPosition.x - 24}px`,
           top: `${cursorPosition.y - 24}px`,
