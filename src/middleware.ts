@@ -6,7 +6,7 @@ export function middleware(req: NextRequest) {
   const hostname = req.headers.get('host'); // Get the incoming hostname
 
   // Only apply rewrite logic to non-root paths
-  if (hostname === 'domain.shop' && url.pathname !== '/') {
+  if (hostname === 'codexchristi.shop' && url.pathname !== '/') {
     if (!url.pathname.startsWith('/shop')) {
       url.pathname = `/shop${url.pathname}`;
       return NextResponse.rewrite(url);
