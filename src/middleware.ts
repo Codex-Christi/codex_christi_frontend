@@ -7,12 +7,12 @@ export function middleware(req: NextRequest) {
 
   // Check if the hostname is 'codexchristi.shop'
   if (hostname === 'codexchristi.shop') {
-    // Logging to track the middleware activity
-    const pathname = url.pathname;
-    const [str1, str2] = pathname.split('shop');
-    console.log(pathname.split('shop'));
-    const newURL = `${str1}/${str2}`;
-    logger.info(`${url.pathname} converted to ${newURL} `);
+    // Force Next.js to treat requests as being inside `/shop/`
+    if (!url.pathname.startsWith('/shop')) {
+      url.pathname = `/shop${url.pathname}`;
+      return NextResponse.rewrite(url);
+    }
+    logger.info(`${url.pathname}`);
   }
 
   return NextResponse.next(); // Proceed with the default Next.js response
