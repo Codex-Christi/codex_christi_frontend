@@ -5,14 +5,16 @@ export function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
   const hostname = req.headers.get('host'); // Get the incoming hostname
 
-  // Check if the hostname is 'codexchristi.shop'
-  if (hostname === 'codexchristi.shop') {
-    // Force Next.js to treat requests as being inside `/shop/`
-    if (!url.pathname.startsWith('/shop') && url.pathname !== '/') {
+  // Only apply rewrite logic to non-root paths
+  if (hostname === 'domain.shop' && url.pathname !== '/') {
+    if (!url.pathname.startsWith('/shop')) {
       url.pathname = `/shop${url.pathname}`;
       return NextResponse.rewrite(url);
     }
-    logger.info(`${url.pathname}`);
+
+    logger.info(
+      `${Date.now().toLocaleString()} for ${hostname}/${url.pathname}`
+    );
   }
 
   return NextResponse.next(); // Proceed with the default Next.js response
