@@ -8,7 +8,7 @@ export function middleware(req: NextRequest) {
   // Check if the hostname is 'codexchristi.shop'
   if (hostname === 'codexchristi.shop') {
     // Force Next.js to treat requests as being inside `/shop/`
-    if (!url.pathname.startsWith('/shop')) {
+    if (!url.pathname.startsWith('/shop') && url.pathname !== '/') {
       url.pathname = `/shop${url.pathname}`;
       return NextResponse.rewrite(url);
     }
