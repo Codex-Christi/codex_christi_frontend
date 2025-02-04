@@ -10,6 +10,7 @@ export function middleware(req: NextRequest) {
     // Logging to track the middleware activity
     const pathname = url.pathname;
     const [str1, str2] = pathname.split('shop');
+    console.log(pathname.split('shop'));
     const newURL = `${str1}/${str2}`;
     logger.info(`${url.pathname} converted to ${newURL} `);
   }
