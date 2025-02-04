@@ -8,7 +8,10 @@ export function middleware(req: NextRequest) {
   // Check if the hostname is 'codexchristi.shop'
   if (hostname === 'codexchristi.shop') {
     // Logging to track the middleware activity
-    logger.info(`Middleware triggered for /shop/${url.pathname}`);
+    const pathname = url.pathname;
+    const [str1, str2] = pathname.split('shop');
+    const newURL = `${str1}/${str2}`;
+    logger.info(`${url.pathname} converted to ${newURL} `);
   }
 
   return NextResponse.next(); // Proceed with the default Next.js response
