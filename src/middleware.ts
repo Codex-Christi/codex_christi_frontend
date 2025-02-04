@@ -8,17 +8,7 @@ export function middleware(req: NextRequest) {
   // Check if the hostname is 'codexchristi.shop'
   if (hostname === 'codexchristi.shop') {
     // Logging to track the middleware activity
-    logger.info(`Middleware triggered for ${url.pathname} on ${hostname}`);
-
-    const statusCode = req.headers.get('X-Status-Code');
-
-    // Handle cases where the header is missing or invalid
-    if (!statusCode) {
-      logger.warn('X-Status-Code header is missing.');
-      return NextResponse.next(); // Continue with the normal flow
-    } else {
-      logger.info(`Status code is ${statusCode}`);
-    }
+    logger.info(`Middleware triggered for /shop/${url.pathname}`);
   }
 
   return NextResponse.next(); // Proceed with the default Next.js response
