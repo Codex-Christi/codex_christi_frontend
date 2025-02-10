@@ -1,9 +1,9 @@
 import { FC } from 'react';
 import { SearchButtonOnly } from './NavSearch';
 import useResponsiveSSR from '@/lib/hooks/useResponsiveSSR';
-import Link from 'next/link';
 import { CartIcon } from './NavIcons';
 import { Heart } from 'lucide-react';
+import CustomShopLink from '../HelperComponents/CustomShopLink';
 
 const NavTopRightLinks: FC = () => {
   // Hooks
@@ -27,11 +27,11 @@ const NavTopRightLinks: FC = () => {
         {['cart', 'favorites', 'profile'].map((str, index) => {
           const href = '/shop/' + str;
           return (
-            <Link href={href} key={str + index}>
+            <CustomShopLink href={href} key={str + index}>
               {str === 'cart' && <CartIcon />}
               {str === 'favorites' && <Heart />}
               {str === 'profile' && 'User'}
-            </Link>
+            </CustomShopLink>
           );
         })}
       </>
