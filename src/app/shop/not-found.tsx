@@ -8,7 +8,7 @@ import Cube from '@/components/UI/Shop/404PageComponents/Cube';
 
 export default function NotFound() {
   return (
-    <div className='!relative min-h-screen w-full bg-transparent !select-none'>
+    <div className='!relative min-h-dvh w-full bg-transparent !select-none'>
       {/* Floating cube */}
       <Cube className='!top-10 !left-10' />
 
