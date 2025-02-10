@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { ReactNode } from 'react';
 import dynamic from 'next/dynamic';
-import ShopNav from '@/components/UI/Shop/Navbar';
+import ShopNav from '@/components/UI/Shop/Nav/Navbar';
 const CometsContainer = dynamic(
   () => import('@/components/UI/general/CometsContainer')
 );
