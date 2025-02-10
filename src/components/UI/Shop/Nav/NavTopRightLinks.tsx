@@ -3,6 +3,7 @@ import { SearchButtonOnly } from './NavSearch';
 import useResponsiveSSR from '@/lib/hooks/useResponsiveSSR';
 import Link from 'next/link';
 import { CartIcon } from './NavIcons';
+import { Heart } from 'lucide-react';
 
 const NavTopRightLinks: FC = () => {
   // Hooks
@@ -24,12 +25,12 @@ const NavTopRightLinks: FC = () => {
       )}
       <>
         {['cart', 'favorites', 'profile'].map((str, index) => {
-          const href = '/' + str;
+          const href = '/shop/' + str;
           return (
             <Link href={href} key={str + index}>
               {str === 'cart' && <CartIcon />}
-              {str === 'favorites' && 'der'}
-              {str === 'profile' && 'buytr'}
+              {str === 'favorites' && <Heart />}
+              {str === 'profile' && 'User'}
             </Link>
           );
         })}

@@ -1,11 +1,11 @@
 'use client';
 
 import { FC, useCallback, useMemo, useState, useEffect } from 'react';
-import useAuthStore from '@/store/authStore';
+// import useAuthStore from '@/store/authStore';
 
 export const CartIcon: FC = () => {
   // Hooks
-  const { isAuthenticated } = useAuthStore();
+  //   const { isAuthenticated } = useAuthStore();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -69,6 +69,29 @@ export const CartIcon: FC = () => {
         >
           {true ? getApproxCartItems() : 0}
         </text>
+      </g>
+    </svg>
+  );
+};
+
+export const FavoritesIcon: FC = () => {
+  return (
+    <svg
+      xmlns='http://www.w3.org/2000/svg'
+      width='24'
+      height='21.785'
+      fill='none'
+      viewBox='0 0 24 21.785'
+    >
+      <g>
+        <path d='M0 0h24v21.785H0z'></path>
+        <path
+          id='Vector'
+          fill='#FFF'
+          fillRule='evenodd'
+          d='M5.972.07C3.34.488 1.197 2.285.372 4.761c-1.047 3.13.126 6.652 3.428 10.32 1.853 2.055 4.119 3.96 7.098 5.963l1.102.74 1.102-.74c2.98-2.003 5.245-3.908 7.098-5.962 3.302-3.669 4.475-7.192 3.429-10.32C22.686 1.941 20.007.004 17.043 0c-1.76 0-3.359.6-4.668 1.754-.192.17-.36.31-.375.31-.014 0-.183-.14-.375-.31A6.96 6.96 0 0 0 7.872.052c-.516-.066-1.426-.057-1.9.018m2.13 1.52c1.384.282 2.552 1.074 3.523 2.388.192.258.36.474.375.474.014 0 .183-.216.375-.474 1.234-1.67 2.74-2.477 4.63-2.482 2.763 0 5.057 1.994 5.46 4.743.076.52.029 1.58-.093 2.148-.338 1.553-1.178 3.143-2.576 4.888-.647.803-2.42 2.604-3.34 3.387a43 43 0 0 1-3.813 2.9l-.643.44-.647-.44a44 44 0 0 1-3.81-2.9c-.919-.783-2.692-2.584-3.34-3.386C2.807 11.53 1.967 9.94 1.629 8.386 1.506 7.82 1.46 6.76 1.534 6.24a5.56 5.56 0 0 1 3.57-4.424c.868-.323 2.06-.412 2.998-.225'
+          transform='matrix(1 0 0 -1 0 21.785)'
+        ></path>
       </g>
     </svg>
   );
