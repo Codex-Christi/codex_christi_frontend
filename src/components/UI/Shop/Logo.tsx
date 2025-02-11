@@ -16,7 +16,7 @@ export default function Logo() {
         priority
         width={72}
         height={48.375}
-        className={`h-auto relative pointer-events-auto`}
+        className={`h-auto relative pointer-events-auto !max-w-[unset]`}
         alt='Codex Christi Main Logo'
         src='/media/img/shop/shop-logo.svg'
         onContextMenu={(event: MouseEvent<HTMLImageElement>) => {

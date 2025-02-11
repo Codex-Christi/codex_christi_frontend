@@ -19,6 +19,7 @@ const CustomShopLink: FC<CustomShopLinkInterface> = ({
   // Hooks
   const [domain, setDomain] = useState<string | null>(null);
   const [isDev, setIsDev] = useState<boolean>(false);
+  const [isOnShopRoute, setIsOnShopRoute] = useState<boolean>(false);
 
   // Parent & shop domains
   const parentSiteProd = 'https://codexchristi.org';
@@ -30,17 +31,22 @@ const CustomShopLink: FC<CustomShopLinkInterface> = ({
       const currentDomain = window.location.hostname;
       setDomain(currentDomain);
       setIsDev(currentDomain === 'localhost');
+      setIsOnShopRoute(window.location.pathname.startsWith('/shop'));
     }
   }, []);
 
   // Adjusted href based on conditions
   let newHref = href as string;
 
-  if (!isDev && domain === shopDomainProd) {
-    if (newHref === '/shop') {
-      newHref = '/'; // Ensure "/shop" goes to "/" on the shop domain
-    } else if (newHref.startsWith('/shop')) {
-      newHref = newHref.replace('/shop', ''); // Strip "/shop" for child routes
+  if (newHref === '/') {
+    // If user clicks "/", we determine the correct behavior
+    if (domain === shopDomainProd || (isDev && isOnShopRoute)) {
+      newHref = '/shop'; // Ensure "/" keeps them inside the shop
+    }
+  } else if (!isDev && domain === shopDomainProd) {
+    // Only modify links on domain.shop in production
+    if (newHref.startsWith('/shop')) {
+      newHref = newHref.replace('/shop', ''); // Strip "/shop" for shop child routes
     } else if (redirectToParentSite) {
       newHref = `${parentSiteProd}${newHref}`; // Redirect non-shop links to parent site
     }

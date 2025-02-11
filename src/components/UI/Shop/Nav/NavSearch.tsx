@@ -12,16 +12,18 @@ const NavSearch: FC = () => {
   // Main JSX
   return (
     <>
-      {isDesktopOnly && (
-        <section className='relative flex w-full max-w-[500px]'>
-          <Input
-            type='text'
-            placeholder='Search for products here...'
-            className={`relative !bg-transparent rounded-2xl p-1 h-8 pr-8 pl-4 placeholder:text-white/80`}
-          />
-          <SearchButtonOnly isDesktopOnly={isDesktopOnly} />
-        </section>
-      )}
+      <section className='relative flex w-full max-w-[500px]'>
+        <Input
+          type='text'
+          placeholder='Search for products here...'
+          className={`relative !bg-transparent rounded-2xl p-1 h-8 pr-8 pl-4 placeholder:text-white/80
+              hidden lg:inline-block `}
+        />
+        <SearchButtonOnly
+          isDesktopOnly={isDesktopOnly}
+          className='hidden lg:!block'
+        />
+      </section>
     </>
   );
 };
