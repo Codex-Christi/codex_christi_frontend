@@ -17,7 +17,7 @@ const UserAvatar: FC<UserAvatarInterface> = (props) => {
 
   return (
     <div
-      className={`flex flex-col `}
+      className={`flex flex-col items-center`}
       // min-h-[${height + 12}px] min-w-[${width + 12}px]
     >
       {!loaded && (
@@ -32,7 +32,7 @@ const UserAvatar: FC<UserAvatarInterface> = (props) => {
         onLoad={() => setLoaded(true)}
       />
 
-      <small className='text-xs font-semibold leading-none mt-2'>
+      <small className='text-[.95rem] font-semibold leading-none mt-2'>
         {username ? username : 'User'}
       </small>
     </div>

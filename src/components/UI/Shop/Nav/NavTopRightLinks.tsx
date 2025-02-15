@@ -12,9 +12,10 @@ const NavTopRightLinks: FC = () => {
   return (
     <section
       className={`flex items-center justify-between 
-    gap-4 
-    sm:gap-6
-    md:gap-10`}
+    gap-6 
+    sm:gap-8
+    md:gap-10
+    lg:gap-12`}
     >
       <SearchButtonOnly
         className='scale-125 relative block lg:!hidden'
