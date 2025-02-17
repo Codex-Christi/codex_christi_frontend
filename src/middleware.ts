@@ -11,22 +11,19 @@ export function middleware(req: NextRequest) {
 
   // Only apply rewrite logic to non-root paths if the hostname matches 'codexchristi.shop'
   if (hostname === 'codexchristi.shop') {
-    logger.info(`${new Date(Date.now()).toLocaleString()} for ${url.pathname}`);
-
-    //
     // Apply rewrite only to paths that don't match the excludePattern
-    if (!excludePattern.test(url.pathname)) {
-      // Ensure the path starts with /shop if it doesn't already
-      if (!url.pathname.startsWith('/shop')) {
-        // Log for debugging (if necessary)
-        logger.info(`${Date.now()} for ${hostname}${url.pathname}`);
-        //
-        url.pathname = `/shop${url.pathname}`;
-        const RewrittenURL = NextResponse.rewrite(url);
-        logger.info(`Rewritten URL: ${RewrittenURL}`);
-        return RewrittenURL; // Rewrite the URL
-      }
+    // if (!excludePattern.test(url.pathname)) {
+    // Ensure the path starts with /shop if it doesn't already
+    if (!url.pathname.startsWith('/shop')) {
+      // Log for debugging (if necessary)
+      logger.info(`${Date.now()} for ${hostname}${url.pathname}`);
+      //
+      url.pathname = `/shop${url.pathname}`;
+      const RewrittenURL = NextResponse.rewrite(url);
+      logger.info(`Rewritten URL: ${RewrittenURL}`);
+      return RewrittenURL; // Rewrite the URL
     }
+    // }
   }
 
   return NextResponse.next(); // Proceed with the default Next.js response
