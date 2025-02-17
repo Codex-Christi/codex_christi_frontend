@@ -20,9 +20,8 @@ export function middleware(req: NextRequest) {
         //
         url.pathname = `/shop${url.pathname}`;
         const RewrittenURL = NextResponse.rewrite(url);
-        return RewrittenURL; // Rewrite the URL
-
         logger.info(`Rewritten URL: ${RewrittenURL}`);
+        return RewrittenURL; // Rewrite the URL
       }
     }
   }
