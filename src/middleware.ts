@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import logger from './logger';
 
-// Define a constant for the exclusion pattern (matches /_next/image, /media, and OpenGraph/Twitter images with or without query parameters)
+// Define a constant for the exclusion pattern (matches all paths under /_next including any sub-paths and query parameters, and /media with query parameters)
 const excludePattern =
-  /^\/(_next\/image(?:\?[^ ]*)?|media|opengraph-image|twitter-image)/;
+  /^\/(_next(?:\/[^ ]*)*(?:\?[^ ]*)?|media(?:\/[^ ]*)?(?:\?[^ ]*)?)/;
 
 export function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
@@ -19,10 +19,9 @@ export function middleware(req: NextRequest) {
         return NextResponse.rewrite(url); // Rewrite the URL
       }
     }
-
-    // Log for debugging (if necessary)
-    logger.info(`${Date.now()} for ${hostname}/${url.pathname}`);
   }
+  // Log for debugging (if necessary)
+  logger.info(`${Date.now()} for ${hostname}/${url.pathname}`);
 
   return NextResponse.next(); // Proceed with the default Next.js response
 }
