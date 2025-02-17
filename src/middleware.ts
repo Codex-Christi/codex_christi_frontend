@@ -30,7 +30,7 @@ export const config = {
     // - favicon.ico, sitemap.xml, robots.txt (metadata files)
     {
       source:
-        '/((?!api|_next/static|wp-admin|wordpress|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+        '/((?!api|_next|wp-admin|wordpress|favicon.ico|sitemap.xml|robots.txt).*)',
 
       // has: [{ type: 'header', key: 'x-present' }],
       // missing: [{ type: 'header', key: 'x-missing', value: 'prefetch' }],
