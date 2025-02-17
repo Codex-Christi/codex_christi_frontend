@@ -9,6 +9,9 @@ export function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
   const hostname = req.headers.get('host'); // Get the incoming hostname
 
+  // Log for debugging (if necessary)
+  logger.info(`${Date.now()} for ${hostname}${url.pathname}`);
+
   // Only apply rewrite logic to non-root paths if the hostname matches 'codexchristi.shop'
   if (hostname === 'codexchristi.shop' && url.pathname !== '/') {
     // Apply rewrite only to paths that don't match the excludePattern
@@ -20,8 +23,6 @@ export function middleware(req: NextRequest) {
       }
     }
   }
-  // Log for debugging (if necessary)
-  logger.info(`${Date.now()} for ${hostname}/${url.pathname}`);
 
   return NextResponse.next(); // Proceed with the default Next.js response
 }
@@ -36,7 +37,7 @@ export const config = {
     // - favicon.ico, sitemap.xml, robots.txt (metadata files)
     {
       source:
-        '/((?!api|_next|wp-admin|wordpress|favicon.ico|sitemap.xml|robots.txt).*)',
+        '/((?!api|_next|wp-admin|media|wordpress|favicon.ico|sitemap.xml|robots.txt).*)',
     },
   ],
 };
