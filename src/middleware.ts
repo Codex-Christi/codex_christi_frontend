@@ -11,7 +11,7 @@ export function middleware(req: NextRequest) {
 
   // Only apply rewrite logic to non-root paths if the hostname matches 'codexchristi.shop'
   if (hostname === 'codexchristi.shop') {
-    logger.info(`${Date.now()} for ${hostname}${url.pathname}`);
+    logger.info(`${new Date(Date.now()).toLocaleString()} for ${url.pathname}`);
 
     //
     // Apply rewrite only to paths that don't match the excludePattern
