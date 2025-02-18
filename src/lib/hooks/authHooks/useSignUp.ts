@@ -103,6 +103,8 @@ export const properlyReturnAnyError = (error: AxiosError) => {
       // that falls out of the range of 2xx
       // Return responseText
       const responseTextObj = JSON.parse(error.response.request.responseText);
+      console.log(Object.values(responseTextObj)[0]);
+
       const responseTextObjArr = Object.values(responseTextObj)[0] as string[];
       return responseTextObjArr[0];
     } else if (error.request) {
