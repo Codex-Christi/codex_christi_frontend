@@ -18,6 +18,7 @@ const NavTopRightLinks: FC = () => {
     lg:gap-12`}
     >
       <SearchButtonOnly
+        name='Search Button'
         className='scale-125 relative block lg:!hidden'
         isDesktopOnly={false}
       />

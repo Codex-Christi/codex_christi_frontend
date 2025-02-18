@@ -68,7 +68,7 @@ const ForgotPassword = () => {
           inputName='confirm_password'
         />
 
-        <SubmitButton textValue='Confirm Password' />
+        <SubmitButton name='Confirm Password' textValue='Confirm Password' />
       </form>
     </Form>
   );

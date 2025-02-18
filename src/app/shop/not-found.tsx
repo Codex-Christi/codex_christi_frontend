@@ -67,6 +67,7 @@ export default function NotFound() {
             className='flex justify-center'
           >
             <Button
+              name='Return to shop home button'
               variant='outline'
               className={`bg-transparent border-cyan-400/50 text-cyan-400 hover:bg-cyan-400/30 hover:text-white 
                font-ocr !font-bold px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base`}

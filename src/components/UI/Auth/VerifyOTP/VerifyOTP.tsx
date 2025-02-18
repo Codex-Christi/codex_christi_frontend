@@ -140,7 +140,7 @@ const VerifyOTP = () => {
             Resend
           </button>
         </p>
-        <SubmitButton textValue='Verify' />
+        <SubmitButton name='Verify button' textValue='Verify' />
       </form>
     </Form>
   );

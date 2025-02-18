@@ -152,7 +152,10 @@ const SignUpForm = () => {
           {/* Last Name Input*/}
           <NameInput currentZodForm={signupZodForm} inputName='lastname' />
 
-          <ContinueButton onClick={() => moveOutFirstFieldsSetLeft()} />
+          <ContinueButton
+            name='Continue'
+            onClick={() => moveOutFirstFieldsSetLeft()}
+          />
         </div>
         {/*  */}
 
@@ -179,6 +182,7 @@ const SignUpForm = () => {
           </CheckBoxInput>
 
           <SubmitButton
+            name='Continue'
             textValue={'Continue'}
             disabled={isLoading === true ? true : false}
           />

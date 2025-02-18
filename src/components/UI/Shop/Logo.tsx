@@ -13,7 +13,7 @@ export default function Logo() {
       className='inline-block'
     >
       <Image
-        priority
+        priority={true}
         width={72}
         height={48.375}
         className={`h-auto relative pointer-events-auto !max-w-[unset]`}

@@ -19,6 +19,7 @@ const ShopNav: FC = () => {
       <section className='flex gap-5 md:gap-10'>
         {/* Button for Mobile Sidebar Hamburger */}
         <Button
+          name='Toggle mobile sidebar'
           className='lg:!hidden scale-75 md:scale-90 !p-0 '
           variant='link'
         >

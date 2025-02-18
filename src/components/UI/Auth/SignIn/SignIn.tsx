@@ -91,7 +91,7 @@ const SignIn = () => {
 
           <PasswordInput currentZodForm={signInForm} inputName='password' />
 
-          <SubmitButton textValue='Log In' />
+          <SubmitButton name='Submit Button' textValue='Log In' />
         </form>
       </Form>
       <div className='mt-16 space-y-12 text-center'>

@@ -64,7 +64,7 @@ const ForgotPassword = () => {
           label='Enter your email address'
         />
 
-        <SubmitButton textValue='Next' />
+        <SubmitButton name='Next' textValue='Next' />
       </form>
     </Form>
   );

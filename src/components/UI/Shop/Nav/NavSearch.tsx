@@ -20,6 +20,7 @@ const NavSearch: FC = () => {
               hidden lg:inline-block `}
         />
         <SearchButtonOnly
+          name='Search button'
           isDesktopOnly={isDesktopOnly}
           className='hidden lg:!block'
         />

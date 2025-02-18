@@ -27,6 +27,7 @@ interface SubmitButtonInterface extends ButtonProps {
 export const SubmitButton: FC<SubmitButtonInterface> = (props) => {
   return (
     <Button
+      name='Submit form'
       type='submit'
       variant='secondary'
       className={`mt-5 mx-auto font-bold text-[1.05rem] rounded-[2rem] flex 
