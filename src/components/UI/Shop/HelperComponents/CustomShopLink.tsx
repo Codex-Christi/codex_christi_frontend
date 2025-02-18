@@ -1,6 +1,7 @@
 'use client';
 
 import Link, { LinkProps } from 'next/link';
+import { usePathname } from 'next/navigation';
 import { FC, ReactNode, useEffect, useState } from 'react';
 
 interface CustomShopLinkInterface extends LinkProps {
@@ -21,6 +22,7 @@ const CustomShopLink: FC<CustomShopLinkInterface> = ({
   const [isDev, setIsDev] = useState<boolean>(false);
   const [isOnShopRouteParentSite, setIsOnShopRouteParentSite] =
     useState<boolean>(false);
+  const pathname = usePathname();
 
   // Parent & shop domains
   const parentSiteProdHref = 'https://codexchristi.org';
@@ -58,7 +60,12 @@ const CustomShopLink: FC<CustomShopLinkInterface> = ({
   }
 
   return (
-    <Link href={newHref} className={className} {...rest}>
+    <Link
+      href={newHref}
+      className={className}
+      aria-label={`Go to ${domain + pathname} page`}
+      {...rest}
+    >
       {children}
     </Link>
   );
