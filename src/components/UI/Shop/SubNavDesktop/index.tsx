@@ -26,7 +26,7 @@ const SubNav = () => {
             ariaLabel={ariaLabel}
             className='flex items-center'
           >
-            {<SvgElem className='!w-10 h-10' />}
+            {isMobileAndTablet && <SvgElem className='!w-10 h-10' />}
             <h3 className='font-semibold text-lg'>{textValue}</h3>
           </CustomShopLink>
         );
