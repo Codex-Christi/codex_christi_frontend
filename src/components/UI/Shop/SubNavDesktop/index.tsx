@@ -3,16 +3,14 @@ import CustomShopLink from '../HelperComponents/CustomShopLink';
 import useResponsiveSSR from '@/lib/hooks/useResponsiveSSR';
 import { categories, helperLinks } from './SubNavObj';
 
-const subNavLinks = { categories, helperLinks };
-
 const SubNav = () => {
   // Hooks
-  const { isMobileAndTablet } = useResponsiveSSR();
+  const { isMobileAndTablet, isDesktopOnly } = useResponsiveSSR();
 
   // jsx
   return (
     <div role='navigation' className='bg-transparent flex w-full '>
-      {subNavLinks.categories.map((obj, index) => {
+      {categories.map((obj, index) => {
         const { textValue, href, SvgElem, isCategoryHomePath } = obj;
         const ariaLabel = `Go to ${textValue} category`;
         return (
@@ -29,6 +27,25 @@ const SubNav = () => {
             {isMobileAndTablet && <SvgElem className='!w-10 h-10' />}
             <h3 className='font-semibold text-lg'>{textValue}</h3>
           </CustomShopLink>
+        );
+      })}
+      {helperLinks.map((obj, index) => {
+        const { textValue, href, SvgElem } = obj;
+        const ariaLabel = `${textValue}`;
+        return (
+          <>
+            {!(isDesktopOnly && href === '/contact-us') && (
+              <CustomShopLink
+                key={textValue + index}
+                href={`/shop/${href}`}
+                ariaLabel={ariaLabel}
+                className='flex items-center'
+              >
+                {<SvgElem className='!w-10 h-10 lg:w-5 lg:h-5' />}
+                <h3 className='font-semibold text-lg'>{textValue}</h3>
+              </CustomShopLink>
+            )}
+          </>
         );
       })}
     </div>
