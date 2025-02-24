@@ -8,7 +8,7 @@ import NavTopRightLinks from './NavTopRightLinks';
 import SubNav from '../ShopSubNav';
 import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 import ShopMobileSideBar from '../MobileSidebar';
-import RouteWatcher from './RouteWatcher';
+// import RouteWatcher from './RouteWatcher';
 
 const ShopNav: FC = () => {
   // Hooks
@@ -70,7 +70,7 @@ const ShopNav: FC = () => {
         />
       )}
 
-      <RouteWatcher stateSwitcher={setIsSidebarOpen} />
+      {/* <RouteWatcher stateSwitcher={setIsSidebarOpen} /> */}
     </>
   );
 };
