@@ -98,7 +98,8 @@ const SignUpForm = () => {
         // Format names well
 
         const userSendData = {
-          name: `${firstname.trim()} ${lastname.trim()}`,
+          first_name: firstname.trim(),
+          last_name: lastname.trim(),
           email,
           password,
         };
