@@ -11,8 +11,10 @@ const RouteWatcher: FC<RouteWatcherInterface> = ({ stateSwitcher }) => {
   const pathname = usePathname();
 
   useEffect(() => {
-    console.log(`Route changed to: ${pathname}`);
-    stateSwitcher((prev) => !prev);
+    if (pathname !== '/shop') {
+      console.log(`Route changed to: ${pathname}`);
+      stateSwitcher((prev) => !prev);
+    }
     // Perform actions on route change, e.g., analytics, state updates
   }, [pathname, stateSwitcher]);
 
