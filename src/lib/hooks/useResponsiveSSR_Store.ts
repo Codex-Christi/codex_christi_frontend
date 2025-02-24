@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import { create } from 'zustand';
 import { useMediaQuery } from 'react-responsive';
 
@@ -73,6 +73,7 @@ export const useResponsiveSSRValue = () => {
   const responsiveState = useResponsiveSSRStore(
     (state) => state.responsiveState
   );
+
   const cachedState = useMemo(() => responsiveState, [responsiveState]);
 
   return cachedState;
