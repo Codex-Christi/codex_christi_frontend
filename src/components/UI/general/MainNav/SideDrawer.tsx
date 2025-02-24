@@ -7,6 +7,7 @@ import {
   DrawerContent,
   DrawerTitle,
   DrawerDescription,
+  DrawerOverlay,
 } from '@/components/UI/primitives/drawer';
 import { BsCaretLeftFill } from 'react-icons/bs';
 import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
@@ -22,7 +23,6 @@ interface SideDrawerInterface {
 const SideDrawer: FC<SideDrawerInterface> = ({
   openState,
   openCloseController,
-  children,
 }) => {
   // Hooks
   const { isDesktopOnly } = useResponsiveSSRValue();
@@ -36,23 +36,25 @@ const SideDrawer: FC<SideDrawerInterface> = ({
           open={openState}
           onOpenChange={openCloseController}
         >
-          <DrawerContent
-            className={` !rounded-none h-full bg-black/80  !border-none
+          <DrawerOverlay className={` bg-black/[0.01] !backdrop-blur-[10px]`}>
+            <DrawerContent
+              className={` !rounded-none h-full bg-black/80  !border-none
                 !fixed !bottom-0 !right-0 !z-[500] w-full max-w-[600px]`}
-          >
-            <DrawerTitle className='!invisible'>
-              <DrawerDescription>Mobile Navigation Sidebar</DrawerDescription>
-            </DrawerTitle>
+            >
+              <DrawerTitle className='!invisible'>
+                <DrawerDescription>Mobile Navigation Sidebar</DrawerDescription>
+              </DrawerTitle>
 
-            <DrawerClose className=' ml-6 mt-2 mb-4 text-[2.5rem]'>
-              <BsCaretLeftFill />
-            </DrawerClose>
+              <DrawerClose className=' ml-6 mt-2 mb-4 text-[2.5rem]'>
+                <BsCaretLeftFill />
+              </DrawerClose>
 
-            {/* ...... */}
-            <NavList />
+              {/* ...... */}
+              <NavList />
 
-            {/* {children} */}
-          </DrawerContent>
+              {/* {children} */}
+            </DrawerContent>
+          </DrawerOverlay>
         </Drawer>
       )}
     </>

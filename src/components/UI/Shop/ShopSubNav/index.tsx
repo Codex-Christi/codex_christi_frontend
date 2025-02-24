@@ -12,8 +12,10 @@ const SubNav = () => {
   return (
     <div
       role='navigation'
-      className={`bg-transparent flex flex-col gap-5
-        lg:flex-row w-full lg:items-center lg:justify-around lg:gap-[unset] py-2.5 
+      className={`bg-transparent flex flex-col gap-7 w-full max-w-[220px] self-center py-2.5
+        !overflow-y-auto
+        lg:flex-row lg:items-center lg:justify-around lg:gap-[unset] lg:max-w-full lg:self-[unset]
+        lg:!overflow-y-hidden
         lg:shadow lg:shadow-gray-800`}
     >
       {/* HelperLinks component for only  desktop */}
@@ -70,7 +72,7 @@ const HelperLinksComponent: FC = () => {
       !(isDesktopOnly && href === '/contact-us') && (
         <CustomShopLink
           key={textValue + index}
-          href={`/shop/${href}`}
+          href={`/shop${href}`}
           ariaLabel={ariaLabel}
           className='flex items-center gap-7 lg:gap-[unset]'
         >

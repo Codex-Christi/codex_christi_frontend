@@ -1,13 +1,23 @@
 'use client';
 
-import { FC } from 'react';
+import { FC, useState } from 'react';
 import Logo from '../Logo';
 import NavSearch from './NavSearch';
 import { Button } from '../../primitives/button';
 import NavTopRightLinks from './NavTopRightLinks';
-import SubNav from '../SubNavDesktop';
+import SubNav from '../ShopSubNav';
+import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
+import ShopMobileSideBar from '../MobileSidebar';
+import RouteWatcher from './RouteWatcher';
 
 const ShopNav: FC = () => {
+  // Hooks
+  const { isDesktopOnly, isMobileAndTablet } = useResponsiveSSRValue();
+
+  // State Values
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Main JSX
   return (
     <>
       <nav
@@ -24,6 +34,7 @@ const ShopNav: FC = () => {
             name='Toggle mobile sidebar'
             className='lg:!hidden scale-75 md:scale-90 !p-0 '
             variant='link'
+            onClick={() => setIsSidebarOpen((prevSate) => !prevSate)}
           >
             <svg
               xmlns='http://www.w3.org/2000/svg'
@@ -50,7 +61,16 @@ const ShopNav: FC = () => {
         <NavTopRightLinks />
       </nav>
 
-      <SubNav />
+      {isDesktopOnly && <SubNav />}
+
+      {isMobileAndTablet && (
+        <ShopMobileSideBar
+          openState={isSidebarOpen}
+          openCloseController={setIsSidebarOpen}
+        />
+      )}
+
+      <RouteWatcher stateSwitcher={setIsSidebarOpen} />
     </>
   );
 };
