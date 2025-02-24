@@ -4,7 +4,7 @@ import Link, { LinkProps } from 'next/link';
 import { FC, ReactNode } from 'react';
 import { navListArr } from './NavList';
 import { BsCaretLeftFill, BsCaretDownFill } from 'react-icons/bs';
-import useResponsiveSSR from '@/lib/hooks/useResponsiveSSR';
+import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 
 interface ActiveLinkInterface extends LinkProps {
   index: number;
@@ -14,7 +14,7 @@ interface ActiveLinkInterface extends LinkProps {
 
 const ActiveLink: FC<ActiveLinkInterface> = (props) => {
   // Hooks
-  const { isDesktopOnly } = useResponsiveSSR();
+  const { isDesktopOnly } = useResponsiveSSRValue();
 
   // Props Destructuring
   const { children, href, linkText, index } = props;

@@ -13,7 +13,7 @@ import AppleIcon from '@/components/UI/general/IconComponents/AppleIcon';
 import GitHubIcon from '@/components/UI/general/IconComponents/GitHubIcon';
 import { useCustomToast } from '@/lib/hooks/useCustomToast';
 import { useEffect } from 'react';
-import useAuthStore from '@/store/authStore';
+import useAuthStore from '@/stores/authStore';
 
 // Main Component
 const SignIn = () => {

@@ -77,7 +77,7 @@
 
 html,
 body {
-  overflow: hidden !important;
+  overflow-x: hidden !important;
 }
 
 input:-webkit-autofill,

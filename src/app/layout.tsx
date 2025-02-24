@@ -5,6 +5,7 @@ import { Inter } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import { headers } from 'next/headers';
 import { Toaster } from '@/components/UI/primitives/toaster';
+import ResponsiveMediaProvider from '@/components/UI/Providers/ResponsiveMediaQueryProvider';
 
 // Components Import
 import FaviconUpdater from '@/components/UI/general/Helpers/FaviconUpdater';
@@ -57,7 +58,7 @@ export default function RootLayout({
       >
         <FaviconUpdater />
         <Toaster />
-        {children}
+        <ResponsiveMediaProvider>{children}</ResponsiveMediaProvider>
       </body>
     </html>
   );

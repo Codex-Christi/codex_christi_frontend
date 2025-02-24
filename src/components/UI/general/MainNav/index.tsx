@@ -6,12 +6,12 @@ import { FC, useState } from 'react';
 import Logo from '../Logo';
 import NavList from './NavList';
 import SideDrawer from './SideDrawer';
-import useResponsiveSSR from '@/lib/hooks/useResponsiveSSR';
+import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 
 // Main Nav Component
 const MainNav: FC = () => {
   // Hooks
-  const { isDesktopOnly } = useResponsiveSSR();
+  const { isDesktopOnly } = useResponsiveSSRValue();
 
   // States
   const [isSideDrawerOpen, setIsSideDrawerOpen] = useState<boolean>(false);

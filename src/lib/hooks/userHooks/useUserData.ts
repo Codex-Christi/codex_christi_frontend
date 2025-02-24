@@ -1,7 +1,7 @@
 // src/hooks/useUser.ts
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import useAuthStore from '@/store/authStore';
+import useAuthStore from '@/stores/authStore';
 
 export const useUser = () => {
   const accessToken = useAuthStore((state) => state.accessToken);

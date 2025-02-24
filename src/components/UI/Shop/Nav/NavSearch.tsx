@@ -2,12 +2,12 @@ import { FC, ReactNode, ComponentPropsWithRef } from 'react';
 import { Input } from '../../primitives/input';
 import { Button } from '../../primitives/button';
 import { Search } from 'lucide-react';
-import useResponsiveSSR from '@/lib/hooks/useResponsiveSSR';
+import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 
 // Main NavSearch Component
 const NavSearch: FC = () => {
   // Hooks
-  const { isDesktopOnly } = useResponsiveSSR();
+  const { isDesktopOnly } = useResponsiveSSRValue();
 
   // Main JSX
   return (

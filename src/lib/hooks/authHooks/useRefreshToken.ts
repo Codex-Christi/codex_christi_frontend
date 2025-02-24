@@ -2,7 +2,7 @@
 
 import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore } from '@/stores/authStore';
 import { LoginDataReturnType as TokensObjectType } from './useLogin';
 
 export const useRefreshToken = () => {

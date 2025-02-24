@@ -1,5 +1,5 @@
 'use client';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore } from '@/stores/authStore';
 import { ReactNode, useEffect, useMemo } from 'react';
 import { redirect } from 'next/navigation';
 import { useCustomToast } from '@/lib/hooks/useCustomToast';
