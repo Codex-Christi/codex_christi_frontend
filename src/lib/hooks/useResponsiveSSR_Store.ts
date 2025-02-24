@@ -33,7 +33,6 @@ const useResponsiveSSRStore = create<ResponsiveStore>((set) => ({
 
 // ✅ Custom Hook: Runs at the top level
 export function useResponsiveSSRInitial() {
-  const [isClient, setIsClient] = useState(false);
   const setResponsiveState = useResponsiveSSRStore(
     (state) => state.setResponsiveState
   );
@@ -44,23 +43,16 @@ export function useResponsiveSSRInitial() {
   const isTabletAndAbove = useMediaQuery({ minWidth: 768 });
   const isDesktopOnly = useMediaQuery({ minWidth: 1024 });
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsClient(true);
-    }
-  }, []);
-
   // Memoize the values to prevent recalculating media queries on every render
   const memoizedBools = useMemo(() => {
     return {
-      isDesktopOnly: isClient ? isDesktopOnly : false,
-      isTabletOnly: isClient ? isTabletOnly : false,
-      isMobile: isClient ? isMobile : true,
-      isTabletAndAbove: isClient ? isTabletAndAbove : false,
-      isMobileAndTablet: isClient ? isMobileAndTablet : false,
+      isDesktopOnly: isDesktopOnly,
+      isTabletOnly: isTabletOnly,
+      isMobile: isMobile,
+      isTabletAndAbove: isTabletAndAbove,
+      isMobileAndTablet: isMobileAndTablet,
     };
   }, [
-    isClient,
     isDesktopOnly,
     isMobile,
     isMobileAndTablet,
