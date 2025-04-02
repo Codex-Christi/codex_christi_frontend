@@ -31,7 +31,7 @@ export const useVerifyOTP = () => {
   const verifyOTP = async (userDetails: otpType) => {
     try {
       const verifyOTPRes: AxiosResponse<UserDataReturnType> =
-        await tokenClient.post(`/verify-otp/`, { ...userDetails });
+        await tokenClient.post(`/verify-otp`, { ...userDetails });
 
       setVerifyOTPProcessState({
         isLoading: false,
@@ -65,7 +65,7 @@ export const useResendOTP = () => {
   const resendOTP = async (userDetails: resendOTPType) => {
     try {
       const resendOTPRes: AxiosResponse<UserDataReturnType> =
-        await tokenClient.post(`/resend-otp/`, { ...userDetails });
+        await tokenClient.post(`/resend-otp`, { ...userDetails });
 
       setVerifyOTPProcessState({
         isLoading: false,

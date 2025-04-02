@@ -10,7 +10,7 @@ export const useRefreshToken = () => {
 
   const refreshTokenMutation = useMutation({
     mutationFn: async () => {
-      const response = await axios.post('/api/refresh', { refreshToken });
+      const response = await axios.post('/token/refresh', { refreshToken });
       return response.data;
     },
     onSuccess: (data: TokensObjectType) => {
