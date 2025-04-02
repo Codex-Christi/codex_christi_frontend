@@ -7,7 +7,7 @@ import TopHomeBanner from '@/components/UI/Shop/ShopHomepageComponents/TopHomeBa
 const Shop: FC = () => {
   const logOut = async () => {
     await axios
-      .get(`${process.env.NEXT_PUBLIC_BASE_URL}/v1/signout`)
+      .get(`${process.env.NEXT_PUBLIC_BASE_URL}/signout`)
       .then((resp) => {
         console.log('Logout successful');
       });

@@ -3,7 +3,7 @@ import axios, { AxiosError, AxiosResponse } from 'axios';
 import { useState } from 'react';
 
 const tokenClient = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}/v1`,
+  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
 });
 
 type otpType = { email: string; otp: string };
