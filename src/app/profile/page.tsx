@@ -1,9 +1,13 @@
 import axios from 'axios';
 
+const client = axios.create({
+  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
+});
+
 export default async function Page() {
   try {
-    const resp = await axios.get('https://codexchristi.org/api/user-profile');
-    console.log(resp);
+    const resp = await client.get('/user-profile');
+    console.log(resp.data);
   } catch (error) {
     console.error(error);
   }
