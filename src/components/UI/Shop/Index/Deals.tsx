@@ -51,15 +51,6 @@ const Deals = () => {
 					/>
 				</div>
 
-                <div className="w-1/2 md:w-1/3 lg:min-w-40 lg:w-40 h-32 relative shrink-0">
-					<Image
-						className="w-full h-full"
-						src="/sneaker.png"
-						fill
-						alt="Sneaker"
-					/>
-				</div>
-
 				<div className="w-1/2 md:w-1/3 lg:min-w-40 lg:w-40 h-32 relative shrink-0">
 					<Image
 						className="w-full h-full"

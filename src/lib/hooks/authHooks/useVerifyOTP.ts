@@ -3,7 +3,7 @@ import axios, { AxiosError, AxiosResponse } from 'axios';
 import { useState } from 'react';
 
 const tokenClient = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}/v1`,
+  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
 });
 
 type otpType = { email: string; otp: string };
@@ -31,7 +31,7 @@ export const useVerifyOTP = () => {
   const verifyOTP = async (userDetails: otpType) => {
     try {
       const verifyOTPRes: AxiosResponse<UserDataReturnType> =
-        await tokenClient.post(`/verify-otp/`, { ...userDetails });
+        await tokenClient.post(`/verify-otp`, { ...userDetails });
 
       setVerifyOTPProcessState({
         isLoading: false,
@@ -65,7 +65,7 @@ export const useResendOTP = () => {
   const resendOTP = async (userDetails: resendOTPType) => {
     try {
       const resendOTPRes: AxiosResponse<UserDataReturnType> =
-        await tokenClient.post(`/resend-otp/`, { ...userDetails });
+        await tokenClient.post(`/resend-otp`, { ...userDetails });
 
       setVerifyOTPProcessState({
         isLoading: false,

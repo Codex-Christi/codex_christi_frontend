@@ -15,8 +15,7 @@ const SubNav = () => {
       className={`bg-transparent flex flex-col gap-7 w-full max-w-[220px] self-center py-2.5
         !overflow-y-auto
         lg:flex-row lg:items-center lg:justify-around lg:gap-[unset] lg:max-w-full lg:self-[unset]
-        lg:!overflow-y-hidden
-        lg:shadow lg:shadow-gray-800`}
+        lg:!overflow-y-hidden`}
     >
       {/* HelperLinks component for only  desktop */}
       {isDesktopOnly && <HelperLinksComponent />}

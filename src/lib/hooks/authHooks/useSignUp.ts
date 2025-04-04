@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 
 const client = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}/v1`,
+  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
 });
 
 export type UserDataSendType = {
@@ -55,7 +55,7 @@ export const useRegularSignUp = () => {
 
       try {
         const signUpRes: AxiosResponse<UserDataReturnType> = await client.post(
-          `/users/`,
+          `/users`,
           { ...userDetails }
         );
 
