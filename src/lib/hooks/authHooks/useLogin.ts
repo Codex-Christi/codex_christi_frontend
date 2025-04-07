@@ -34,7 +34,7 @@ export const useLogin = () => {
         });
         try {
           const loginRes: AxiosResponse<LoginDataReturnType> =
-            await tokenClient.post(`/login`, { ...userDetails });
+            await tokenClient.post(`/auth/user-login`, { ...userDetails });
 
           setLoginProcessState({
             isLoading: false,
