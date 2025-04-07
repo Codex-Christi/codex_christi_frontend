@@ -36,7 +36,10 @@ const Shop: FC = () => {
 			<div className="relative px-2 py-12 md:px-[20px] lg:px-[24px] space-y-12">
 				<div className="bg-[linear-gradient(90deg,_#FFFFFF_0%,_#E6F3FF_100%)] md:rounded-full p-4 flex flex-wrap items-center gap-4 text-[#0085FF] text-center md:text-left">
 					<div className="flex items-center mx-auto md:mx-0">
-						<Link href="">
+						<Link
+							href=""
+							aria-label="Give us a call"
+						>
 							<svg
 								width="80"
 								height="80"
@@ -104,7 +107,10 @@ const Shop: FC = () => {
 							</svg>
 						</Link>
 
-						<Link href="">
+						<Link
+							href=""
+							aria-label="Send us a mail"
+						>
 							<svg
 								width="80"
 								height="80"
