@@ -39,6 +39,8 @@ const Deals = () => {
 						src="/water-bottle.png"
 						fill
 						alt="Water bottle"
+                        priority
+                        quality={100}
 					/>
 				</div>
 
@@ -48,6 +50,8 @@ const Deals = () => {
 						src="/sneaker.png"
 						fill
 						alt="Sneaker"
+                        priority
+                        quality={100}
 					/>
 				</div>
 
@@ -57,6 +61,8 @@ const Deals = () => {
 						src="/hoodie-1.png"
 						fill
 						alt="Hoodie"
+                        priority
+                        quality={100}
 					/>
 				</div>
 
@@ -66,6 +72,8 @@ const Deals = () => {
 						src="/caps.png"
 						fill
 						alt="cap"
+                        priority
+                        quality={100}
 					/>
 				</div>
 
@@ -75,6 +83,8 @@ const Deals = () => {
 						src="/bagpack.png"
 						fill
 						alt="Bagpack"
+                        priority
+                        quality={100}
 					/>
 				</div>
 
@@ -84,6 +94,8 @@ const Deals = () => {
 						src="/T-shirt.png"
 						fill
 						alt="T-shirt"
+                        priority
+                        quality={100}
 					/>
 				</div>
 
@@ -95,6 +107,7 @@ const Deals = () => {
 
 						slideContainer!.current!.scrollLeft -= slideWidth;
 					}}
+                    aria-label="Scroll left"
 				>
 					<svg
 						width="57"
@@ -192,6 +205,7 @@ const Deals = () => {
 
 						slideContainer!.current!.scrollLeft += slideWidth;
 					}}
+                    aria-label="Scroll right"
 				>
 					<svg
 						width="57"
