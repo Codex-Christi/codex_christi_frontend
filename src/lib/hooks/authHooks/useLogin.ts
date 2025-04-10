@@ -1,18 +1,21 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import { useCallback, useMemo, useState } from 'react';
+import { createLoginSession } from '@/actions/login';
 
 const tokenClient = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
 });
 
 type loginType = { email: string; password: string };
-export type LoginDataReturnType = { refresh: string; access: string };
+export type LoginDataReturnType = {
+  data: { refresh: string; access: string };
+  success: boolean;
+};
 
 interface SignInHookInterface {
   isLoading: boolean;
   isError: boolean;
   errorMsg: string;
-  loginSuccessData: LoginDataReturnType | null;
 }
 
 const defaultSignUpProcessState: SignInHookInterface = {
@@ -26,42 +29,41 @@ export const useLogin = () => {
   const [loginProcessState, setLoginProcessState] =
     useState<SignInHookInterface>(useMemo(() => defaultSignUpProcessState, []));
 
-  const login = useCallback(
-    async (userDetails: loginType) => {
-      if (!loginProcessState.loginSuccessData) {
-        setLoginProcessState((prev) => {
-          return { ...prev, isLoading: true };
-        });
-        try {
-          const loginRes: AxiosResponse<LoginDataReturnType> =
-            await tokenClient.post(`/auth/user-login`, { ...userDetails });
+  const login = useCallback(async (userDetails: loginType) => {
+    setLoginProcessState((prev) => {
+      return { ...prev, isLoading: true };
+    });
+    try {
+      const loginRes: AxiosResponse<LoginDataReturnType> =
+        await tokenClient.post(`/auth/user-login`, { ...userDetails });
 
-          setLoginProcessState({
-            isLoading: false,
-            isError: false,
-            errorMsg: '',
-            loginSuccessData: loginRes.data,
-          });
+      console.log(loginRes);
 
-          return loginRes.data;
-        } catch (err: unknown) {
-          // Handle error case and set loading to false
-          setLoginProcessState((prev) => ({
-            ...prev,
-            isLoading: false,
-            isError: true,
-            errorMsg:
-              properlyReturnAnyError(err as AxiosError) || 'An error occurred', // Handle error message
-          }));
+      const { refresh: refreshToken, access: accessToken } = loginRes.data.data;
 
-          return properlyReturnAnyError(err as AxiosError); // Return error message
-        }
-      } else {
-        alert('Already logged in');
-      }
-    },
-    [loginProcessState.loginSuccessData]
-  );
+      await createLoginSession(accessToken, refreshToken);
+
+      setLoginProcessState({
+        isLoading: false,
+        isError: false,
+        errorMsg: '',
+        loginSuccessData: loginRes.data,
+      });
+
+      return loginRes.data;
+    } catch (err: unknown) {
+      // Handle error case and set loading to false
+      setLoginProcessState((prev) => ({
+        ...prev,
+        isLoading: false,
+        isError: true,
+        errorMsg:
+          properlyReturnAnyError(err as AxiosError) || 'An error occurred', // Handle error message
+      }));
+
+      return properlyReturnAnyError(err as AxiosError); // Return error message
+    }
+  }, []);
 
   return { ...loginProcessState, login };
 };

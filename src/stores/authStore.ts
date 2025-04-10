@@ -8,13 +8,10 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
-  setLoginState: (accessToken: string, refreshToken: string) => void;
-  setLogoutState: () => void;
+  // setLoginState: (accessToken: string, refreshToken: string) => void;
+  // setLogoutState: () => void;
   userLoginInfo: {
     user_id: string;
-    name: string;
-    email: string;
-    username: string;
   } | null;
 }
 
@@ -31,21 +28,21 @@ export const useAuthStore = create<AuthState>((set) => ({
   accessToken: !!localAccessToken ? localAccessToken : null,
   refreshToken: !!localRefreshToken ? localRefreshToken : null,
   isAuthenticated: !!decodedAccessToken ? true : false,
-  setLoginState: (accessToken: string, refreshToken: string) => {
-    setCookie('accessToken', accessToken);
-    setCookie('refreshToken', refreshToken);
-    set({ accessToken, refreshToken, isAuthenticated: true });
-    const decodedResp = decodeJWT(accessToken) as UserLoginInfoType;
+  // setLoginState: (accessToken: string, refreshToken: string) => {
+  //   setCookie('accessToken', accessToken);
+  //   setCookie('refreshToken', refreshToken);
+  //   set({ accessToken, refreshToken, isAuthenticated: true });
+  //   const decodedResp = decodeJWT(accessToken) as UserLoginInfoType;
 
-    set((prevState) => {
-      return { ...prevState, userLoginInfo: decodedResp };
-    });
-  },
-  setLogoutState: () => {
-    Cookies.remove('accessToken');
-    Cookies.remove('refreshToken');
-    set({ accessToken: null, refreshToken: null, isAuthenticated: false });
-  },
+  //   set((prevState) => {
+  //     return { ...prevState, userLoginInfo: decodedResp };
+  //   });
+  // },
+  // setLogoutState: () => {
+  //   Cookies.remove('accessToken');
+  //   Cookies.remove('refreshToken');
+  //   set({ accessToken: null, refreshToken: null, isAuthenticated: false });
+  // },
   userLoginInfo: !!decodedAccessToken ? decodedAccessToken : null,
 }));
 
