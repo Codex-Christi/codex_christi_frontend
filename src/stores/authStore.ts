@@ -1,8 +1,7 @@
 // src/store/authStore.ts
 import { create } from 'zustand';
-import Cookies from 'js-cookie';
 import { jwtDecode } from 'jwt-decode';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { getCookie, decrypt } from '@/lib/session/main-session';
 import { RequestCookie } from 'next/dist/compiled/@edge-runtime/cookies';
 
@@ -32,7 +31,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   autoUpDateSession: async () => {
     const sessionCookie = await getCookie('session');
     const refreshToken = await getCookie('refreshToken');
-    const userSessionInfo = { user_id: '' } as UserSessionInfoType;
+
+    const decryptedSessionCookie = await decrypt(sessionCookie?.value);
+    // console.log(jwtDecode(decryptedSessionCookie!.mainAccessToken as string));
+
+    const userSessionInfo = {
+      user_id: decryptedSessionCookie?.userID,
+    } as UserSessionInfoType;
     const isAuthenticated = !!sessionCookie;
 
     set((prevState) => {
