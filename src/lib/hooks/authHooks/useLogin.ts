@@ -22,9 +22,9 @@ const defaultSignUpProcessState: SignInHookInterface = {
   isLoading: false,
   isError: false,
   errorMsg: '',
-  loginSuccessData: null,
 };
 
+// Main useLogin
 export const useLogin = () => {
   const [loginProcessState, setLoginProcessState] =
     useState<SignInHookInterface>(useMemo(() => defaultSignUpProcessState, []));
@@ -37,20 +37,19 @@ export const useLogin = () => {
       const loginRes: AxiosResponse<LoginDataReturnType> =
         await tokenClient.post(`/auth/user-login`, { ...userDetails });
 
-      console.log(loginRes);
-
       const { refresh: refreshToken, access: accessToken } = loginRes.data.data;
 
-      await createLoginSession(accessToken, refreshToken);
+      const sessionStatus = await createLoginSession(accessToken, refreshToken);
 
-      setLoginProcessState({
-        isLoading: false,
-        isError: false,
-        errorMsg: '',
-        loginSuccessData: loginRes.data,
-      });
-
-      return loginRes.data;
+      if (sessionStatus.success === true) {
+        setLoginProcessState({
+          isLoading: false,
+          isError: false,
+          errorMsg: '',
+        });
+      } else {
+        throw new Error(sessionStatus.error);
+      }
     } catch (err: unknown) {
       // Handle error case and set loading to false
       setLoginProcessState((prev) => ({

@@ -1,44 +1,31 @@
 'use client';
 import { useAuthStore } from '@/stores/authStore';
-import { ReactNode, useEffect, useMemo } from 'react';
-import { redirect } from 'next/navigation';
+import { ReactNode, useEffect, useCallback } from 'react';
 import { useCustomToast } from '@/lib/hooks/useCustomToast';
+import { useIsLoggedIn } from '@/stores/authStore';
 
 // Main Provider Component
-function LoggedinSuccessRedirectProvider({
-  children,
-}: {
-  children: ReactNode;
-}) {
+function LoggedinProvider({ children }: { children: ReactNode }) {
   // Hooks
-  const accessToken = useAuthStore((state) => state.accessToken);
+  const { sessionCookie, autoUpDateSession } = useAuthStore((state) => state);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { triggerCustomToast } = useCustomToast();
 
-  // Bools
-  const isReallyAuthenticated = useMemo(
-    () => !!accessToken && !!isAuthenticated,
-    [accessToken, isAuthenticated]
-  );
+  // Direct Hook Calls
+  // useIsLoggedIn();
 
   // useEffects
   useEffect(() => {
-    if (isReallyAuthenticated) {
-      setTimeout(() => {
-        triggerCustomToast(
-          'success',
-          `You're already logged in`,
-          'Confirmation'
-        );
-        redirect('/');
-      }, 50);
-    }
-  }, [accessToken, isReallyAuthenticated, triggerCustomToast]);
+    autoUpDateSession();
+  }, [autoUpDateSession]);
+
+  useEffect(() => {
+    console.log(sessionCookie);
+  }, [sessionCookie]);
 
   // Main JSX
-  if (!isReallyAuthenticated) {
-    return <>{children}</>;
-  }
+
+  return <>{children}</>;
 }
 
-export default LoggedinSuccessRedirectProvider;
+export default LoggedinProvider;

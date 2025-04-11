@@ -30,7 +30,7 @@ function convertIatToDate(iat: number) {
 }
 
 // Cookie Setter from next/headers
-async function setCookie(cookie: string, name: string, expiresAt: Date) {
+export async function setCookie(cookie: string, name: string, expiresAt: Date) {
   const cookieStore = await cookies();
 
   cookieStore.set(name, cookie, {
@@ -85,6 +85,17 @@ export async function createSession(accessToken: string, refreshToken: string) {
     mainRefreshToken: refreshToken,
   });
 
-  setCookie(sessionObj, 'session', convertIatToDate(accessExp));
-  setCookie(encodedRefreshToken, 'refreshToken', convertIatToDate(refreshExp));
+  await setCookie(sessionObj, 'session', convertIatToDate(accessExp));
+  await setCookie(
+    encodedRefreshToken,
+    'refreshToken',
+    convertIatToDate(refreshExp)
+  );
 }
+
+// Get cookie from server
+export const getCookie = async (name: string) => {
+  const cookieStore = await cookies();
+
+  return cookieStore.get(name);
+};
