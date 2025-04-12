@@ -1,10 +1,336 @@
+"use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import Hoodie from "@/assets/img/specials-hoodie.png";
+import Cap from "@/assets/img/cap-1.png";
+import SpecialsTshirt from "@/assets/img/specials-t-shirt.png";
+import Tshirt from "@/assets/img/t-shirt-1.png";
+import { useState } from "react";
+
+const images = [Hoodie, Cap, SpecialsTshirt, Tshirt];
 
 const ProductSummary = () => {
-    return (
+	const [currentItem, setCurrentItem] = useState(0);
+
+	return (
 		<div className="grid gap-4">
-			<div></div>
+			<div className="bg-[#3D3D3D4D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-2 lg:p-8 flex flex-col gap-8 items-start md:gap-12 md:flex-row">
+				<div className="grid gap-4 grid-cols-2 md:grid-cols-1 order-2 md:order-1">
+					{images.map((image, index) => (
+						<div
+							className={`rounded-[20px] size-24 border-2 ${index === currentItem ? "border-white" : "border-transparent"}`}
+							key={index}
+							onClick={() => setCurrentItem(index)}
+						>
+							<Image
+								className="rounded-[20px]"
+								src={image}
+								alt="Dummy product name"
+							/>
+						</div>
+					))}
+				</div>
+
+				<div className="flex items-start md:w-full h-full gap-8 md:order-2">
+					<div className="rounded-[20px] w-[90%] h-56 md:h-full relative">
+						<Image
+							className="rounded-[20px] size-full object-cover object-center aspect-auto"
+							src={images[currentItem]}
+							alt="Dummy product name"
+							quality={100}
+						/>
+
+						<button
+							className="absolute top-[40%] -left-2 -rotate-180"
+							type="button"
+							onClick={() => {
+								setCurrentItem((prevIndex) => {
+									if (prevIndex - 1 < 0) return prevIndex;
+
+									return prevIndex - 1;
+								});
+							}}
+							aria-label="Go to previous image"
+						>
+							<svg
+								width="57"
+								height="57"
+								viewBox="0 0 57 57"
+								fill="none"
+							>
+								<g filter="url(#filter0_d_589_1207)">
+									<foreignObject
+										x="-3.63672"
+										y="-3.95935"
+										width="56"
+										height="56"
+									>
+										<div className="[backdrop-filter:blur(2px)] [clip-path:url(#bgblur_0_589_1207_clip_path)] [height:100%] [width:100%]"></div>
+									</foreignObject>
+									<circle
+										data-figma-bg-blur-radius="4"
+										cx="24.3633"
+										cy="24.0406"
+										r="24"
+										fill="white"
+										fillOpacity="0.8"
+									/>
+									<path
+										d="M18.3633 31.4669C18.3617 31.9248 18.496 32.3728 18.7493 32.7543C19.0026 33.1357 19.3635 33.4333 19.7861 33.6095C20.2088 33.7856 20.6742 33.8322 21.1235 33.7435C21.5727 33.6548 21.9854 33.4347 22.3094 33.1111L29.6857 25.7266C29.9015 25.5108 30.0724 25.2544 30.1884 24.9722C30.3045 24.69 30.3634 24.3875 30.3619 24.0824C30.3619 24.0557 30.3619 24.031 30.3619 24.0063C30.373 23.6903 30.3189 23.3753 30.2029 23.0811C30.0869 22.7869 29.9115 22.5198 29.6877 22.2964L22.3073 14.9303C21.8702 14.5146 21.2878 14.2862 20.6846 14.2939C20.0813 14.3016 19.505 14.5447 19.0785 14.9714C18.6521 15.3982 18.4093 15.9746 18.402 16.5779C18.3947 17.1811 18.6235 17.7633 19.0395 18.2002L24.8558 24.0166L19.0395 29.833C18.8249 30.0475 18.6547 30.3022 18.5387 30.5826C18.4227 30.863 18.3631 31.1635 18.3633 31.4669Z"
+										fill="black"
+									/>
+								</g>
+								<defs>
+									<filter
+										id="filter0_d_589_1207"
+										x="0.363281"
+										y="0.0406494"
+										width="56"
+										height="56"
+										filterUnits="userSpaceOnUse"
+										colorInterpolationFilters="sRGB"
+									>
+										<feFlood
+											floodOpacity="0"
+											result="BackgroundImageFix"
+										/>
+										<feColorMatrix
+											in="SourceAlpha"
+											type="matrix"
+											values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+											result="hardAlpha"
+										/>
+										<feOffset
+											dx="4"
+											dy="4"
+										/>
+										<feGaussianBlur stdDeviation="2" />
+										<feComposite
+											in2="hardAlpha"
+											operator="out"
+										/>
+										<feColorMatrix
+											type="matrix"
+											values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.2 0"
+										/>
+										<feBlend
+											mode="normal"
+											in2="BackgroundImageFix"
+											result="effect1_dropShadow_589_1207"
+										/>
+										<feBlend
+											mode="normal"
+											in="SourceGraphic"
+											in2="effect1_dropShadow_589_1207"
+											result="shape"
+										/>
+									</filter>
+									<clipPath
+										id="bgblur_0_589_1207_clip_path"
+										transform="translate(3.63672 3.95935)"
+									>
+										<circle
+											cx="24.3633"
+											cy="24.0406"
+											r="24"
+										/>
+									</clipPath>
+								</defs>
+							</svg>
+						</button>
+
+						<button
+							className="absolute top-[40%] -right-2"
+							type="button"
+							onClick={() => {
+								setCurrentItem((prevIndex) => {
+									if (prevIndex + 1 === images.length)
+										return prevIndex;
+
+									return prevIndex + 1;
+								});
+							}}
+							aria-label="Go to next image"
+						>
+							<svg
+								width="57"
+								height="57"
+								viewBox="0 0 57 57"
+								fill="none"
+							>
+								<g filter="url(#filter0_d_589_1207)">
+									<foreignObject
+										x="-3.63672"
+										y="-3.95935"
+										width="56"
+										height="56"
+									>
+										<div className="[backdrop-filter:blur(2px)] [clip-path:url(#bgblur_0_589_1207_clip_path)] [height:100%] [width:100%]"></div>
+									</foreignObject>
+									<circle
+										data-figma-bg-blur-radius="4"
+										cx="24.3633"
+										cy="24.0406"
+										r="24"
+										fill="white"
+										fillOpacity="0.8"
+									/>
+									<path
+										d="M18.3633 31.4669C18.3617 31.9248 18.496 32.3728 18.7493 32.7543C19.0026 33.1357 19.3635 33.4333 19.7861 33.6095C20.2088 33.7856 20.6742 33.8322 21.1235 33.7435C21.5727 33.6548 21.9854 33.4347 22.3094 33.1111L29.6857 25.7266C29.9015 25.5108 30.0724 25.2544 30.1884 24.9722C30.3045 24.69 30.3634 24.3875 30.3619 24.0824C30.3619 24.0557 30.3619 24.031 30.3619 24.0063C30.373 23.6903 30.3189 23.3753 30.2029 23.0811C30.0869 22.7869 29.9115 22.5198 29.6877 22.2964L22.3073 14.9303C21.8702 14.5146 21.2878 14.2862 20.6846 14.2939C20.0813 14.3016 19.505 14.5447 19.0785 14.9714C18.6521 15.3982 18.4093 15.9746 18.402 16.5779C18.3947 17.1811 18.6235 17.7633 19.0395 18.2002L24.8558 24.0166L19.0395 29.833C18.8249 30.0475 18.6547 30.3022 18.5387 30.5826C18.4227 30.863 18.3631 31.1635 18.3633 31.4669Z"
+										fill="black"
+									/>
+								</g>
+								<defs>
+									<filter
+										id="filter0_d_589_1207"
+										x="0.363281"
+										y="0.0406494"
+										width="56"
+										height="56"
+										filterUnits="userSpaceOnUse"
+										colorInterpolationFilters="sRGB"
+									>
+										<feFlood
+											floodOpacity="0"
+											result="BackgroundImageFix"
+										/>
+										<feColorMatrix
+											in="SourceAlpha"
+											type="matrix"
+											values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+											result="hardAlpha"
+										/>
+										<feOffset
+											dx="4"
+											dy="4"
+										/>
+										<feGaussianBlur stdDeviation="2" />
+										<feComposite
+											in2="hardAlpha"
+											operator="out"
+										/>
+										<feColorMatrix
+											type="matrix"
+											values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.2 0"
+										/>
+										<feBlend
+											mode="normal"
+											in2="BackgroundImageFix"
+											result="effect1_dropShadow_589_1207"
+										/>
+										<feBlend
+											mode="normal"
+											in="SourceGraphic"
+											in2="effect1_dropShadow_589_1207"
+											result="shape"
+										/>
+									</filter>
+									<clipPath
+										id="bgblur_0_589_1207_clip_path"
+										transform="translate(3.63672 3.95935)"
+									>
+										<circle
+											cx="24.3633"
+											cy="24.0406"
+											r="24"
+										/>
+									</clipPath>
+								</defs>
+							</svg>
+						</button>
+					</div>
+
+					<div className="grid gap-8">
+						<Link href="">
+							<svg
+								width="26"
+								height="26"
+								viewBox="0 0 26 26"
+								fill="none"
+							>
+								<path
+									d="M24.5801 1.03334C24.5272 1.01147 24.4711 1 24.4147 1H15.513C15.2736 1 15.0798 1.19375 15.0798 1.43318C15.0798 1.67261 15.2736 1.86636 15.513 1.86636H23.369L14.8378 10.3975C14.6686 10.5667 14.6686 10.8408 14.8378 11.0101C14.9225 11.0947 15.0333 11.137 15.1441 11.137C15.2549 11.137 15.3658 11.0947 15.4504 11.0101L23.9815 2.4789V10.1649C23.9815 10.4043 24.1753 10.598 24.4147 10.598C24.6542 10.598 24.8479 10.4043 24.8479 10.1649V1.43318C24.8479 1.37684 24.8364 1.32068 24.8146 1.2678C24.7707 1.16165 24.6863 1.07723 24.5801 1.03334Z"
+									fill="white"
+									stroke="white"
+								/>
+								<path
+									d="M1.28083 15.6287C1.0414 15.6287 0.847656 15.8224 0.847656 16.0618V24.5668C0.847656 24.6231 0.859131 24.6793 0.881022 24.7322C0.924885 24.8383 1.00933 24.9227 1.11538 24.9666C1.16831 24.9885 1.22447 24.9999 1.28083 24.9999H10.2393C10.4787 24.9999 10.6724 24.8062 10.6724 24.5668C10.6724 24.3273 10.4787 24.1336 10.2393 24.1336H2.32655L10.9427 15.5174C11.112 15.3482 11.112 15.0741 10.9427 14.9049C10.7735 14.7357 10.4994 14.7357 10.3302 14.9049L1.71401 23.521V16.0618C1.71401 15.8224 1.52027 15.6287 1.28083 15.6287Z"
+									fill="white"
+									stroke="white"
+								/>
+							</svg>
+						</Link>
+
+						<Link href="">
+							<svg
+								width="30"
+								height="26"
+								viewBox="0 0 30 26"
+								fill="none"
+							>
+								<path
+									d="M15.8468 24.41C15.4671 24.7464 14.8958 24.7453 14.5175 24.4075L13.2477 23.2736C6.38099 17.1657 1.84766 13.1373 1.84766 8.19346C1.84766 4.16512 5.07432 1 9.18099 1C11.1006 1 12.9564 1.72531 14.363 2.92401C14.8259 3.31848 15.5361 3.31848 15.999 2.92402C17.4056 1.72531 19.2614 1 21.181 1C25.2877 1 28.5143 4.16512 28.5143 8.19346C28.5143 13.1373 23.981 17.1657 17.1143 23.2866L15.8468 24.41Z"
+									stroke="white"
+									strokeWidth="2"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								/>
+							</svg>
+						</Link>
+
+						<Link href="">
+							<svg
+								width="22"
+								height="26"
+								viewBox="0 0 22 26"
+								fill="none"
+							>
+								<path
+									fillRule="evenodd"
+									clipRule="evenodd"
+									d="M20.6682 21.9967C20.6147 20.4055 19.295 19.1537 17.7084 19.1896C16.1218 19.2253 14.8593 20.5351 14.8771 22.1271C14.8951 23.7189 16.1866 25.0001 17.7735 25.0001C19.3993 24.9717 20.6949 23.6276 20.6682 21.9967Z"
+									stroke="white"
+									strokeWidth="2"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								/>
+								<path
+									fillRule="evenodd"
+									clipRule="evenodd"
+									d="M10.5341 12.9862C10.574 15.4334 8.62967 17.45 6.19032 17.4913C3.75163 17.4491 1.80825 15.4327 1.84826 12.9862C1.80825 10.5399 3.75163 8.52351 6.19032 8.4812C8.62967 8.52256 10.574 10.5392 10.5341 12.9862Z"
+									stroke="white"
+									strokeWidth="2"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								/>
+								<path
+									fillRule="evenodd"
+									clipRule="evenodd"
+									d="M19.2197 3.97618C19.2452 5.03077 18.6989 6.01641 17.7925 6.55124C16.8862 7.08607 15.762 7.08607 14.8556 6.55124C13.9492 6.01641 13.4029 5.03077 13.4286 3.97618C13.4029 2.92159 13.9492 1.93597 14.8556 1.40112C15.762 0.866293 16.8862 0.866293 17.7925 1.40112C18.6989 1.93597 19.2452 2.92159 19.2197 3.97618Z"
+									stroke="white"
+									strokeWidth="2"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+								/>
+								<line
+									x1="9.14055"
+									y1="9.79228"
+									x2="13.6136"
+									y2="5.31922"
+									stroke="white"
+									strokeWidth="2"
+								/>
+								<path
+									d="M9.80273 15.4656L15.5117 20.2808"
+									stroke="white"
+									strokeWidth="2"
+								/>
+							</svg>
+						</Link>
+					</div>
+				</div>
+			</div>
 
 			<div className="bg-[#3D3D3D4D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-2 lg:p-8">
 				<h2 className="font-bold text-2xl">Product Details</h2>
@@ -185,6 +511,6 @@ const ProductSummary = () => {
 			</div>
 		</div>
 	);
- };
+};
 
 export default ProductSummary;
