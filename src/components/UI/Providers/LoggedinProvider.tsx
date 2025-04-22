@@ -1,21 +1,18 @@
 'use client';
 import { useAuthStore } from '@/stores/authStore';
 import { ReactNode, useEffect } from 'react';
-import { useCustomToast } from '@/lib/hooks/useCustomToast';
 
 // Main Provider Component
 function LoggedinProvider({ children }: { children: ReactNode }) {
   // Hooks
-  const { autoUpDateSession } = useAuthStore((state) => state);
-  const { triggerCustomToast } = useCustomToast();
-
-  // Direct Hook Calls
-  // useIsLoggedIn();
+  const { autoUpDateSession, isAuthenticated } = useAuthStore((state) => state);
 
   // useEffects
   useEffect(() => {
-    autoUpDateSession();
-  }, [autoUpDateSession]);
+    if (!isAuthenticated) {
+      autoUpDateSession();
+    }
+  }, [autoUpDateSession, isAuthenticated]);
 
   // Main JSX
   return <>{children}</>;

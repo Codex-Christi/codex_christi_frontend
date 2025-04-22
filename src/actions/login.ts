@@ -1,6 +1,6 @@
 'use server';
 
-import { createSession } from '@/lib/session/main-session';
+import { createSession, decrypt, getCookie } from '@/lib/session/main-session';
 
 export async function createLoginSession(
   accessToken: string,
@@ -18,4 +18,12 @@ export async function createLoginSession(
       error: `${err}`,
     };
   }
+}
+
+export async function getUserID() {
+  const sessionCookie = await getCookie('session');
+
+  const decryptedSessionCookie = await decrypt(sessionCookie?.value);
+
+  return decryptedSessionCookie?.userID as string;
 }

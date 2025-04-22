@@ -584,6 +584,13 @@
   dependencies:
     "@radix-ui/react-primitive" "2.1.0"
 
+"@rescale/nemo@^2.0.1":
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/@rescale/nemo/-/nemo-2.0.1.tgz#87ca55e215519d721651010aaf732587bff0ec87"
+  integrity sha512-digdU/ekk19RrP/0FLCJmGoeH2xDzwP1ZN7nvDflaNMwzVwjvzWeDmIqlsYwRUQapoCEF4nbO8BcN7hsnSoFTg==
+  dependencies:
+    path-to-regexp "^6.1.0"
+
 "@rtsao/scc@^1.1.0":
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/@rtsao/scc/-/scc-1.1.0.tgz#927dd2fae9bc3361403ac2c7a00c32ddce9ad7e8"
@@ -2546,13 +2553,6 @@ natural-compare@^1.4.0:
   resolved "https://registry.yarnpkg.com/natural-compare/-/natural-compare-1.4.0.tgz#4abebfeed7541f2c27acfb29bdbbd15c8d5ba4f7"
   integrity sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==
 
-next-client-cookies@^2.0.1:
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/next-client-cookies/-/next-client-cookies-2.0.1.tgz#bcc52f4f4fe674e93be9a7d6edacb153175a3420"
-  integrity sha512-iut6Q+vc+2dfnaFVgAvb2Hsch872JO2r08LNoJ/bF8Gqi+zANoGqOL+TJLBq163GqEwjtGGEcm6DUzo5+5Za8g==
-  dependencies:
-    js-cookie "^3.0.5"
-
 next-themes@^0.4.3:
   version "0.4.6"
   resolved "https://registry.yarnpkg.com/next-themes/-/next-themes-0.4.6.tgz#8d7e92d03b8fea6582892a50a928c9b23502e8b6"
@@ -2738,6 +2738,11 @@ path-scurry@^1.11.1:
   dependencies:
     lru-cache "^10.2.0"
     minipass "^5.0.0 || ^6.0.2 || ^7.0.0"
+
+path-to-regexp@^6.1.0:
+  version "6.3.0"
+  resolved "https://registry.yarnpkg.com/path-to-regexp/-/path-to-regexp-6.3.0.tgz#2b6a26a337737a8e1416f9272ed0766b1c0389f4"
+  integrity sha512-Yhpw4T9C6hPpgPeA28us07OJeqZ5EzQTkbfwuhsUg0c237RomFoETJgmp2sa3F/41gfLE6G5cqcYwznmeEeOlQ==
 
 picocolors@^1.0.0, picocolors@^1.1.1:
   version "1.1.1"
