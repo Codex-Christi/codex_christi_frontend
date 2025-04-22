@@ -18,9 +18,9 @@ import useAuthStore from '@/stores/authStore';
 // Main Component
 const SignIn = () => {
   // Hooks
-  const { login, isError, errorMsg, loginSuccessData, isLoading } = useLogin();
+  const { login, isError, errorMsg, isLoading } = useLogin();
   const { triggerCustomToast } = useCustomToast();
-  const setLoginState = useAuthStore((state) => state.setLoginState);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const signInForm = useForm<signInSchemaType>({
     resolver: zodResolver(signInSchema),
     defaultValues: {
@@ -59,21 +59,10 @@ const SignIn = () => {
       triggerCustomToast('error', errorMsg);
     }
 
-    if (isError === false && loginSuccessData !== null) {
+    if (isError === false && isAuthenticated) {
       triggerCustomToast('success', 'Login successful.');
-      const { access, refresh } = loginSuccessData;
-      setTimeout(() => {
-        setLoginState(access, refresh);
-      }, 500);
     }
-  }, [
-    errorMsg,
-    isError,
-    isLoading,
-    triggerCustomToast,
-    loginSuccessData,
-    setLoginState,
-  ]);
+  }, [errorMsg, isError, isLoading, triggerCustomToast, isAuthenticated]);
 
   // Main JSX
   return (

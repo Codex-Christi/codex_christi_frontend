@@ -1,5 +1,5 @@
 # The base image
-FROM node:20.16.0-bookworm-slim AS base
+FROM node:lts-bookworm-slim AS base
 
 # The "dependencies" stage
 # It's good to install dependencies in a separate stage to be explicit about
