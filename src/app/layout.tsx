@@ -7,7 +7,7 @@ import { headers } from 'next/headers';
 import { Toaster } from '@/components/UI/primitives/toaster';
 import ResponsiveMediaProvider from '@/components/UI/Providers/ResponsiveMediaQueryProvider';
 import { CookiesProvider } from 'next-client-cookies/server';
-import LoggedinSuccessRedirectProvider from '@/components/UI/Providers/LoggedinProvider';
+import LoggedinProvider from '@/components/UI/Providers/LoggedinProvider';
 
 // Components Import
 import FaviconUpdater from '@/components/UI/general/Helpers/FaviconUpdater';
@@ -61,9 +61,9 @@ export default function RootLayout({
         <FaviconUpdater />
         <Toaster />
         <CookiesProvider>
-          <LoggedinSuccessRedirectProvider>
+          <LoggedinProvider>
             <ResponsiveMediaProvider>{children}</ResponsiveMediaProvider>
-          </LoggedinSuccessRedirectProvider>
+          </LoggedinProvider>
         </CookiesProvider>
       </body>
     </html>

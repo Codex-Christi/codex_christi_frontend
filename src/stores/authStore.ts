@@ -1,9 +1,10 @@
 // src/store/authStore.ts
 import { create } from 'zustand';
 import { jwtDecode } from 'jwt-decode';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { getCookie, decrypt } from '@/lib/session/main-session';
 import { RequestCookie } from 'next/dist/compiled/@edge-runtime/cookies';
+import { verifySession } from '@/lib/session/session-validate';
 
 // Interfaces and types
 interface AuthState {
@@ -38,7 +39,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const userSessionInfo = {
       user_id: decryptedSessionCookie?.userID,
     } as UserSessionInfoType;
-    const isAuthenticated = !!sessionCookie;
+    const isAuthenticated = (await verifySession()) === true ? true : false;
 
     set((prevState) => {
       return {
@@ -66,12 +67,7 @@ export const useIsLoggedIn = () => {
     });
   }, [setLoggedIn]);
 
-  useEffect(() => {
-    console.log(checkForCookie());
-    checkForCookie(); // initial check
-    const interval = setInterval(checkForCookie, 2000);
-    return () => clearInterval(interval);
-  }, [checkForCookie, setLoggedIn]);
+  alert(`Is logged in? ${useAuthStore((s) => s.isAuthenticated)}`);
 };
 
 function decodeJWT(token: string) {
