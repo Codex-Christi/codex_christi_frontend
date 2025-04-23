@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
-import { Inter } from 'next/font/google';
+import { Inter, Trade_Winds } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import { headers } from 'next/headers';
 import { Toaster } from '@/components/UI/primitives/toaster';
@@ -23,6 +23,11 @@ const OCR_ext = localFont({
 const InterFont = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
+});
+const TradeWinds = Trade_Winds({
+	subsets: ["latin"],
+	variable: "--font-trade-winds",
+    weight: ["400"]
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -48,24 +53,30 @@ export default function RootLayout({
 }>) {
   // Main HTML Document
   return (
-    <html lang='en' className='!overflow-x-hidden !overflow-y-auto '>
-      {/* !w-screen */}
-      <body
-        className={cn(
-          ` font-inter bg-black text-white !max-w-full !overflow-x-hidden antialiased`,
-          nicoMoji.variable,
-          OCR_ext.variable,
-          InterFont.variable
-        )}
-      >
-        <FaviconUpdater />
-        <Toaster />
-        <CookiesProvider>
-          <LoggedinSuccessRedirectProvider>
-            <ResponsiveMediaProvider>{children}</ResponsiveMediaProvider>
-          </LoggedinSuccessRedirectProvider>
-        </CookiesProvider>
-      </body>
-    </html>
+		<html
+			lang="en"
+			className="!overflow-x-hidden !overflow-y-auto "
+		>
+			{/* !w-screen */}
+			<body
+				className={cn(
+					` font-inter bg-black text-white !max-w-full !overflow-x-hidden antialiased`,
+					nicoMoji.variable,
+					OCR_ext.variable,
+					InterFont.variable,
+					TradeWinds.variable
+				)}
+			>
+				<FaviconUpdater />
+				<Toaster />
+				<CookiesProvider>
+					<LoggedinSuccessRedirectProvider>
+						<ResponsiveMediaProvider>
+							{children}
+						</ResponsiveMediaProvider>
+					</LoggedinSuccessRedirectProvider>
+				</CookiesProvider>
+			</body>
+		</html>
   );
 }
