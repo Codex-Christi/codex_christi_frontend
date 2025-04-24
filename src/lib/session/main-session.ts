@@ -10,7 +10,7 @@ const secretKey = process.env.SESSION_SECRET;
 const encodedKey = new TextEncoder().encode(secretKey);
 
 // Interfaces
-interface TokenInterface {
+export interface TokenInterface {
   token_type: 'access' | 'refresh';
   exp: number;
   iat: number;

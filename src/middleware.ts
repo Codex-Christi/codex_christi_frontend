@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import logger from './logger';
 import { createNEMO } from '@rescale/nemo';
-import { defaultRedirectMiddleware } from './lib/middlewares/auth';
+import { defaultRedirectMiddleware } from './lib/middlewares/auth-middleware';
 
 // Define a constant for the exclusion pattern (matches all paths under /_next including any sub-paths and query parameters, and /media with query parameters)
-const excludePattern =
-  /^\/(_next(?:\/[^ ]*)*(?:\?[^ ]*)?|media(?:\/[^ ]*)?(?:\?[^ ]*)?)/;
+// const excludePattern =
+//   /^\/(_next(?:\/[^ ]*)*(?:\?[^ ]*)?|media(?:\/[^ ]*)?(?:\?[^ ]*)?)/;
 
 export const middleware = createNEMO({
   // For shop
@@ -38,11 +38,6 @@ export const middleware = createNEMO({
     '/sign-in': [defaultRedirectMiddleware],
     '/signup': [defaultRedirectMiddleware],
   },
-  '/': [
-    async () => {
-      console.log('Nemo');
-    },
-  ],
 });
 
 // Config for middleware matcher

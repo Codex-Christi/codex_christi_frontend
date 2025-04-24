@@ -1,3 +1,5 @@
+import { Button } from '@/components/UI/primitives/button';
+import { decrypt } from '@/lib/session/main-session';
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import { cookies } from 'next/headers';
 
@@ -14,16 +16,21 @@ interface UserData {
   email: string;
 }
 
+// Pre rendering get User SSR order
 const getUser = async () => {
-  const accessToken = (await cookies()).get('accessToken')?.value;
+  const accessToken = await decrypt((await cookies()).get('session')!.value);
+
+  const mainAccessToken = accessToken
+    ? accessToken.mainAccessToken
+    : ('' as string);
 
   const apiResponse = await client
-    .get('/account/user-profile', {
+    .get('/account/my-profile', {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${mainAccessToken}`,
       },
     })
-    .then((resp: AxiosResponse<UserData>) => resp.data)
+    .then((resp: { data: AxiosResponse<UserData> }) => resp.data.data)
     .catch((err: AxiosError) => err);
 
   console.log(apiResponse);
@@ -33,19 +40,20 @@ const getUser = async () => {
 
 export default async function Page() {
   const apiResponse = await getUser();
+  const doesResponseHaveUserData = 'first_name' in apiResponse;
 
-  return (
-    // <div
-    //   key={id}
-    //   className='border border-white max-w-[400px] mx-auto py-5 shadow-sm shadow-slate-200
-    //         rounded-lg my-7 w-full text-center'
-    // >
-    //   <h2>
-    //     {first_name ? first_name : 'No name'} {last_name}
-    //   </h2>
-    //   <h5>Email : {email}</h5>
-    // </div>
-
-    <h3>Hello</h3>
-  );
+  if (doesResponseHaveUserData) {
+    const responseObj = apiResponse;
+    return (
+      <div>
+        <h3>Hello {responseObj.first_name}</h3>
+        <Button name='Logout button' className='my-3'>
+          Logout User
+        </Button>
+      </div>
+    );
+  } else {
+    const { err: requestError } = { err: apiResponse.message };
+    return <h5>An error occured: {requestError}</h5>;
+  }
 }
