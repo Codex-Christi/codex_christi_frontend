@@ -106,3 +106,7 @@ input:focus-visible {
 .custom-scrollbar::-webkit-scrollbar {
 	display: none;
 }
+
+.input {
+    @apply bg-transparent border border-white py-2.5 px-3 focus:!outline-0 focus-visible:!ring-0 autofill:!bg-transparent rounded placeholder:!text-white/50 placeholder:text-sm
+}

@@ -2,10 +2,14 @@
 
 import Image from "next/image";
 import ProfileImage from "@/assets/img/profile-img.png";
+import EditProfileModal from "./EditProfileModal";
+import { useState } from "react";
 
 const ProfileBanner = () => {
+    const [isActive, setIsActive] = useState(false);
+
 	return (
-		<div className="flex items-start justify-between gap-4 px-4 py-8">
+		<div className="flex items-start justify-between gap-4 px-4 py-8 relative">
 			<div className="flex items-center gap-4">
 				<Image
 					className="size-20 rounded-full"
@@ -60,10 +64,13 @@ const ProfileBanner = () => {
 
 			<button
 				className="border border-white py-3 px-4 rounded-sm shrink-0"
-				type="button"
+                type="button"
+                onClick={() => setIsActive(!isActive)}
 			>
 				Edit Profile
 			</button>
+
+            <EditProfileModal isActive={isActive} setIsActive={setIsActive} />
 		</div>
 	);
 };

@@ -7,7 +7,7 @@ import UserImg from "@/assets/img/user-img.png";
 const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 	return (
 		<div className="w-full grid gap-8">
-			<div className="bg-[#0D0D0D] p-8 flex items-center justify-between gap-4 sticky z-30 top-0">
+			<div className="bg-[#0D0D0D] px-8 py-4 flex items-center justify-between gap-4 sticky z-30 top-0">
 				<div className="flex items-center justify-between w-1/2 gap-12">
 					<Link href="">
 						<svg
