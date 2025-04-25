@@ -33,8 +33,6 @@ const getUser = async () => {
     .then((resp: { data: AxiosResponse<UserData> }) => resp.data.data)
     .catch((err: AxiosError) => err);
 
-  console.log(apiResponse);
-
   return apiResponse;
 };
 
