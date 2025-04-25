@@ -1,3 +1,6 @@
+import ContentContainer from '@/components/UI/profile/ContentContainer';
+import ProfileBanner from '@/components/UI/profile/ProfileBanner';
+import ProfileContainer from '@/components/UI/profile/ProfileContainer';
 import { Button } from '@/components/UI/primitives/button';
 import { decrypt } from '@/lib/session/main-session';
 import axios, { AxiosError, AxiosResponse } from 'axios';
@@ -40,18 +43,28 @@ export default async function Page() {
   const apiResponse = await getUser();
   const doesResponseHaveUserData = 'first_name' in apiResponse;
 
-  if (doesResponseHaveUserData) {
-    const responseObj = apiResponse;
-    return (
-      <div>
-        <h3>Hello {responseObj.first_name}</h3>
-        <Button name='Logout button' className='my-3'>
-          Logout User
-        </Button>
+  return (
+    <ContentContainer>
+      <div className='bg-[#0D0D0D]/30 backdrop-blur-lg rounded-[10px]'>
+        <ProfileBanner />
+
+        <ProfileContainer />
       </div>
-    );
-  } else {
-    const { err: requestError } = { err: apiResponse.message };
-    return <h5>An error occured: {requestError}</h5>;
-  }
+    </ContentContainer>
+  );
+
+  //   if (doesResponseHaveUserData) {
+  //     const responseObj = apiResponse;
+  //     return (
+  //       <div>
+  //         <h3>Hello {responseObj.first_name}</h3>
+  //         <Button name='Logout button' className='my-3'>
+  //           Logout User
+  //         </Button>
+  //       </div>
+  //     );
+  //   } else {
+  //     const { err: requestError } = { err: apiResponse.message };
+  //     return <h5>An error occured: {requestError}</h5>;
+  //   }
 }
