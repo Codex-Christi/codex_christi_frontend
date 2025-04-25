@@ -138,7 +138,7 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 						height={0}
 						width={0}
 						src="/media/img/home/blue-planet.svg"
-						className="w-[80%] z-50 max-w-[550px] h-[8.5rem] right-[-4rem] top-[-1.25rem] md:w-[65%] md:max-w-[500px] md:h-[9rem] md:right-[-4.5rem] lg:w-[35%] lg:max-w-[470px] lg:h-[200px] lg:right-0 lg:top-[-.1rem] fixed !overflow-x-hidden"
+						className="w-[80%] z-50 max-w-[550px] h-[8.5rem] right-[-4rem] top-[-1.25rem] md:w-[65%] md:max-w-[500px] md:h-[9rem] md:right-[-4.5rem] lg:w-[35%] lg:max-w-[470px] lg:h-[200px] lg:[inset-inline-end:16px;] lg:top-[-.1rem] fixed !overflow-x-hidden"
                     />
 
 					<Image
