@@ -10,7 +10,7 @@ const secretKey = process.env.SESSION_SECRET;
 const encodedKey = new TextEncoder().encode(secretKey);
 
 // Interfaces
-interface TokenInterface {
+export interface TokenInterface {
   token_type: 'access' | 'refresh';
   exp: number;
   iat: number;
@@ -25,7 +25,8 @@ interface PayloadInterface extends JWTPayload {
 }
 
 // Util funcs
-function convertIatToDate(iat: number) {
+// Conver IAT to Date
+export async function convertIatToDate(iat: number) {
   return new Date(iat * 1000);
 }
 
@@ -77,19 +78,19 @@ export async function createSession(accessToken: string, refreshToken: string) {
 
   const sessionObj = await encrypt({
     userID: user_id,
-    expiresAt: convertIatToDate(accessExp),
+    expiresAt: await convertIatToDate(accessExp),
     mainAccessToken: accessToken,
   });
   const encodedRefreshToken = await encrypt({
-    expiresAt: convertIatToDate(refreshExp),
+    expiresAt: await convertIatToDate(refreshExp),
     mainRefreshToken: refreshToken,
   });
 
-  await setCookie(sessionObj, 'session', convertIatToDate(accessExp));
+  await setCookie(sessionObj, 'session', await convertIatToDate(accessExp));
   await setCookie(
     encodedRefreshToken,
     'refreshToken',
-    convertIatToDate(refreshExp)
+    await convertIatToDate(refreshExp)
   );
 }
 

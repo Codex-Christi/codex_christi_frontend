@@ -6,8 +6,7 @@ import { cn } from '@/lib/utils';
 import { headers } from 'next/headers';
 import { Toaster } from '@/components/UI/primitives/toaster';
 import ResponsiveMediaProvider from '@/components/UI/Providers/ResponsiveMediaQueryProvider';
-import { CookiesProvider } from 'next-client-cookies/server';
-import LoggedinSuccessRedirectProvider from '@/components/UI/Providers/LoggedinProvider';
+import LoggedinProvider from '@/components/UI/Providers/LoggedinProvider';
 
 // Components Import
 import FaviconUpdater from '@/components/UI/general/Helpers/FaviconUpdater';
@@ -53,30 +52,25 @@ export default function RootLayout({
 }>) {
   // Main HTML Document
   return (
-		<html
-			lang="en"
-			className="!overflow-x-hidden !overflow-y-auto "
-		>
-			{/* !w-screen */}
-			<body
-				className={cn(
-					` font-inter bg-black text-white !max-w-full !overflow-x-hidden antialiased`,
-					nicoMoji.variable,
-					OCR_ext.variable,
-					InterFont.variable,
-					TradeWinds.variable
-				)}
-			>
-				<FaviconUpdater />
-				<Toaster />
-				<CookiesProvider>
-					<LoggedinSuccessRedirectProvider>
-						<ResponsiveMediaProvider>
-							{children}
-						</ResponsiveMediaProvider>
-					</LoggedinSuccessRedirectProvider>
-				</CookiesProvider>
-			</body>
-		</html>
+
+    <html lang='en' className='!overflow-x-hidden !overflow-y-auto '>
+      {/* !w-screen */}
+      <body
+        className={cn(
+          ` font-inter bg-black text-white !max-w-full !overflow-x-hidden antialiased`,
+          nicoMoji.variable,
+          OCR_ext.variable,
+          InterFont.variable,
+          TradeWinds.variable
+
+        )}
+      >
+        <FaviconUpdater />
+        <Toaster />
+        <ResponsiveMediaProvider>
+          <LoggedinProvider>{children}</LoggedinProvider>
+        </ResponsiveMediaProvider>
+      </body>
+    </html>
   );
 }
