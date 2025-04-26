@@ -2,7 +2,7 @@
 import ContentContainer from "@/components/UI/profile/ContentContainer";
 import ProfileBanner from "@/components/UI/profile/ProfileBanner";
 import ProfileContainer from "@/components/UI/profile/ProfileContainer";
-import { Button } from '@/components/UI/primitives/button';
+// import { Button } from '@/components/UI/primitives/button';
 import { decrypt } from '@/lib/session/main-session';
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import { cookies } from 'next/headers';
@@ -46,7 +46,7 @@ const getUser = async () => {
 
 export default async function Page() {
 
-	  const apiResponse = await getUser();
+	//   const apiResponse = await getUser();
 
 	return (
 		<ContentContainer>
@@ -58,8 +58,8 @@ export default async function Page() {
 		</ContentContainer>
 	);
 
-  const apiResponse = await getUser();
-  const doesResponseHaveUserData = 'first_name' in apiResponse;
+//   const apiResponse = await getUser();
+//   const doesResponseHaveUserData = 'first_name' in apiResponse;
 
 //   if (doesResponseHaveUserData) {
 //     const responseObj = apiResponse;

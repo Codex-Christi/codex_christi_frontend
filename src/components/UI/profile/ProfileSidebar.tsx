@@ -1,11 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
+import { SearchIcon } from "lucide-react";
 
 const ProfileSidebar = () => {
 	return (
-		<div className="w-[300px] bg-[#0D0D0D] shadow text-white flex flex-col gap-16 p-4 h-svh sticky top-0">
+		<div className="w-[315.48px] bg-[#0D0D0D] shadow text-white flex flex-col gap-16 py-4 h-svh sticky top-0">
 			<Image
-				className="-ml-6"
+				className="-ml-1.5 mr-4"
 				src="/media/img/general/logo.svg"
 				priority
 				width={100}
@@ -13,7 +14,22 @@ const ProfileSidebar = () => {
 				alt="Codex Christi"
 			/>
 
-			<div className="grid gap-10 pb-2 overflow-y-auto h-full">
+			<div className="flex flex-col gap-10 p-4 overflow-y-auto h-full max-w-full">
+				<div className="max-w-full">
+					<form>
+						<label className="flex items-center border border-white p-4 py-1 rounded-full" htmlFor="search">
+							<SearchIcon className="shrink-0" />
+
+							<input
+								className="input p-0 w-full border-none border-transparent"
+                                placeholder="Search"
+                                type="text"
+                                id="search"
+							/>
+						</label>
+					</form>
+				</div>
+
 				<Link
 					className="flex items-center gap-4"
 					href="/profile/messages"
