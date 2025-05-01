@@ -24,10 +24,10 @@ const Categories = () => {
 				Explore Top Categories
 			</h2>
 
-			<div className="grid md:grid-cols-2 gap-8 items-start lg:gap-12 rounded-[20px]">
-				<div className="grid gap-8">
-					<div className="grid gap-8 md:grid-cols-12">
-						<div className="space-y-8 md:col-span-7">
+			<div className="max-md:flex overflow-x-auto md:grid md:grid-cols-2 gap-4 md:gap-8 items-start lg:gap-12 rounded-[20px]">
+				<div className="max-md:min-w-[90%] grid gap-4 md:gap-8">
+					<div className="grid gap-4 md:gap-8 md:grid-cols-12">
+						<div className="space-y-4 md:space-y-8 md:col-span-7">
 							<div className="bg-[linear-gradient(161.11deg,_rgba(0,_133,_255,_0.7)_6.84%,_rgba(0,_24,_140,_0.5)_49.48%,_rgba(8,_8,_8,_0.7)_92.13%)] p-4 md:p-8 rounded-[20px] space-y-4">
 								<div className="flex items-center gap-4 justify-between">
 									<p className="font-extrabold text-xl">
@@ -92,7 +92,7 @@ const Categories = () => {
 								Sneakers
 							</p>
 
-							<div className="grid place-content-center gap-8">
+							<div className="grid place-content-center gap-4 md:gap-8">
 								<div>
 									<Image
 										className="mx-auto"
@@ -171,8 +171,8 @@ const Categories = () => {
 					</div>
 				</div>
 
-				<div className="grid gap-8">
-					<div className="grid gap-8 items-start md:grid-cols-12">
+				<div className="max-md:min-w-[90%] grid gap-4 md:gap-8">
+					<div className="grid gap-4 md:gap-8 items-start md:grid-cols-12">
 						<div className="bg-[linear-gradient(161.11deg,_rgba(0,_133,_255,_0.7)_6.84%,_rgba(0,_24,_140,_0.5)_49.48%,_rgba(8,_8,_8,_0.7)_92.13%)] p-4 md:p-8 space-y-4 rounded-[20px] md:col-span-7">
 							<div className="flex items-center gap-4 justify-between">
 								<p className="font-extrabold text-xl">
@@ -208,7 +208,7 @@ const Categories = () => {
 								Headwears
 							</p>
 
-							<div className="grid place-content-center gap-8">
+							<div className="grid place-content-center gap-4 md:gap-8">
 								<div>
 									<Image
 										className="mx-auto"
