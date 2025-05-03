@@ -40,8 +40,8 @@ const getUser = async () => {
 };
 
 export default async function Page() {
-  const apiResponse = await getUser();
-  const doesResponseHaveUserData = 'first_name' in apiResponse;
+  const userDataApiResponse = await getUser();
+  const doesResponseHaveUserData = 'first_name' in userDataApiResponse;
 
   return (
     <ContentContainer>
