@@ -10,7 +10,7 @@ const ProfileBanner = () => {
 
     return (
         <>
-            <div className="flex items-start justify-between gap-4 px-4 py-8 relative">
+            <div className="flex items-start justify-between gap-4 px-4 py-8 relative bg-black/5 backdrop-blur-[30px] rounded-t-[20px]">
                 <div className="flex items-center gap-4">
                     <Image
                         className="size-20 rounded-full"
@@ -64,7 +64,7 @@ const ProfileBanner = () => {
                 </div>
 
                 <button
-                    className="border border-white py-3 px-4 rounded-sm shrink-0"
+                    className="inline-block border border-white py-3 px-4 rounded-sm shrink-0"
                     type="button"
                     onClick={() => setIsActive(!isActive)}
                 >

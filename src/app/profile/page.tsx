@@ -1,3 +1,4 @@
+
 import ContentContainer from '@/components/UI/profile/ContentContainer';
 import ProfileBanner from '@/components/UI/profile/ProfileBanner';
 import ProfileContainer from '@/components/UI/profile/ProfileContainer';
@@ -40,6 +41,7 @@ const getUser = async () => {
 };
 
 export default async function Page() {
+
   const userDataApiResponse = await getUser();
   const doesResponseHaveUserData = 'first_name' in userDataApiResponse;
 
@@ -53,18 +55,18 @@ export default async function Page() {
     </ContentContainer>
   );
 
-  //   if (doesResponseHaveUserData) {
-  //     const responseObj = apiResponse;
-  //     return (
-  //       <div>
-  //         <h3>Hello {responseObj.first_name}</h3>
-  //         <Button name='Logout button' className='my-3'>
-  //           Logout User
-  //         </Button>
-  //       </div>
-  //     );
-  //   } else {
-  //     const { err: requestError } = { err: apiResponse.message };
-  //     return <h5>An error occured: {requestError}</h5>;
-  //   }
+    if (doesResponseHaveUserData) {
+      const responseObj = apiResponse;
+      return (
+        <div>
+          <h3>Hello {responseObj.first_name}</h3>
+          <Button name='Logout button' className='my-3'>
+            Logout User
+          </Button>
+        </div>
+      );
+    } else {
+      const { err: requestError } = { err: apiResponse.message };
+      return <h5>An error occured: {requestError}</h5>;
+    }
 }

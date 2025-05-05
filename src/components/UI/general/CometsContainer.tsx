@@ -11,11 +11,11 @@ const CometsContainer: FC<CometsContainerInterface> = (props) => {
   // Main JSX
   return (
     <div
-      className={`${children ? 'relative' : 'absolute'} top-0 bottom-0 left-0 right-0 w-full 
+      className={`${children ? 'relative' : 'absolute'} top-0 bottom-0 left-0 right-0 w-full
       ${children ? '!-z-[0]' : '!-z-[1]'} `}
     >
       <div
-        className={`relative top-0 bottom-0 left-0 right-0 w-full h-full 
+        className={`relative top-0 bottom-0 left-0 right-0 w-full h-full
           ${children ? '!-z-[0]' : '!-z-[1]'} ${children ? 'min-h-dvh' : 'min-h-[auto]'}
           bg-[url('/media/img/home/comets_mobile.svg')]
           md:bg-[url('/media/img/home/comets_tablet.svg')]

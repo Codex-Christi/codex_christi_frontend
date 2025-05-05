@@ -7,7 +7,7 @@ import UserImg from "@/assets/img/user-img.png";
 const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 	return (
 		<div className="w-full grid gap-8">
-			<div className="bg-[#0D0D0D] px-8 py-4 flex items-center justify-between gap-4 sticky z-30 top-0">
+			<div className="bg-[#0D0D0D] px-8 py-4 md:px-[66px] flex items-center justify-between gap-4 sticky z-30 top-0">
 				<div className="flex items-center justify-between w-1/2 gap-12">
 					<Link href="">
 						<svg
@@ -139,7 +139,7 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 						width={0}
 						src="/media/img/home/blue-planet.svg"
 						className="w-[80%] z-50 max-w-[550px] h-[8.5rem] right-[-4rem] top-[-1.25rem] md:w-[65%] md:max-w-[500px] md:h-[9rem] md:right-[-4.5rem] lg:w-[35%] lg:max-w-[470px] lg:h-[200px] lg:[inset-inline-end:16px;] lg:top-[-.1rem] fixed !overflow-x-hidden"
-                    />
+					/>
 
 					<Image
 						className="w-16 h-auto rounded-full relative z-[1024]"
@@ -147,8 +147,8 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 						alt="User image"
 					/>
 
-                    <button
-                        className="relative z-[1024]"
+					<button
+						className="relative z-[1024]"
 						type="button"
 						aria-label="Nav toggle"
 					>
@@ -167,10 +167,10 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 				</div>
 			</div>
 
-			<div className="flex items-start p-8 z-10 gap-16">
-				<div className="w-[calc(100%-(200px+6rem))]">{children}</div>
+			<div className="flex items-start z-10 gap-[66px] md:px-[66px] md:py-6">
+				<div className="w-full">{children}</div>
 
-				<div className="w-[200px] grid gap-8 mt-8 sticky top-1/3">
+				<div className="w-[274.05px] grid gap-8 mt-8 sticky top-1/3">
 					<div className="bg-[#0D0D0D] border-2 border-[#0085FF] rounded-[20px] p-10 grid place-content-center text-[#2586D9] font-semibold text-[46px]">
 						AD SPACE
 					</div>

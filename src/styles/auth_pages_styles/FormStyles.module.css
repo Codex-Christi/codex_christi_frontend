@@ -1,18 +1,18 @@
 /* First fields setdefault class */
 .firstFormFieldSet {
-  position: relative;
-  flex-grow: 1 !important;
-  min-width: -webkit-fill-available !important;
-  min-width: -moz-available !important;
-  /* display: block; */
-  width: 100%;
+  /* position: relative; */
+  /* flex-grow: 1 !important; */
+  /* min-width: -webkit-fill-available !important;
+  min-width: -moz-available !important; */
+  min-width: 100%;
 }
 /* Second fields set default class */
 .secondFormFieldSetHiddenState {
-  position: relative;
-  flex-grow: 1 !important;
-  min-width: -webkit-fill-available !important;
-  min-width: -moz-available !important;
+  /* position: relative; */
+  /* flex-grow: 1 !important; */
+  /* min-width: -webkit-fill-available !important;
+  min-width: -moz-available !important; */
+  min-width: 100%;
   left: 40vw;
 }
 

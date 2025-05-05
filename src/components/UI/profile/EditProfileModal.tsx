@@ -19,7 +19,7 @@ const EditProfileModal = ({
 	return (
 		<div
 			className={cn(
-				"bg-[#0D0D0DFA] text-white fixed w-full top-[calc(4rem+1.40rem)] p-8 left-0 space-y-8 transition-transform duration-300 ease-linear -translate-y-[200%]",
+				"bg-[#0D0D0DFA] text-white fixed w-full top-[calc(4rem+1.40rem)] p-8 left-0 space-y-8 transition-transform md:w-4/5 md:translate-x-[13%] duration-300 ease-linear rounded-[10px] -translate-y-[200%]",
 				{
 					"translate-y-0": isActive,
 				},
@@ -121,7 +121,7 @@ const EditProfileModal = ({
 					/>
 				</label>
 
-                <EditCountry />
+				<EditCountry />
 
 				<div className="grid gap-0.5">
 					<p className="text-white/70">Select Gender</p>
@@ -135,7 +135,7 @@ const EditProfileModal = ({
 
 				<EditBirthday />
 
-                <EditWebsite />
+				<EditWebsite />
 
 				<button
 					className="bg-[#0085FF] text-white font-semibold rounded py-3 px-5 mx-auto block"
