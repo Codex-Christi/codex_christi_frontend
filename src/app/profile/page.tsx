@@ -22,7 +22,7 @@ interface UserData {
 
 // Pre rendering get User SSR order
 const getUser = async () => {
-  const accessToken = await decrypt((await cookies()).get('session')!.value);
+  const accessToken = await decrypt((await cookies()).get('session')?.value);
 
   const mainAccessToken = accessToken
     ? accessToken.mainAccessToken
@@ -47,7 +47,7 @@ export default async function Page() {
 
   return (
     <ContentContainer>
-      <div className='bg-[#0D0D0D]/30 backdrop-blur-lg rounded-[10px]'>
+      <div className='bg-[#0D0D0D]/30 rounded-[10px]'>
         <ProfileBanner />
 
         <ProfileContainer />

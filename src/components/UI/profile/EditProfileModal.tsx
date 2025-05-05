@@ -19,9 +19,9 @@ const EditProfileModal = ({
 	return (
 		<div
 			className={cn(
-				"bg-[#0D0D0DFA] text-white fixed w-full top-[calc(4rem+1.40rem)] p-8 left-0 space-y-8 transition-transform md:w-4/5 md:translate-x-[13%] duration-300 ease-linear rounded-[10px] -translate-y-[200%]",
+				"bg-[#0D0D0D]/[.98] backdrop-blur-lg text-white fixed top-[calc(4rem+1.40rem)] p-8 w-[90%] left-[5%] space-y-8 transition-transform md:w-1/2 h-[calc(100dvh-6rem)] overflow-y-auto md:left-[25%] duration-300 ease-linear rounded-[10px] -translate-y-[200%] shadow-2xl lg:w-2/5 lg:left-[30%]",
 				{
-					"translate-y-0": isActive,
+					"md:translate-y-4 translate-y-0": isActive,
 				},
 			)}
 		>

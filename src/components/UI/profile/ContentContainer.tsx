@@ -170,14 +170,14 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 			<div className="flex items-start z-10 gap-[66px] md:px-[66px] md:py-6">
 				<div className="w-full">{children}</div>
 
-				<div className="w-[274.05px] grid gap-8 mt-8 sticky top-1/3">
+				<div className="w-[274.05px] grid gap-8 mt-8 sticky top-1/3 xl:w-[600px]">
 					<div className="bg-[#0D0D0D] border-2 border-[#0085FF] rounded-[20px] p-10 grid place-content-center text-[#2586D9] font-semibold text-[46px]">
 						AD SPACE
 					</div>
 
 					<div>
 						<Image
-							className="rounded-t-[10px] h-56"
+							className="rounded-t-[10px] h-56 xl:h-72"
 							src={AdsImage}
 							alt="Ads Image"
 						/>
@@ -200,7 +200,7 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 
 					<div className="border border-white rounded-[10px]">
 						<Image
-							className="rounded-t-[10px] h-32"
+							className="rounded-t-[10px] h-32 xl:h-60"
 							src={SponsoredAd}
 							alt="Sponsored ad"
 						/>

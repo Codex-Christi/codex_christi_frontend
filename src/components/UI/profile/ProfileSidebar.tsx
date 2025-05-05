@@ -4,7 +4,7 @@ import { SearchIcon } from "lucide-react";
 
 const ProfileSidebar = () => {
 	return (
-		<div className="w-[315.48px] bg-[#0D0D0D] shadow text-white flex flex-col gap-16 py-4 h-svh sticky top-0">
+		<div className="w-[315.48px] bg-[#0D0D0D] shadow text-white flex flex-col gap-16 py-4 h-svh sticky top-0 xl:w-[500px]">
 			<Image
 				className="-ml-1.5 mr-4"
 				src="/media/img/general/logo.svg"
