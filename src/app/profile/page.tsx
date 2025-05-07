@@ -21,7 +21,12 @@ interface UserData {
 
 // Pre rendering get User SSR order
 const getUser = async () => {
-  const accessToken = await decrypt((await cookies()).get('session')!.value);
+  const accessToken =
+    (await decrypt((await cookies()).get('session')?.value)) ?? null;
+
+  if (!accessToken) {
+    return;
+  }
 
   const mainAccessToken = accessToken
     ? accessToken.mainAccessToken
@@ -41,17 +46,9 @@ const getUser = async () => {
 
 export default async function Page() {
   const userDataApiResponse = await getUser();
-  const doesResponseHaveUserData = 'first_name' in userDataApiResponse;
-
-  return (
-    <ContentContainer>
-      <div className='bg-[#0D0D0D]/30 backdrop-blur-lg rounded-[10px]'>
-        <ProfileBanner />
-
-        <ProfileContainer />
-      </div>
-    </ContentContainer>
-  );
+  const doesResponseHaveUserData = userDataApiResponse
+    ? 'first_name' in userDataApiResponse
+    : false;
 
   // if (doesResponseHaveUserData) {
   //   const responseObj = apiResponse;
@@ -67,4 +64,14 @@ export default async function Page() {
   //   const { err: requestError } = { err: apiResponse.message };
   //   return <h5>An error occured: {requestError}</h5>;
   // }
+
+  return (
+    <ContentContainer>
+      <div className='bg-[#0D0D0D]/30 backdrop-blur-lg rounded-[10px]'>
+        <ProfileBanner />
+
+        <ProfileContainer />
+      </div>
+    </ContentContainer>
+  );
 }

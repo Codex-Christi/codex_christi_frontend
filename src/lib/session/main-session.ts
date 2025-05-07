@@ -43,6 +43,12 @@ export async function setCookie(cookie: string, name: string, expiresAt: Date) {
   });
 }
 
+// Delete Cookie
+export async function deleteCookie(name: string) {
+  const cookieStore = await cookies();
+  cookieStore.delete(name);
+}
+
 // Use 'jose' to encrypt session details
 export async function encrypt(payload: PayloadInterface) {
   return new SignJWT(payload)
@@ -92,6 +98,14 @@ export async function createSession(accessToken: string, refreshToken: string) {
     'refreshToken',
     await convertIatToDate(refreshExp)
   );
+}
+
+// Update Session
+
+// Delete Session
+export async function deleteSession() {
+  await deleteCookie('session');
+  await deleteCookie('refreshToken');
 }
 
 // Get cookie from server
