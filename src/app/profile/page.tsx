@@ -1,10 +1,7 @@
-import ContentContainer from '@/components/UI/profile/ContentContainer';
-import ProfileBanner from '@/components/UI/profile/ProfileBanner';
-import ProfileContainer from '@/components/UI/profile/ProfileContainer';
-import { Button } from '@/components/UI/primitives/button';
 import { decrypt } from '@/lib/session/main-session';
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import { cookies } from 'next/headers';
+import ProfilePageMainComponent from '@/components/UI/profile/ProfilePageMainComponent';
 
 const client = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
@@ -46,19 +43,12 @@ const getUser = async () => {
 
 export default async function Page() {
   const userDataApiResponse = await getUser();
+
   const doesResponseHaveUserData = userDataApiResponse
     ? 'first_name' in userDataApiResponse
     : false;
 
-  return (
-    <ContentContainer>
-      <div className='bg-[#0D0D0D]/30 rounded-[10px]'>
-        <ProfileBanner />
-
-        <ProfileContainer />
-      </div>
-    </ContentContainer>
-  );
+  return <ProfilePageMainComponent></ProfilePageMainComponent>;
 
   // if (doesResponseHaveUserData) {
   //   const responseObj = apiResponse;
@@ -74,14 +64,4 @@ export default async function Page() {
   //   const { err: requestError } = { err: apiResponse.message };
   //   return <h5>An error occured: {requestError}</h5>;
   // }
-
-  return (
-    <ContentContainer>
-      <div className='bg-[#0D0D0D]/30 backdrop-blur-lg rounded-[10px]'>
-        <ProfileBanner />
-
-        <ProfileContainer />
-      </div>
-    </ContentContainer>
-  );
 }
