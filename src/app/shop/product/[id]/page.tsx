@@ -6,12 +6,12 @@ import ProductSummary from "@/components/UI/Shop/ProductDetails/ProductSummary";
 
 const ProductDetails = () => {
     return (
-		<div className="grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] md:grid-cols-2">
+		<div className="grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-2">
 			<ProductSummary />
 
 			<ProductCart />
 
-			<div className="space-y-8 mt-4 md:col-span-2">
+			<div className="space-y-8 mt-4 lg:col-span-2">
 				<h2 className="font-extrabold text-white text-2xl px-8">
 					You might also like
 				</h2>
