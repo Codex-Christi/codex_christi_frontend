@@ -48,13 +48,14 @@ const Posts = () => {
             </p>
           </div>
 
-          <div className='h-[400px]'>
-            <Image
-              className='size-full aspect-video'
-              src={ProfileImage}
-              alt='Post image'
-            />
-          </div>
+
+					<div className="h-[400px] xl:h-[600px] 2xl:h-[800px]">
+						<Image
+							className="size-full aspect-video"
+							src={ProfileImage}
+							alt="Post image"
+						/>
+					</div>
 
           <div className='p-6 -mt-10 flex items-center gap-8'>
             <button

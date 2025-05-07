@@ -10,7 +10,7 @@ const ProfileContainer = () => {
     const [selectedTab, setSelectedTab] = useState("POSTS");
 
     return (
-		<div className="">
+		<>
 			<div className="flex items-center w-4/5 mx-auto gap-4 justify-between pb-4">
 				{tabs.map((tab) => (
 					<button
@@ -27,7 +27,7 @@ const ProfileContainer = () => {
 			</div>
 
 			<Posts />
-		</div>
+		</>
 	);
 };
 
