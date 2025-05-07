@@ -50,6 +50,16 @@ export default async function Page() {
     ? 'first_name' in userDataApiResponse
     : false;
 
+  return (
+    <ContentContainer>
+      <div className='bg-[#0D0D0D]/30 rounded-[10px]'>
+        <ProfileBanner />
+
+        <ProfileContainer />
+      </div>
+    </ContentContainer>
+  );
+
   // if (doesResponseHaveUserData) {
   //   const responseObj = apiResponse;
   //   return (
