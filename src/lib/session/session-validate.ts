@@ -1,6 +1,7 @@
 import { getCookie } from './main-session';
 import { decrypt } from './main-session';
 import { convertIatToDate } from './main-session';
+import { logoutUser } from '@/actions/logout';
 
 export async function verifySession() {
   const session = await getCookie('session'); //Get session
@@ -19,6 +20,7 @@ export async function verifySession() {
       const hoursToSessionExpiry = compareDatesInHours(expDate);
       if (hoursToSessionExpiry <= 0) {
         console.log('session has expired');
+        await logoutUser();
         // Log out user
       } else if (hoursToSessionExpiry <= 24) {
         // Refresh Session

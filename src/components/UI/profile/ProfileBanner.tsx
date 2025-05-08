@@ -2,13 +2,13 @@
 
 import Image from "next/image";
 import ProfileImage from "@/assets/img/profile-img.png";
-import EditProfileModal from "./EditProfileModal";
-import { useState } from "react";
+import { FC, Dispatch, SetStateAction } from "react";
 
-const ProfileBanner = () => {
-    const [isActive, setIsActive] = useState(false);
-
-    return (
+const ProfileBanner: FC<{
+	setIsActive: Dispatch<SetStateAction<boolean>>;
+	isActive: boolean;
+}> = ({ setIsActive, isActive }) => {
+	return (
 		<>
 			<div className="text-[#F3F3F30D] bg-[#0D0D0D] rounded-[20px] p-4 flex gap-4 items-center mb-8 lg:hidden">
 				<Image
@@ -145,11 +145,6 @@ const ProfileBanner = () => {
 					Edit Profile
 				</button>
 			</div>
-
-			<EditProfileModal
-				isActive={isActive}
-				setIsActive={setIsActive}
-			/>
 		</>
 	);
 };
