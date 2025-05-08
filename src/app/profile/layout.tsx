@@ -7,8 +7,10 @@ const CometsContainer = dynamic(
 const ProfileLayout = ({ children }: { children: React.ReactNode }) => {
 	return (
 		<CometsContainer>
-			<div className="flex items-start">
-				<ProfileSidebar />
+			<div className="md:flex md:items-start">
+				<div className="hidden lg:contents">
+					<ProfileSidebar />
+				</div>
 
 				{children}
 			</div>

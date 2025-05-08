@@ -19,7 +19,7 @@ const ProductSummary = () => {
 				<div className="grid gap-4 grid-cols-2 md:grid-cols-1 order-2 md:order-1">
 					{images.map((image, index) => (
 						<div
-							className={`rounded-[20px] size-24 border-2 ${index === currentItem ? "border-white" : "border-transparent"}`}
+							className={`rounded-[20px] size-24 border-2 cursor-pointer ${index === currentItem ? "border-white" : "border-transparent"}`}
 							key={index}
 							onClick={() => setCurrentItem(index)}
 						>
@@ -27,6 +27,7 @@ const ProductSummary = () => {
 								className="rounded-[20px]"
 								src={image}
 								alt="Dummy product name"
+                                quality={100}
 							/>
 						</div>
 					))}
@@ -46,7 +47,7 @@ const ProductSummary = () => {
 							type="button"
 							onClick={() => {
 								setCurrentItem((prevIndex) => {
-									if (prevIndex - 1 < 0) return prevIndex;
+									if (prevIndex - 1 < 0) return images.length - 1;
 
 									return prevIndex - 1;
 								});
@@ -146,7 +147,7 @@ const ProductSummary = () => {
 							onClick={() => {
 								setCurrentItem((prevIndex) => {
 									if (prevIndex + 1 === images.length)
-										return prevIndex;
+										return 0;
 
 									return prevIndex + 1;
 								});

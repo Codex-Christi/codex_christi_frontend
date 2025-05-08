@@ -17,7 +17,7 @@ const SubNav = () => {
 	return (
 		<div
 			role="navigation"
-			className={`flex flex-col gap-7 w-full max-w-[220px] ${pathname === "/shop" ? "bg-inherit" : "bg-[#3D3D3D4D]"} self-center py-2.5
+			className={`flex flex-col gap-7 w-full max-w-[220px] ${pathname === "/shop" ? "bg-inherit" : "lg:bg-[#3D3D3D4D]"} self-center py-2.5
         !overflow-y-auto
         lg:flex-row lg:items-center lg:justify-around lg:gap-[unset] lg:max-w-full lg:self-[unset]
         lg:!overflow-y-hidden`}

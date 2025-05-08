@@ -4,16 +4,16 @@ import { cookies } from 'next/headers';
 import ProfilePageMainComponent from '@/components/UI/profile/ProfilePageMainComponent';
 
 const client = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
+	baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
 });
 
 export const revalidate = 600;
 
 interface UserData {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
+	id: string;
+	first_name: string;
+	last_name: string;
+	email: string;
 }
 
 // Pre rendering get User SSR order
@@ -25,20 +25,20 @@ const getUser = async () => {
     return;
   }
 
-  const mainAccessToken = accessToken
-    ? accessToken.mainAccessToken
-    : ('' as string);
+	const mainAccessToken = accessToken
+		? accessToken.mainAccessToken
+		: ("" as string);
 
-  const apiResponse = await client
-    .get('/account/my-profile', {
-      headers: {
-        Authorization: `Bearer ${mainAccessToken}`,
-      },
-    })
-    .then((resp: { data: AxiosResponse<UserData> }) => resp.data.data)
-    .catch((err: AxiosError) => err);
+	const apiResponse = await client
+		.get("/account/my-profile", {
+			headers: {
+				Authorization: `Bearer ${mainAccessToken}`,
+			},
+		})
+		.then((resp: { data: AxiosResponse<UserData> }) => resp.data.data)
+		.catch((err: AxiosError) => err);
 
-  return apiResponse;
+	return apiResponse;
 };
 
 export default async function Page() {
