@@ -1,6 +1,7 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
+import { properlyReturnAnyError } from './useLogin';
 
 const client = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
@@ -55,7 +56,7 @@ export const useRegularSignUp = () => {
 
       try {
         const signUpRes: AxiosResponse<UserDataReturnType> = await client.post(
-          `/users`,
+          `/account/user-registration`,
           { ...userDetails }
         );
 
@@ -95,28 +96,4 @@ export const useRegularSignUp = () => {
   );
 
   return { ...signupProcessState, signUp };
-};
-
-export const properlyReturnAnyError = (error: AxiosError) => {
-  if (axios.isAxiosError(error)) {
-    if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
-      // Return responseText
-      const responseTextObj = JSON.parse(error.response.request.responseText);
-      console.log(Object.values(responseTextObj)[0]);
-
-      const responseTextObjArr = Object.values(responseTextObj)[0] as string[];
-      return responseTextObjArr[0];
-    } else if (error.request) {
-      // The request was made but no response was received
-      return `${error.message}`;
-    } else {
-      // Something happened in setting up the request that triggered an Error
-      return `Error:, ${error.message}`;
-    }
-  } else {
-    // Non-Axios error
-    return `An error occured!`;
-  }
 };

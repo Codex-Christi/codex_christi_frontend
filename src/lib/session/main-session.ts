@@ -1,7 +1,7 @@
 'use server';
 
 import 'server-only';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { JWTPayload, SignJWT, jwtVerify } from 'jose';
 import { jwtDecode } from 'jwt-decode';
 
@@ -32,11 +32,14 @@ export async function convertIatToDate(iat: number) {
 
 // Cookie Setter from next/headers
 export async function setCookie(cookie: string, name: string, expiresAt: Date) {
+  const host = (await headers()).get('host');
+  const isMobileDevPhone = host?.includes('192.168.1.231:3000');
+  const isDevelopment = process.env.NODE_ENV === 'development';
   const cookieStore = await cookies();
 
   cookieStore.set(name, cookie, {
     httpOnly: true,
-    secure: true,
+    secure: isDevelopment && isMobileDevPhone ? false : true,
     expires: expiresAt,
     sameSite: 'lax',
     path: '/',

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 const tokenClient = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
@@ -25,13 +26,17 @@ const defaultVerifyOTPProcessState: IVerifyOTP = {
 };
 
 export const useVerifyOTP = () => {
+  // Hooks
+  const router = useRouter();
+
+  // State values
   const [verifyOTPProcessState, setVerifyOTPProcessState] =
     useState<IVerifyOTP>(defaultVerifyOTPProcessState);
 
   const verifyOTP = async (userDetails: otpType) => {
     try {
       const verifyOTPRes: AxiosResponse<UserDataReturnType> =
-        await tokenClient.post(`/verify-otp`, { ...userDetails });
+        await tokenClient.post(`/account/otp/verify`, { ...userDetails });
 
       setVerifyOTPProcessState({
         isLoading: false,
@@ -39,6 +44,7 @@ export const useVerifyOTP = () => {
         errorMsg: '',
         userData: verifyOTPRes.data,
       });
+      router.push('/login');
 
       return verifyOTPRes.data;
     } catch (err: AxiosError | any) {

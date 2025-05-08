@@ -59,7 +59,7 @@ const SignIn = () => {
       triggerCustomToast('error', errorMsg);
     }
 
-    if (isError === false && isAuthenticated) {
+    if (isError === false && !isLoading && isAuthenticated === true) {
       triggerCustomToast('success', 'Login successful.');
     }
   }, [errorMsg, isError, isLoading, triggerCustomToast, isAuthenticated]);

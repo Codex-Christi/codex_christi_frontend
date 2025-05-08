@@ -55,6 +55,8 @@ export const useLogin = () => {
           refreshToken
         );
 
+        console.log(sessionStatus);
+
         if (sessionStatus.success === true) {
           setLoginProcessState({
             isLoading: false,
@@ -64,6 +66,8 @@ export const useLogin = () => {
 
           // Manually check is session is created and active (from server)
           const isSessionActive = await verifySession();
+          console.log('isSessionActive', isSessionActive);
+
           if (isSessionActive === true) {
             router.push('/profile');
           }
@@ -95,14 +99,19 @@ export const properlyReturnAnyError = (error: AxiosError) => {
       // The request was made and the server responded with a status code
       // that falls out of the range of 2xx
       // Return responseText
-      const responseTextObj = JSON.parse(error.response.request.responseText);
-      if (typeof responseTextObj === 'object') {
-        const responseTextObjArr = Object.values(
-          responseTextObj
-        )[0] as string[];
-        return responseTextObjArr;
+      console.log(error.response);
+
+      const errorsObj = error.response?.data as {
+        errors: Array<{ code: number; message: string }>;
+      };
+      const errorArr = errorsObj.errors;
+      if (errorArr && errorArr.length > 0) {
+        // If there are multiple errors, return the first one
+
+        return errorArr[0].message as string;
       } else {
-        return responseTextObj;
+        // If there are no errors, return the status text
+        return error.response.statusText;
       }
     } else if (error.request) {
       // The request was made but no response was received
