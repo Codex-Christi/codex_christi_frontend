@@ -22,7 +22,7 @@ const Cart = () => {
 
 						<Link
 							className="text-center bg-[#0085FF] px-4 py-3 rounded-lg text-white font-extrabold inline-flex items-center gap-4"
-							href=""
+							href="/shop"
 						>
 							START SHOPPING
 							<svg

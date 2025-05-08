@@ -49,7 +49,7 @@ const Posts = () => {
           </div>
 
 
-					<div className="h-[400px] xl:h-[600px] 2xl:h-[800px]">
+					<div className="h-[250px] md:h-[400px] xl:h-[600px] 2xl:h-[800px]">
 						<Image
 							className="size-full aspect-video"
 							src={ProfileImage}

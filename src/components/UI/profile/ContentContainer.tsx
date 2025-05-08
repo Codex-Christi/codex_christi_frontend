@@ -1,14 +1,20 @@
+"use client";
+
+import ProfileMobileNav from "./ProfileMobileNav";
 import Image from "next/image";
 import Link from "next/link";
 import AdsImage from "@/assets/img/ad-snickers.png";
 import SponsoredAd from "@/assets/img/sponsored-ad.png";
 import UserImg from "@/assets/img/user-img.png";
+import { useState } from "react";
 
 const ContentContainer = ({ children }: { children: React.ReactNode }) => {
+    const [navIsOpen, setNavIsOpen] = useState(false);
+
 	return (
-		<div className="w-full grid gap-8">
-			<div className="bg-[#0D0D0D] px-8 py-4 md:px-[66px] flex items-center justify-between gap-4 sticky z-30 top-0">
-				<div className="flex items-center justify-between w-1/2 gap-12">
+		<div className="w-full grid gap-4 md:gap-8">
+			<div className="w-full bg-[#0D0D0D] md:px-8 p-4 lg:px-[66px] flex items-center justify-between gap-4 sticky z-30 top-0">
+				<div className="flex items-center justify-between gap-8 md:w-1/2 md:gap-12">
 					<Link href="">
 						<svg
 							width="25"
@@ -131,7 +137,7 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 					</Link>
 				</div>
 
-				<div className="flex items-center gap-10 shrink-0 relative">
+				<div className="flex items-center gap-6 md:gap-10 relative">
 					<Image
 						priority
 						alt="Blue Planet"
@@ -142,15 +148,16 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 					/>
 
 					<Image
-						className="w-16 h-auto rounded-full relative z-[1024]"
+						className="w-12 md:w-16 h-auto rounded-full relative z-[1024]"
 						src={UserImg}
 						alt="User image"
 					/>
 
 					<button
-						className="relative z-[1024]"
+						className="relative z-[1024] lg:hidden"
 						type="button"
 						aria-label="Nav toggle"
+						onClick={() => setNavIsOpen(true)}
 					>
 						<svg
 							width="25"
@@ -167,17 +174,22 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 				</div>
 			</div>
 
-			<div className="flex items-start z-10 gap-[66px] md:px-[66px] md:py-6">
+			<ProfileMobileNav
+				openState={navIsOpen}
+				openCloseController={setNavIsOpen}
+			/>
+
+			<div className="md:flex grid items-start z-10 p-4 gap-4 md:gap-8 w-full lg:gap-[66px] lg:px-[66px] lg:py-6 md:flex-row">
 				<div className="w-full">{children}</div>
 
-				<div className="w-[274.05px] grid gap-8 mt-8 sticky top-1/3 xl:w-[600px]">
+				<div className="w-full md:w-1/3 lg:w-[274.05px] grid gap-8 mt-8 md:sticky md:top-24 lg:top-1/3 xl:w-[600px]">
 					<div className="bg-[#0D0D0D] border-2 border-[#0085FF] rounded-[20px] p-10 grid place-content-center text-[#2586D9] font-semibold text-[46px]">
 						AD SPACE
 					</div>
 
 					<div>
 						<Image
-							className="rounded-t-[10px] h-56 xl:h-72"
+							className="rounded-t-[10px] h-56 md:h-44 xl:h-72"
 							src={AdsImage}
 							alt="Ads Image"
 						/>
@@ -200,7 +212,7 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 
 					<div className="border border-white rounded-[10px]">
 						<Image
-							className="rounded-t-[10px] h-32 xl:h-60"
+							className="rounded-t-[10px] h-40 md:h-32 xl:h-60"
 							src={SponsoredAd}
 							alt="Sponsored ad"
 						/>
