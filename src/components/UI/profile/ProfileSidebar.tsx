@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { SearchIcon } from "lucide-react";
+import { PowerIcon, SearchIcon } from "lucide-react";
 
 const ProfileSidebar = () => {
 	return (
@@ -17,14 +17,17 @@ const ProfileSidebar = () => {
 			<div className="flex flex-col gap-10 p-4 overflow-y-auto h-full max-w-full">
 				<div className="max-w-full">
 					<form>
-						<label className="flex items-center border border-white p-4 py-1 rounded-full" htmlFor="search">
+						<label
+							className="flex items-center border border-white p-4 py-1 rounded-full"
+							htmlFor="search"
+						>
 							<SearchIcon className="shrink-0" />
 
 							<input
 								className="input p-0 w-full border-none border-transparent"
-                                placeholder="Search"
-                                type="text"
-                                id="search"
+								placeholder="Search"
+								type="text"
+								id="search"
 							/>
 						</label>
 					</form>
@@ -155,6 +158,14 @@ const ProfileSidebar = () => {
 					</svg>
 					Settings
 				</Link>
+
+				<button
+					className="flex items-center gap-4"
+					type="button"
+				>
+					<PowerIcon strokeWidth={1.2} />
+					Logout
+				</button>
 
 				<div className="space-y-4 text-[#C1C1C1]">
 					<div className="flex flex-wrap gap-4">
