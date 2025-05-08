@@ -26,7 +26,7 @@ const getUser = async () => {
   }
 
   const mainAccessToken = accessToken
-    ? accessToken.mainAccessToken
+    ? (accessToken.mainAccessToken as string)
     : ('' as string);
 
   const apiResponse = await client
@@ -48,8 +48,6 @@ export default async function Page() {
     ? 'first_name' in userDataApiResponse
     : false;
 
-  return <ProfilePageMainComponent></ProfilePageMainComponent>;
-
   // if (doesResponseHaveUserData) {
   //   const responseObj = apiResponse;
   //   return (
@@ -64,4 +62,6 @@ export default async function Page() {
   //   const { err: requestError } = { err: apiResponse.message };
   //   return <h5>An error occured: {requestError}</h5>;
   // }
+
+  return <ProfilePageMainComponent></ProfilePageMainComponent>;
 }

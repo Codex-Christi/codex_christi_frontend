@@ -1,7 +1,7 @@
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import { useCallback, useMemo, useState } from 'react';
 import { createLoginSession } from '@/actions/login';
-import useAuthStore from '@/stores/authStore';
+// import useAuthStore from '@/stores/authStore';
 import { verifySession } from '@/lib/session/session-validate';
 import { useRouter } from 'next/navigation';
 
@@ -30,7 +30,7 @@ const defaultSignUpProcessState: SignInHookInterface = {
 // Main useLogin
 export const useLogin = () => {
   // Hooks
-  const { autoUpDateSession } = useAuthStore((state) => state);
+  // const { autoUpDateSession } = useAuthStore((state) => state);
   const router = useRouter();
 
   // State values

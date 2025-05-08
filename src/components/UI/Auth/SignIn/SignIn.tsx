@@ -51,7 +51,7 @@ const SignIn = () => {
 
   // useEffects
   useEffect(() => {
-    if (isLoading) {
+    if (isLoading && isError === false && isAuthenticated === false) {
       triggerCustomToast('processs', 'Please wait moment');
     }
 
