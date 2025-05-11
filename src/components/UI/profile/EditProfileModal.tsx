@@ -30,7 +30,7 @@ const EditProfileModal = ({
 }) => {
   return (
     <>
-      <Drawer direction='top' open={isActive} onOpenChange={setIsActive}>
+      <Drawer direction='right' open={isActive} onOpenChange={setIsActive}>
         <DrawerOverlay
           className={` bg-black/[0.01] !backdrop-blur-[10px]`}
           //   onClick={() => setIsActive(false)}
@@ -51,7 +51,7 @@ const EditProfileModal = ({
             <div
               className={cn(
                 `bg-[#0D0D0D]/[.98] backdrop-blur-lg text-white mx-auto p-8 w-[90%] space-y-2 
-		            transition-transform md:w-1/2 h-[calc(100dvh-6rem)] overflow-y-auto duration-300 ease-linear 
+		            transition-transform md:w-[60%] h-[calc(100dvh-6rem)] overflow-y-auto duration-300 ease-linear 
                 rounded-[10px] -translate-y-[200%] shadow-2xl lg:w-2/5 z-[500]`,
                 {
                   'md:translate-y-4 translate-y-0': isActive,

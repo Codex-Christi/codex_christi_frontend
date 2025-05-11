@@ -54,9 +54,6 @@ export const useLogin = () => {
           accessToken,
           refreshToken
         );
-
-        console.log(sessionStatus);
-
         if (sessionStatus.success === true) {
           setLoginProcessState({
             isLoading: false,
@@ -66,7 +63,6 @@ export const useLogin = () => {
 
           // Manually check is session is created and active (from server)
           const isSessionActive = await verifySession();
-          console.log('isSessionActive', isSessionActive);
 
           if (isSessionActive === true) {
             router.push('/profile');
