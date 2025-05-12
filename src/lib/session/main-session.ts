@@ -33,7 +33,9 @@ export async function convertIatToDate(iat: number) {
 // Cookie Setter from next/headers
 export async function setCookie(cookie: string, name: string, expiresAt: Date) {
   const host = (await headers()).get('host');
-  const isMobileDevPhone = host?.includes('192.168.1.231:3000');
+  const isMobileDevPhone =
+    host?.includes('192.168.1.231:3000') ||
+    host?.includes('192.168.207.195:3000');
   const isDevelopment = process.env.NODE_ENV === 'development';
   const cookieStore = await cookies();
 

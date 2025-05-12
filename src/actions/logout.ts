@@ -1,4 +1,4 @@
-'use client';
+'use server';
 
 import { decrypt, deleteSession } from '@/lib/session/main-session';
 import axios from 'axios';

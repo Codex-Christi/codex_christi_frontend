@@ -16,6 +16,7 @@ interface EditModalFieldsProps {
 }
 
 const EditModalFields: FC<EditModalFieldsProps> = (props) => {
+  // Hooks
   const { isActive, setIsActive } = props;
 
   // Main JSX
