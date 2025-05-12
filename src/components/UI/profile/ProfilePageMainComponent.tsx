@@ -2,21 +2,31 @@
 import ContentContainer from '@/components/UI/profile/ContentContainer';
 import ProfileBanner from '@/components/UI/profile/ProfileBanner';
 import ProfileContainer from '@/components/UI/profile/ProfileContainer';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import EditProfileModal from './EditProfileModal';
 import { UserProfileData } from '@/lib/types/user-profile/main-user-profile';
+import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 
 // Interfaces
 interface ProfilePageMainComponentProps {
-  mainProfileUserData: UserProfileData;
+  serverFetchedProfileUserData: UserProfileData;
 }
 
 // main component
-const ProfilePageMainComponent: React.FC<
-  ProfilePageMainComponentProps
-> = () => {
+const ProfilePageMainComponent: React.FC<ProfilePageMainComponentProps> = ({
+  serverFetchedProfileUserData,
+}) => {
   // Hooks
   const [isActive, setIsActive] = useState(false);
+  const setUserMainProfile = useUserMainProfileStore(
+    (state) => state.setUserMainProfile
+  );
+
+  // useEffects
+  useEffect(() => {
+    // Set the user profile data in the store
+    setUserMainProfile(serverFetchedProfileUserData);
+  }, [serverFetchedProfileUserData, setUserMainProfile]);
 
   //   Main JSX
   return (

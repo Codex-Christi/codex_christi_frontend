@@ -51,7 +51,9 @@ export default async function Page() {
 
     if (doesResponseHaveUserData) {
       const responseObj = userDataApiResponse as UserData;
-      return <ProfilePageMainComponent mainProfileUserData={responseObj} />;
+      return (
+        <ProfilePageMainComponent serverFetchedProfileUserData={responseObj} />
+      );
     }
   } catch (error) {
     const requestError = error as Error;
