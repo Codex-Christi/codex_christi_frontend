@@ -52,7 +52,7 @@ export const useRegularSignUp = () => {
 			}));
 
 			const loadingToastID = loadingToast({
-				message: "Please wait moment...",
+				message: "Please wait a moment...",
 			});
 
 			try {

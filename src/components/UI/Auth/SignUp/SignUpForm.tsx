@@ -175,7 +175,6 @@ const SignUpForm = () => {
 						disabled={isLoading === true ? true : false}
 					/>
 				</div>
-				{/*  */}
 			</form>
 		</Form>
 	);
