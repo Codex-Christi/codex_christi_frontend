@@ -12,6 +12,7 @@ import {
   useEditUserMainProfileStore,
   useUserMainProfileStore,
 } from '@/stores/userMainProfileStore';
+import { t } from 'node_modules/framer-motion/dist/types.d-CQt5spQA';
 
 // Interfaces
 interface EditModalFieldsProps {
@@ -42,19 +43,18 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
   //   Handlers
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const targetName = e.target.name;
-    let targetVal = e.target.value;
+    const targetVal = e.target.value;
 
     switch (targetName) {
       case 'fullname':
+        console.log(targetVal.split(' '));
+
         setUserEditData({
           ...editProfileData,
           first_name: targetVal.split(' ')[0],
-          last_name: targetVal.split(' ')[1],
+          last_name: targetVal.split(' ')[2],
         });
-        targetVal =
-          editProfileData && targetName === 'fullname'
-            ? `${firstNameEdit || ''} ${lastNameEdit || ''}`.trim()
-            : targetVal;
+
         break;
 
       default:
@@ -125,8 +125,8 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
             name='fullname'
             value={
               editProfileData
-                ? `${firstNameEdit || ''} ${lastNameEdit || ''}`.trim()
-                : `${first_name || ''} ${last_name || ''}`.trim()
+                ? `${firstNameEdit || ''}  ${lastNameEdit || ''}`
+                : `${first_name || ''}  ${last_name || ''}`.trim()
             }
             onChange={handleInputChange}
           />
