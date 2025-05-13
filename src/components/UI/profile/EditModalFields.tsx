@@ -1,4 +1,4 @@
-import { FC, SetStateAction, use } from 'react';
+import { FC, SetStateAction, useEffect } from 'react';
 import Image from 'next/image';
 import ProfileImage from '@/assets/img/profile-img.png';
 import EditGender from './EditGender';
@@ -12,7 +12,7 @@ import {
   useEditUserMainProfileStore,
   useUserMainProfileStore,
 } from '@/stores/userMainProfileStore';
-import { t } from 'node_modules/framer-motion/dist/types.d-CQt5spQA';
+import { UserProfileData } from '@/lib/types/user-profile/main-user-profile';
 
 // Interfaces
 interface EditModalFieldsProps {
@@ -32,38 +32,26 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
   const mainProfileData = useUserMainProfileStore(
     (state) => state.userMainProfile
   );
-  const { first_name, last_name } = mainProfileData ? mainProfileData : {};
-  const { first_name: firstNameEdit, last_name: lastNameEdit } = editProfileData
-    ? editProfileData
-    : {};
 
   // Bools
-  const isThereExistingProfileData = Boolean(editProfileData);
+  const isThereEditData = Boolean(editProfileData);
 
   //   Handlers
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const targetName = e.target.name;
+    const targetName = e.target.name as keyof UserProfileData;
     const targetVal = e.target.value;
 
-    switch (targetName) {
-      case 'fullname':
-        console.log(targetVal.split(' '));
-
-        setUserEditData({
-          ...editProfileData,
-          first_name: targetVal.split(' ')[0],
-          last_name: targetVal.split(' ')[2],
-        });
-
-        break;
-
-      default:
-        setUserEditData({
-          ...editProfileData,
-          [targetName]: targetVal,
-        });
-    }
+    // Change the edit profile data
+    setUserEditData({
+      ...editProfileData,
+      [targetName]: targetVal,
+    });
   };
+
+  //   UseEffects
+  useEffect(() => {
+    console.log('Edit Profile Data:', editProfileData);
+  }, [editProfileData]);
 
   // Main JSX
   return (
@@ -71,7 +59,7 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
       className={cn(
         `bg-[#0D0D0D]/[.98] backdrop-blur-lg text-white mx-auto p-8 w-[90%] space-y-2 
           transition-transform md:w-[60%] h-[calc(100dvh-6rem)] overflow-y-auto duration-300 ease-linear 
-      rounded-[10px] -translate-y-[200%] shadow-2xl lg:w-2/5 z-[500]`,
+      rounded-[10px] -translate-y-[200%] shadow-2xl lg:w-2/5 z-[500] max-w-full overflow-x-hidden`,
         {
           'md:translate-y-4 translate-y-0': isActive,
         }
@@ -114,25 +102,43 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
       </div>
 
       <div className='grid gap-6'>
-        <label className='grid gap-0.5' htmlFor='fullname'>
-          <span className='text-white/70'>Fullname</span>
+        <section className='flex gap-3 justify-between'>
+          {[
+            { name: 'first_name', text: 'First Name' },
+            { name: 'last_name', text: 'Last Name' },
+          ].map((item, index) => {
+            const name = item.name as 'first_name' | 'last_name';
+            const text = item.text as 'First Name' | 'Last Name';
+            return (
+              <label
+                className='grid gap-0.5 w-full'
+                htmlFor={item.name}
+                key={index}
+              >
+                <span className='text-white/70'>{item.text}</span>
 
-          <input
-            className='input'
-            type='text'
-            placeholder='Full name...'
-            id='fullname'
-            name='fullname'
-            value={
-              editProfileData
-                ? `${firstNameEdit || ''}  ${lastNameEdit || ''}`
-                : `${first_name || ''}  ${last_name || ''}`.trim()
-            }
-            onChange={handleInputChange}
-          />
-
-          <span className='text-sm'>*name can be changed once in 6 months</span>
-        </label>
+                <input
+                  className='input'
+                  type='text'
+                  placeholder={text}
+                  id={name}
+                  name={name}
+                  value={
+                    editProfileData &&
+                    editProfileData[name] !== undefined &&
+                    editProfileData[name] !== null
+                      ? editProfileData[name]
+                      : mainProfileData && mainProfileData[name]
+                        ? mainProfileData[name]
+                        : ''
+                  }
+                  onChange={handleInputChange}
+                />
+              </label>
+            );
+          })}
+        </section>
+        <span className='text-sm'>*name can be changed once in 6 months</span>
 
         <label className='grid gap-0.5' htmlFor='username'>
           <span className='text-white/70'>Username</span>
