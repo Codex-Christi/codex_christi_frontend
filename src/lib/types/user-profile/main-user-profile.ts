@@ -3,8 +3,8 @@
 // Suitable for API payloads, PATCH requests, and form validation.
 
 export interface UserProfileData {
-  id: string; // UUID (ReadOnly)
-  email: string; // Email (Required, Max: 254, Min: 1)
+  id?: string; // UUID (ReadOnly)
+  email?: string; // Email (Required, Max: 254, Min: 1)
   first_name?: string; // First name (Max: 50)
   last_name?: string; // Last name (Max: 50)
   profile_pic?: string | null; // Profile picture URI (ReadOnly)

@@ -1,4 +1,4 @@
-import { FC, SetStateAction } from 'react';
+import { FC, SetStateAction, use } from 'react';
 import Image from 'next/image';
 import ProfileImage from '@/assets/img/profile-img.png';
 import EditGender from './EditGender';
@@ -8,6 +8,10 @@ import EditWebsite from './EditWebsite';
 import EditPhoneNumber from './EditPhoneNumber';
 import EditCountry from './EditCountry';
 import { cn } from '@/lib/utils';
+import {
+  useEditUserMainProfileStore,
+  useUserMainProfileStore,
+} from '@/stores/userMainProfileStore';
 
 // Interfaces
 interface EditModalFieldsProps {
@@ -18,6 +22,48 @@ interface EditModalFieldsProps {
 const EditModalFields: FC<EditModalFieldsProps> = (props) => {
   // Hooks
   const { isActive, setIsActive } = props;
+  const editProfileData = useEditUserMainProfileStore(
+    (state) => state.userEditData
+  );
+  const setUserEditData = useEditUserMainProfileStore(
+    (state) => state.setUserEditData
+  );
+  const mainProfileData = useUserMainProfileStore(
+    (state) => state.userMainProfile
+  );
+  const { first_name, last_name } = mainProfileData ? mainProfileData : {};
+  const { first_name: firstNameEdit, last_name: lastNameEdit } = editProfileData
+    ? editProfileData
+    : {};
+
+  // Bools
+  const isThereExistingProfileData = Boolean(editProfileData);
+
+  //   Handlers
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const targetName = e.target.name;
+    let targetVal = e.target.value;
+
+    switch (targetName) {
+      case 'fullname':
+        setUserEditData({
+          ...editProfileData,
+          first_name: targetVal.split(' ')[0],
+          last_name: targetVal.split(' ')[1],
+        });
+        targetVal =
+          editProfileData && targetName === 'fullname'
+            ? `${firstNameEdit || ''} ${lastNameEdit || ''}`.trim()
+            : targetVal;
+        break;
+
+      default:
+        setUserEditData({
+          ...editProfileData,
+          [targetName]: targetVal,
+        });
+    }
+  };
 
   // Main JSX
   return (
@@ -68,15 +114,21 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
       </div>
 
       <div className='grid gap-6'>
-        <label className='grid gap-0.5' htmlFor='name'>
+        <label className='grid gap-0.5' htmlFor='fullname'>
           <span className='text-white/70'>Fullname</span>
 
           <input
             className='input'
             type='text'
-            placeholder='Fullname'
-            id='name'
-            name='name'
+            placeholder='Full name...'
+            id='fullname'
+            name='fullname'
+            value={
+              editProfileData
+                ? `${firstNameEdit || ''} ${lastNameEdit || ''}`.trim()
+                : `${first_name || ''} ${last_name || ''}`.trim()
+            }
+            onChange={handleInputChange}
           />
 
           <span className='text-sm'>*name can be changed once in 6 months</span>

@@ -9,7 +9,11 @@ export const basicRedirect = (destination: string, req: NextRequest) => {
 
 export const redirectLoggedInUserToProfile = async (req: NextRequest) => {
   // If user is logged in already, sedn them to profile page and show alert about logged in status
-  if ((await verifySession()) === true) {
-    return basicRedirect('/profile?from-login-page=true', req);
+  try {
+    if ((await verifySession()) === true) {
+      return basicRedirect('/profile?from-login-page=true', req);
+    }
+  } catch (error) {
+    console.error('Error verifying session:', error);
   }
 };
