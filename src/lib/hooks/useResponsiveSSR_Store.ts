@@ -28,7 +28,8 @@ const useResponsiveSSRStore = create<ResponsiveStore>((set) => ({
     isTabletAndAbove: false,
     isMobileAndTablet: false,
   },
-  setResponsiveState: (newState) => set({ responsiveState: newState }),
+  setResponsiveState: (newState) =>
+    set((state) => ({ ...state, responsiveState: newState })),
 }));
 
 // ✅ Custom Hook: Runs at the top level

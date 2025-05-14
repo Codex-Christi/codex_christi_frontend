@@ -42,26 +42,22 @@ const getUser = async () => {
 };
 
 export default async function Page() {
-  const userDataApiResponse = await getUser();
+  try {
+    const userDataApiResponse = await getUser();
 
-  const doesResponseHaveUserData = userDataApiResponse
-    ? 'first_name' in userDataApiResponse
-    : false;
+    const doesResponseHaveUserData = userDataApiResponse
+      ? 'first_name' in userDataApiResponse
+      : false;
 
-  // if (doesResponseHaveUserData) {
-  //   const responseObj = apiResponse;
-  //   return (
-  //     <div>
-  //       <h3>Hello {responseObj.first_name}</h3>
-  //       <Button name='Logout button' className='my-3'>
-  //         Logout User
-  //       </Button>
-  //     </div>
-  //   );
-  // } else {
-  //   const { err: requestError } = { err: apiResponse.message };
-  //   return <h5>An error occured: {requestError}</h5>;
-  // }
-
-  return <ProfilePageMainComponent></ProfilePageMainComponent>;
+    if (doesResponseHaveUserData) {
+      const responseObj = userDataApiResponse as UserData;
+      return (
+        <ProfilePageMainComponent serverFetchedProfileUserData={responseObj} />
+      );
+    }
+  } catch (error) {
+    const requestError = error as Error;
+    // Handle the case where user data is not available
+    return <h5>An error occured: {requestError.message}</h5>;
+  }
 }

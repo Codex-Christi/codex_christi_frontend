@@ -1,6 +1,5 @@
 // src/store/authStore.ts
 import { create } from 'zustand';
-import { jwtDecode } from 'jwt-decode';
 import { verifySession } from '@/lib/session/session-validate';
 import { getUserID } from '@/actions/login';
 
@@ -19,7 +18,7 @@ interface AuthState {
 type UserSessionInfoType = AuthState['userSessionInfo'];
 
 // useAuthStore Hook
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   sessionCookie: null,
   refreshToken: null,
   isAuthenticated: false,
@@ -40,15 +39,5 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
   },
 }));
-
-function decodeJWT(token: string) {
-  try {
-    const decoded = jwtDecode(token);
-    return decoded;
-  } catch (error) {
-    console.error('Error decoding JWT:', error);
-    return null;
-  }
-}
 
 export default useAuthStore;

@@ -3,6 +3,7 @@
 import { decrypt, deleteSession } from '@/lib/session/main-session';
 import axios from 'axios';
 import { getCookie } from '@/lib/session/main-session';
+import { clearUserMainProfileStore } from '@/stores/userMainProfileStore';
 
 const axiosClient = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
@@ -22,6 +23,7 @@ export const logoutUser = async () => {
       },
     });
     await deleteSession();
+    clearUserMainProfileStore();
     return true;
   } catch (err: Error | unknown) {
     await deleteSession();
