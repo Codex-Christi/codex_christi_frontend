@@ -10,7 +10,7 @@ type Position =
 
 const loadingToast = ({
 	message,
-	header = "Loading...",
+	header = "Processing...",
 	position = "top-right",
 }: {
 	message: string;

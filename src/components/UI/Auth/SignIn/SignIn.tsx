@@ -1,120 +1,110 @@
-'use client';
+"use client";
 
-import { zodResolver } from '@hookform/resolvers/zod';
-import { SubmitHandler, useForm } from 'react-hook-form';
-import { Form } from '@/components/UI/primitives/form';
-import { signInSchema, signInSchemaType } from '@/lib/formSchemas/signInSchema';
-import { EmailInput, PasswordInput } from '@/components/UI/Auth/FormFields';
-import { SubmitButton } from '@/components/UI/Auth/FormActionButtons';
-import { useLogin } from '@/lib/hooks/authHooks/useLogin';
-import Link from 'next/link';
-import GoogleIcon from '@/components/UI/general/IconComponents/GoogleIcon';
-import AppleIcon from '@/components/UI/general/IconComponents/AppleIcon';
-import GitHubIcon from '@/components/UI/general/IconComponents/GitHubIcon';
-import { useCustomToast } from '@/lib/hooks/useCustomToast';
-import { useEffect } from 'react';
-import useAuthStore from '@/stores/authStore';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { SubmitHandler, useForm } from "react-hook-form";
+import { Form } from "@/components/UI/primitives/form";
+import { signInSchema, signInSchemaType } from "@/lib/formSchemas/signInSchema";
+import { EmailInput, PasswordInput } from "@/components/UI/Auth/FormFields";
+import { SubmitButton } from "@/components/UI/Auth/FormActionButtons";
+import { useLogin } from "@/lib/hooks/authHooks/useLogin";
+import Link from "next/link";
+import GoogleIcon from "@/components/UI/general/IconComponents/GoogleIcon";
+import AppleIcon from "@/components/UI/general/IconComponents/AppleIcon";
+import GitHubIcon from "@/components/UI/general/IconComponents/GitHubIcon";
 
 // Main Component
 const SignIn = () => {
-  // Hooks
-  const { login, isError, errorMsg, isLoading } = useLogin();
-  const { triggerCustomToast } = useCustomToast();
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const signInForm = useForm<signInSchemaType>({
-    resolver: zodResolver(signInSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
-    mode: 'all',
-    reValidateMode: 'onBlur',
-  });
+    const { login } = useLogin();
 
-  //   Signup form submit handler
-  const signInFormSubmitHandler: SubmitHandler<signInSchemaType> = async (
-    fieldValues,
-    event
-  ) => {
-    // Prevent default first
-    event?.preventDefault();
+	const signInForm = useForm<signInSchemaType>({
+		resolver: zodResolver(signInSchema),
+		defaultValues: {
+			email: "",
+			password: "",
+		},
+		mode: "all",
+		reValidateMode: "onBlur",
+	});
 
-    const { email, password } = fieldValues;
+	//   Signup form submit handler
+	const signInFormSubmitHandler: SubmitHandler<signInSchemaType> = async (
+		fieldValues,
+		event,
+	) => {
+		// Prevent default first
+		event?.preventDefault();
 
-    const userSendData = {
-      email,
-      password,
-    };
+		const { email, password } = fieldValues;
 
-    await login(userSendData);
-  };
+		const userSendData = {
+			email,
+			password,
+		};
 
-  // useEffects
-  useEffect(() => {
-    if (isLoading && isError === false && isAuthenticated === false) {
-      triggerCustomToast('processs', 'Please wait moment');
-    }
+		await login(userSendData);
+	};
 
-    if (isError === true) {
-      triggerCustomToast('error', errorMsg);
-    }
-
-    if (isError === false && isAuthenticated) {
-      triggerCustomToast('success', 'Login successful.');
-    }
-  }, [errorMsg, isError, isLoading, triggerCustomToast, isAuthenticated]);
-
-  // Main JSX
-  return (
-    <>
-      <Form {...signInForm}>
-        <form
-          onSubmit={signInForm.handleSubmit(signInFormSubmitHandler)}
-          className={`w-[80%] max-w-[375px] mt-12 !font-inter
+	// Main JSX
+	return (
+		<>
+			<Form {...signInForm}>
+				<form
+					onSubmit={signInForm.handleSubmit(signInFormSubmitHandler)}
+					className={`w-[80%] max-w-[375px] mt-12 !font-inter
                     sm:w-[70%] sm:max-w-[400px]
                     md:w-[50%] md:max-w-[410px]
                     lg:w-full lg:max-w-[425px]
                     mx-auto relative mb-12`}
-        >
-          <EmailInput currentZodForm={signInForm} inputName='email' />
+				>
+					<EmailInput
+						currentZodForm={signInForm}
+						inputName="email"
+					/>
 
-          <PasswordInput currentZodForm={signInForm} inputName='password' />
+					<PasswordInput
+						currentZodForm={signInForm}
+						inputName="password"
+					/>
 
-          <SubmitButton name='Submit Button' textValue='Log In' />
-        </form>
-      </Form>
-      <div className='mt-16 space-y-12 text-center'>
-        <div className='space-y-4 lg:w-1/2 lg:mx-auto'>
-          <p>or Sign In with</p>
+					<SubmitButton
+						name="Submit Button"
+						textValue="Log In"
+					/>
+				</form>
+            </Form>
 
-          <div className='flex place-content-center justify-between gap-4 mx-auto'>
-            <Link href=''>
-              <GoogleIcon />
-            </Link>
+			<div className="mt-16 space-y-12 text-center">
+				<div className="space-y-4 lg:w-1/2 lg:mx-auto">
+					<p>or Sign In with</p>
 
-            <Link href=''>
-              <AppleIcon />
-            </Link>
+					<div className="flex place-content-center justify-between gap-4 mx-auto">
+						<Link href="">
+							<GoogleIcon />
+						</Link>
 
-            <Link href=''>
-              <GitHubIcon />
-            </Link>
-          </div>
-        </div>
+						<Link href="">
+							<AppleIcon />
+						</Link>
 
-        <p className='w-full text-center'>
-          Don’t have an account?{' '}
-          <Link
-            className='text-white font-semibold'
-            type='button'
-            href='/auth/signup'
-          >
-            Sign Up
-          </Link>
-        </p>
-      </div>
-    </>
-  );
+						<Link href="">
+							<GitHubIcon />
+						</Link>
+					</div>
+				</div>
+
+				<p className="w-full text-center">
+					Don’t have an account?{" "}
+					<Link
+						className="text-white font-semibold"
+						type="button"
+						href="/auth/signup"
+					>
+						Sign Up
+					</Link>
+				</p>
+			</div>
+		</>
+	);
 };
 
 export default SignIn;
