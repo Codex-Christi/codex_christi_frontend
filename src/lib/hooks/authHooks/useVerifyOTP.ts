@@ -72,7 +72,9 @@ export const useResendOTP = () => {
 
 		try {
 			const resendOTPRes: AxiosResponse<UserDataReturnType> =
-				await tokenClient.post(`/account/otp/resend-otp`, { ...userDetails });
+				await tokenClient.post(`/account/otp/resend`, {
+					...userDetails,
+				});
 
             if (resendOTPRes?.data?.success) {
 				successToast({
