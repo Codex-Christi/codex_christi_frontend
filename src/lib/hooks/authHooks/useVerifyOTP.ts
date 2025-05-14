@@ -40,9 +40,7 @@ export const useVerifyOTP = () => {
 					header: "Account Verified!",
 				});
 
-				setTimeout(() => {
-					router.replace(`/auth/sign-in`);
-				}, 3000);
+                router.replace(`/auth/sign-in`);
 
 				return verifyOTPRes.data;
 			}

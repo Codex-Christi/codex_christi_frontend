@@ -76,11 +76,9 @@ export const useRegularSignUp = () => {
 						userData: signUpRes.data,
 					});
 
-					setTimeout(() => {
-						router.replace(
-							`/auth/verify-otp?email=${signUpRes?.data?.data?.email}`,
-						);
-					}, 3000);
+					router.replace(
+						`/auth/verify-otp?email=${signUpRes?.data?.data?.email}`,
+					);
 
 					return signUpRes.data;
 				}
