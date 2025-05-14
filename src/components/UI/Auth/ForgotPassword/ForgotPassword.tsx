@@ -8,15 +8,17 @@ import { EmailInput } from "@/components/UI/Auth/FormFields";
 import { SubmitButton } from "@/components/UI/Auth/FormActionButtons";
 import { z } from "zod";
 import { SignUpFormSchema } from "@/lib/formSchemas/signUpFormSchema";
+import { usePasswordReset } from "@/lib/hooks/authHooks/usePasswordReset";
 
 const forgotPasswordSchema = SignUpFormSchema.pick({
 	email: true,
-	password: undefined,
 });
 
 export type ForgotPasswordSchemaType = z.infer<typeof forgotPasswordSchema>;
 
 const ForgotPassword = () => {
+    const { passwordResetOTP } = usePasswordReset();
+
 	const forgotPasswordForm = useForm<ForgotPasswordSchemaType>({
 		resolver: zodResolver(forgotPasswordSchema),
 		defaultValues: {
@@ -26,7 +28,6 @@ const ForgotPassword = () => {
 		reValidateMode: "onBlur",
 	});
 
-	//   Signup form submit handler
 	const forgotPasswordFormSubmitHandler: SubmitHandler<
 		ForgotPasswordSchemaType
 	> = async (fieldValues, event) => {
@@ -35,9 +36,7 @@ const ForgotPassword = () => {
 
 		const { email } = fieldValues;
 
-		const userSendData = {
-			email,
-		};
+        await passwordResetOTP({ email: email });
 	};
 
 	return (

@@ -90,7 +90,8 @@ const VerifyOTP = () => {
 					>
 						Resend
 					</button>
-				</p>
+                </p>
+
 				<SubmitButton
 					name="Verify button"
 					textValue="Verify"
