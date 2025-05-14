@@ -48,10 +48,16 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
     });
   };
 
-  //   UseEffects
-  useEffect(() => {
-    console.log('Edit Profile Data:', editProfileData);
-  }, [editProfileData]);
+  //   Functions
+  const getEditFieldValues = (name: keyof UserProfileData) => {
+    return editProfileData &&
+      editProfileData[name] !== undefined &&
+      editProfileData[name] !== null
+      ? editProfileData[name]
+      : mainProfileData && mainProfileData[name]
+        ? mainProfileData[name]
+        : '';
+  };
 
   // Main JSX
   return (
@@ -123,15 +129,7 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
                   placeholder={text}
                   id={name}
                   name={name}
-                  value={
-                    editProfileData &&
-                    editProfileData[name] !== undefined &&
-                    editProfileData[name] !== null
-                      ? editProfileData[name]
-                      : mainProfileData && mainProfileData[name]
-                        ? mainProfileData[name]
-                        : ''
-                  }
+                  value={getEditFieldValues(name)}
                   onChange={handleInputChange}
                 />
               </label>
@@ -149,6 +147,8 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
             placeholder='Username'
             id='username'
             name='username'
+            value={getEditFieldValues('username')}
+            onChange={handleInputChange}
           />
         </label>
 
@@ -161,6 +161,8 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
             placeholder='Bio'
             id='bio'
             name='bio'
+            value={getEditFieldValues('bio')}
+            onChange={handleInputChange}
           />
         </label>
 
