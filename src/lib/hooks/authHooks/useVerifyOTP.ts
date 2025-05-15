@@ -44,7 +44,7 @@ export const useVerifyOTP = () => {
         errorMsg: '',
         userData: verifyOTPRes.data,
       });
-      router.push('/login');
+      router.push('/auth/sign-in');
 
       return verifyOTPRes.data;
     } catch (err: AxiosError | any) {

@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import ProfileImage from '@/assets/img/profile-img.png';
-import { FC, Dispatch, SetStateAction } from 'react';
+import { FC, Dispatch, SetStateAction, use } from 'react';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 
 const ProfileBanner: FC<{
@@ -93,7 +93,10 @@ const ProfileBanner: FC<{
         <div className='flex items-center gap-4'>
           <Image
             className='size-20 rounded-full'
-            src={ProfileImage}
+            src={userMainProfile?.profile_pic || ProfileImage}
+            width={80}
+            height={80}
+            priority
             alt='User'
           />
 

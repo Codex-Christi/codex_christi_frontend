@@ -22,11 +22,12 @@ interface SignupHookInterface {
   errorMsg: string;
   userData: UserDataReturnType | null;
 }
-// interface SignUpResponse {
-//   user: UserDataReturnType; // Assuming response includes a user object
-//   message?: string; // Optional message for success/error
-//   email?: string;
-// }
+interface SignUpResponse {
+  data: UserDataReturnType; // Assuming response includes a user object
+
+  message?: string; // Optional message for success/error
+  success: boolean; // Indicates success or failure
+}
 
 // Default values
 const defaultSignUpProcessState: SignupHookInterface = {
@@ -55,7 +56,7 @@ export const useRegularSignUp = () => {
       }));
 
       try {
-        const signUpRes: AxiosResponse<UserDataReturnType> = await client.post(
+        const signUpRes: AxiosResponse<SignUpResponse> = await client.post(
           `/account/user-registration`,
           { ...userDetails }
         );
@@ -65,18 +66,13 @@ export const useRegularSignUp = () => {
           isLoading: false,
           isError: false,
           errorMsg: '',
-          userData: signUpRes.data,
+          userData: signUpRes.data.data,
         });
 
         // Perform redirection
         setTimeout(() => {
-          router.replace(`/auth/verify-otp?email=${signUpRes.data.email}`);
-        }, 3000);
-
-        // Perform redirection
-        setTimeout(() => {
-          router.replace(`/auth/verify-otp?email=${signUpRes.data.email}`);
-        }, 3000);
+          router.replace(`/auth/verify-otp?email=${signUpRes.data.data.email}`);
+        }, 500);
 
         return signUpRes.data; // Return structured response
       } catch (err: unknown) {
