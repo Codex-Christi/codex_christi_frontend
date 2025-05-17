@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 
 export const metadata: Metadata = {
 	title: 'Create New Password | Codex Christi',
-	description: 'Sign up as a renonwned Christian Creative',
+	description: 'Createa new password and access your account.',
 };
 
 const Index = (): JSX.Element => {

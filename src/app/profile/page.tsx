@@ -2,6 +2,12 @@ import { decrypt } from '@/lib/session/main-session';
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import { cookies } from 'next/headers';
 import ProfilePageMainComponent from '@/components/UI/profile/ProfilePageMainComponent';
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+	title: "Profile | Codex Christi",
+	description: "View and edit your personal information",
+};
 
 const client = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
