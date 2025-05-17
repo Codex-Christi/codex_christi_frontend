@@ -1,77 +1,121 @@
-'use client';
+"use client";
 
-import { ResetPasswordLogo } from '@/components/UI/general/IconComponents/AuthLogo';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { SubmitHandler, useForm } from 'react-hook-form';
-import { Form } from '@/components/UI/primitives/form';
+import errorToast from "@/lib/error-toast";
+import { ResetPasswordLogo } from "@/components/UI/general/IconComponents/AuthLogo";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { SubmitHandler, useForm } from "react-hook-form";
+import { Form } from "@/components/UI/primitives/form";
 import {
-  resetPasswordSchema,
-  resetPasswordSchemaType,
-} from '@/lib/formSchemas/resetPasswordSchema';
-import { PasswordInput } from '@/components/UI/Auth/FormFields';
-import { SubmitButton } from '@/components/UI/Auth/FormActionButtons';
-import { useLogin } from '@/lib/hooks/authHooks/useLogin';
+	resetPasswordSchema,
+	resetPasswordSchemaType,
+} from "@/lib/formSchemas/resetPasswordSchema";
+import { PasswordInput } from "@/components/UI/Auth/FormFields";
+import { SubmitButton } from "@/components/UI/Auth/FormActionButtons";
+import { usePasswordReset } from "@/lib/hooks/authHooks/usePasswordReset";
+import { useSearchParams } from "next/navigation";
+import { useResendOTP } from "@/lib/hooks/authHooks/useVerifyOTP";
 
 const ForgotPassword = () => {
-  const { login } = useLogin();
+	const { resetPassword } = usePasswordReset();
 
-  const resetPasswordZodForm = useForm<resetPasswordSchemaType>({
-    resolver: zodResolver(resetPasswordSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
-    mode: 'all',
-    reValidateMode: 'onBlur',
-  });
+    const { resendOTP } = useResendOTP();
 
-  //   Signup form submit handler
-  const resetPasswordSubmitHandler: SubmitHandler<
-    resetPasswordSchemaType
-  > = async (fieldValues, event) => {
-    // Prevent default first
-    event?.preventDefault();
+	const searchParams = useSearchParams();
+	const email = searchParams.get("email");
 
-    const { email, password } = fieldValues;
+	const resetPasswordZodForm = useForm<resetPasswordSchemaType>({
+		resolver: zodResolver(resetPasswordSchema),
+		defaultValues: {
+			otp: "",
+			password: "",
+			confirm_password: ""
+		},
+		mode: "all",
+		reValidateMode: "onBlur",
+	});
 
-    const userSendData = {
-      email,
-      password,
-    };
+    const resetPasswordSubmitHandler: SubmitHandler<
+		resetPasswordSchemaType
+	> = async (fieldValues) => {
+		const { password, otp } = fieldValues;
 
-    const serverResponse = await login(userSendData);
+        if (!email) {
+            errorToast({
+                header: "Email Required!",
+                message: "Please provide a valid email address"
+            });
 
-    console.log(serverResponse);
-  };
+            return;
+        }
 
-  return (
-    <Form {...resetPasswordZodForm}>
-      <form
-        onSubmit={resetPasswordZodForm.handleSubmit(resetPasswordSubmitHandler)}
-        className={`mt-12 px-4 sm:px-0 !font-inter
+		const userSendData = {
+			email: email ?? "",
+			password,
+			otp,
+		};
+
+        await resetPassword(userSendData);
+
+	};
+
+	return (
+		<Form {...resetPasswordZodForm}>
+			<form
+				onSubmit={resetPasswordZodForm.handleSubmit(
+					resetPasswordSubmitHandler
+				)}
+				className={`mt-12 px-4 sm:px-0 !font-inter
                     sm:w-[70%] sm:max-w-[400px]
                     md:w-[50%] md:max-w-[410px]
                     lg:w-[100%] lg:max-w-[425px]
                     mx-auto relative`}
-      >
-        <h1 className='text-bold text-3xl text-center mb-8'>Password Change</h1>
+			>
+				<h1 className="text-bold text-3xl text-center mb-8">
+					Password Change
+				</h1>
 
-        <ResetPasswordLogo />
+				<ResetPasswordLogo />
 
-        <PasswordInput
-          currentZodForm={resetPasswordZodForm}
-          inputName='password'
-        />
+				<PasswordInput
+					currentZodForm={resetPasswordZodForm}
+					inputName="otp"
+				/>
 
-        <PasswordInput
-          currentZodForm={resetPasswordZodForm}
-          inputName='confirm_password'
-        />
+				<PasswordInput
+					currentZodForm={resetPasswordZodForm}
+					inputName="password"
+				/>
 
-        <SubmitButton name='Confirm Password' textValue='Confirm Password' />
-      </form>
-    </Form>
-  );
+				<PasswordInput
+					currentZodForm={resetPasswordZodForm}
+					inputName="confirm_password"
+				/>
+
+				<p className="w-full text-center mb-4">
+					If you didn’t receive a code,{" "}
+					<button
+						className="text-white font-semibold"
+						type="button"
+						onClick={async () => {
+							await resendOTP({
+								email:
+									email ??
+									prompt("Enter email: ")?.trim() ??
+									("" as string),
+							});
+						}}
+					>
+						Resend
+					</button>
+				</p>
+
+				<SubmitButton
+					name="Change Password"
+					textValue="Change Password"
+				/>
+			</form>
+		</Form>
+	);
 };
 
 export default ForgotPassword;

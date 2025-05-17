@@ -3,6 +3,14 @@ import Image from "next/image";
 import Calendar from "@/assets/img/calendar.png";
 import ProductCart from "@/components/UI/Shop/ProductDetails/ProductCart";
 import ProductSummary from "@/components/UI/Shop/ProductDetails/ProductSummary";
+import { Metadata } from "next";
+
+
+// Once we started consuming the API this would be replaced wuth `generateMetadata`
+export const metadata: Metadata = {
+	title: "Product Details | Codex Christi",
+	description: "Product details for this product",
+};
 
 const ProductDetails = () => {
     return (

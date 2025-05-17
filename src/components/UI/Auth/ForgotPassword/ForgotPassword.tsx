@@ -1,73 +1,75 @@
-'use client';
+"use client";
 
-import { PasswordResetLogo } from '@/components/UI/general/IconComponents/AuthLogo';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { SubmitHandler, useForm } from 'react-hook-form';
-import { Form } from '@/components/UI/primitives/form';
-import { EmailInput } from '@/components/UI/Auth/FormFields';
-import { SubmitButton } from '@/components/UI/Auth/FormActionButtons';
-import { z } from 'zod';
-import { SignUpFormSchema } from '@/lib/formSchemas/signUpFormSchema';
+import { PasswordResetLogo } from "@/components/UI/general/IconComponents/AuthLogo";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { SubmitHandler, useForm } from "react-hook-form";
+import { Form } from "@/components/UI/primitives/form";
+import { EmailInput } from "@/components/UI/Auth/FormFields";
+import { SubmitButton } from "@/components/UI/Auth/FormActionButtons";
+import { z } from "zod";
+import { SignUpFormSchema } from "@/lib/formSchemas/signUpFormSchema";
+import { usePasswordReset } from "@/lib/hooks/authHooks/usePasswordReset";
 
 const forgotPasswordSchema = SignUpFormSchema.pick({
-  email: true,
-  password: undefined,
+	email: true,
 });
 
 export type ForgotPasswordSchemaType = z.infer<typeof forgotPasswordSchema>;
 
 const ForgotPassword = () => {
-  const forgotPasswordForm = useForm<ForgotPasswordSchemaType>({
-    resolver: zodResolver(forgotPasswordSchema),
-    defaultValues: {
-      email: '',
-    },
-    mode: 'all',
-    reValidateMode: 'onBlur',
-  });
+    const { passwordResetOTP } = usePasswordReset();
 
-  //   Signup form submit handler
-  const forgotPasswordFormSubmitHandler: SubmitHandler<
-    ForgotPasswordSchemaType
-  > = async (fieldValues, event) => {
-    // Prevent default first
-    event?.preventDefault();
+	const forgotPasswordForm = useForm<ForgotPasswordSchemaType>({
+		resolver: zodResolver(forgotPasswordSchema),
+		defaultValues: {
+			email: "",
+		},
+		mode: "all",
+		reValidateMode: "onBlur",
+	});
 
-    const { email } = fieldValues;
+	const forgotPasswordFormSubmitHandler: SubmitHandler<
+		ForgotPasswordSchemaType
+	> = async (fieldValues, event) => {
+		// Prevent default first
+		event?.preventDefault();
 
-    const userSendData = {
-      email,
-    };
+		const { email } = fieldValues;
 
-    console.log(userSendData);
-  };
+        await passwordResetOTP({ email: email });
+	};
 
-  return (
-    <Form {...forgotPasswordForm}>
-      <form
-        onSubmit={forgotPasswordForm.handleSubmit(
-          forgotPasswordFormSubmitHandler
-        )}
-        className={`mt-12 px-4 sm:px-0 !font-inter
+	return (
+		<Form {...forgotPasswordForm}>
+			<form
+				onSubmit={forgotPasswordForm.handleSubmit(
+					forgotPasswordFormSubmitHandler,
+				)}
+				className={`mt-12 px-4 sm:px-0 !font-inter
                     sm:w-[70%] sm:max-w-[400px]
                     md:w-[50%] md:max-w-[410px]
                     lg:w-[100%] lg:max-w-[425px]
                     mx-auto relative`}
-      >
-        <h1 className='text-bold text-3xl text-center mb-8'>Forgot Password</h1>
+			>
+				<h1 className="text-bold text-3xl text-center mb-8">
+					Forgot Password
+				</h1>
 
-        <PasswordResetLogo />
+				<PasswordResetLogo />
 
-        <EmailInput
-          currentZodForm={forgotPasswordForm}
-          inputName='email'
-          label='Enter your email address'
-        />
+				<EmailInput
+					currentZodForm={forgotPasswordForm}
+					inputName="email"
+					label="Enter your email address"
+				/>
 
-        <SubmitButton name='Next' textValue='Next' />
-      </form>
-    </Form>
-  );
+				<SubmitButton
+					name="Next"
+					textValue="Next"
+				/>
+			</form>
+		</Form>
+	);
 };
 
 export default ForgotPassword;

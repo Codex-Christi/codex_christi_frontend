@@ -33,7 +33,7 @@ interface EmailInputProps<T extends FieldValues> extends BaseInputProps<T> {
 }
 
 interface PasswordInputProps<T extends FieldValues> extends BaseInputProps<T> {
-	inputName: "password" | "confirm_password";
+	inputName: "password" | "confirm_password" | "otp";
 	currentZodForm: UseFormReturn<T>;
 }
 
@@ -204,6 +204,8 @@ export const PasswordInput = <T extends FieldValues>(
 	// Bools
 	const isConfirmPaswwordField = inputName === "confirm_password";
 
+	const isOTP = inputName === "otp";
+
 	// Main JSX
 	return (
 		<FormField
@@ -212,9 +214,11 @@ export const PasswordInput = <T extends FieldValues>(
 			render={({ field }) => (
 				<FormItem>
 					<FormLabel className="text-white">
-						{isConfirmPaswwordField
-							? "Confirm Password"
-							: "Password"}
+						{isConfirmPaswwordField && "Confirm Password"}
+
+						{!isConfirmPaswwordField && !isOTP && "Password"}
+
+						{isOTP && "Enter OTP"}
 					</FormLabel>
 					<FormControl>
 						<InputWithIcon
@@ -222,10 +226,12 @@ export const PasswordInput = <T extends FieldValues>(
 							placeholder={
 								isConfirmPaswwordField
 									? "Confirm Password"
-									: "Enter your password"
+									: isOTP
+										? "Enter OTP"
+										: "Enter your password"
 							}
 							{...field}
-							type="password"
+							type={isOTP ? "text" : "password"}
 						/>
 					</FormControl>
 					<CustomFormMessage className="text-red-400" />
