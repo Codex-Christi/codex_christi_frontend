@@ -2,7 +2,6 @@
 import { NextRequest } from 'next/server';
 import { decrypt, deleteSession, getCookie } from '@/lib/session/main-session';
 import axios from 'axios';
-import { basicRedirect } from '@/lib/session/session-redirect';
 import { clearUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { redirect } from 'next/navigation';
 

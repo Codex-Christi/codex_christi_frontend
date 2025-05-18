@@ -30,7 +30,7 @@ const getUser = async () => {
     : ('' as string);
 
   const apiResponse = await client
-    .get('/account/my-profil', {
+    .get('/account/my-profile', {
       headers: {
         Authorization: `Bearer ${mainAccessToken}`,
       },
