@@ -1,6 +1,5 @@
 'use server';
 
-import 'server-only';
 import { cookies, headers } from 'next/headers';
 import { JWTPayload, SignJWT, jwtVerify } from 'jose';
 import { jwtDecode } from 'jwt-decode';

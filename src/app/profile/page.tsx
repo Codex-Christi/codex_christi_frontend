@@ -1,13 +1,13 @@
+'use server';
+
 import { decrypt } from '@/lib/session/main-session';
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import { cookies } from 'next/headers';
 import ProfilePageMainComponent from '@/components/UI/profile/ProfilePageMainComponent';
-
+import { redirect } from 'next/navigation';
 const client = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
 });
-
-export const revalidate = 600;
 
 interface UserData {
   id: string;
@@ -30,34 +30,38 @@ const getUser = async () => {
     : ('' as string);
 
   const apiResponse = await client
-    .get('/account/my-profile', {
+    .get('/account/my-profil', {
       headers: {
         Authorization: `Bearer ${mainAccessToken}`,
       },
     })
     .then((resp: { data: AxiosResponse<UserData> }) => resp.data.data)
-    .catch((err: AxiosError) => err);
+    .catch(async (err: AxiosError) => {
+      // Handle unauthorized access
+      const statusCode = (err as AxiosError).response?.status;
+      if (statusCode === 401 || statusCode === 403 || statusCode === 404) {
+        // Handle unauthorized access
+        console.log('User not found or unauthorized access');
+
+        redirect('/api/logout');
+      }
+    });
 
   return apiResponse;
 };
 
+// Async SSR profile page data genarator function
 export default async function Page() {
-  try {
-    const userDataApiResponse = await getUser();
+  const userDataApiResponse = await getUser();
 
-    const doesResponseHaveUserData = userDataApiResponse
-      ? 'first_name' in userDataApiResponse
-      : false;
+  const doesResponseHaveUserData = userDataApiResponse
+    ? 'first_name' in userDataApiResponse
+    : false;
 
-    if (doesResponseHaveUserData) {
-      const responseObj = userDataApiResponse as UserData;
-      return (
-        <ProfilePageMainComponent serverFetchedProfileUserData={responseObj} />
-      );
-    }
-  } catch (error) {
-    const requestError = error as Error;
-    // Handle the case where user data is not available
-    return <h5>An error occured: {requestError.message}</h5>;
+  if (doesResponseHaveUserData) {
+    const responseObj = userDataApiResponse as UserData;
+    return (
+      <ProfilePageMainComponent serverFetchedProfileUserData={responseObj} />
+    );
   }
 }

@@ -2,8 +2,10 @@ import { verifySession } from './session-validate';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const basicRedirect = (destination: string, req: NextRequest) => {
+  // If the destination is an absolute URL, redirect to that URL
+  console.log(req);
   return NextResponse.redirect(
-    new URL(destination.startsWith('/') ? destination : '/', req.url)
+    new URL(destination.startsWith('/') ? destination : '/', req.referrer)
   );
 };
 
