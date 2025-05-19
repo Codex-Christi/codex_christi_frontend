@@ -1,99 +1,100 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import axios, { AxiosError, AxiosResponse } from 'axios';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import errorToast from "@/lib/error-toast";
+import loadingToast from "@/lib/loading-toast";
+import successToast from "@/lib/success-toast";
+import axios, { AxiosResponse } from "axios";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 const tokenClient = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
+	baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
 });
 
 type otpType = { email: string; otp: string };
 type resendOTPType = { email: string };
-type UserDataReturnType = { id: number; name: string; email: string };
-
-interface IVerifyOTP {
-  isLoading: boolean;
-  isError: boolean;
-  errorMsg: string;
-  userData: UserDataReturnType | null;
-}
-
-const defaultVerifyOTPProcessState: IVerifyOTP = {
-  isLoading: false,
-  isError: false,
-  errorMsg: '',
-  userData: null,
+type UserDataReturnType = {
+	status: number;
+	success: boolean;
+	message: string;
 };
 
 export const useVerifyOTP = () => {
-  // Hooks
-  const router = useRouter();
+    const router = useRouter();
 
-  // State values
-  const [verifyOTPProcessState, setVerifyOTPProcessState] =
-    useState<IVerifyOTP>(defaultVerifyOTPProcessState);
+    const verifyOTP = async (userDetails: otpType) => {
+        const loadingToastID = loadingToast({
+			message: "Please wait a moment...",
+        });
 
-  const verifyOTP = async (userDetails: otpType) => {
-    try {
-      const verifyOTPRes: AxiosResponse<UserDataReturnType> =
-        await tokenClient.post(`/account/otp/verify`, { ...userDetails });
+		try {
+			const verifyOTPRes: AxiosResponse<UserDataReturnType> =
+				await tokenClient.post(`/account/otp/verify`, {
+					...userDetails,
+				});
 
-      setVerifyOTPProcessState({
-        isLoading: false,
-        isError: false,
-        errorMsg: '',
-        userData: verifyOTPRes.data,
-      });
-      router.push('/auth/sign-in');
+			toast.dismiss(loadingToastID);
 
-      return verifyOTPRes.data;
-    } catch (err: AxiosError | any) {
-      const { data } = err.response;
+			if (verifyOTPRes?.data?.success) {
+				successToast({
+					message: "Account verified successfully.",
+					header: "Account Verified!",
+				});
 
-      setVerifyOTPProcessState((prev) => ({
-        ...prev,
-        isLoading: false,
-        isError: true,
-        errorMsg: data.non_field_errors[0],
-      }));
+                router.replace(`/auth/sign-in`);
 
-      return data.non_field_errors[0];
-    }
-  };
+				return verifyOTPRes.data;
+			}
+        } catch (err: any) {
+            toast.dismiss(loadingToastID);
 
-  return { ...verifyOTPProcessState, verifyOTP };
+			if (err?.response?.data?.errors) {
+				errorToast({
+					message: err?.response?.data?.errors[0]?.message as string,
+				});
+
+				return;
+			}
+
+			errorToast({
+				message: String(err),
+			});
+		}
+	};
+
+	return { verifyOTP };
+
 };
 
 export const useResendOTP = () => {
-  const [verifyOTPProcessState, setVerifyOTPProcessState] =
-    useState<IVerifyOTP>(defaultVerifyOTPProcessState);
+    const resendOTP = async (userDetails: resendOTPType) => {
+        const loadingToastID = loadingToast({
+			message: "Please wait a moment...",
+        });
 
-  const resendOTP = async (userDetails: resendOTPType) => {
-    try {
-      const resendOTPRes: AxiosResponse<UserDataReturnType> =
-        await tokenClient.post(`/resend-otp`, { ...userDetails });
+		try {
+			const resendOTPRes: AxiosResponse<UserDataReturnType> =
+				await tokenClient.post(`/account/otp/resend`, {
+					...userDetails,
+				});
 
-      setVerifyOTPProcessState({
-        isLoading: false,
-        isError: false,
-        errorMsg: '',
-        userData: resendOTPRes.data,
-      });
+            if (resendOTPRes?.data?.success) {
+				successToast({
+					message: "OTP resent successfully.",
+					header: "OTP Resent!",
+				});
 
-      return resendOTPRes.data;
-    } catch (err: AxiosError | any) {
-      const { data } = err.response;
+				return resendOTPRes.data;
+			}
+		} catch (err: unknown) {
+			toast.dismiss(loadingToastID);
 
-      setVerifyOTPProcessState((prev) => ({
-        ...prev,
-        isLoading: false,
-        isError: true,
-        errorMsg: Array.isArray(data.email) ? data.email[0] : err.message,
-      }));
+			errorToast({
+				message: String(err),
+			});
 
-      return Array.isArray(data.email) ? data.email[0] : err.message;
-    }
-  };
+			return String(err);
+		}
+	};
 
-  return { ...verifyOTPProcessState, resendOTP };
+	return { resendOTP };
 };

@@ -1,27 +1,36 @@
-import axios, { AxiosError, AxiosResponse } from 'axios';
-import { useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
-import { properlyReturnAnyError } from './useLogin';
+import errorToast from "@/lib/error-toast";
+import loadingToast from "@/lib/loading-toast";
+import successToast from "@/lib/success-toast";
+import axios, { AxiosResponse } from "axios";
+import { useRouter } from "next/navigation";
+import { useCallback, useState } from "react";
+import { toast } from "sonner";
 
 const client = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
+	baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
 });
 
 export type UserDataSendType = {
-  first_name: string;
-  last_name: string;
-  email: string;
-  password: string;
+	first_name: string;
+	last_name: string;
+	email: string;
+	password: string;
 };
 
-export type UserDataReturnType = { id: string; name: string; email: string };
+export type UserDataReturnType = {
+	status: number;
+	success: boolean;
+	message: string;
+	data: { id: string; first_name: string; last_name: string; email: string };
+};
 
 interface SignupHookInterface {
-  isLoading: boolean;
-  isError: boolean | undefined;
-  errorMsg: string;
-  userData: UserDataReturnType | null;
+	isLoading: boolean;
+	isError: boolean | undefined;
+	errorMsg: string;
+	userData: UserDataReturnType | null;
 }
+
 interface SignUpResponse {
   data: UserDataReturnType; // Assuming response includes a user object
 
@@ -29,67 +38,79 @@ interface SignUpResponse {
   success: boolean; // Indicates success or failure
 }
 
-// Default values
 const defaultSignUpProcessState: SignupHookInterface = {
-  isLoading: false,
-  isError: undefined,
-  errorMsg: '',
-  userData: null,
+	isLoading: false,
+	isError: undefined,
+	errorMsg: "",
+	userData: null,
 };
 
-// Main SignUp Hook
 export const useRegularSignUp = () => {
-  // Hooks
-  const router = useRouter();
+	const router = useRouter();
 
-  // State values
-  const [signupProcessState, setSignupProcessState] =
-    useState<SignupHookInterface>(defaultSignUpProcessState);
+	const [signupProcessState, setSignupProcessState] =
+		useState<SignupHookInterface>(defaultSignUpProcessState);
 
-  // Main singup func
-  const signUp = useCallback(
-    async (userDetails: UserDataSendType) => {
-      // Set loading state to true before making the request
-      setSignupProcessState((prev) => ({
-        ...prev,
-        isLoading: true,
-      }));
+	const signUp = useCallback(
+		async (userDetails: UserDataSendType) => {
+			setSignupProcessState((prev) => ({
+				...prev,
+				isLoading: true,
+			}));
 
-      try {
-        const signUpRes: AxiosResponse<SignUpResponse> = await client.post(
-          `/account/user-registration`,
-          { ...userDetails }
-        );
+			const loadingToastID = loadingToast({
+				message: "Please wait a moment...",
+			});
 
-        // Set state with the user data on successful request
-        setSignupProcessState({
-          isLoading: false,
-          isError: false,
-          errorMsg: '',
-          userData: signUpRes.data.data,
-        });
+			try {
+				const signUpRes: AxiosResponse<UserDataReturnType> =
+					await client.post(`/account/user-registration`, {
+						...userDetails,
+					});
 
-        // Perform redirection
-        setTimeout(() => {
-          router.replace(`/auth/verify-otp?email=${signUpRes.data.data.email}`);
-        }, 500);
+                toast.dismiss(loadingToastID);
 
-        return signUpRes.data; // Return structured response
-      } catch (err: unknown) {
-        // Handle error case and set loading to false
-        setSignupProcessState((prev) => ({
-          ...prev,
-          isLoading: false,
-          isError: true,
-          errorMsg:
-            properlyReturnAnyError(err as AxiosError) || 'An error occurred', // Handle error message
-        }));
+				if (signUpRes?.data?.success) {
+					successToast({
+						message: "Account creation successful.",
+						header: "Account Created Sucessfully.",
+                    });
 
-        return properlyReturnAnyError(err as AxiosError); // Return error message
-      }
-    },
-    [router]
-  );
+                    setSignupProcessState({
+						isLoading: false,
+						isError: false,
+						errorMsg: "",
+						userData: signUpRes.data,
+					});
 
-  return { ...signupProcessState, signUp };
+					router.replace(
+						`/auth/verify-otp?email=${signUpRes?.data?.data?.email}`,
+					);
+
+					return signUpRes.data;
+				}
+
+				throw new Error(signUpRes?.data?.message);
+            } catch (err: unknown) {
+                toast.dismiss(loadingToastID);
+
+				setSignupProcessState((prev) => ({
+					...prev,
+					isLoading: false,
+					isError: true,
+					errorMsg: String(err),
+				}));
+
+				errorToast({
+					message: String(err),
+				});
+
+				return String(err);
+			}
+		},
+		[router],
+	);
+
+	return { ...signupProcessState, signUp };
+
 };

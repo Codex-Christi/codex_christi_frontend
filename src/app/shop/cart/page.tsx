@@ -2,6 +2,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 import CartImage from '@/assets/img/cart-image.png';
 import Calendar from '@/assets/img/calendar.png';
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+	title: "Cart | Codex Christi",
+	description: "View and modify products in your cart",
+};
+
 
 const Cart = () => {
   return (

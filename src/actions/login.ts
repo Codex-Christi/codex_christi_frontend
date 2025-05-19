@@ -1,29 +1,29 @@
-'use server';
+"use server";
 
-import { createSession, decrypt, getCookie } from '@/lib/session/main-session';
+import { createSession, decrypt, getCookie } from "@/lib/session/main-session";
 
 export async function createLoginSession(
-  accessToken: string,
-  refreshToken: string
+	accessToken: string,
+	refreshToken: string,
 ) {
-  try {
-    await createSession(accessToken, refreshToken);
+	try {
+		await createSession(accessToken, refreshToken);
 
-    return {
-      success: true,
-    };
-  } catch (err: Error | unknown) {
-    return {
-      success: false,
-      error: `${err}`,
-    };
-  }
+		return {
+			success: true,
+		};
+	} catch (err: Error | unknown) {
+		return {
+			success: false,
+			error: `${err}`,
+		};
+	}
 }
 
 export async function getUserID() {
-  const sessionCookie = await getCookie('session');
+	const sessionCookie = await getCookie("session");
 
-  const decryptedSessionCookie = await decrypt(sessionCookie?.value);
+	const decryptedSessionCookie = await decrypt(sessionCookie?.value);
 
-  return decryptedSessionCookie?.userID as string;
+	return decryptedSessionCookie?.userID as string;
 }

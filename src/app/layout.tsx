@@ -4,7 +4,7 @@ import "./globals.css";
 import { Inter, Trade_Winds } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { headers } from "next/headers";
-import { Toaster } from "@/components/UI/primitives/toaster";
+import { Toaster } from "sonner";
 import ResponsiveMediaProvider from "@/components/UI/Providers/ResponsiveMediaQueryProvider";
 import LoggedinProvider from "@/components/UI/Providers/LoggedinProvider";
 
@@ -67,7 +67,7 @@ export default function RootLayout({
 				)}
 			>
 				<FaviconUpdater />
-				<Toaster />
+				<Toaster richColors />
 				<ResponsiveMediaProvider>
 					<LoggedinProvider>{children}</LoggedinProvider>
 				</ResponsiveMediaProvider>

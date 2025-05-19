@@ -1,36 +1,88 @@
-'use server';
-
-import { decrypt, deleteSession } from '@/lib/session/main-session';
-import axios from 'axios';
-import { getCookie } from '@/lib/session/main-session';
-import { clearUserMainProfileStore } from '@/stores/userMainProfileStore';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import axios from "axios";
+import loadingToast from "@/lib/loading-toast";
+import errorToast from "@/lib/error-toast";
+import successToast from "@/lib/success-toast";
+import { decrypt, deleteSession } from "@/lib/session/main-session";
+import { getCookie } from "@/lib/session/main-session";
+import { clearUserMainProfileStore } from "@/stores/userMainProfileStore";
+import { toast } from "sonner";
 
 const axiosClient = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
+	baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
 });
 
 export const logoutUser = async () => {
-  try {
-    const sessionCookie = await getCookie('session');
+	const loadingToastID = loadingToast({
+		message: "Please wait a moment...",
+	});
 
-    const decryptedSessionCookie = await decrypt(sessionCookie?.value);
-    const mainAccessToken = decryptedSessionCookie
-      ? (decryptedSessionCookie.mainAccessToken as string)
-      : ('' as string);
-    await axiosClient.post('/auth/user-logout', {
-      headers: {
-        Authorization: `Bearer ${mainAccessToken}`,
-      },
-    });
-    await deleteSession();
-    clearUserMainProfileStore();
-    return true;
-  } catch (err: Error | unknown) {
-    await deleteSession();
-    console.log(`Failed to logout user. Reason: ${err}`);
-    return {
-      status: false,
-      error: `${err}`,
-    };
-  }
+	try {
+        const sessionCookie = await getCookie("session");
+
+		const refreshToken = await getCookie("refreshToken");
+
+        const decryptedSessionCookie = await decrypt(sessionCookie?.value);
+
+		const decryptRefreshToken = await decrypt(refreshToken?.value);
+
+		const mainAccessToken = decryptedSessionCookie
+			? (decryptedSessionCookie.mainAccessToken as string)
+			: ("" as string);
+
+        const mainRefreshToken = decryptRefreshToken
+			? (decryptRefreshToken.mainRefreshToken as string)
+			: ("" as string);
+
+		const res = await axiosClient.post(
+			"/auth/user-logout",
+			{ refresh: mainRefreshToken },
+			{
+				headers: {
+					Authorization: `Bearer ${mainAccessToken}`,
+				},
+			},
+		);
+
+		if (res?.data?.success) {
+			await deleteSession();
+
+			clearUserMainProfileStore();
+
+			successToast({
+				message: "You have successfully logged out.",
+				header: "Logout Successful.",
+			});
+
+			toast.dismiss(loadingToastID);
+
+			window.location.replace("/auth/sign-in");
+
+			return true;
+		}
+
+		throw new Error(res?.data?.message);
+	} catch (err: any) {
+		toast.dismiss(loadingToastID);
+
+		if (err?.response?.data?.errors) {
+			errorToast({
+				message: err?.response?.data?.errors[0]?.message as string,
+			});
+
+			return {
+				status: false,
+				error: err?.response?.data?.errors[0]?.message as string,
+			};
+		}
+
+		errorToast({
+			message: String(err),
+		});
+
+		return {
+			status: false,
+			error: err,
+		};
+	}
 };
