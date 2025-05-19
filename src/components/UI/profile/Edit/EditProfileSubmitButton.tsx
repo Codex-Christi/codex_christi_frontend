@@ -1,25 +1,22 @@
 import React, { useEffect } from 'react';
 import { Button } from '../../primitives/button';
-import {
-  useSubmitEditData,
-  useEditUserMainProfileStore,
-} from '@/stores/editUserProfileStore';
-import { validateUserEditData } from '@/stores/editUserProfileStore';
+import { useSubmitEditData } from '@/stores/editUserProfileStore';
+import { useValidateUserEditData } from '@/stores/editUserProfileStore';
 
 const EditProfileSubmitButton = () => {
   // Hooks
   const { diffData } = useSubmitEditData();
-  const { fieldErrors } = useEditUserMainProfileStore((state) => state);
+  const { errors, validate } = useValidateUserEditData();
 
   // useEffects
   useEffect(() => {
     // Check if there is any data to submit
-    if (diffData && Object.keys(diffData).length > 0) {
-      console.log('Submitting data:', validateUserEditData(diffData));
-    } else {
-      console.log('No data to submit');
+    console.log('Submitting data:', validate());
+
+    if (errors) {
+      console.log(errors);
     }
-  }, [diffData]);
+  }, [errors, validate]);
 
   // Main JSx
   return (

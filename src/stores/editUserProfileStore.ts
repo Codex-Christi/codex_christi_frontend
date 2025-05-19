@@ -5,6 +5,7 @@ import { getUpdatedKeys } from '@/lib/utils/getUpdatedObjKeys';
 import { useUserMainProfileStore } from './userMainProfileStore';
 import { PatchUserProfileSchema } from '@/lib/formSchemas/editUserProfileSchema';
 import { ZodError } from 'zod';
+import { useCallback, useMemo } from 'react';
 
 // Types
 type UserEditProfileStoreType = {
@@ -22,7 +23,7 @@ type UserEditProfileStoreType = {
 
 // Store for user edit profile data
 export const useEditUserMainProfileStore = create<UserEditProfileStoreType>(
-  (set, get) => ({
+  (set) => ({
     userEditData: null,
     fieldErrors: null,
     // Set the user edit data
@@ -32,38 +33,48 @@ export const useEditUserMainProfileStore = create<UserEditProfileStoreType>(
         userEditData: userEditProfileState,
         fieldErrors: null,
       })),
-    setFieldErrors: (fieldErrors: Record<string, string> | null) =>
-      set((state) => ({ ...state, fieldErrors: fieldErrors })),
+    setFieldErrors: (fieldErrors: Record<string, string> | null) => fieldErrors,
 
     // Clear the user edit data
     cleaEditData: () => set({ userEditData: null, fieldErrors: null }),
   })
 );
 
-export const validateUserEditData = (
-  currentEditData: Partial<UserProfileDataInterface>
-) => {
-  const result = PatchUserProfileSchema.safeParse(currentEditData);
+export const useValidateUserEditData = () => {
+  // Hooks
+  const currentEditData = useEditUserMainProfileStore(
+    (state) => state.userEditData
+  );
+  const { setFieldErrors, fieldErrors: errors } = useEditUserMainProfileStore(
+    (state) => state
+  );
 
-  //   If validation passes, set the fieldErrors to null
-  if (result.success) {
-    //   Return the validated data
-    return {
-      success: true as const,
-      data: result.data as unknown as UserProfileDataInterface,
-    };
-  }
+  const validate = useCallback(() => {
+    const result = PatchUserProfileSchema.safeParse(currentEditData);
 
-  //   If validation fails, map the errors to a fieldErrors object
-  const fieldErrors: Record<string, string> = {};
-  for (const issue of (result.error as ZodError).issues) {
-    const key = issue.path[0] as string;
-    if (!fieldErrors[key]) {
-      fieldErrors[key] = issue.message;
+    //   If validation passes, set the fieldErrors to null
+    if (result.success) {
+      //   Return the validated data
+      return {
+        success: true as const,
+        data: result.data as unknown as UserProfileDataInterface,
+      };
     }
-  }
-  //   Return the errors
-  return { success: false as const, errors: fieldErrors };
+
+    //   If validation fails, map the errors to a fieldErrors object
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of (result.error as ZodError).issues) {
+      const key = issue.path[0] as string;
+      if (!fieldErrors[key]) {
+        fieldErrors[key] = issue.message;
+      }
+    }
+    //   Return the errors
+    setFieldErrors(fieldErrors);
+    return { success: false as const, errors: fieldErrors };
+  }, [currentEditData, setFieldErrors]);
+
+  return { validate, errors };
 };
 
 // Hook to submit the user edit data
@@ -75,10 +86,11 @@ export const useSubmitEditData = () => {
     (state) => state.userMainProfile
   );
 
-  const diffData =
-    userMainProfile && userEditData
+  const diffData = useMemo(() => {
+    return userMainProfile && userEditData
       ? getUpdatedKeys(userMainProfile, userEditData)
       : null;
+  }, [userEditData, userMainProfile]);
 
   return {
     diffData,
