@@ -5,7 +5,7 @@ import {
   DrawerDescription,
   DrawerOverlay,
   DrawerTitle,
-} from '../primitives/drawer';
+} from '../../primitives/drawer';
 import EditModalFields from './EditModalFields';
 
 // CSS Imports

@@ -77,20 +77,3 @@ function isUserProfileData(value: {
     value && typeof value.id === 'string' && typeof value.email === 'string'
   );
 }
-
-//
-type UserEditProfileStoreType = {
-  userEditData: UserProfileData | null;
-  setUserEditData: (userEditData: UserProfileData | null) => void;
-};
-
-// Store for user edit profile data
-export const useEditUserMainProfileStore = create<UserEditProfileStoreType>(
-  (set) => ({
-    userEditData: null,
-    setUserEditData: (userEditProfileState: UserProfileData | null) =>
-      set((state) => ({ ...state, userEditData: userEditProfileState })),
-    // Clear the user edit data
-    cleaEditData: () => set({ userEditData: null }),
-  })
-);

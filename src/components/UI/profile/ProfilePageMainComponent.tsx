@@ -3,13 +3,13 @@ import ContentContainer from '@/components/UI/profile/ContentContainer';
 import ProfileBanner from '@/components/UI/profile/ProfileBanner';
 import ProfileContainer from '@/components/UI/profile/ProfileContainer';
 import { useEffect, useState } from 'react';
-import EditProfileModal from './EditProfileModal';
-import { UserProfileData } from '@/lib/types/user-profile/main-user-profile';
+import EditProfileModal from './Edit/EditProfileModal';
+import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 
 // Interfaces
 interface ProfilePageMainComponentProps {
-  serverFetchedProfileUserData: UserProfileData;
+  serverFetchedProfileUserData: UserProfileDataInterface;
 }
 
 // main component
