@@ -31,6 +31,13 @@ interface SignupHookInterface {
 	userData: UserDataReturnType | null;
 }
 
+interface SignUpResponse {
+  data: UserDataReturnType; // Assuming response includes a user object
+
+  message?: string; // Optional message for success/error
+  success: boolean; // Indicates success or failure
+}
+
 const defaultSignUpProcessState: SignupHookInterface = {
 	isLoading: false,
 	isError: undefined,
@@ -105,4 +112,5 @@ export const useRegularSignUp = () => {
 	);
 
 	return { ...signupProcessState, signUp };
+
 };

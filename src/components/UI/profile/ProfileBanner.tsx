@@ -1,9 +1,11 @@
 "use client";
 
-import Image from "next/image";
-import ProfileImage from "@/assets/img/profile-img.png";
-import { FC, Dispatch, SetStateAction } from "react";
-import { useUserMainProfileStore } from "@/stores/userMainProfileStore";
+
+import Image from 'next/image';
+import ProfileImage from '@/assets/img/profile-img.png';
+import { FC, Dispatch, SetStateAction } from 'react';
+import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
+import UserAvatar from './UserAvatar';
 
 const ProfileBanner: FC<{
 	setIsActive: Dispatch<SetStateAction<boolean>>;
@@ -96,11 +98,8 @@ const ProfileBanner: FC<{
 
 			<div className="flex items-start justify-between gap-4 px-4 py-8 bg-black backdrop-blur-[30px] rounded-t-[20px]">
 				<div className="flex flex-wrap mf:flex-nowrap items-center gap-4">
-					<Image
-						className="size-20 rounded-full"
-						src={ProfileImage}
-						alt="User"
-					/>
+					
+          <UserAvatar size={80} />
 
 					<div className="space-y-4">
 						<div>

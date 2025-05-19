@@ -62,6 +62,7 @@ export const useVerifyOTP = () => {
 	};
 
 	return { verifyOTP };
+
 };
 
 export const useResendOTP = () => {
