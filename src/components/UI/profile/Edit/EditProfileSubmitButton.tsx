@@ -1,22 +1,31 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useTransition } from 'react';
 import { Button } from '../../primitives/button';
-import { useSubmitEditData } from '@/stores/editUserProfileStore';
 import { useValidateUserEditData } from '@/stores/editUserProfileStore';
 
 const EditProfileSubmitButton = () => {
   // Hooks
-  const { diffData } = useSubmitEditData();
-  const { errors, validate } = useValidateUserEditData();
+  const { validate } = useValidateUserEditData();
 
   // useEffects
-  useEffect(() => {
-    // Check if there is any data to submit
-    console.log('Submitting data:', validate());
+  const submitPatchData = useCallback(() => {
+    // Validate the data
+    const submissionData = validate();
+    const formData = new FormData();
 
-    if (errors) {
-      console.log(errors);
+    // Convert the data to FormData
+    if (submissionData.success && submissionData.data) {
+      for (const key in submissionData.data) {
+        formData.set(
+          key,
+          submissionData.data[key as keyof typeof submissionData.data] as
+            | string
+            | Blob
+        );
+      }
     }
-  }, [errors, validate]);
+
+    console.log('FormData:', formData.get('profile_pic'));
+  }, [validate]);
 
   // Main JSx
   return (
@@ -26,6 +35,7 @@ const EditProfileSubmitButton = () => {
       aria-label='Edit Profile'
       className='bg-[#0085FF] text-white font-semibold rounded py-3 px-5 mx-auto block'
       type='button'
+      onClick={submitPatchData}
     >
       Save changes
     </Button>
