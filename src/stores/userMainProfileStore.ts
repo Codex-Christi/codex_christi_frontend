@@ -1,20 +1,22 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { UserProfileData } from '@/lib/types/user-profile/main-user-profile';
+import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
 import CryptoJS from 'crypto-js';
 
 const ENCRYPTION_KEY =
   process.env.NEXT_PUBLIC_USER_PROFILE_DATA_ENCRYPTION_KEY!;
 
 // === 🔐 Encryption ===
-const encryptData = (data: UserProfileData | null): string => {
+const encryptData = (data: UserProfileDataInterface | null): string => {
   if (!data) return '';
   const jsonData = JSON.stringify(data);
   return CryptoJS.AES.encrypt(jsonData, ENCRYPTION_KEY).toString();
 };
 
 // === 🔓 Decryption ===
-const decryptData = (encryptedData: string): UserProfileData | null => {
+const decryptData = (
+  encryptedData: string
+): UserProfileDataInterface | null => {
   if (!encryptedData) return null;
   const bytes = CryptoJS.AES.decrypt(encryptedData, ENCRYPTION_KEY);
   const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
@@ -22,8 +24,10 @@ const decryptData = (encryptedData: string): UserProfileData | null => {
 };
 
 type UserMainProfileStore = {
-  userMainProfile: UserProfileData | null;
-  setUserMainProfile: (userMainProfile: UserProfileData | null) => void;
+  userMainProfile: UserProfileDataInterface | null;
+  setUserMainProfile: (
+    userMainProfile: UserProfileDataInterface | null
+  ) => void;
 };
 
 // Persisted store for user main profile
@@ -33,7 +37,7 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
   persist(
     (set) => ({
       userMainProfile: null,
-      setUserMainProfile: (userMainProfile: UserProfileData | null) =>
+      setUserMainProfile: (userMainProfile: UserProfileDataInterface | null) =>
         set((state) => ({ ...state, userMainProfile })),
       clearProfile: () => set({ userMainProfile: null }),
     }),
@@ -72,7 +76,7 @@ export const clearUserMainProfileStore = () => {
 function isUserProfileData(value: {
   id?: string;
   email?: string;
-}): value is UserProfileData {
+}): value is UserProfileDataInterface {
   return (
     value && typeof value.id === 'string' && typeof value.email === 'string'
   );

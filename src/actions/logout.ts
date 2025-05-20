@@ -1,88 +1,88 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import axios from "axios";
-import loadingToast from "@/lib/loading-toast";
-import errorToast from "@/lib/error-toast";
-import successToast from "@/lib/success-toast";
-import { decrypt, deleteSession } from "@/lib/session/main-session";
-import { getCookie } from "@/lib/session/main-session";
-import { clearUserMainProfileStore } from "@/stores/userMainProfileStore";
-import { toast } from "sonner";
+import axios from 'axios';
+import loadingToast from '@/lib/loading-toast';
+import errorToast from '@/lib/error-toast';
+import successToast from '@/lib/success-toast';
+import { decrypt, deleteSession } from '@/lib/session/main-session';
+import { getCookie } from '@/lib/session/main-session';
+import { clearUserMainProfileStore } from '@/stores/userMainProfileStore';
+import { toast } from 'sonner';
 
 const axiosClient = axios.create({
-	baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
+  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
 });
 
 export const logoutUser = async () => {
-	const loadingToastID = loadingToast({
-		message: "Please wait a moment...",
-	});
+  const loadingToastID = loadingToast({
+    message: 'Please wait a moment...',
+  });
 
-	try {
-        const sessionCookie = await getCookie("session");
+  try {
+    const sessionCookie = await getCookie('session');
 
-		const refreshToken = await getCookie("refreshToken");
+    const refreshToken = await getCookie('refreshToken');
 
-        const decryptedSessionCookie = await decrypt(sessionCookie?.value);
+    const decryptedSessionCookie = await decrypt(sessionCookie?.value);
 
-		const decryptRefreshToken = await decrypt(refreshToken?.value);
+    const decryptRefreshToken = await decrypt(refreshToken?.value);
 
-		const mainAccessToken = decryptedSessionCookie
-			? (decryptedSessionCookie.mainAccessToken as string)
-			: ("" as string);
+    const mainAccessToken = decryptedSessionCookie
+      ? (decryptedSessionCookie.mainAccessToken as string)
+      : ('' as string);
 
-        const mainRefreshToken = decryptRefreshToken
-			? (decryptRefreshToken.mainRefreshToken as string)
-			: ("" as string);
+    const mainRefreshToken = decryptRefreshToken
+      ? (decryptRefreshToken.mainRefreshToken as string)
+      : ('' as string);
 
-		const res = await axiosClient.post(
-			"/auth/user-logout",
-			{ refresh: mainRefreshToken },
-			{
-				headers: {
-					Authorization: `Bearer ${mainAccessToken}`,
-				},
-			},
-		);
+    const res = await axiosClient.post(
+      '/auth/user-logout',
+      { refresh: mainRefreshToken },
+      {
+        headers: {
+          Authorization: `Bearer ${mainAccessToken}`,
+        },
+      }
+    );
 
-		if (res?.data?.success) {
-			await deleteSession();
+    if (res?.data?.success) {
+      await deleteSession();
 
-			clearUserMainProfileStore();
+      clearUserMainProfileStore();
 
-			successToast({
-				message: "You have successfully logged out.",
-				header: "Logout Successful.",
-			});
+      successToast({
+        message: 'You have successfully logged out.',
+        header: 'Logout Successful.',
+      });
 
-			toast.dismiss(loadingToastID);
+      toast.dismiss(loadingToastID);
 
-			window.location.replace("/auth/sign-in");
+      window.location.replace('/auth/sign-in');
 
-			return true;
-		}
+      return true;
+    }
 
-		throw new Error(res?.data?.message);
-	} catch (err: any) {
-		toast.dismiss(loadingToastID);
+    throw new Error(res?.data?.message);
+  } catch (err: any) {
+    toast.dismiss(loadingToastID);
 
-		if (err?.response?.data?.errors) {
-			errorToast({
-				message: err?.response?.data?.errors[0]?.message as string,
-			});
+    if (err?.response?.data?.errors) {
+      errorToast({
+        message: err?.response?.data?.errors[0]?.message as string,
+      });
 
-			return {
-				status: false,
-				error: err?.response?.data?.errors[0]?.message as string,
-			};
-		}
+      return {
+        status: false,
+        error: err?.response?.data?.errors[0]?.message as string,
+      };
+    }
 
-		errorToast({
-			message: String(err),
-		});
+    errorToast({
+      message: String(err),
+    });
 
-		return {
-			status: false,
-			error: err,
-		};
-	}
+    return {
+      status: false,
+      error: err,
+    };
+  }
 };

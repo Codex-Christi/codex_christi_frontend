@@ -13,12 +13,7 @@ type UserEditProfileStoreType = {
   setUserEditData: (userEditData: UserProfileDataInterface | null) => void;
   fieldErrors: Record<string, string> | null;
   setFieldErrors: (fieldErrors: Record<string, string> | null) => void;
-  //   validateUserEditData: (currentEditData: Partial<UserProfileDataInterface>) =>
-  //     | {
-  //         success: true;
-  //         data: UserProfileDataInterface;
-  //       }
-  //     | { success: false; errors: Record<string, string> };
+  clearEditData: () => void;
 };
 
 // Store for user edit profile data
@@ -36,7 +31,7 @@ export const useEditUserMainProfileStore = create<UserEditProfileStoreType>(
     setFieldErrors: (fieldErrors: Record<string, string> | null) => fieldErrors,
 
     // Clear the user edit data
-    cleaEditData: () => set({ userEditData: null, fieldErrors: null }),
+    clearEditData: () => set({ userEditData: null, fieldErrors: null }),
   })
 );
 
