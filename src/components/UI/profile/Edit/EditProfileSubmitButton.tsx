@@ -78,6 +78,7 @@ const EditProfileSubmitButton = () => {
         );
       }
       // Set the loading state
+      setIsLoading(true);
       const loadingToastID = loadingToast({
         message: 'Updating user details...',
       });

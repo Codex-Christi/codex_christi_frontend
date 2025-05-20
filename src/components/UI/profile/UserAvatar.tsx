@@ -19,7 +19,7 @@ const UserAvatar: FC<{
   // Main JSX
   return (
     <Image
-      className={`size-20 rounded-full ${!size ? '!w-full' : ''} ${className}`}
+      className={`size-20 rounded-full ${!size ? '!w-full' : `size-[${size}]`} ${className} !max-w-[unset]`}
       src={
         src ||
         (typeof userMainProfile?.profile_pic === 'string'
