@@ -49,7 +49,7 @@ const getUser = async () => {
         // Handle unauthorized access
         console.log('User not found or unauthorized access');
 
-        redirect('/api/logout');
+        redirect('/next-api/logout');
       }
     });
 
