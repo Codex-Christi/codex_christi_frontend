@@ -1,16 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { redirectLoggedInUserToProfile } from '../session/session-redirect';
-import { getCookie } from '../session/main-session';
-import { logoutUser } from '@/actions/logout';
+import { NextRequest, NextResponse } from "next/server";
+import { redirectLoggedInUserToProfile } from "../session/session-redirect";
+import { getCookie } from "../session/main-session";
+import { logoutUser } from "@/actions/logout";
 
 export const redirectLoggedInUserToProfileMiddleware = async (
-  request: NextRequest
+	request: NextRequest,
 ) => {
-  return await redirectLoggedInUserToProfile(request);
+	return await redirectLoggedInUserToProfile(request);
 };
 
 export const redirectExpSessionToLoginPage = async (req: NextRequest) => {
-    try {
+	try {
 		const isSessionAvailable = (await getCookie("session")) ? true : false;
 
 		if (!isSessionAvailable) {
@@ -20,7 +20,7 @@ export const redirectExpSessionToLoginPage = async (req: NextRequest) => {
 				new URL("/auth/sign-in?sessionExp=true", req.url),
 			);
 		}
-	} catch {
+    } catch {
         return NextResponse.redirect(
 			new URL("/auth/sign-in?sessionExp=true", req.url),
 		);

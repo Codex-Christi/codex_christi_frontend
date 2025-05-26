@@ -11,11 +11,7 @@ const NavTopRightLinks: FC = () => {
 	// JSX
 	return (
 		<section
-			className={`flex items-center justify-between
-    gap-6
-    sm:gap-8
-    md:gap-10
-    lg:gap-12`}
+			className="flex items-center justify-between gap-6 sm:gap-8 md:gap-10 lg:gap-12"
 		>
 			<SearchButtonOnly
 				name="Search Button"
