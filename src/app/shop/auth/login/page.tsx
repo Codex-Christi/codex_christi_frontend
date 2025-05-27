@@ -1,6 +1,5 @@
 'use client';
 
-import LoggedinProvider from '@/components/UI/Providers/LoggedinProvider';
 import SignIn from '@/components/UI/Auth/SignIn/SignIn';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
@@ -20,9 +19,5 @@ export default function Launcher() {
   }, []);
 
   // Main Component
-  return (
-    <LoggedinProvider>
-      <SignIn />;
-    </LoggedinProvider>
-  );
+  return <SignIn />;
 }
