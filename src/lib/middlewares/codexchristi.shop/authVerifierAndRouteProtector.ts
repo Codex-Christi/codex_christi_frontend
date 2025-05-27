@@ -7,7 +7,8 @@ export const authVerifierAndRouteProtector = async (req: NextRequest) => {
   if (hostname === 'codexchristi.shop') {
     try {
       if ((await verifySession()) === true) {
-        return redirectToReferrer(req);
+        return NextResponse.next(); // Proceed with the request if session is valid
+        // return redirectToReferrer(req);
       }
     } catch (error) {
       console.error('Error verifying session:', error);
