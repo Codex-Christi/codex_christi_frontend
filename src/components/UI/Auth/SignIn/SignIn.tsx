@@ -18,7 +18,7 @@ const SignIn = () => {
   const { login } = useLogin();
   const [isClient, setIsClient] = useState(false);
   const isCodexChristiShop = isClient
-    ? window.location.hostname.includes('localhost')
+    ? window.location.hostname.includes('codexchristi.shop')
     : false;
 
   useEffect(() => {
