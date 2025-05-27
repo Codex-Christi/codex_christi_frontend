@@ -5,6 +5,7 @@ import {
   redirectLoggedInUserToProfileMiddleware,
   redirectExpSessionToLoginPage,
 } from './lib/middlewares/auth-middleware';
+import { authVerifierAndRouteProtector } from './lib/middlewares/codexchristi.shop/authVerifierAndRouteProtector';
 
 // Define a constant for the exclusion pattern (matches all paths under /_next including any sub-paths and query parameters, and /media with query parameters)
 // const excludePattern =
@@ -37,6 +38,8 @@ export const middleware = createNEMO({
       return NextResponse.next(); // Proceed with the default Next.js response
     },
   ],
+  '/shop/auth/login': [authVerifierAndRouteProtector],
+  // For auth routes
   '/auth': {
     '/sign-in': [redirectLoggedInUserToProfileMiddleware],
     '/signup': [redirectLoggedInUserToProfileMiddleware],
