@@ -48,7 +48,7 @@ const EditModalFields: FC<EditModalFieldsProps> = ({
 
 	const setFormValues = (
 		fieldName: keyof UserProfileDataInterface,
-		value: string,
+		value: string | undefined,
 	) => {
 		setUserEditData({
 			...editProfileData,

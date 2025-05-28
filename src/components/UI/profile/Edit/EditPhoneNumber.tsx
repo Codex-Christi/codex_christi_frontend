@@ -1,22 +1,45 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-"use client";
-
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const EditPhoneNumber = ({
 	onChange,
 	value,
 }: {
-	onChange: (e: any) => void;
+	onChange: (e: string | undefined) => void;
 	value: string | null | number;
 }) => {
 	const [isOpen, setIsOpen] = useState(false);
 	const [activeTab, setActiveTab] = useState("");
 
-    console.log(value)
+	const [phoneValue, setPhoneValue] = useState<string | undefined>(
+		value ? String(value) : undefined,
+	);
+
+	const lastCountryCodeRef = useRef<string | undefined>();
+
+	useEffect(() => {
+		if (phoneValue) {
+			const match = phoneValue.match(/^(\+\d{1,4})/);
+
+			if (match) {
+				lastCountryCodeRef.current = match[1];
+			}
+		}
+	}, [phoneValue]);
+
+	const handlePhoneChange = (newValue: string | undefined) => {
+		if (!newValue && lastCountryCodeRef.current) {
+			setPhoneValue(lastCountryCodeRef.current);
+
+			onChange(lastCountryCodeRef.current);
+		} else {
+			setPhoneValue(newValue);
+
+			onChange(newValue);
+		}
+	};
 
 	return (
 		<div className="grid gap-2">
@@ -25,7 +48,7 @@ const EditPhoneNumber = ({
 				type="button"
 				onClick={() => {
 					setIsOpen(!isOpen);
-					setActiveTab("email");
+					setActiveTab("mobile_phone");
 				}}
 			>
 				<span>
@@ -54,7 +77,7 @@ const EditPhoneNumber = ({
 
 			<label
 				className={cn("grid gap-0.5", {
-					hidden: !isOpen || activeTab !== "email",
+					hidden: !isOpen || activeTab !== "mobile_phone",
 				})}
 				htmlFor="email"
 			>
@@ -62,11 +85,10 @@ const EditPhoneNumber = ({
 					<PhoneInput
 						placeholder="Enter phone number"
 						international
-						value={value ? String(value) : undefined}
+						defaultCountry={undefined}
+						value={phoneValue}
+						onChange={handlePhoneChange}
 						className="input border-transparent rounded-none bg-[#0D0D0D]"
-						onChange={(e) => {
-							onChange(e);
-						}}
 					/>
 				</div>
 			</label>
