@@ -76,7 +76,7 @@ const EditProfileSubmitButton = () => {
 				message:
 					getFirstErrorKey === "undefined"
 						? "You have not made any changes."
-						: firstError,
+						: `${getFirstErrorKey} ${firstError}`,
 			});
         }
 

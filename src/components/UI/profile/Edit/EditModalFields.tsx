@@ -188,7 +188,12 @@ const EditModalFields: FC<EditModalFieldsProps> = ({isActive, setIsActive}) => {
 					/>
 				</div>
 
-				<EditEmail />
+				<EditEmail
+					value={getEditFieldValues("email")}
+					onChange={(e) => {
+						setFormValues("email", e);
+					}}
+				/>
 
 				<EditPhoneNumber
 					value={getEditFieldValues("mobile_phone")}
