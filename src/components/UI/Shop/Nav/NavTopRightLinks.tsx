@@ -24,13 +24,13 @@ const NavTopRightLinks: FC = () => {
       />
 
       <>
-        {['cart', 'favorites', 'profile'].map((str, index) => {
+        {['cart', 'favorites', 'account-overview'].map((str, index) => {
           const href = '/shop/' + str;
           return (
             <CustomShopLink href={href} key={str + index}>
               {str === 'cart' && <CartIcon />}
               {str === 'favorites' && <Heart />}
-              {str === 'profile' && (
+              {str === 'account-overview' && (
                 <UserAvatar
                   src='https://avatar.iran.liara.run/public'
                   alt={'User avatar'}

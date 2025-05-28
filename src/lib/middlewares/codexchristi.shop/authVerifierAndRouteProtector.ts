@@ -9,11 +9,15 @@ export const authVerifierAndRouteProtector = async (req: NextRequest) => {
       const referrer = req.headers.get('referer')!.split(hostname)[1];
       const url = req.nextUrl.clone().toString()!.split(hostname)[1];
 
-      console.log(`Referrer: ${referrer}, Current URL: ${url}`);
+      console.log(
+        `Referrer: ${referrer}, Current URL: ${req.nextUrl.clone().toString()}`
+      );
 
-      if (referrer && referrer === url.toString()) {
+      if (referrer && url && referrer === url) {
         if ((await verifySession()) === true && req.method === 'GET') {
-          return NextResponse.redirect(new URL('/account-overview', req.url)); // Redirect to the referrer if session is valid
+          return NextResponse.redirect(
+            new URL('/shop/account-overview', req.url)
+          ); // Redirect to the referrer if session is valid
         } else {
           return NextResponse.next(); // Proceed with the request if session is valid
         }

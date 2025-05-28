@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 
 const UserAvatar: FC<{
-  size?: number;
+  size: number;
   className?: string;
   src?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -19,7 +19,7 @@ const UserAvatar: FC<{
   // Main JSX
   return (
     <Image
-      className={`size-20 rounded-full ${!size ? '!w-full' : `size-[${size}]`} ${className} !max-w-[unset]`}
+      className={`rounded-full ${className}`}
       src={
         src ||
         (typeof userMainProfile?.profile_pic === 'string'
@@ -30,6 +30,12 @@ const UserAvatar: FC<{
       height={size ? size : 80}
       priority
       alt='User Avatar'
+      style={{
+        objectFit: 'cover',
+        width: `${size}px !important`,
+        height: `${size}px !important`,
+        maxWidth: `${size}px !important`,
+      }}
       {...rest}
     />
   );

@@ -1,6 +1,7 @@
 import { FC, useState } from 'react';
-import Image, { ImageProps } from 'next/image';
+import { ImageProps } from 'next/image';
 import { Skeleton } from '../../primitives/skeleton';
+import MainProfileAvatar from '../../profile/UserAvatar';
 
 type UserAvatarInterface = Omit<ImageProps, 'width' | 'height'> & {
   width: number;
@@ -25,8 +26,10 @@ const UserAvatar: FC<UserAvatarInterface> = (props) => {
           className={`h-[${height ? height : 25}px] w-[${width ? width : 25}px] rounded-full p-0`}
         />
       )}
-      <Image
+      <MainProfileAvatar
+        size={width ? width : 25}
         {...props}
+        src={typeof props.src === 'string' ? props.src : undefined}
         alt='User Avatar'
         className='rounded-full'
         onLoad={() => setLoaded(true)}

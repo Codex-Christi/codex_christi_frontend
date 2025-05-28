@@ -128,7 +128,7 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
           />
 
           <div className='w-12 md:w-16'>
-            <UserAvatar size={80} className='rounded-full relative z-[1024]' />
+            <UserAvatar size={50} className='rounded-full relative z-[1024]' />
           </div>
 
           <button
