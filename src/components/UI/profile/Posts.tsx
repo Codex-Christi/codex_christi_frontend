@@ -1,5 +1,6 @@
 import Image from "next/image";
 import ProfileImage from "@/assets/img/profile-img.png";
+import UserAvatar from "./UserAvatar";
 
 const Posts = () => {
 	return (
@@ -12,10 +13,10 @@ const Posts = () => {
 					<div className="p-4 space-y-6">
 						<div className="flex items-center justify-between gap-4">
 							<div className="flex items-start gap-4">
-								<Image
-									className="size-10 rounded-full"
-									src={ProfileImage}
-									alt="Post image"
+								<UserAvatar
+									className="size-12 aspect-square"
+									height={10}
+									width={10}
 								/>
 
 								<div>

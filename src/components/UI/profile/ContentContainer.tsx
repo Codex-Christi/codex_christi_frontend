@@ -5,8 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import AdsImage from "@/assets/img/ad-snickers.png";
 import SponsoredAd from "@/assets/img/sponsored-ad.png";
-import { useState } from "react";
 import UserAvatar from "./UserAvatar";
+import { useState } from "react";
 
 const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 	const [navIsOpen, setNavIsOpen] = useState(false);
