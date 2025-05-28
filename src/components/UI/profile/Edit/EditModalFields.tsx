@@ -77,7 +77,7 @@ const EditModalFields: FC<EditModalFieldsProps> = ({
 			}
 		}
 	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [getEditFieldValues("country")]);
+    }, [getEditFieldValues("country")]);
 
 	// Main JSX
 	return (
@@ -187,7 +187,7 @@ const EditModalFields: FC<EditModalFieldsProps> = ({
 				<div className="grid gap-0.5">
 					<p className="text-white/70">
 						{getEditFieldValues("gender") || "Select Gender"}
-                    </p>
+					</p>
 
 					<EditGender
 						value={getEditFieldValues("gender")}
@@ -205,7 +205,10 @@ const EditModalFields: FC<EditModalFieldsProps> = ({
 					onChange={(val) => setFormValues("mobile_phone", val)}
 				/>
 
-				<EditBirthday />
+				<EditBirthday
+					value={getEditFieldValues("date_of_birth")}
+					onChange={(val) => setFormValues("date_of_birth", val)}
+				/>
 
 				<EditWebsite
 					value={getEditFieldValues("website")}
