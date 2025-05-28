@@ -1,4 +1,3 @@
-import { FC, SetStateAction } from "react";
 import EditGender from "./EditGender";
 import EditBirthday from "./EditBirthday";
 import EditEmail from "./EditEmail";
@@ -6,11 +5,14 @@ import EditWebsite from "./EditWebsite";
 import EditPhoneNumber from "./EditPhoneNumber";
 import EditCountry from "./EditCountry";
 import EditProfilePicture from "./EditProfilePicture";
+import EditProfileSubmitButton from "./EditProfileSubmitButton";
+import en from "react-phone-number-input/locale/en";
+import { FC, SetStateAction, useEffect } from "react";
+import { getCurrencyAbbreviation } from "currency-map-country";
 import { cn } from "@/lib/utils";
 import { useUserMainProfileStore } from "@/stores/userMainProfileStore";
 import { useEditUserMainProfileStore } from "@/stores/editUserProfileStore";
 import { UserProfileDataInterface } from "@/lib/types/user-profile/main-user-profile";
-import EditProfileSubmitButton from "./EditProfileSubmitButton";
 
 // Interfaces
 interface EditModalFieldsProps {
@@ -63,7 +65,23 @@ const EditModalFields: FC<EditModalFieldsProps> = ({isActive, setIsActive}) => {
 					: "";
 
 		return value instanceof File ? value.name : value;
-	};
+    };
+
+    useEffect(() => {
+        const countryCode = getEditFieldValues("country");
+
+        if (countryCode && typeof countryCode === "string") {
+            const countryName = en[countryCode as keyof typeof en];
+
+            if (countryName) {
+                const currency = getCurrencyAbbreviation(countryName);
+
+                if (currency) {
+                    setFormValues("currency", currency);
+                }
+            }
+        }
+    }, [getEditFieldValues("country")]);
 
 	// Main JSX
 	return (
@@ -177,8 +195,8 @@ const EditModalFields: FC<EditModalFieldsProps> = ({isActive, setIsActive}) => {
 
 				<EditCountry
 					value={getEditFieldValues("country")}
-					onChange={(e) => {
-						setFormValues("country", e);
+					onChange={(country) => {
+						setFormValues("country", country);
 					}}
 				/>
 
@@ -187,23 +205,23 @@ const EditModalFields: FC<EditModalFieldsProps> = ({isActive, setIsActive}) => {
 
 					<EditGender
 						value={getEditFieldValues("gender")}
-						onChange={(e) => {
-							setFormValues("gender", e);
+						onChange={(gender) => {
+							setFormValues("gender", gender);
 						}}
 					/>
 				</div>
 
 				<EditEmail
 					value={getEditFieldValues("email")}
-					onChange={(e) => {
-						setFormValues("email", e);
+					onChange={(email) => {
+						setFormValues("email", email);
 					}}
 				/>
 
 				<EditPhoneNumber
 					value={getEditFieldValues("mobile_phone")}
-					onChange={(e) => {
-						setFormValues("mobile_phone", e);
+					onChange={(mobile_phone) => {
+						setFormValues("mobile_phone", mobile_phone);
 					}}
 				/>
 
