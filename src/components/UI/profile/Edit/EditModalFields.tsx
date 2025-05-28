@@ -18,20 +18,19 @@ interface EditModalFieldsProps {
 	setIsActive: React.Dispatch<SetStateAction<boolean>>;
 }
 
-const EditModalFields: FC<EditModalFieldsProps> = (props) => {
+const EditModalFields: FC<EditModalFieldsProps> = ({isActive, setIsActive}) => {
 	// Hooks
-	const { isActive, setIsActive } = props;
 	const editProfileData = useEditUserMainProfileStore(
 		(state) => state.userEditData,
 	);
+
 	const setUserEditData = useEditUserMainProfileStore(
 		(state) => state.setUserEditData,
 	);
+
 	const mainProfileData = useUserMainProfileStore(
 		(state) => state.userMainProfile,
 	);
-
-	// Bools
 
 	//   Handlers
 	const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,6 +41,13 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
 		setUserEditData({
 			...editProfileData,
 			[targetName]: targetVal,
+		});
+	};
+
+	const setFormValues = (fieldName: string, value: string) => {
+		setUserEditData({
+			...editProfileData,
+			[fieldName]: value,
 		});
 	};
 
@@ -63,9 +69,7 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
 	return (
 		<div
 			className={cn(
-				`bg-[#0D0D0D]/[.98] backdrop-blur-lg text-white mx-auto p-8 w-[90%] space-y-2
-          transition-transform md:w-[60%] h-[calc(100dvh-3rem)] md:h-[calc(100dvh-4rem)] overflow-y-auto duration-300 ease-linear
-      rounded-[10px] -translate-y-[200%] shadow-2xl lg:w-2/5 z-[500] max-w-full overflow-x-hidden`,
+				`bg-[#0D0D0D]/[.98] backdrop-blur-lg text-white mx-auto p-8 w-[90%] space-y-2 transition-transform md:w-[60%] h-[calc(100dvh-3rem)] md:h-[calc(100dvh-4rem)] overflow-y-auto duration-300 ease-linear rounded-[10px] -translate-y-[200%] shadow-2xl lg:w-2/5 z-[500] max-w-full overflow-x-hidden`,
 				{
 					"md:translate-y-4 translate-y-0": isActive,
 				},
@@ -94,6 +98,11 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
 
 				<p className="font-bold text-lg mx-auto">Edit Profile</p>
 			</div>
+
+			<p className="text-yellow-500 text-center">
+				Please note that excluding the profile picture, each field can
+				be changed once in 6 months.
+			</p>
 
 			<EditProfilePicture />
 
@@ -128,9 +137,6 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
 							</label>
 						);
 					})}
-					<span className="text-sm md:col-span-2">
-						*name can be changed once in 6 months
-					</span>
 				</section>
 
 				{/* Username Edit */}
@@ -179,7 +185,12 @@ const EditModalFields: FC<EditModalFieldsProps> = (props) => {
 
 				<EditEmail />
 
-				<EditPhoneNumber />
+				<EditPhoneNumber
+					value={getEditFieldValues("mobile_phone")}
+					onChange={(e) => {
+						setFormValues("mobile_phone", e);
+					}}
+				/>
 
 				<EditBirthday />
 
