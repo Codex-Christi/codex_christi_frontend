@@ -1,26 +1,29 @@
 import { verifySession } from '@/lib/session/session-validate';
 import { NextRequest, NextResponse } from 'next/server';
+import { redirect } from 'next/navigation';
 
 export const authVerifierAndRouteProtector = async (req: NextRequest) => {
   // Auth verifier for shop login page on codexchristi.shop
   const hostname = req.headers.get('host'); // Get the incoming hostname
   if (hostname === 'codexchristi.shop') {
     try {
-      if ((await verifySession()) === true) {
-        const referrer = req.headers.get('referer')?.split(hostname)[1];
-        const url = req.nextUrl.clone().toString()?.split(hostname)[1];
+      const referrer = req.headers.get('referer')?.split(hostname)[1];
+      const url = req.nextUrl.clone().toString()?.split(hostname)[1];
 
-        if (referrer === url.toString()) {
-          return NextResponse.next(); // Proceed with the request if session is valid
+      if (referrer === url.toString()) {
+        if ((await verifySession()) === true && req.method === 'GET') {
+          return NextResponse.redirect(new URL('/account-overview', req.url)); // Redirect to the referrer if session is valid
         } else {
-          return redirectToReferrer(req);
+          return NextResponse.next(); // Proceed with the request if session is valid
         }
+      } else {
+        return redirectToReferrer(req);
       }
     } catch (error) {
       console.error('Error verifying session:', error);
     }
   } else {
-    redirectToReferrer(req);
+    return redirectToReferrer(req);
   }
 };
 
