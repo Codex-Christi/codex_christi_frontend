@@ -61,6 +61,7 @@ const EditProfilePicture: FC = () => {
         <UserAvatar
           className='rounded-full mx-auto'
           src={imageUrl ? imageUrl : undefined}
+          size={80}
         />
 
         {!imageUrl && (

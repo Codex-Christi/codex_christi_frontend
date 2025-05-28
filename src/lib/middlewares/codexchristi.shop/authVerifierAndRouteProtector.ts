@@ -4,15 +4,13 @@ import { NextRequest, NextResponse } from 'next/server';
 export const authVerifierAndRouteProtector = async (req: NextRequest) => {
   // Auth verifier for shop login page on codexchristi.shop
   const hostname = req.headers.get('host'); // Get the incoming hostname
-  if (hostname === 'codexchristi.shop') {
+  if (hostname === 'localhost:3000' || hostname === 'codexchristi.shop') {
     try {
-      const referrer = req.headers.get('referer')!.split(hostname)[1];
-      const url = req.nextUrl.clone().toString()!.split(hostname)[1];
+      const referrer = req.headers.get('referer')?.split(hostname)[1];
+      const url = req.nextUrl.clone().toString()?.split(hostname)[1];
 
-      console.log(
-        `Referrer: ${referrer}, Current URL: ${req.nextUrl.clone().toString()}`
-      );
-
+      // Check if the referrer and URL are the same
+      // and if the session is valid for GET requests
       if (referrer && url && referrer === url) {
         if ((await verifySession()) === true && req.method === 'GET') {
           return NextResponse.redirect(

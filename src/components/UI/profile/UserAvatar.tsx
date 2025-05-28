@@ -19,19 +19,18 @@ const UserAvatar: FC<{
   // Main JSX
   return (
     <Image
-      className={`rounded-full ${className}`}
+      className={`rounded-full ${className} h-[inherit]`}
       src={
         src ||
         (typeof userMainProfile?.profile_pic === 'string'
           ? userMainProfile.profile_pic
           : ProfileImage)
       }
-      width={size ? size : 80}
-      height={size ? size : 80}
+      width={size}
+      height={size}
       priority
       alt='User Avatar'
       style={{
-        objectFit: 'cover',
         width: `${size}px !important`,
         height: `${size}px !important`,
         maxWidth: `${size}px !important`,
