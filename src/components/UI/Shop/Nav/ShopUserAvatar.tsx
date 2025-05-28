@@ -2,19 +2,23 @@ import { FC, useState } from 'react';
 import { ImageProps } from 'next/image';
 import { Skeleton } from '../../primitives/skeleton';
 import MainProfileAvatar from '../../profile/UserAvatar';
+import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 
-type UserAvatarInterface = Omit<ImageProps, 'width' | 'height'> & {
+type UserAvatarInterface = Omit<ImageProps, 'width' | 'height' | 'src'> & {
   width: number;
   height: number;
-  username?: string;
 };
 
 const UserAvatar: FC<UserAvatarInterface> = (props) => {
   // Hooks
   const [loaded, setLoaded] = useState<boolean>(false);
+  const userMainProfile = useUserMainProfileStore(
+    (state) => state.userMainProfile
+  );
+  const { username } = userMainProfile ? userMainProfile : {};
 
   // Props
-  const { width, height, username } = props;
+  const { width, height } = props;
 
   return (
     <div
@@ -29,7 +33,6 @@ const UserAvatar: FC<UserAvatarInterface> = (props) => {
       <MainProfileAvatar
         size={width ? width : 25}
         {...props}
-        src={typeof props.src === 'string' ? props.src : undefined}
         alt='User Avatar'
         className='rounded-full'
         onLoad={() => setLoaded(true)}

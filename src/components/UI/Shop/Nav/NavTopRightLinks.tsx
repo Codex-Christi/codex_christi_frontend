@@ -3,7 +3,7 @@ import { SearchButtonOnly } from './NavSearch';
 import { CartIcon } from './NavIcons';
 import { Heart } from 'lucide-react';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
-import UserAvatar from './UserAvatar';
+import UserAvatar from './ShopUserAvatar';
 
 const NavTopRightLinks: FC = () => {
   // Hooks
@@ -31,12 +31,7 @@ const NavTopRightLinks: FC = () => {
               {str === 'cart' && <CartIcon />}
               {str === 'favorites' && <Heart />}
               {str === 'account-overview' && (
-                <UserAvatar
-                  src='https://avatar.iran.liara.run/public'
-                  alt={'User avatar'}
-                  width={25}
-                  height={25}
-                />
+                <UserAvatar alt={'User avatar'} width={25} height={25} />
               )}
             </CustomShopLink>
           );
