@@ -1,6 +1,5 @@
 import { verifySession } from '@/lib/session/session-validate';
 import { NextRequest, NextResponse } from 'next/server';
-import { redirect } from 'next/navigation';
 
 export const authVerifierAndRouteProtector = async (req: NextRequest) => {
   // Auth verifier for shop login page on codexchristi.shop
@@ -10,7 +9,7 @@ export const authVerifierAndRouteProtector = async (req: NextRequest) => {
       const referrer = req.headers.get('referer')?.split(hostname)[1];
       const url = req.nextUrl.clone().toString()?.split(hostname)[1];
 
-      if (referrer === url.toString()) {
+      if (referrer && referrer === url.toString()) {
         if ((await verifySession()) === true && req.method === 'GET') {
           return NextResponse.redirect(new URL('/account-overview', req.url)); // Redirect to the referrer if session is valid
         } else {
