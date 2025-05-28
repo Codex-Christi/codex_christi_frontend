@@ -7,21 +7,23 @@ import EditCountry from "./EditCountry";
 import EditProfilePicture from "./EditProfilePicture";
 import EditProfileSubmitButton from "./EditProfileSubmitButton";
 import en from "react-phone-number-input/locale/en";
-import { FC, SetStateAction, useEffect } from "react";
+import { FC, SetStateAction, useEffect, useCallback } from "react";
 import { getCurrencyAbbreviation } from "currency-map-country";
 import { cn } from "@/lib/utils";
 import { useUserMainProfileStore } from "@/stores/userMainProfileStore";
 import { useEditUserMainProfileStore } from "@/stores/editUserProfileStore";
 import { UserProfileDataInterface } from "@/lib/types/user-profile/main-user-profile";
 
-// Interfaces
 interface EditModalFieldsProps {
 	isActive: boolean;
 	setIsActive: React.Dispatch<SetStateAction<boolean>>;
 }
 
-const EditModalFields: FC<EditModalFieldsProps> = ({isActive, setIsActive}) => {
-	// Hooks
+const EditModalFields: FC<EditModalFieldsProps> = ({
+	isActive,
+	setIsActive,
+}) => {
+	// Stores
 	const editProfileData = useEditUserMainProfileStore(
 		(state) => state.userEditData,
 	);
@@ -32,65 +34,57 @@ const EditModalFields: FC<EditModalFieldsProps> = ({isActive, setIsActive}) => {
 
 	const mainProfileData = useUserMainProfileStore(
 		(state) => state.userMainProfile,
-    );
+	);
 
-	//   Handlers
-	const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const targetName = e.target.name as keyof UserProfileDataInterface;
-		const targetVal = e.target.value;
+	const getEditFieldValues = useCallback(
+		(name: keyof UserProfileDataInterface) => {
+			const val =
+                editProfileData?.[name] ?? mainProfileData?.[name] ?? "";
 
-		// Change the edit profile data
-		setUserEditData({
-			...editProfileData,
-			[targetName]: targetVal,
-		});
-	};
+			return val instanceof File ? val.name : val;
+		},
+		[editProfileData, mainProfileData],
+	);
 
-	const setFormValues = (fieldName: string, value: string) => {
+	const setFormValues = (
+		fieldName: keyof UserProfileDataInterface,
+		value: string,
+	) => {
 		setUserEditData({
 			...editProfileData,
 			[fieldName]: value,
 		});
 	};
 
-	//   Functions
-	const getEditFieldValues = (name: keyof UserProfileDataInterface) => {
-		const value =
-			editProfileData &&
-			editProfileData[name] !== undefined &&
-			editProfileData[name] !== null
-				? editProfileData[name]
-				: mainProfileData && mainProfileData[name]
-					? mainProfileData[name]
-					: "";
+	const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const name = e.target.name as keyof UserProfileDataInterface;
 
-		return value instanceof File ? value.name : value;
-    };
+		setFormValues(name, e.target.value);
+	};
 
-    useEffect(() => {
-        const countryCode = getEditFieldValues("country");
+	useEffect(() => {
+		const countryCode = getEditFieldValues("country");
 
-        if (countryCode && typeof countryCode === "string") {
-            const countryName = en[countryCode as keyof typeof en];
+		if (countryCode && typeof countryCode === "string") {
+			const countryName = en[countryCode as keyof typeof en];
 
-            if (countryName) {
-                const currency = getCurrencyAbbreviation(countryName);
+			if (countryName) {
+				const currency = getCurrencyAbbreviation(countryName);
 
-                if (currency) {
-                    setFormValues("currency", currency);
-                }
-            }
-        }
-    }, [getEditFieldValues("country")]);
+				if (currency) {
+					setFormValues("currency", currency);
+				}
+			}
+		}
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [getEditFieldValues("country")]);
 
 	// Main JSX
 	return (
 		<div
 			className={cn(
 				`bg-[#0D0D0D]/[.98] backdrop-blur-lg text-white mx-auto p-8 w-[90%] space-y-2 transition-transform md:w-[60%] h-[calc(100dvh-3rem)] md:h-[calc(100dvh-4rem)] overflow-y-auto duration-300 ease-linear rounded-[10px] -translate-y-[200%] shadow-2xl lg:w-2/5 z-[500] max-w-full overflow-x-hidden`,
-				{
-					"md:translate-y-4 translate-y-0": isActive,
-				},
+				{ "md:translate-y-4 translate-y-0": isActive },
 			)}
 		>
 			<div className="flex items-center justify-between">
@@ -124,40 +118,33 @@ const EditModalFields: FC<EditModalFieldsProps> = ({isActive, setIsActive}) => {
 
 			<EditProfilePicture />
 
-			{/* First and Last Name Edit */}
 			<div className="grid gap-6">
 				<section className="grid md:grid-cols-2 gap-3">
 					{[
 						{ name: "first_name", text: "First Name" },
 						{ name: "last_name", text: "Last Name" },
-					].map((item, index) => {
-						const name = item.name as "first_name" | "last_name";
-						const text = item.text as "First Name" | "Last Name";
-						return (
-							<label
-								className="grid gap-0.5 w-full"
-								htmlFor={item.name}
-								key={index}
-							>
-								<span className="text-white/70">
-									{item.text}
-								</span>
-
-								<input
-									className="input w-full"
-									type="text"
-									placeholder={text}
-									id={name}
-									name={name}
-									value={getEditFieldValues(name)}
-									onChange={handleInputChange}
-								/>
-							</label>
-						);
-					})}
+					].map(({ name, text }) => (
+						<label
+							key={name}
+							className="grid gap-0.5 w-full"
+							htmlFor={name}
+						>
+							<span className="text-white/70">{text}</span>
+							<input
+								className="input w-full"
+								type="text"
+								placeholder={text}
+								id={name}
+								name={name}
+								value={getEditFieldValues(
+									name as keyof UserProfileDataInterface,
+								)}
+								onChange={handleInputChange}
+							/>
+						</label>
+					))}
 				</section>
 
-				{/* Username Edit */}
 				<label
 					className="grid gap-0.5"
 					htmlFor="username"
@@ -167,27 +154,26 @@ const EditModalFields: FC<EditModalFieldsProps> = ({isActive, setIsActive}) => {
 					<input
 						className="input"
 						type="text"
-						placeholder="Username"
 						id="username"
 						name="username"
+						placeholder="Username"
 						value={getEditFieldValues("username")}
 						onChange={handleInputChange}
 					/>
 				</label>
 
-				{/* Bio Edit */}
+				{/* Bio */}
 				<label
 					className="grid gap-0.5"
 					htmlFor="bio"
 				>
 					<span className="text-white/70">Bio</span>
-
 					<input
 						className="input"
 						type="text"
-						placeholder="Bio"
 						id="bio"
 						name="bio"
+						placeholder="Bio"
 						value={getEditFieldValues("bio")}
 						onChange={handleInputChange}
 					/>
@@ -195,39 +181,36 @@ const EditModalFields: FC<EditModalFieldsProps> = ({isActive, setIsActive}) => {
 
 				<EditCountry
 					value={getEditFieldValues("country")}
-					onChange={(country) => {
-						setFormValues("country", country);
-					}}
+					onChange={(val) => setFormValues("country", val)}
 				/>
 
 				<div className="grid gap-0.5">
-					<p className="text-white/70">Select Gender</p>
+					<p className="text-white/70">
+						{getEditFieldValues("gender") || "Select Gender"}
+                    </p>
 
 					<EditGender
 						value={getEditFieldValues("gender")}
-						onChange={(gender) => {
-							setFormValues("gender", gender);
-						}}
+						onChange={(val) => setFormValues("gender", val)}
 					/>
 				</div>
 
 				<EditEmail
 					value={getEditFieldValues("email")}
-					onChange={(email) => {
-						setFormValues("email", email);
-					}}
+					onChange={(val) => setFormValues("email", val)}
 				/>
 
 				<EditPhoneNumber
 					value={getEditFieldValues("mobile_phone")}
-					onChange={(mobile_phone) => {
-						setFormValues("mobile_phone", mobile_phone);
-					}}
+					onChange={(val) => setFormValues("mobile_phone", val)}
 				/>
 
 				<EditBirthday />
 
-				<EditWebsite />
+				<EditWebsite
+					value={getEditFieldValues("website")}
+					onChange={(val) => setFormValues("website", val)}
+				/>
 
 				<EditProfileSubmitButton />
 			</div>

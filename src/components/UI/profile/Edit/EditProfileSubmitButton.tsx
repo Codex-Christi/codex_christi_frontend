@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useCallback, useState } from "react";
 import { Button } from "../../primitives/button";
 import {
@@ -77,7 +76,7 @@ const EditProfileSubmitButton = () => {
 				message:
 					getFirstErrorKey === "undefined"
 						? "You have not made any changes."
-						: `${getFirstErrorKey} ${firstError}`,
+						: `${getFirstErrorKey} field: ${firstError}`,
 			});
 		}
 
@@ -125,14 +124,14 @@ const EditProfileSubmitButton = () => {
 								"Error updating profile. Please try again.",
 						});
 					});
-            } catch (error: any) {
+            } catch (error) {
                 setIsLoading(false);
 
 				toast.dismiss(loadingToastID);
 
 				errorToast({
 					message:
-						"Error submitting data. Please try again.",
+						String(error),
 				});
 			}
 		}

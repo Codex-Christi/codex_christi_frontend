@@ -16,6 +16,8 @@ const EditPhoneNumber = ({
 	const [isOpen, setIsOpen] = useState(false);
 	const [activeTab, setActiveTab] = useState("");
 
+    console.log(value)
+
 	return (
 		<div className="grid gap-2">
 			<button
@@ -27,7 +29,7 @@ const EditPhoneNumber = ({
 				}}
 			>
 				<span>
-					{value ? "Update phone number" : "Add phone number"}
+					{value ? "Update Phone Number" : "Add Phone Number"}
 				</span>
 
 				<svg
