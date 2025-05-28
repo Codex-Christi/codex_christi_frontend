@@ -175,7 +175,12 @@ const EditModalFields: FC<EditModalFieldsProps> = ({isActive, setIsActive}) => {
 					/>
 				</label>
 
-				<EditCountry />
+				<EditCountry
+					value={getEditFieldValues("country")}
+					onChange={(e) => {
+						setFormValues("country", e);
+					}}
+				/>
 
 				<div className="grid gap-0.5">
 					<p className="text-white/70">Select Gender</p>

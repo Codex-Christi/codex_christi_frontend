@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useCallback, useState } from "react";
 import { Button } from "../../primitives/button";
 import {
@@ -67,18 +68,18 @@ const EditProfileSubmitButton = () => {
 		const submissionData = validate();
 		const formData = new FormData();
 
-        if (!submissionData.success) {
-            const getFirstErrorKey = Object.keys(submissionData?.errors)[0];
+		if (!submissionData.success) {
+			const getFirstErrorKey = Object.keys(submissionData?.errors)[0];
 
-            const firstError = Object.values(submissionData?.errors)[0];
+			const firstError = Object.values(submissionData?.errors)[0];
 
-            errorToast({
+			errorToast({
 				message:
 					getFirstErrorKey === "undefined"
 						? "You have not made any changes."
 						: `${getFirstErrorKey} ${firstError}`,
 			});
-        }
+		}
 
 		// Convert the data to FormData
 		if (submissionData.success && submissionData.data) {
@@ -101,34 +102,38 @@ const EditProfileSubmitButton = () => {
 				await patchUser(formData)
 					.then((response) => {
 						setIsLoading(false);
+
 						toast.dismiss(loadingToastID);
+
 						successToast({
 							message: "Profile updated successfully.",
 							header: "Profile Updated",
 						});
+
 						setUserMainProfile(response.data);
+
 						clearEditData();
-						console.log(
-							"Profile updated successfully:",
-							response.data,
-						);
 					})
 					.catch((error) => {
-						setIsLoading(false);
+                        setIsLoading(false);
+
 						toast.dismiss(loadingToastID);
+
 						errorToast({
 							message:
+								error?.response?.data?.errors[0]?.message ??
 								"Error updating profile. Please try again.",
 						});
-						console.error("Error updating profile:", error);
 					});
-			} catch (error) {
-				setIsLoading(false);
+            } catch (error: any) {
+                setIsLoading(false);
+
 				toast.dismiss(loadingToastID);
+
 				errorToast({
-					message: "Error submitting data. Please try again.",
+					message:
+						"Error submitting data. Please try again.",
 				});
-				console.error("Error submitting form data:", error);
 			}
 		}
 	}, [clearEditData, setUserMainProfile, validate]);
