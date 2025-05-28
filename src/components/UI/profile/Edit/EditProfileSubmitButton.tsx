@@ -67,6 +67,19 @@ const EditProfileSubmitButton = () => {
 		const submissionData = validate();
 		const formData = new FormData();
 
+        if (!submissionData.success) {
+            const getFirstErrorKey = Object.keys(submissionData?.errors)[0];
+
+            const firstError = Object.values(submissionData?.errors)[0];
+
+            errorToast({
+				message:
+					getFirstErrorKey === "undefined"
+						? "You have not made any changes."
+						: firstError,
+			});
+        }
+
 		// Convert the data to FormData
 		if (submissionData.success && submissionData.data) {
 			for (const key in submissionData.data) {

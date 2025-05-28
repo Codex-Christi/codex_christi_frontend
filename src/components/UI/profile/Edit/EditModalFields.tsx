@@ -30,7 +30,7 @@ const EditModalFields: FC<EditModalFieldsProps> = ({isActive, setIsActive}) => {
 
 	const mainProfileData = useUserMainProfileStore(
 		(state) => state.userMainProfile,
-	);
+    );
 
 	//   Handlers
 	const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -180,7 +180,12 @@ const EditModalFields: FC<EditModalFieldsProps> = ({isActive, setIsActive}) => {
 				<div className="grid gap-0.5">
 					<p className="text-white/70">Select Gender</p>
 
-					<EditGender />
+					<EditGender
+						value={getEditFieldValues("gender")}
+						onChange={(e) => {
+							setFormValues("gender", e);
+						}}
+					/>
 				</div>
 
 				<EditEmail />

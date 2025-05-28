@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
 	Select,
 	SelectContent,
@@ -7,9 +8,15 @@ import {
 	SelectValue,
 } from "@/components/UI/primitives/select";
 
-export default function EditGender() {
+export default function EditGender({
+	onChange,
+	value,
+}: {
+	onChange: (e: any) => void;
+	value: string | null | number;
+}) {
 	return (
-		<Select>
+		<Select defaultValue={value ? String(value) : ""} onValueChange={(e) => onChange(e)}>
 			<SelectTrigger className="w-full bg-[#0D0D0DFA] text-white data-[placeholder]:text-white py-4">
 				<SelectValue
 					className="text-white"
