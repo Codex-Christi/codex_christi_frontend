@@ -8,7 +8,7 @@ import { getCookie } from '@/lib/session/main-session';
 import { clearUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { toast } from 'sonner';
 
-const axiosClient = axios.create({
+export const axiosClient = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
 });
 
@@ -18,17 +18,9 @@ export const logoutUser = async () => {
   });
 
   try {
-    const sessionCookie = await getCookie('session');
-
     const refreshToken = await getCookie('refreshToken');
 
-    const decryptedSessionCookie = await decrypt(sessionCookie?.value);
-
     const decryptRefreshToken = await decrypt(refreshToken?.value);
-
-    const mainAccessToken = decryptedSessionCookie
-      ? (decryptedSessionCookie.mainAccessToken as string)
-      : ('' as string);
 
     const mainRefreshToken = decryptRefreshToken
       ? (decryptRefreshToken.mainRefreshToken as string)
@@ -36,12 +28,12 @@ export const logoutUser = async () => {
 
     const res = await axiosClient.post(
       '/auth/user-logout',
-      { refresh: mainRefreshToken },
-      {
-        headers: {
-          Authorization: `Bearer ${mainAccessToken}`,
-        },
-      }
+      { refresh: mainRefreshToken }
+      // {
+      //   headers: {
+      //     Authorization: `Bearer ${mainAccessToken}`,
+      //   },
+      // }
     );
 
     if (res?.data?.success) {
@@ -57,7 +49,6 @@ export const logoutUser = async () => {
       toast.dismiss(loadingToastID);
 
       window.location.replace('/auth/sign-in');
-
       return true;
     }
 

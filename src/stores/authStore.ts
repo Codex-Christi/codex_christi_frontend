@@ -25,6 +25,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   setIsAuthenticated: (bool: boolean) => set({ isAuthenticated: bool }),
   userSessionInfo: null,
   autoUpDateSession: async () => {
+    // Check if session exists in localStorage
+    // If not, do nothing
+    if (!localStorage.getItem('session')) {
+      return;
+    }
+
     const userSessionInfo = {
       user_id: await getUserID(),
     } as UserSessionInfoType;

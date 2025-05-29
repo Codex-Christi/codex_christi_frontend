@@ -15,17 +15,16 @@ export async function GET(req: NextRequest) {
   const redirectUrl = `${protocol}://${host}/auth/sign-in?from-logout=true`;
 
   try {
-    const sessionCookie = await getCookie('session');
+    // Get the refresh token from cookies
+    // and decrypt it to get the main refresh token
+    const refreshToken = await getCookie('refreshToken');
 
-    const decryptedSessionCookie = await decrypt(sessionCookie?.value);
-    const mainAccessToken = decryptedSessionCookie
-      ? (decryptedSessionCookie.mainAccessToken as string)
+    const decryptRefreshToken = await decrypt(refreshToken?.value);
+
+    const mainRefreshToken = decryptRefreshToken
+      ? (decryptRefreshToken.mainRefreshToken as string)
       : ('' as string);
-    await axiosClient.post('/auth/user-logout', {
-      headers: {
-        Authorization: `Bearer ${mainAccessToken}`,
-      },
-    });
+    await axiosClient.post('/auth/user-logout', { refresh: mainRefreshToken });
     clearUserMainProfileStore();
     await deleteSession(); // allowed here
     redirect(`${redirectUrl}`);
