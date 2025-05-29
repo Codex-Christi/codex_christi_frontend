@@ -1,6 +1,7 @@
 import { FC, useState } from "react";
 import Image, { ImageProps } from "next/image";
 import { Skeleton } from "../../primitives/skeleton";
+import { cn } from "@/lib/utils";
 
 type UserAvatarInterface = Omit<ImageProps, "width" | "height"> & {
 	width: number;
@@ -8,27 +9,27 @@ type UserAvatarInterface = Omit<ImageProps, "width" | "height"> & {
 	username?: string;
 };
 
-const UserAvatar: FC<UserAvatarInterface> = (props) => {
+const UserAvatar: FC<UserAvatarInterface> = ({width, height, username, ...props}) => {
 	// Hooks
 	const [loaded, setLoaded] = useState<boolean>(false);
 
-	// Props
-	const { width, height, username } = props;
-
 	return (
-		<div
-			className={`flex flex-col items-center`}
-			// min-h-[${height + 12}px] min-w-[${width + 12}px]
-		>
+		<div className="flex flex-col items-center">
 			{!loaded && (
 				<Skeleton
-					className={`h-[${height ? height : 25}px] w-[${width ? width : 25}px] rounded-full p-0`}
+					className={cn("size-10 rounded-full p-0")}
+					style={{ width, height }}
 				/>
 			)}
+
 			<Image
 				{...props}
 				alt="User Avatar"
-				className="rounded-full"
+				width={width ?? 25}
+				height={height ?? 25}
+                className={cn("rounded-full size-8 object-cover object-center", {
+                    "hidden": !loaded
+                })}
 				onLoad={() => setLoaded(true)}
 			/>
 

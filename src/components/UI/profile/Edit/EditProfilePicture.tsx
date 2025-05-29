@@ -92,7 +92,6 @@ const EditProfilePicture: FC = () => {
 				name="profile_pic"
 				aria-label="Update Profile Picture"
 				aria-required="true"
-				style={{ display: "none" }}
 				onChange={handleFileChange}
 			/>
 		</>

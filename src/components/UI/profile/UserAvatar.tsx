@@ -46,7 +46,10 @@ const UserAvatar: FC<{
 
 	return (
 		<Image
-			className={cn("rounded-full size-20 object-cover object-center", className)}
+			className={cn(
+				"rounded-full size-20 object-cover object-center",
+				className,
+			)}
 			src={imageSrc}
 			width={width}
 			height={height}

@@ -1,9 +1,9 @@
-import { FC } from "react";
-import { SearchButtonOnly } from "./NavSearch";
-import { CartIcon } from "./NavIcons";
-import { Heart } from "lucide-react";
-import CustomShopLink from "../HelperComponents/CustomShopLink";
-import UserAvatar from "./UserAvatar";
+import { FC } from 'react';
+import { SearchButtonOnly } from './NavSearch';
+import { CartIcon } from './NavIcons';
+import { Heart } from 'lucide-react';
+import CustomShopLink from '../HelperComponents/CustomShopLink';
+import UserAvatar from './ShopUserAvatar';
 
 const NavTopRightLinks: FC = () => {
 	// Hooks

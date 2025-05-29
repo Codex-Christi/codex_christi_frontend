@@ -22,8 +22,8 @@ const ProfileBanner: FC<{
 			<div className="text-[#F3F3F30D] bg-[#0D0D0D] rounded-[20px] p-4 flex gap-4 items-center mb-8 lg:hidden">
 				<UserAvatar
 					className="size-12 aspect-square"
-					height={10}
-					width={10}
+					height={48}
+					width={48}
 				/>
 
 				<div className="bg-inherit relative text-white w-full">

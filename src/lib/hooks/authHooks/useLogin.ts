@@ -2,8 +2,8 @@
 import errorToast from '@/lib/error-toast';
 import loadingToast from '@/lib/loading-toast';
 import successToast from '@/lib/success-toast';
-import axios, { AxiosError, AxiosResponse } from 'axios';
-import { useCallback, useMemo, useState } from 'react';
+import axios, { AxiosResponse } from 'axios';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createLoginSession } from '@/actions/login';
 import { verifySession } from '@/lib/session/session-validate';
 import { useRouter } from 'next/navigation';
@@ -38,8 +38,26 @@ export const useLogin = () => {
   const router = useRouter();
 
   // State values
+  const [isClient, setIsClient] = useState(false);
+  const [referer, setReferer] = useState<string | null>(null);
+  // State for login process
   const [loginProcessState, setLoginProcessState] =
     useState<SignInHookInterface>(useMemo(() => defaultSignUpProcessState, []));
+  const isCodexChristiShop = isClient
+    ? window.location.hostname.includes('codexchristi.shop')
+    : false;
+
+  // Effect to set client-side state and referer
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsClient(true);
+      setReferer(
+        document.referrer
+          ? document.referrer.split(window.location.hostname)[1]
+          : null
+      );
+    }
+  }, [referer]);
 
   // Main Login Func
   const login = useCallback(
@@ -81,11 +99,21 @@ export const useLogin = () => {
               toast.dismiss(loadingToastID);
 
               successToast({
-                message: 'Redirecting you to your dashboard...',
+                message: `Redirecting you ${isCodexChristiShop ? '' : 'to your dashboard'}...`,
                 header: 'Login Successful.',
               });
 
-              router.push('/profile');
+              // If the user is not codexchristi.shop, push to referer
+              if (isCodexChristiShop) {
+                if (referer && typeof referer === 'string') {
+                  router.push(referer);
+                } else {
+                  router.push('/');
+                }
+              } else {
+                // If the user is not on codexchristi.shop, push to profile page
+                router.push('/profile');
+              }
             }
           } else {
             throw new Error(sessionStatus.error);
@@ -127,41 +155,8 @@ export const useLogin = () => {
         return String(err);
       }
     },
-    [router]
+    [isCodexChristiShop, referer, router]
   );
 
   return { ...loginProcessState, login };
-};
-
-export const properlyReturnAnyError = (error: AxiosError) => {
-  if (axios.isAxiosError(error)) {
-    if (error.response) {
-      // The request was made and the server responded with a status code
-      // that falls out of the range of 2xx
-      // Return responseText
-      console.log(error.response);
-
-      const errorsObj = error.response?.data as {
-        errors: Array<{ code: number; message: string }>;
-      };
-      const errorArr = errorsObj.errors;
-      if (errorArr && errorArr.length > 0) {
-        // If there are multiple errors, return the first one
-
-        return errorArr[0].message as string;
-      } else {
-        // If there are no errors, return the status text
-        return error.response.statusText;
-      }
-    } else if (error.request) {
-      // The request was made but no response was received
-      return `${error.message}`;
-    } else {
-      // Something happened in setting up the request that triggered an Error
-      return `Error:, ${error.message}`;
-    }
-  } else {
-    // Non-Axios error
-    return `An error occured!`;
-  }
 };
