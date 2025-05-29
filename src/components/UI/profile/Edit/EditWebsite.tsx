@@ -1,9 +1,16 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-const EditWebsite = () => {
+const EditWebsite = ({
+	onChange,
+	value,
+}: {
+	onChange: (e: any) => void;
+	value: string | null | number;
+}) => {
 	const [isOpen, setIsOpen] = useState(false);
 
 	return (
@@ -15,7 +22,7 @@ const EditWebsite = () => {
 					setIsOpen(!isOpen);
 				}}
 			>
-				<span>Add Website</span>
+				<span>{value ? "Update Website" : "Add Website"}</span>
 
 				<svg
 					width="22"
@@ -87,18 +94,9 @@ const EditWebsite = () => {
 							placeholder="https://example.com"
 							id="website"
 							name="website"
+                            onChange={(e) => onChange(e.target.value)}
 						/>
 					</div>
-
-					<button
-						className="bg-[#0085FF] text-white font-semibold rounded py-2.5 px-5 mx-auto block"
-						type="button"
-						onClick={() => {
-							setIsOpen(false);
-						}}
-					>
-						Save
-					</button>
 				</div>
 			</label>
 		</div>
