@@ -1,26 +1,37 @@
-import Link from "next/link";
-import Image from "next/image";
-import Calendar from "@/assets/img/calendar.png";
-import ProductCart from "@/components/UI/Shop/ProductDetails/ProductCart";
-import ProductSummary from "@/components/UI/Shop/ProductDetails/ProductSummary";
-import { Metadata } from "next";
-
+import Link from 'next/link';
+import Image from 'next/image';
+import Calendar from '@/assets/img/calendar.png';
+import ProductCart from '@/components/UI/Shop/ProductDetails/ProductCart';
+import ProductSummary from '@/components/UI/Shop/ProductDetails/ProductSummary';
+import { Metadata } from 'next';
+import { getProductDetailsSSR } from './productDetailsSSR';
 
 // Once we started consuming the API this would be replaced wuth `generateMetadata`
 export const metadata: Metadata = {
-	title: "Product Details | Codex Christi",
-	description: "Product details for this product",
+  title: 'Product Details | Codex Christi',
+  description: 'Product details for this product',
 };
 
-const ProductDetails = () => {
-    return (
-		<div className="grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-2">
-			<ProductSummary />
+const ProductDetails = async ({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) => {
+  const { id: productID } = await params;
 
-			<ProductCart />
+  //   Main SSR generator
+  const productData = await getProductDetailsSSR(productID);
+  console.log(productData);
 
-			<div className="space-y-8 mt-4 lg:col-span-2">
-				<h2 className="font-extrabold text-white text-2xl px-8">
+  // Main JSX
+  return (
+    <div className='grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-2'>
+      <ProductSummary />
+
+      <ProductCart />
+
+      <div className='space-y-8 mt-4 lg:col-span-2'>
+        {/* <h2 className="font-extrabold text-white text-2xl px-8">
 					You might also like
 				</h2>
 
@@ -64,21 +75,21 @@ const ProductDetails = () => {
 							</div>
 						</div>
 					))}
-				</div>
+				</div> */}
 
-				<div className="grid place-content-center gap-4">
-					<p>Please tell us what you think.</p>
+        <div className='grid place-content-center gap-4'>
+          <p>Please tell us what you think.</p>
 
-					<Link
-						className="text-center bg-[#0085FF] px-4 py-3 rounded-lg text-white"
-						href=""
-					>
-						Kindly give us a feedback!
-					</Link>
-				</div>
-			</div>
-		</div>
-	);
+          <Link
+            className='text-center bg-[#0085FF] px-4 py-3 rounded-lg text-white'
+            href='/shop/contact-us/'
+          >
+            Kindly give us a feedback!
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default ProductDetails;
