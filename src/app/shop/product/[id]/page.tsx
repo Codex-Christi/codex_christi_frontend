@@ -20,18 +20,18 @@ export async function generateMetadata({
     const { productMetaData } = await getProductDetailsSSR(id);
 
     return {
-      title: `${productMetaData.title} – Codex Christi Shop`,
+      title: `${productMetaData.title} | Codex Christi Shop`,
       description: `Buy ${productMetaData.title} now. Limited edition.`,
       openGraph: {
         title: productMetaData.title,
         description: `Check out this product on Codex Christi.`,
-        images: [productMetaData.image],
+        images: [{ url: productMetaData.image }],
       },
       twitter: {
         card: 'summary_large_image',
         title: productMetaData.title,
         description: `Check out this product on Codex Christi.`,
-        images: [productMetaData.image],
+        images: productMetaData.image,
       },
     };
   } catch (error) {
