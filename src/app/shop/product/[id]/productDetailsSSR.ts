@@ -1,18 +1,15 @@
 // utils/getProductDetailsSSR.ts
 import { cache } from 'react';
-import { notFound } from 'next/navigation';
-import axios from 'axios';
 
-// ENV
-const merchizeToken = process.env.MERCHIZE_TOKEN!;
-const baseURL = process.env.NEXT_PUBLIC_BASE_URL!;
-const merchizeBaseURL = process.env.MERCHIZE_BASE_URL!;
+const merchizeToken: string = process.env.MERCHIZE_TOKEN!;
+const baseURL: string = process.env.NEXT_PUBLIC_BASE_URL!;
+const merchizeBaseURL: string = process.env.MERCHIZE_BASE_URL!;
 
 // Interfaces
-interface BasicProductInterface {
+export interface BasicProductInterface {
   data: { _id: string; title: string; description: string; image: string };
 }
-interface ProductVariantsInterface {
+export interface ProductVariantsInterface {
   data: {
     _id: string;
     image_uris: string[];
@@ -21,90 +18,111 @@ interface ProductVariantsInterface {
     title: string;
   }[];
 }
-interface ProductResult {
+export interface ProductResult {
   productMetaData: BasicProductInterface['data'];
   productVariants: ProductVariantsInterface['data'];
 }
 
-// Axios client
-const axiosClient = axios.create({
-  baseURL: `${baseURL}`,
-});
+const cacheForDays = (days: number): number => 60 * 60 * 24 * days;
 
-// Main SSR function
-export const getProductDetailsSSR = cache(
-  async (productID: string): Promise<ProductResult> => {
-    try {
-      // 1. get external product
-      const ExternalID = await axiosClient
-        .get<{
-          data: { external_product_id: string };
-        }>(`/product/${productID}/filter-by-id`)
-        .then((res) => {
-          if (res.status !== 200) {
-            console.error(
-              `[getProductDetailsSSR] External product fetch failed: ${res.statusText}`
-            );
-            return notFound();
-          }
-          const externalProductData = res.data.data;
-          return externalProductData.external_product_id;
-        })
-        .catch((error) => {
-          console.error(
-            `[getProductDetailsSSR] External product fetch error: ${error}`
-          );
-          return notFound();
-        });
-
-      // 2. Fetch base product info
-      const productRes = await fetchAndCacheFromMerchize(
-        `/product/products/${ExternalID}`,
-        7 // Cache for 7 days
-      );
-      if (!productRes.ok) {
-        console.error(
-          `[getProductDetailsSSR] Product fetch failed: ${productRes.statusText}`
-        );
-        return notFound();
+// 1. Fetch External ID
+export const fetchExternalProductID = cache(
+  async (
+    productID: string
+  ): Promise<{ external_product_id: string; image: string }> => {
+    const res: Response = await fetch(
+      `${baseURL}/product/${productID}/filter-by-id`,
+      {
+        next: { revalidate: cacheForDays(7) },
       }
-      const productData: BasicProductInterface = await productRes.json();
-      const { _id, description, title, image } = productData.data;
+    );
 
-      // 3. Fetch variants from Merchize
-      const variantsRes = await fetchAndCacheFromMerchize(
-        `/product/products/${_id}/variants`,
-        7 // Cache for 7 days
-      );
-      if (!variantsRes.ok) {
-        console.error(
-          `[getProductDetailsSSR] Variant fetch failed: ${variantsRes.statusText}`
-        );
-        return notFound();
-      }
-      const variantData: ProductVariantsInterface = await variantsRes.json();
-
-      //   Return the combined data
-      return {
-        productMetaData: { _id, description, title, image },
-        productVariants: variantData.data,
-      };
-    } catch (error) {
-      console.error('[getProductDetailsSSR] Unexpected Error', error);
-      return notFound();
+    if (!res.ok) {
+      const error: string = `[fetchExternalProductID] Failed: ${res.statusText}`;
+      console.error(error);
+      throw new Error(error);
     }
+
+    const { data } = await res.json();
+    const { external_product_id, image } = data;
+    return { external_product_id, image };
   }
 );
 
-const cacheForDays = (days: number) => {
-  return 60 * 60 * 24 * days;
-};
+// 2. Fetch Base Product Info
+export const fetchBaseProduct = cache(
+  async (
+    externalProductID: string,
+    image: string
+  ): Promise<BasicProductInterface['data']> => {
+    const res: Response = await fetch(
+      `${merchizeBaseURL}/product/products/${externalProductID}`,
+      {
+        headers: {
+          Authorization: `Bearer ${merchizeToken}`,
+        },
+        next: { revalidate: cacheForDays(7) },
+      }
+    );
 
-const fetchAndCacheFromMerchize = async (url: string, cacheDays: number) => {
-  return await fetch(`${merchizeBaseURL}${url}`, {
-    headers: {
-      Authorization: `Bearer ${merchizeToken}`,
-    },
-    next: { revalidate: cacheForDays(cacheDays) }, // You can configure this independently
-  });
-};
+    if (!res.ok) {
+      const error: string = `[fetchBaseProduct] Failed: ${res.statusText}`;
+      console.error(error);
+      throw new Error(error);
+    }
+
+    const json: BasicProductInterface = await res.json();
+    const { _id, title, description } = json.data;
+    return { _id, title, description, image };
+  }
+);
+
+// 3. Fetch Product Variants
+export const fetchProductVariants = cache(
+  async (productID: string): Promise<ProductVariantsInterface['data']> => {
+    const res: Response = await fetch(
+      `${merchizeBaseURL}/product/products/${productID}/variants`,
+      {
+        headers: {
+          Authorization: `Bearer ${merchizeToken}`,
+        },
+        next: { revalidate: cacheForDays(7) },
+      }
+    );
+
+    if (!res.ok) {
+      const error: string = `[fetchProductVariants] Failed: ${res.statusText}`;
+      console.error(error);
+      throw new Error(error);
+    }
+
+    const json: ProductVariantsInterface = await res.json();
+    return json.data;
+  }
+);
+
+// Combined Function: All Three Steps
+export const getProductDetailsSSR = cache(
+  async (productID: string): Promise<ProductResult> => {
+    const { external_product_id, image } =
+      await fetchExternalProductID(productID);
+    const productMetaData: BasicProductInterface['data'] =
+      await fetchBaseProduct(external_product_id, image);
+    const productVariants: ProductVariantsInterface['data'] =
+      await fetchProductVariants(productMetaData._id);
+
+    return { productMetaData, productVariants };
+  }
+);
+
+// Combined Function: External ID and Base Product Info Only
+export const getProductMetaDataOnly = cache(
+  async (productID: string): Promise<BasicProductInterface['data']> => {
+    const { external_product_id, image } =
+      await fetchExternalProductID(productID);
+    const productMetaData: BasicProductInterface['data'] =
+      await fetchBaseProduct(external_product_id, image);
+
+    return productMetaData;
+  }
+);

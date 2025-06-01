@@ -5,6 +5,7 @@ import ProductCart from '@/components/UI/Shop/ProductDetails/ProductCart';
 import ProductSummary from '@/components/UI/Shop/ProductDetails/ProductSummary';
 import { Metadata } from 'next';
 import { getProductDetailsSSR } from './productDetailsSSR';
+import { notFound } from 'next/navigation';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -19,22 +20,27 @@ export async function generateMetadata({
     const { id } = await params;
     const { productMetaData } = await getProductDetailsSSR(id);
 
+    const title = `${productMetaData.title} | Codex Christi Shop`;
+    const description = productMetaData.description.split('.')[0];
+
     return {
-      title: `${productMetaData.title} | Codex Christi Shop`,
+      title: title,
       description: `Buy ${productMetaData.title} now. Limited edition.`,
       openGraph: {
-        title: productMetaData.title,
-        description: `Check out this product on Codex Christi.`,
+        title: title,
+        description: description,
         images: [{ url: productMetaData.image }],
+        type: 'website',
+        url: `https://codexchristi.shop/product/${id}`,
       },
       twitter: {
         card: 'summary_large_image',
-        title: productMetaData.title,
-        description: `Check out this product on Codex Christi.`,
+        title: title,
+        description: description,
         images: productMetaData.image,
       },
     };
-  } catch (error) {
+  } catch {
     // fallback metadata or suppress entirely
     return {
       title: 'Product not found',
@@ -46,7 +52,12 @@ const ProductDetails = async ({ params }: PageProps) => {
   const { id: productID } = await params;
 
   //   Main SSR generator
-  const productData = await getProductDetailsSSR(productID);
+  const productData = await getProductDetailsSSR(productID)
+    .then((data) => data)
+    .catch((error) => {
+      console.error('Error fetching product details:', error);
+      return notFound(); // or handle the error as needed
+    });
   console.log(productData);
 
   // Main JSX
