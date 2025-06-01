@@ -21,7 +21,9 @@ export async function generateMetadata({
     const { productMetaData } = await getProductDetailsSSR(id);
 
     const title = `${productMetaData.title} | Codex Christi Shop`;
-    const description = productMetaData.description.split('.')[0];
+    const description = productMetaData.description
+      .split('.')[0]
+      .replace(/<[^>]*>/g, '');
 
     return {
       title: title,
@@ -48,6 +50,7 @@ export async function generateMetadata({
   }
 }
 
+// ✅ 2. Main component for the product details page
 const ProductDetails = async ({ params }: PageProps) => {
   const { id: productID } = await params;
 
@@ -58,7 +61,6 @@ const ProductDetails = async ({ params }: PageProps) => {
       console.error('Error fetching product details:', error);
       return notFound(); // or handle the error as needed
     });
-  console.log(productData);
 
   // Main JSX
   return (
