@@ -1,22 +1,48 @@
 import Link from 'next/link';
-import Image from 'next/image';
-import Calendar from '@/assets/img/calendar.png';
+// import Image from 'next/image';
+// import Calendar from '@/assets/img/calendar.png';
 import ProductCart from '@/components/UI/Shop/ProductDetails/ProductCart';
 import ProductSummary from '@/components/UI/Shop/ProductDetails/ProductSummary';
 import { Metadata } from 'next';
 import { getProductDetailsSSR } from './productDetailsSSR';
 
-// Once we started consuming the API this would be replaced wuth `generateMetadata`
-export const metadata: Metadata = {
-  title: 'Product Details | Codex Christi',
-  description: 'Product details for this product',
+type PageProps = {
+  params: Promise<{ id: string }>;
 };
 
-const ProductDetails = async ({
+// Once we started consuming the API this would be replaced wuth `generateMetadata`
+// ✅ 1. Generate metadata dynamically
+export async function generateMetadata({
   params,
-}: {
-  params: Promise<{ id: string }>;
-}) => {
+}: PageProps): Promise<Metadata> {
+  try {
+    const { id } = await params;
+    const { productMetaData } = await getProductDetailsSSR(id);
+
+    return {
+      title: `${productMetaData.title} – Codex Christi Shop`,
+      description: `Buy ${productMetaData.title} now. Limited edition.`,
+      openGraph: {
+        title: productMetaData.title,
+        description: `Check out this product on Codex Christi.`,
+        images: [productMetaData.image],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: productMetaData.title,
+        description: `Check out this product on Codex Christi.`,
+        images: [productMetaData.image],
+      },
+    };
+  } catch (error) {
+    // fallback metadata or suppress entirely
+    return {
+      title: 'Product not found',
+    };
+  }
+}
+
+const ProductDetails = async ({ params }: PageProps) => {
   const { id: productID } = await params;
 
   //   Main SSR generator
