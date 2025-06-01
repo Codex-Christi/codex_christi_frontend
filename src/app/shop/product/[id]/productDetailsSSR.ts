@@ -73,11 +73,11 @@ type SizeAttribute = {
   };
 };
 
-type ColorAttribute = {
-  slug: string;
+export type ColorAttribute = {
+  slug?: string;
   value: string; // could be hex or named
   name: string;
-  attribute: {
+  attribute?: {
     name: 'Color';
     value_type: 'color';
   };
@@ -103,8 +103,12 @@ export interface ProductVariantsInterface {
 
 // Utility: Check if a product variant has both Color and Size attributes
 export function hasColorAndSize(options: ProductVariantOptions): boolean {
-  const hasColor = options.some((opt) => opt.attribute.name === 'Color');
-  const hasSize = options.some((opt) => opt.attribute.name === 'Size');
+  const hasColor = options.some(
+    (opt) => opt.attribute && opt.attribute.name === 'Color'
+  );
+  const hasSize = options.some(
+    (opt) => opt.attribute && opt.attribute.name === 'Size'
+  );
   return hasColor && hasSize;
 }
 
