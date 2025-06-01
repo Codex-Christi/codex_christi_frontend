@@ -36,6 +36,8 @@ export async function generateMetadata({
         images: [{ url: productMetaData.image }],
         type: 'website',
         url: `https://codexchristi.shop/product/${id}`,
+        locale: 'en_US',
+        siteName: 'Codex Christi Shop',
       },
       twitter: {
         card: 'summary_large_image',

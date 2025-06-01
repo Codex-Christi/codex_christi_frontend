@@ -74,8 +74,6 @@ type ColorAttribute = {
   };
 };
 
-type VariantAttribute = SizeAttribute | ColorAttribute | ProductAttribute;
-
 // Supported combinations based on required SizeAttribute and optional Color/ProductAttribute
 type ProductVariantOptions =
   | [SizeAttribute]
