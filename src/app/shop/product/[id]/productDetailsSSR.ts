@@ -1,21 +1,59 @@
 // utils/getProductDetailsSSR.ts
 import { cache } from 'react';
 
-const merchizeToken: string = process.env.MERCHIZE_TOKEN!;
-const baseURL: string = process.env.NEXT_PUBLIC_BASE_URL!;
-const merchizeBaseURL: string = process.env.MERCHIZE_BASE_URL!;
+// --- Env Config ---
+const merchizeToken = process.env.MERCHIZE_TOKEN!;
+const baseURL = process.env.NEXT_PUBLIC_BASE_URL!;
+const merchizeBaseURL = process.env.MERCHIZE_BASE_URL!;
 
-// Interfaces
+const cacheForDays = (days: number): number => 60 * 60 * 24 * days;
+
+// --- In-Memory Memoization Maps ---
+const externalProductIDMemo = new Map<
+  string,
+  Promise<{ external_product_id: string; image: string }>
+>();
+const baseProductMemo = new Map<
+  string,
+  Promise<BasicProductInterface['data']>
+>();
+const productVariantsMemo = new Map<
+  string,
+  Promise<ProductVariantsInterface['data']>
+>();
+
+// --- Interfaces ---
 export interface BasicProductInterface {
-  data: { _id: string; title: string; description: string; image: string };
+  data: {
+    _id: string;
+    title: string;
+    description: string;
+    image: string;
+  };
 }
-type ProductAttribute = {
+
+// --- Attribute Types ---
+// Base type for attributes to ensure consistency
+
+type AttributeBase<Name extends string, ValueType extends string> = {
+  slug: string;
+  value: string;
+  name: string;
+  attribute: {
+    name: Name;
+    value_type: ValueType;
+  };
+};
+
+type ProductAttribute = AttributeBase<'Product', 'slide'> & {
   is_preselected: boolean;
   position: 0;
   hide_storefront: false;
 };
+
 type ClothingSizeSlug = 'xs' | 's' | 'm' | 'l' | 'xl' | '2xl' | '3xl' | '4xl';
-type ClothingSizeValue = 'XS' | 'S' | 'M' | 'L' | 'XL' | '2XL' | '3XL' | '4XL';
+type ClothingSizeValue = Uppercase<ClothingSizeSlug>;
+
 type SizeAttribute = {
   slug: ClothingSizeSlug;
   value: ClothingSizeValue;
@@ -25,22 +63,26 @@ type SizeAttribute = {
     value_type: 'size';
   };
 };
+
 type ColorAttribute = {
   slug: string;
-  value: string;
+  value: string; // could be hex or named
   name: string;
   attribute: {
     name: 'Color';
     value_type: 'color';
   };
 };
-// All possible attributes
-type VariantAttribute = ProductAttribute | SizeAttribute | ColorAttribute;
 
-// This enforces that SizeAttribute must be present
-type ProductVariantOptions = [SizeAttribute, ...VariantAttribute[]];
+type VariantAttribute = SizeAttribute | ColorAttribute | ProductAttribute;
 
-// Product Variants Interface
+// Supported combinations based on required SizeAttribute and optional Color/ProductAttribute
+type ProductVariantOptions =
+  | [SizeAttribute]
+  | [SizeAttribute, ColorAttribute]
+  | [SizeAttribute, ProductAttribute]
+  | [SizeAttribute, ColorAttribute, ProductAttribute];
+
 export interface ProductVariantsInterface {
   data: {
     _id: string;
@@ -51,112 +93,122 @@ export interface ProductVariantsInterface {
     options: ProductVariantOptions;
   }[];
 }
+
+// Utility: Check if a product variant has both Color and Size attributes
+export function hasColorAndSize(options: ProductVariantOptions): boolean {
+  const hasColor = options.some((opt) => opt.attribute.name === 'Color');
+  const hasSize = options.some((opt) => opt.attribute.name === 'Size');
+  return hasColor && hasSize;
+}
+
 export interface ProductResult {
   productMetaData: BasicProductInterface['data'];
   productVariants: ProductVariantsInterface['data'];
 }
 
-// Utility function to cache for a specific number of days
-const cacheForDays = (days: number): number => 60 * 60 * 24 * days;
+// --- Fetch External ID with dual memoization ---
+export const fetchExternalProductID = cache((productID: string) => {
+  if (externalProductIDMemo.has(productID)) {
+    return externalProductIDMemo.get(productID)!;
+  }
 
-// 1. Fetch External ID
-export const fetchExternalProductID = cache(
-  async (
-    productID: string
-  ): Promise<{ external_product_id: string; image: string }> => {
-    const res: Response = await fetch(
-      `${baseURL}/product/${productID}/filter-by-id`,
-      {
-        next: { revalidate: cacheForDays(7) },
-      }
-    );
+  const promise = (async () => {
+    const res = await fetch(`${baseURL}/product/${productID}/filter-by-id`, {
+      next: { revalidate: cacheForDays(7) },
+    });
 
     if (!res.ok) {
-      const error: string = `[fetchExternalProductID] Failed: ${res.statusText}`;
+      const error = `[fetchExternalProductID] Failed: ${res.statusText}`;
       console.error(error);
       throw new Error(error);
     }
 
     const { data } = await res.json();
-    const { external_product_id, image } = data;
-    return { external_product_id, image };
-  }
-);
+    return { external_product_id: data.external_product_id, image: data.image };
+  })();
 
-// 2. Fetch Base Product Info
+  externalProductIDMemo.set(productID, promise);
+  return promise;
+});
+
+// --- Fetch Base Product Info ---
 export const fetchBaseProduct = cache(
-  async (
-    externalProductID: string,
-    image: string
-  ): Promise<BasicProductInterface['data']> => {
-    const res: Response = await fetch(
-      `${merchizeBaseURL}/product/products/${externalProductID}`,
-      {
-        headers: {
-          Authorization: `Bearer ${merchizeToken}`,
-        },
-        next: { revalidate: cacheForDays(7) },
-      }
-    );
-
-    if (!res.ok) {
-      const error: string = `[fetchBaseProduct] Failed: ${res.statusText}`;
-      console.error(error);
-      throw new Error(error);
+  (externalProductID: string, image: string) => {
+    const key = `${externalProductID}|${image}`;
+    if (baseProductMemo.has(key)) {
+      return baseProductMemo.get(key)!;
     }
 
-    const json: BasicProductInterface = await res.json();
-    const { _id, title, description } = json.data;
-    return { _id, title, description, image };
+    const promise = (async () => {
+      const res = await fetch(
+        `${merchizeBaseURL}/product/products/${externalProductID}`,
+        {
+          headers: { Authorization: `Bearer ${merchizeToken}` },
+          next: { revalidate: cacheForDays(7) },
+        }
+      );
+
+      if (!res.ok) {
+        const error = `[fetchBaseProduct] Failed: ${res.statusText}`;
+        console.error(error);
+        throw new Error(error);
+      }
+
+      const json: BasicProductInterface = await res.json();
+      return { ...json.data, image };
+    })();
+
+    baseProductMemo.set(key, promise);
+    return promise;
   }
 );
 
-// 3. Fetch Product Variants
-export const fetchProductVariants = cache(
-  async (productID: string): Promise<ProductVariantsInterface['data']> => {
-    const res: Response = await fetch(
+// --- Fetch Variants Info ---
+export const fetchProductVariants = cache((productID: string) => {
+  if (productVariantsMemo.has(productID)) {
+    return productVariantsMemo.get(productID)!;
+  }
+
+  const promise = (async () => {
+    const res = await fetch(
       `${merchizeBaseURL}/product/products/${productID}/all-variants`,
       {
-        headers: {
-          Authorization: `Bearer ${merchizeToken}`,
-        },
+        headers: { Authorization: `Bearer ${merchizeToken}` },
         next: { revalidate: cacheForDays(7) },
       }
     );
 
     if (!res.ok) {
-      const error: string = `[fetchProductVariants] Failed: ${res.statusText}`;
+      const error = `[fetchProductVariants] Failed: ${res.statusText}`;
       console.error(error);
       throw new Error(error);
     }
 
     const json: ProductVariantsInterface = await res.json();
     return json.data;
-  }
-);
+  })();
 
-// Combined Function: All Three Steps
+  productVariantsMemo.set(productID, promise);
+  return promise;
+});
+
+// --- Combined Full Fetch ---
 export const getProductDetailsSSR = cache(
   async (productID: string): Promise<ProductResult> => {
     const { external_product_id, image } =
       await fetchExternalProductID(productID);
-    const productMetaData: BasicProductInterface['data'] =
-      await fetchBaseProduct(external_product_id, image);
-    const productVariants: ProductVariantsInterface['data'] =
-      await fetchProductVariants(productMetaData._id);
+    const productMetaData = await fetchBaseProduct(external_product_id, image);
+    const productVariants = await fetchProductVariants(productMetaData._id);
 
     return { productMetaData, productVariants };
   }
 );
 
-// Combined Function: External ID and Base Product Info Only
+// --- Metadata-Only Fetch ---
 export const getProductMetaDataOnly = cache(
   async (productID: string): Promise<BasicProductInterface['data']> => {
     const { external_product_id, image } =
       await fetchExternalProductID(productID);
-    const productMetaData: BasicProductInterface['data'] =
-      await fetchBaseProduct(external_product_id, image);
-
-    return productMetaData;
+    return fetchBaseProduct(external_product_id, image);
   }
 );
