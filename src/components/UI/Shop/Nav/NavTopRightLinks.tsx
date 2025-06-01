@@ -27,7 +27,11 @@ const NavTopRightLinks: FC = () => {
         {['account-overview', 'cart', 'my-wishlist'].map((str, index) => {
           const href = '/shop/' + str;
           return (
-            <CustomShopLink href={href} key={str + index}>
+            <CustomShopLink
+              href={href}
+              className='min-w-[30px]'
+              key={str + index}
+            >
               {str === 'cart' && <CartIcon />}
               {str === 'my-wishlist' && <Heart />}
               {str === 'account-overview' && (

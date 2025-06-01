@@ -2,43 +2,14 @@
 
 import Link from 'next/link';
 import { ProductImageGallery } from './ProductImageGallery';
+import { ProductDescription } from './ProductDescription';
 
 const ProductSummary = () => {
   return (
     <div className='grid gap-4'>
       <ProductImageGallery />
 
-      <div className='bg-[#3D3D3D4D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-2 lg:p-8'>
-        <h2 className='font-bold text-2xl'>Product Details</h2>
-
-        <div className='grid gap-3'>
-          <p>
-            These Hoodies are a versatile choice for casual outings and also
-            brilliant gear for chilled days. Various styles, high quality soft
-            skin-friendly fabric, bring you a different quality experience. Its
-            also brings out the confidence in you when put on. The hoodie has
-            long sleeves, hooded collar cover you in style. Selected fabrics,
-            comfortable and classic version. Never get lost in the crowd, please
-            learn to dominate your style with fashion items, and make sure you
-            can keep up with the trend, you will not regret it! Various styles,
-            high quality soft skin-friendly fabric, bring you a different
-            quality experience.
-          </p>
-
-          <p>
-            It is made of high quality materials,durable enough for your daily
-            wearing Stylish and fashion design make you more attractive. Good
-            air permeability, effectively ensure the comfort of clothes.
-            Creative design, full of fashion sense, show personality attitude.
-            Great for outdoor and sports, fit all types of situation. This
-            amazing style is designed to stand you out wherever you go. Comfort
-            is the first element, the pursuit of freedom, the pursuit of style.
-            For transportation needs, the cloth that you’ve received will have a
-            fold phenomenon. Please don’t worry, this fold situation will
-            disappear after the first time you wear or ironing.
-          </p>
-        </div>
-      </div>
+      <ProductDescription />
 
       <div className='bg-[#3D3D3D4D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-2 lg:p-8'>
         <h2 className='font-bold text-2xl'>Specifications</h2>

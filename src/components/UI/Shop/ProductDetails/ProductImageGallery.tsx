@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { FC, useEffect, useMemo, useState } from 'react';
+import { FC, useMemo, useState } from 'react';
 import { useProductDetailsContext } from '.';
 import { useCurrentVariant } from './currentVariantStore';
 import { GalleryPrevButton } from './GalleryPrevButton';
@@ -12,7 +12,6 @@ export const ProductImageGallery: FC = () => {
   const productDetailsContext = useProductDetailsContext();
   const { currentVariant } = useCurrentVariant((state) => state);
 
-  const allVariantsArr = productDetailsContext.productVariants;
   const metadata = productDetailsContext.productMetaData;
   const imagesArr = useMemo(
     () =>
@@ -22,21 +21,10 @@ export const ProductImageGallery: FC = () => {
     [currentVariant, metadata.image]
   );
 
-  useEffect(() => {
-    console.log(
-      allVariantsArr
-      //   allVariantsArr.find(
-      //     (variant) =>
-      //       variant.options[1].name === 'XL' &&
-      //       (variant.options[2] ? variant.options[2].name === 'Black' : true) // Handle case where color option might not exist
-      //   )
-    );
-
-    console.log(imagesArr);
-  }, [allVariantsArr, imagesArr]);
-
   return (
     <div className='bg-[#3D3D3D4D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-2 lg:p-8 flex flex-col gap-8 items-start md:gap-12 md:flex-row'>
+      {/* Thumbnail Image Section*/}
+
       <div className='grid gap-4 grid-cols-2 md:grid-cols-1 order-2 md:order-1'>
         {imagesArr &&
           imagesArr.map((image, index) => (
@@ -45,7 +33,6 @@ export const ProductImageGallery: FC = () => {
               key={index}
               onClick={() => setCurrentItem(index)}
             >
-              {/* Thumbnail Image */}
               <Image
                 className='rounded-[20px]'
                 src={image}
@@ -57,12 +44,12 @@ export const ProductImageGallery: FC = () => {
             </div>
           ))}
       </div>
-
+      {/* Main Image Section */}
       <div className='flex items-start md:w-full h-full gap-8 md:order-2'>
         <div className='rounded-[20px] w-[90%] h-56 md:h-full relative'>
           {imagesArr[currentItem] && (
             <Image
-              className='rounded-[20px] size-full object-cover object-top aspect-[16/12]'
+              className='rounded-[20px] size-full object-cover object-top aspect-[16/13]'
               width={512}
               height={288}
               src={imagesArr[currentItem]}
@@ -71,14 +58,19 @@ export const ProductImageGallery: FC = () => {
             />
           )}
 
-          <GalleryPrevButton
-            setCurrentItem={setCurrentItem}
-            imagesArr={imagesArr}
-          />
-          <GalleryNextButton
-            setCurrentItem={setCurrentItem}
-            imagesArr={imagesArr}
-          />
+          {/* Navigation Buttons */}
+          {imagesArr.length > 1 && (
+            <>
+              <GalleryPrevButton
+                setCurrentItem={setCurrentItem}
+                imagesArr={imagesArr}
+              />
+              <GalleryNextButton
+                setCurrentItem={setCurrentItem}
+                imagesArr={imagesArr}
+              />
+            </>
+          )}
         </div>
 
         <div className='grid gap-8'>
