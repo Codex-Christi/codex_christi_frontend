@@ -9,6 +9,38 @@ const merchizeBaseURL: string = process.env.MERCHIZE_BASE_URL!;
 export interface BasicProductInterface {
   data: { _id: string; title: string; description: string; image: string };
 }
+type ProductAttribute = {
+  is_preselected: boolean;
+  position: 0;
+  hide_storefront: false;
+};
+type ClothingSizeSlug = 'xs' | 's' | 'm' | 'l' | 'xl' | '2xl' | '3xl' | '4xl';
+type ClothingSizeValue = 'XS' | 'S' | 'M' | 'L' | 'XL' | '2XL' | '3XL' | '4XL';
+type SizeAttribute = {
+  slug: ClothingSizeSlug;
+  value: ClothingSizeValue;
+  name: ClothingSizeValue;
+  attribute: {
+    name: 'Size';
+    value_type: 'size';
+  };
+};
+type ColorAttribute = {
+  slug: string;
+  value: string;
+  name: string;
+  attribute: {
+    name: 'Color';
+    value_type: 'color';
+  };
+};
+// All possible attributes
+type VariantAttribute = ProductAttribute | SizeAttribute | ColorAttribute;
+
+// This enforces that SizeAttribute must be present
+type ProductVariantOptions = [SizeAttribute, ...VariantAttribute[]];
+
+// Product Variants Interface
 export interface ProductVariantsInterface {
   data: {
     _id: string;
@@ -16,6 +48,7 @@ export interface ProductVariantsInterface {
     retail_price: number;
     is_default: boolean;
     title: string;
+    options: ProductVariantOptions;
   }[];
 }
 export interface ProductResult {
@@ -23,6 +56,7 @@ export interface ProductResult {
   productVariants: ProductVariantsInterface['data'];
 }
 
+// Utility function to cache for a specific number of days
 const cacheForDays = (days: number): number => 60 * 60 * 24 * days;
 
 // 1. Fetch External ID
@@ -81,7 +115,7 @@ export const fetchBaseProduct = cache(
 export const fetchProductVariants = cache(
   async (productID: string): Promise<ProductVariantsInterface['data']> => {
     const res: Response = await fetch(
-      `${merchizeBaseURL}/product/products/${productID}/variants`,
+      `${merchizeBaseURL}/product/products/${productID}/all-variants`,
       {
         headers: {
           Authorization: `Bearer ${merchizeToken}`,
