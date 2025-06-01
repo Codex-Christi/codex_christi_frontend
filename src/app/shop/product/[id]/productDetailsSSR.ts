@@ -51,7 +51,16 @@ type ProductAttribute = AttributeBase<'Product', 'slide'> & {
   hide_storefront: false;
 };
 
-type ClothingSizeSlug = 'xs' | 's' | 'm' | 'l' | 'xl' | '2xl' | '3xl' | '4xl';
+type ClothingSizeSlug =
+  | 'xs'
+  | 's'
+  | 'm'
+  | 'l'
+  | 'xl'
+  | '2xl'
+  | '3xl'
+  | '4xl'
+  | '5xl';
 type ClothingSizeValue = Uppercase<ClothingSizeSlug>;
 
 type SizeAttribute = {

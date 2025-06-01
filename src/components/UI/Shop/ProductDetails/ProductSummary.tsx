@@ -1,8 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { ProductImageGallery } from './ProductImageGallery';
-import { ProductDescription } from './ProductDescription';
+
+import dynamic from 'next/dynamic';
+
+const ProductImageGallery = dynamic(() =>
+  import('./ProductImageGallery').then((mod) => mod.ProductImageGallery)
+);
+const ProductDescription = dynamic(() =>
+  import('./ProductDescription').then((mod) => mod.ProductDescription)
+);
 
 const ProductSummary = () => {
   return (
@@ -11,7 +18,7 @@ const ProductSummary = () => {
 
       <ProductDescription />
 
-      <div className='bg-[#3D3D3D4D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-2 lg:p-8'>
+      <div className='bg-[#4C3D3D3D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-2 lg:p-8'>
         <h2 className='font-bold text-2xl'>Specifications</h2>
 
         <ul className='space-y-2 list-disc list-inside'>
@@ -24,7 +31,7 @@ const ProductSummary = () => {
         </ul>
       </div>
 
-      <div className='bg-[#3D3D3D4D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-8 lg:p-8'>
+      <div className='bg-[#4C3D3D3D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-8 lg:p-8'>
         <div className='space-y-1'>
           <h2 className='font-bold text-2xl'>Customer Reviews & Ratings</h2>
 

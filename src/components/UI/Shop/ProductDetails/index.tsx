@@ -2,7 +2,9 @@
 import { ProductResult } from '@/app/shop/product/[id]/productDetailsSSR';
 import dynamic from 'next/dynamic';
 const ProductSummary = dynamic(() => import('./ProductSummary'));
-const ProductCart = dynamic(() => import('./ProductCart'));
+const ProductActionsComponents = dynamic(
+  () => import('./ProductActionsComponents')
+);
 import Link from 'next/link';
 import { createContext, useContext, FC } from 'react';
 
@@ -32,7 +34,7 @@ const ProductDetails: FC<ProductDetailsProps> = ({ fetchedProductData }) => {
     <ProductDetailsContext.Provider value={{ ...fetchedProductData }}>
       <div className='grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-2'>
         <ProductSummary />
-        <ProductCart />
+        <ProductActionsComponents />
         <div className='space-y-8 mt-4 lg:col-span-2'>
           {/* <h2 className="font-extrabold text-white text-2xl px-8">
 					You might also like

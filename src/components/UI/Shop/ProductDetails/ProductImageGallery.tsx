@@ -22,7 +22,7 @@ export const ProductImageGallery: FC = () => {
   );
 
   return (
-    <div className='bg-[#3D3D3D4D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-2 lg:p-8 flex flex-col gap-8 items-start md:gap-12 md:flex-row'>
+    <div className='bg-[#4C3D3D3D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-2 lg:p-8 flex flex-col gap-8 items-start md:gap-12 md:flex-row'>
       {/* Thumbnail Image Section*/}
 
       <div className='grid gap-4 grid-cols-2 md:grid-cols-1 order-2 md:order-1'>
