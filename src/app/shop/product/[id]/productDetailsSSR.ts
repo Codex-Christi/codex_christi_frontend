@@ -118,14 +118,27 @@ export interface ProductResult {
   productVariants: ProductVariantsInterface['data'];
 }
 
+function isValidUUID(uuid: string) {
+  const regex =
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  return regex.test(uuid);
+}
+
 // --- Fetch External ID with dual memoization ---
-export const fetchExternalProductID = cache((productID: string) => {
-  if (externalProductIDMemo.has(productID)) {
-    return externalProductIDMemo.get(productID)!;
+export const fetchExternalProductID = cache((productIDorSlug: string) => {
+  if (externalProductIDMemo.has(productIDorSlug)) {
+    return externalProductIDMemo.get(productIDorSlug)!;
   }
 
+  const isUUID = isValidUUID(productIDorSlug);
+  const idOrSlugEndpoint = isUUID
+    ? `${baseURL}/product/${productIDorSlug}/filter-by-id}`
+    : ` ${baseURL}/product/filter-by-slug/${productIDorSlug}`;
+
   const promise = (async () => {
-    const res = await fetch(`${baseURL}/product/${productID}/filter-by-id`, {
+    console.log(`${baseURL}/product/${productIDorSlug}/filter-by-id}`);
+
+    const res = await fetch(idOrSlugEndpoint, {
       next: { revalidate: cacheForDays(7) },
     });
 
@@ -139,7 +152,7 @@ export const fetchExternalProductID = cache((productID: string) => {
     return { external_product_id: data.external_product_id, image: data.image };
   })();
 
-  externalProductIDMemo.set(productID, promise);
+  externalProductIDMemo.set(productIDorSlug, promise);
   return promise;
 });
 
@@ -176,14 +189,14 @@ export const fetchBaseProduct = cache(
 );
 
 // --- Fetch Variants Info ---
-export const fetchProductVariants = cache((productID: string) => {
-  if (productVariantsMemo.has(productID)) {
-    return productVariantsMemo.get(productID)!;
+export const fetchProductVariants = cache((productIDorSlug: string) => {
+  if (productVariantsMemo.has(productIDorSlug)) {
+    return productVariantsMemo.get(productIDorSlug)!;
   }
 
   const promise = (async () => {
     const res = await fetch(
-      `${merchizeBaseURL}/product/products/${productID}/all-variants`,
+      `${merchizeBaseURL}/product/products/${productIDorSlug}/all-variants`,
       {
         headers: { Authorization: `Bearer ${merchizeToken}` },
         next: { revalidate: cacheForDays(7) },
@@ -200,15 +213,15 @@ export const fetchProductVariants = cache((productID: string) => {
     return json.data;
   })();
 
-  productVariantsMemo.set(productID, promise);
+  productVariantsMemo.set(productIDorSlug, promise);
   return promise;
 });
 
 // --- Combined Full Fetch ---
 export const getProductDetailsSSR = cache(
-  async (productID: string): Promise<ProductResult> => {
+  async (productIDorSlug: string): Promise<ProductResult> => {
     const { external_product_id, image } =
-      await fetchExternalProductID(productID);
+      await fetchExternalProductID(productIDorSlug);
     const productMetaData = await fetchBaseProduct(external_product_id, image);
     const productVariants = await fetchProductVariants(productMetaData._id);
 
@@ -218,9 +231,9 @@ export const getProductDetailsSSR = cache(
 
 // --- Metadata-Only Fetch ---
 export const getProductMetaDataOnly = cache(
-  async (productID: string): Promise<BasicProductInterface['data']> => {
+  async (productIDorSlug: string): Promise<BasicProductInterface['data']> => {
     const { external_product_id, image } =
-      await fetchExternalProductID(productID);
+      await fetchExternalProductID(productIDorSlug);
     return fetchBaseProduct(external_product_id, image);
   }
 );
