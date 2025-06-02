@@ -45,7 +45,7 @@ type AttributeBase<Name extends string, ValueType extends string> = {
   };
 };
 
-type ProductAttribute = AttributeBase<'Product', 'slide'> & {
+export type ProductAttribute = AttributeBase<'Product', 'slide'> & {
   is_preselected: boolean;
   position: 0;
   hide_storefront: false;
@@ -61,9 +61,9 @@ type ClothingSizeSlug =
   | '3xl'
   | '4xl'
   | '5xl';
-type ClothingSizeValue = Uppercase<ClothingSizeSlug>;
+export type ClothingSizeValue = Uppercase<ClothingSizeSlug>;
 
-type SizeAttribute = {
+export type SizeAttribute = {
   slug: ClothingSizeSlug;
   value: ClothingSizeValue;
   name: ClothingSizeValue;
@@ -84,11 +84,11 @@ export type ColorAttribute = {
 };
 
 // Supported combinations based on required SizeAttribute and optional Color/ProductAttribute
-type ProductVariantOptions =
+export type ProductVariantOptions =
   | [SizeAttribute]
   | [SizeAttribute, ColorAttribute]
   | [SizeAttribute, ProductAttribute]
-  | [SizeAttribute, ColorAttribute, ProductAttribute];
+  | [ProductAttribute, SizeAttribute, ColorAttribute];
 
 export interface ProductVariantsInterface {
   data: {

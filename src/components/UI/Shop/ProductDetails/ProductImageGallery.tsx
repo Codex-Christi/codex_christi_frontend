@@ -10,15 +10,18 @@ export const ProductImageGallery: FC = () => {
   const [currentItem, setCurrentItem] = useState(0);
 
   const productDetailsContext = useProductDetailsContext();
-  const { currentVariant } = useCurrentVariant((state) => state);
+  useCurrentVariant((state) => state);
 
   const metadata = productDetailsContext.productMetaData;
+  const image_uris = productDetailsContext.productVariants[0].image_uris;
   const imagesArr = useMemo(
     () =>
-      currentVariant.image_uris.length > 0
-        ? currentVariant.image_uris
+      image_uris.length > 0
+        ? image_uris.map(
+            (uri) => `https://d2dytk4tvgwhb4.cloudfront.net/${uri}`
+          )
         : [metadata.image],
-    [currentVariant, metadata.image]
+    [image_uris, metadata.image]
   );
 
   return (

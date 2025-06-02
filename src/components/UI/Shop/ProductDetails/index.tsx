@@ -6,7 +6,8 @@ const ProductActionsComponents = dynamic(
   () => import('./ProductActionsComponents')
 );
 import Link from 'next/link';
-import { createContext, useContext, FC } from 'react';
+import { createContext, useContext, FC, useMemo, useEffect } from 'react';
+import { setupVariantAutoMatching } from './currentVariantStore';
 
 interface ProductDetailsProps {
   // Define any props if needed
@@ -29,9 +30,22 @@ export const useProductDetailsContext = () => {
 };
 
 const ProductDetails: FC<ProductDetailsProps> = ({ fetchedProductData }) => {
+  // Hooks
+
+  // useEffects
+  useEffect(() => {
+    const unsubscribe = setupVariantAutoMatching(
+      fetchedProductData.productVariants
+    );
+    return unsubscribe;
+  }, [fetchedProductData.productVariants]);
+
+  //   JSX
   return (
     // Main JSX
-    <ProductDetailsContext.Provider value={{ ...fetchedProductData }}>
+    <ProductDetailsContext.Provider
+      value={useMemo(() => fetchedProductData, [fetchedProductData])}
+    >
       <div className='grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-2'>
         <ProductSummary />
         <ProductActionsComponents />

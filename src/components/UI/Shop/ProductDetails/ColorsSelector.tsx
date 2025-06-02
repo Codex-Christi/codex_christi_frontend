@@ -3,17 +3,33 @@ import { useProductDetailsContext } from '.';
 import {
   ColorAttribute,
   hasColorAndSize,
+  ProductAttribute,
+  SizeAttribute,
 } from '@/app/shop/product/[id]/productDetailsSSR';
 import dynamic from 'next/dynamic';
 const RadioButtonGroup = dynamic(() =>
   import('./RadioButtonGroupWithText').then((mod) => mod.default)
 );
+import { useCurrentVariant } from './currentVariantStore';
+
+function isColorAttribute(
+  option: SizeAttribute | ColorAttribute | ProductAttribute | undefined
+): option is ColorAttribute {
+  const attr = option?.attribute;
+  return (
+    typeof attr === 'object' &&
+    attr !== null &&
+    'name' in attr &&
+    (attr as { name: string }).name === 'Color'
+  );
+}
 
 // Main Component for Colors Selector
 const ColorsSelector = () => {
   // Hooks
   const { productVariants } = useProductDetailsContext();
   const productHasColorAndSize = hasColorAndSize(productVariants[0].options);
+  const { setColor } = useCurrentVariant();
 
   //   Variables
   const uniqueColorOptions = useMemo(() => {
@@ -45,20 +61,23 @@ const ColorsSelector = () => {
   //   Handlers
   const onChangeColor = useCallback(
     (value: string | { name: string; value: string }) => {
-      if (typeof value === 'string') {
-        const selectedColor = uniqueColorOptions.find(
-          (option) => option.value === value
-        );
-        const { label, value: hexCode } = selectedColor || {
-          label: '',
-          value: '',
-        };
-        const searchObj = { name: label, value: hexCode } as ColorAttribute;
+      const colorValue = typeof value === 'string' ? value : value.value;
+      const matched = productVariants.find(
+        (variant) => variant.options[2]?.value === colorValue
+      );
 
-        console.log(searchObj);
+      const colorOption = matched?.options[2];
+
+      if (isColorAttribute(colorOption)) {
+        setColor(colorOption);
+      } else {
+        console.warn(
+          '[onChangeSize] colorOption not valid ColorAttribute:',
+          colorOption
+        );
       }
     },
-    [uniqueColorOptions]
+    [productVariants, setColor]
   );
 
   return (
