@@ -29,6 +29,7 @@ export interface BasicProductInterface {
     title: string;
     description: string;
     image: string;
+    retail_price: string;
   };
 }
 
