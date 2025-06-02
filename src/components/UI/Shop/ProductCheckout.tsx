@@ -15,7 +15,7 @@ const CheckoutPage = () => {
 
   return (
     <div className='grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] md:grid-cols-2 lg:grid-cols-12'>
-      <div className='bg-[#4C3D3D3D] backdrop-blur-[20px] p-4 rounded-[10px] md:p-10 space-y-8 lg:col-span-7'>
+      <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[10px] md:p-10 space-y-8 lg:col-span-7'>
         <h2 className='border-b border-white pb-1 text-xl font-bold'>
           Payment Method
         </h2>
@@ -168,7 +168,7 @@ const CheckoutPage = () => {
         </div>
       </div>
 
-      <div className='bg-[#4C3D3D3D] backdrop-blur-[20px] p-4 rounded-[10px] md:p-10 space-y-8 lg:col-span-5'>
+      <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[10px] md:p-10 space-y-8 lg:col-span-5'>
         <h2 className='border-b border-white pb-1 text-xl font-bold'>
           Order Summary
         </h2>

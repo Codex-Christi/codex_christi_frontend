@@ -5,7 +5,7 @@ import PaymentProcessors from '@/assets/img/payment-processors.png';
 // Main Component
 export const DeliveryandPaymentsBanner = () => {
   return (
-    <div className='bg-[#4C3D3D3D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-6 lg:p-8'>
+    <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-6 lg:p-8'>
       <div className='space-y-1'>
         <h2 className='font-bold text-2xl flex items-center gap-2'>
           <svg width='21' height='16' viewBox='0 0 21 16' fill='none'>

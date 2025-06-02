@@ -1,15 +1,58 @@
-import Link from 'next/link';
-import React from 'react';
+import React, { FC } from 'react';
+import { Button } from '../../primitives/button';
+import { useCartStore } from '@/stores/shop_stores/cartStore';
+import { useCurrentVariant } from './currentVariantStore';
+import { useProductDetailsContext } from '.';
+import { hasColorAndSize } from '@/app/shop/product/[id]/productDetailsSSR';
+import errorToast from '@/lib/error-toast';
+import successToast from '@/lib/success-toast';
 
-export const AddToCart = () => {
+export const AddToCart: FC = () => {
+  // Hooks
+  const { productVariants } = useProductDetailsContext();
+  const { matchingVariant } = useCurrentVariant();
+  const { addToCart } = useCartStore((state) => state);
+
+  // Handler
+  const addToCartHandler = () => {
+    if (matchingVariant?.options) {
+      if (hasColorAndSize(matchingVariant.options)) {
+        // Has both color and size
+        const { _id } = matchingVariant;
+        addToCart({ variantId: _id, quantity: 1, itemDetail: matchingVariant });
+      } else {
+        // Has only size
+        const { _id } = matchingVariant;
+        addToCart({ variantId: _id, quantity: 1, itemDetail: matchingVariant });
+      }
+      successToast({
+        message: 'Item added to cart successfully.',
+      });
+      // resetVariantOptions();
+    } else {
+      //No matching variant yet, but button was pressed,
+      // indicating, nothing with color and size was selected
+      if (productVariants.length > 0) {
+        errorToast({
+          message: hasColorAndSize(productVariants[0].options)
+            ? 'Please select a size and color before adding to cart.'
+            : 'Please select a size before adding to cart.',
+        });
+      }
+    }
+  };
+
+  // Jsx
   return (
-    <Link
-      className='bg-white rounded-lg py-4 px-8 flex items-center place-content-end justify-between w-full'
-      href=''
+    <Button
+      className={`bg-white hover:bg-white rounded-lg !py-4 !px-8 flex items-center 
+        place-content-end justify-between w-full h-[unset]`}
+      name='Add to Cart'
+      onClick={addToCartHandler}
     >
-      <span className='font-bold text-xl text-black text-center inline-block mx-auto'>
+      <h3 className='font-bold text-xl text-black text-center inline-block mx-auto'>
         Add to Cart
-      </span>
+      </h3>
 
       <svg width='28' height='26' viewBox='0 0 28 26' fill='none'>
         <path
@@ -31,6 +74,6 @@ export const AddToCart = () => {
           stroke='black'
         />
       </svg>
-    </Link>
+    </Button>
   );
 };

@@ -1,11 +1,11 @@
 'use client';
 
 import { FC, useCallback, useMemo, useState, useEffect } from 'react';
-// import useAuthStore from '@/store/authStore';
+import { useCartStore } from '@/stores/shop_stores/cartStore';
 
 export const CartIcon: FC = () => {
   // Hooks
-  //   const { isAuthenticated } = useAuthStore();
+  const { variants } = useCartStore();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -15,13 +15,13 @@ export const CartIcon: FC = () => {
   //   Funcs
   const getApproxCartItems = useCallback(() => {
     if (isClient) {
-      const randomNum = Math.floor(Math.random() * (10 - 1 + 1)) + 1;
+      const cartLenNum = variants.length;
 
-      const approxString = randomNum >= 9 ? '9+' : randomNum;
+      const approxString = cartLenNum >= 9 ? '9+' : cartLenNum;
 
       return approxString;
     }
-  }, [isClient]);
+  }, [isClient, variants.length]);
 
   //   Bools
   const cartIsMoreThanNine = useMemo(

@@ -43,7 +43,7 @@ const ProductTitleAndSizesEtc = () => {
   //  JSX
   return (
     <div className='grid gap-4'>
-      <div className='bg-[#4C3D3D3D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-6 lg:p-8'>
+      <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-6 lg:p-8'>
         <div className='space-y-3'>
           <h2 className='font-bold text-2xl'>{title}</h2>
 

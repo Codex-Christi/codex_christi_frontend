@@ -91,6 +91,7 @@ export const useCurrentVariant = create<CurrentVariantStore>()(
       });
 
       get().setMatchingVariant(matchedProductVariant ?? null);
+
       return matchedProductVariant;
     },
   }))

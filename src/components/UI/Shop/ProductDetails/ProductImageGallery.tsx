@@ -20,8 +20,12 @@ export const ProductImageGallery: FC = () => {
       : [metadata.image];
   }, [matchingVariant?.image_uris, metadata.image]);
 
+  const preventImageClickandDrag = (e: React.MouseEvent<HTMLImageElement>) => {
+    e.preventDefault();
+  };
+
   return (
-    <div className='bg-[#4C3D3D3D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-2 lg:p-8 flex flex-col gap-8 items-start md:gap-12 md:flex-row'>
+    <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-2 lg:p-8 flex flex-col gap-8 items-start md:gap-12 md:flex-row'>
       {/* Thumbnail Image Section*/}
 
       <div className='grid gap-4 grid-cols-2 md:grid-cols-1 order-2 md:order-1'>
@@ -33,8 +37,10 @@ export const ProductImageGallery: FC = () => {
               onClick={() => setCurrentItem(index)}
             >
               <Image
+                onContextMenu={preventImageClickandDrag}
+                onDragStart={preventImageClickandDrag}
                 priority
-                className='rounded-[20px]'
+                className='rounded-[20px] transition-all'
                 src={image}
                 width={80}
                 height={80}
@@ -49,6 +55,8 @@ export const ProductImageGallery: FC = () => {
         <div className='rounded-[20px] w-[90%] h-56 md:h-full relative'>
           {imagesArr[currentItem] && (
             <Image
+              onContextMenu={preventImageClickandDrag}
+              onDragStart={preventImageClickandDrag}
               priority
               className='rounded-[20px] size-full object-cover object-top aspect-[16/13]'
               width={512}
