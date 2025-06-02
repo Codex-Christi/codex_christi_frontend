@@ -33,6 +33,7 @@ export const ProductImageGallery: FC = () => {
               onClick={() => setCurrentItem(index)}
             >
               <Image
+                priority
                 className='rounded-[20px]'
                 src={image}
                 width={80}
@@ -48,6 +49,7 @@ export const ProductImageGallery: FC = () => {
         <div className='rounded-[20px] w-[90%] h-56 md:h-full relative'>
           {imagesArr[currentItem] && (
             <Image
+              priority
               className='rounded-[20px] size-full object-cover object-top aspect-[16/13]'
               width={512}
               height={288}
