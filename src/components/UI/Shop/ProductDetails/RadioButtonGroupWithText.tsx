@@ -66,10 +66,11 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({
                 isSelected &&
                   !isColorValue &&
                   `bg-gray-600 text-white border-[2.5px] font-extrabold border-gray-600 
-                  hover:bg-gray-600 shadow-gray-200 shadow-md hover:text-white`,
+                  hover:bg-gray-600 shadow-gray-200 shadow-md hover:text-white font-ocr`,
                 isColorValue &&
                   isSelected &&
-                  `text-white border-[2.5px] font-extrabold shadow-gray-200 shadow-md hover:text-white`
+                  `text-white border-[2.5px] font-extrabold shadow-gray-200 shadow-md
+                  font-ocr hover:text-white`
               )}
               style={
                 isColorValue && isSelected && hexCode
@@ -81,7 +82,10 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({
               }
               htmlFor={radioValue}
             >
-              {prop.label}
+              {isColorValue && prop.label
+                ? prop.label?.slice(0, 1).toUpperCase() +
+                  prop.label?.slice(1).toLowerCase()
+                : prop.label}
             </label>
           </div>
         );

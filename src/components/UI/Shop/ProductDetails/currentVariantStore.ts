@@ -117,7 +117,5 @@ export function setupVariantAutoMatching(
 // 🔍 Subscription to log matching variant changes
 useCurrentVariant.subscribe(
   (state) => state.matchingVariant,
-  (newMatch) => {
-    console.log('[Matching Variant Changed]', newMatch);
-  }
+  () => {}
 );

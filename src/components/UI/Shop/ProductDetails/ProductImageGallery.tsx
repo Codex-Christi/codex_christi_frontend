@@ -10,19 +10,15 @@ export const ProductImageGallery: FC = () => {
   const [currentItem, setCurrentItem] = useState(0);
 
   const productDetailsContext = useProductDetailsContext();
-  useCurrentVariant((state) => state);
+  const matchingVariant = useCurrentVariant((state) => state.matchingVariant);
 
   const metadata = productDetailsContext.productMetaData;
-  const image_uris = productDetailsContext.productVariants[0].image_uris;
-  const imagesArr = useMemo(
-    () =>
-      image_uris.length > 0
-        ? image_uris.map(
-            (uri) => `https://d2dytk4tvgwhb4.cloudfront.net/${uri}`
-          )
-        : [metadata.image],
-    [image_uris, metadata.image]
-  );
+  const imagesArr = useMemo(() => {
+    const image_uris = matchingVariant?.image_uris ?? [];
+    return image_uris.length > 0
+      ? image_uris.map((uri) => `https://d2dytk4tvgwhb4.cloudfront.net/${uri}`)
+      : [metadata.image];
+  }, [matchingVariant?.image_uris, metadata.image]);
 
   return (
     <div className='bg-[#4C3D3D3D] backdrop-blur-[20px] p-4 rounded-[20px] space-y-2 lg:p-8 flex flex-col gap-8 items-start md:gap-12 md:flex-row'>
