@@ -36,6 +36,7 @@ type ItemDetail = {
 type CartVariant = {
   variantId: string;
   quantity: number;
+  title: string;
   itemDetail: ItemDetail;
 };
 

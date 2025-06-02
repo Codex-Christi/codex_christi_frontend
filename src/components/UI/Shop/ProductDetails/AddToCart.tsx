@@ -1,4 +1,4 @@
-import React, { FC } from 'react';
+import React, { FC, useCallback } from 'react';
 import { Button } from '../../primitives/button';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import { useCurrentVariant } from './currentVariantStore';
@@ -9,26 +9,41 @@ import successToast from '@/lib/success-toast';
 
 export const AddToCart: FC = () => {
   // Hooks
-  const { productVariants } = useProductDetailsContext();
-  const { matchingVariant } = useCurrentVariant();
+  const {
+    productVariants,
+    productMetaData: { title },
+  } = useProductDetailsContext();
+  const { matchingVariant, resetVariantOptions, setMatchingVariant } =
+    useCurrentVariant();
   const { addToCart } = useCartStore((state) => state);
 
   // Handler
-  const addToCartHandler = () => {
+  const addToCartHandler = useCallback(() => {
     if (matchingVariant?.options) {
       if (hasColorAndSize(matchingVariant.options)) {
         // Has both color and size
         const { _id } = matchingVariant;
-        addToCart({ variantId: _id, quantity: 1, itemDetail: matchingVariant });
+        addToCart({
+          variantId: _id,
+          quantity: 1,
+          itemDetail: matchingVariant,
+          title,
+        });
       } else {
         // Has only size
         const { _id } = matchingVariant;
-        addToCart({ variantId: _id, quantity: 1, itemDetail: matchingVariant });
+        addToCart({
+          variantId: _id,
+          quantity: 1,
+          itemDetail: matchingVariant,
+          title,
+        });
       }
       successToast({
         message: 'Item added to cart successfully.',
       });
-      // resetVariantOptions();
+      resetVariantOptions();
+      setMatchingVariant(null);
     } else {
       //No matching variant yet, but button was pressed,
       // indicating, nothing with color and size was selected
@@ -40,7 +55,14 @@ export const AddToCart: FC = () => {
         });
       }
     }
-  };
+  }, [
+    addToCart,
+    matchingVariant,
+    productVariants,
+    resetVariantOptions,
+    setMatchingVariant,
+    title,
+  ]);
 
   // Jsx
   return (

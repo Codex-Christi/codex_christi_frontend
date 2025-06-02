@@ -3,6 +3,7 @@
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import { useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 
 const CartEmptyComponent = dynamic(
   () => import('./CartEmptyComponent').then((mod) => mod.CartEmptyComponent),
@@ -34,18 +35,34 @@ const CartMainComponent = () => {
         {/* If the cart is not empty, render the cart items */}
         {!isCartEmpty && variants && (
           <div className='grid gap-8'>
-            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-              {variants.map(({ itemDetail: variant }) => (
+            {variants.map(({ itemDetail: variant, title }) => {
+              const productTitle = title;
+              const { title: variantTitle, image, retail_price, _id } = variant;
+
+              return (
                 <div
-                  key={variant._id}
-                  className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px]'
+                  key={_id}
+                  className='bg-gray-700 bg-opacity-80 p-4 rounded-lg shadow-sm 
+                   shadow-gray-200 w-full md:w-[600px] flex lg:w-[800px] mx-auto
+                   justify-between'
                 >
                   {/* Render variant details here */}
-                  <h3 className='font-bold text-xl'>{variant.title}</h3>
-                  <p>{`Price: $${variant.retail_price}`}</p>
+                  {image && (
+                    <Image
+                      src={image}
+                      className='rounded-lg'
+                      width={100}
+                      height={100}
+                      alt={title}
+                    />
+                  )}
+                  <section>
+                    <h3 className='font-bold text-xl'>{productTitle}</h3>
+                    <p>{`Price: $${retail_price}`}</p>
+                  </section>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         )}
       </div>
