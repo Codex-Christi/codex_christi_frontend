@@ -90,6 +90,28 @@
   }
 }
 
+@layer utilities {
+  .scrollbar::-webkit-scrollbar {
+    width: 0.8rem;
+    height: 20px;
+  }
+
+  .scrollbar::-webkit-scrollbar-track {
+    border-radius: 100vh;
+    background: #4f4f4f;
+  }
+
+  .scrollbar::-webkit-scrollbar-thumb {
+    background: #d9d9d9;
+    border-radius: 100vh;
+    border: 1px solid #f6f7ed;
+  }
+
+  .scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #c0a0b9;
+  }
+}
+
 html,
 body {
   overflow-x: hidden !important;
