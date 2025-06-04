@@ -33,7 +33,9 @@ type ItemDetail = {
   image?: string;
 };
 
-type CartVariant = {
+export type VariantDetail = ItemDetail;
+
+export type CartVariant = {
   variantId: string;
   quantity: number;
   title: string;
