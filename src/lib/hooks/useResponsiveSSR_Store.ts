@@ -44,14 +44,13 @@ export function useResponsiveSSRInitial() {
   const isTabletAndAbove = useMediaQuery({ minWidth: 768 });
   const isDesktopOnly = useMediaQuery({ minWidth: 1024 });
 
-  // Memoize the values to prevent recalculating media queries on every render
   const memoizedBools = useMemo(() => {
     return {
-      isDesktopOnly: isDesktopOnly,
-      isTabletOnly: isTabletOnly,
-      isMobile: isMobile,
-      isTabletAndAbove: isTabletAndAbove,
-      isMobileAndTablet: isMobileAndTablet,
+      isMobile,
+      isMobileAndTablet,
+      isTabletOnly,
+      isTabletAndAbove,
+      isDesktopOnly,
     };
   }, [
     isDesktopOnly,
@@ -66,7 +65,15 @@ export function useResponsiveSSRInitial() {
     [memoizedBools, setResponsiveState]
   );
 
-  updateRespState();
+  // Memoize the values to prevent recalculating media queries on every render
+  return {
+    isDesktopOnly: isDesktopOnly,
+    isTabletOnly: isTabletOnly,
+    isMobile: isMobile,
+    isTabletAndAbove: isTabletAndAbove,
+    isMobileAndTablet: isMobileAndTablet,
+    updateRespState,
+  };
 }
 
 // ✅ Hook to Access Zustand Store

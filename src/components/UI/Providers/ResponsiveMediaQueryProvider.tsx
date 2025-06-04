@@ -1,14 +1,18 @@
 'use client';
 
 import { useResponsiveSSRInitial } from '@/lib/hooks/useResponsiveSSR_Store';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 
 export default function ResponsiveMediaProvider({
   children,
 }: {
   children: ReactNode;
 }) {
-  useResponsiveSSRInitial();
+  const { updateRespState } = useResponsiveSSRInitial();
+
+  useEffect(() => {
+    updateRespState();
+  }, [updateRespState]);
 
   return <>{children}</>;
 }
