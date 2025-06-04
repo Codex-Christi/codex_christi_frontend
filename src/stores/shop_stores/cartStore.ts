@@ -47,6 +47,7 @@ interface CartState {
   offlineOnly: boolean;
   setOfflineOnly: (value: boolean) => void;
   addToCart: (variant: CartVariant) => void;
+  reduceFromCart: (variantId: string, quantity: number) => void;
   removeFromCart: (variantId: string) => void;
   clearCart: () => void;
   syncRemoteCart: () => Promise<void>;
@@ -133,6 +134,24 @@ export const useCartStore = create<CartState>()(
               )
             : [...get().variants, filtered],
         });
+      },
+
+      reduceFromCart: (variantId: string, quantity: number = 1) => {
+        const existing = get().variants.find((v) => v.variantId === variantId);
+        if (!existing) return;
+
+        const newQuantity = existing.quantity - quantity;
+
+        if (newQuantity > 0) {
+          set({
+            variants: get().variants.map((v) =>
+              v.variantId === variantId ? { ...v, quantity: newQuantity } : v
+            ),
+          });
+        } else {
+          // Quantity is zero or less, remove the item
+          get().removeFromCart(variantId);
+        }
       },
 
       removeFromCart: (variantId) =>

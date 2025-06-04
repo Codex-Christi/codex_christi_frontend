@@ -9,13 +9,17 @@ export const ItemQuantityComponent: FC<{
   const { quantity, title, variantId } = cartItem;
 
   //   Hooks
-  const { addToCart } = useCartStore();
+  const { addToCart, reduceFromCart } = useCartStore();
 
   //   Handlers
   const incrementItemQuantity = useCallback(() => {
     addToCart({ ...cartItem, quantity: 1 });
-    console.log({ ...cartItem, quantity: 1 });
   }, [addToCart, cartItem]);
+
+  const decrementQuantity = useCallback(() => {
+    reduceFromCart(variantId, 1);
+  }, [reduceFromCart, variantId]);
+  //
 
   // JSX
   return (
@@ -26,7 +30,8 @@ export const ItemQuantityComponent: FC<{
       {/* Reduce quantity */}
       <OperationButton
         name={`Remove ${title} ${variantId} from Cart`}
-        disabled={quantity <= 1}
+        // disabled={quantity <= 1}
+        onClick={decrementQuantity}
       >
         -
       </OperationButton>
