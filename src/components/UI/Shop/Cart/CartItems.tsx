@@ -10,7 +10,7 @@ import Link from 'next/link';
 const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
   {
     return cartItems.map((cartItem) => {
-      const { itemDetail: variant, title, slug } = cartItem;
+      const { itemDetail: variant, title, slug, quantity } = cartItem;
       const productTitle = title;
       const { image, retail_price, _id, options } = variant;
 
@@ -19,7 +19,7 @@ const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
           key={_id}
           className='bg-gray-700 bg-opacity-80 p-4 rounded-lg shadow-sm 
              shadow-gray-200 w-full mx-auto items-center grid justify-between
-             grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 '
+             grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 '
         >
           {/* Render variant details here */}
 
@@ -39,7 +39,7 @@ const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
           {/* Title , price */}
           <section
             className='text-left h-full flex flex-col justify-around col-span-1 
-          md:col-span-2 hover:cursor-pointer'
+          md:col-span-2 lg:col-span-3 hover:cursor-pointer'
           >
             <Link href={`/shop/product/${slug}`}>
               <h3 className='text-lg font-semibold font-ocr '>
@@ -72,8 +72,13 @@ const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
             className='flex md:hidden'
             cartItem={cartItem}
           />
-
+          {/* Delete Item */}
           {/* <Button></Button> */}
+
+          {/* Total */}
+          <h3 className='text-[1.2rem] font-semibold self-end text-right'>
+            Total: ${retail_price * quantity}
+          </h3>
         </div>
       );
     });

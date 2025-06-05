@@ -32,7 +32,7 @@ export default function NotFound() {
         <CustomShopLink
           className=' border-[#0085FF] text-white bg-[#0085FF] hover:bg-[#0085FF]/70 rounded-xl 
           hover:text-white font-ocr !font-bold px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base'
-          href='/shop'
+          href='/'
         >
           Return to Home
         </CustomShopLink>

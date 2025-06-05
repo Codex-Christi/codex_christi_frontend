@@ -5,7 +5,8 @@ import { useCurrentVariant } from './currentVariantStore';
 import { useProductDetailsContext } from '.';
 import { hasColorAndSize } from '@/app/shop/product/[id]/productDetailsSSR';
 import errorToast from '@/lib/error-toast';
-import successToast from '@/lib/success-toast';
+import { toast } from 'sonner';
+import Link from 'next/link';
 
 export const AddToCart: FC = () => {
   // Hooks
@@ -41,7 +42,7 @@ export const AddToCart: FC = () => {
           slug,
         });
       }
-      successToast({
+      cartSuccessToast({
         message: 'Item added to cart successfully.',
       });
       resetVariantOptions();
@@ -101,4 +102,33 @@ export const AddToCart: FC = () => {
       </svg>
     </Button>
   );
+};
+
+type Position = 'top-right';
+
+const cartSuccessToast = ({
+  message,
+  header = 'Action Successful!',
+  position = 'top-right',
+}: {
+  message: string;
+  header?: string;
+  position?: Position;
+}) => {
+  const toastID = toast.success(header, {
+    description: message,
+    action: (
+      <Link
+        id='view-cart-toast-button'
+        href='/shop/cart'
+        className='ml-5 bg-black text-white text-[.8rem] px-2 py-1 rounded-lg font-bold
+         !border border-black shadow-md shadow-black'
+      >
+        View Cart
+      </Link>
+    ),
+    position: position,
+  });
+
+  return toastID;
 };
