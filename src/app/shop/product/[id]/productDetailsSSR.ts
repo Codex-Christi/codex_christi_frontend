@@ -11,7 +11,7 @@ const cacheForDays = (days: number): number => 60 * 60 * 24 * days;
 // --- In-Memory Memoization Maps ---
 const externalProductIDMemo = new Map<
   string,
-  Promise<{ external_product_id: string; image: string }>
+  Promise<{ external_product_id: string; image: string; slug: string }>
 >();
 const baseProductMemo = new Map<
   string,
@@ -30,6 +30,7 @@ export interface BasicProductInterface {
     description: string;
     image: string;
     retail_price: string;
+    slug: string;
   };
 }
 
@@ -136,8 +137,6 @@ export const fetchExternalProductID = cache((productIDorSlug: string) => {
     : ` ${baseURL}/product/filter-by-slug/${productIDorSlug}`;
 
   const promise = (async () => {
-    console.log(`${baseURL}/product/${productIDorSlug}/filter-by-id}`);
-
     const res = await fetch(idOrSlugEndpoint, {
       next: { revalidate: cacheForDays(7) },
     });
@@ -149,7 +148,11 @@ export const fetchExternalProductID = cache((productIDorSlug: string) => {
     }
 
     const { data } = await res.json();
-    return { external_product_id: data.external_product_id, image: data.image };
+    return {
+      external_product_id: data.external_product_id,
+      image: data.image,
+      slug: data.slug,
+    };
   })();
 
   externalProductIDMemo.set(productIDorSlug, promise);
@@ -158,7 +161,7 @@ export const fetchExternalProductID = cache((productIDorSlug: string) => {
 
 // --- Fetch Base Product Info ---
 export const fetchBaseProduct = cache(
-  (externalProductID: string, image: string) => {
+  (externalProductID: string, image: string, slug: string) => {
     const key = `${externalProductID}|${image}`;
     if (baseProductMemo.has(key)) {
       return baseProductMemo.get(key)!;
@@ -180,7 +183,7 @@ export const fetchBaseProduct = cache(
       }
 
       const json: BasicProductInterface = await res.json();
-      return { ...json.data, image };
+      return { ...json.data, image, slug };
     })();
 
     baseProductMemo.set(key, promise);
@@ -220,9 +223,13 @@ export const fetchProductVariants = cache((productIDorSlug: string) => {
 // --- Combined Full Fetch ---
 export const getProductDetailsSSR = cache(
   async (productIDorSlug: string): Promise<ProductResult> => {
-    const { external_product_id, image } =
+    const { external_product_id, image, slug } =
       await fetchExternalProductID(productIDorSlug);
-    const productMetaData = await fetchBaseProduct(external_product_id, image);
+    const productMetaData = await fetchBaseProduct(
+      external_product_id,
+      image,
+      slug
+    );
     const productVariants = await fetchProductVariants(productMetaData._id);
 
     return { productMetaData, productVariants };
@@ -232,8 +239,8 @@ export const getProductDetailsSSR = cache(
 // --- Metadata-Only Fetch ---
 export const getProductMetaDataOnly = cache(
   async (productIDorSlug: string): Promise<BasicProductInterface['data']> => {
-    const { external_product_id, image } =
+    const { external_product_id, image, slug } =
       await fetchExternalProductID(productIDorSlug);
-    return fetchBaseProduct(external_product_id, image);
+    return fetchBaseProduct(external_product_id, image, slug);
   }
 );

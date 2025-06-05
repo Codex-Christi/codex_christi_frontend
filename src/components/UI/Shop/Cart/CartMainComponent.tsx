@@ -27,9 +27,12 @@ const CartMainComponent = () => {
 
   // JSX
   return (
-    <div className='px-2 py-12 md:px-[20px] lg:px-[24px] mx-auto'>
-      <h2 className='font-extrabold text-white text-4xl font-ocr my-5 mx-5'>
-        Your Cart
+    <div className='px-2 py-4 md:px-[20px] lg:px-[24px] mx-auto'>
+      <h2 className='font-extrabold text-white text-4xl font-ocr my-5 text-center'>
+        Your Cart{' '}
+        {!isCartEmpty
+          ? `(${variants.length} item${variants.length > 1 ? 's' : ''})`
+          : ''}
       </h2>
       <div
         className='bg-[#3D3D3D4D] backdrop-blur-[5px] text-white rounded-[20px] 

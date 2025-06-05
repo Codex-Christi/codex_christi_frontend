@@ -2,13 +2,10 @@
 
 import Image from 'next/image';
 import NotFoundImage from '@/assets/img/shop-not-found.png';
-import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Button } from '@/components/UI/primitives/button';
+import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 
 export default function NotFound() {
-  const { push } = useRouter();
-
   return (
     <div className='!relative py-12 flex flex-col place-content-center gap-32 min-h-dvh w-full bg-transparent !select-none'>
       <div className='mx-auto text-center grid gap-2'>
@@ -32,14 +29,13 @@ export default function NotFound() {
         whileTap={{ scale: 0.95 }}
         className='flex justify-center'
       >
-        <Button
-          name='Return to shop home button'
-          variant='outline'
-          className='bg-transparent border-[#0085FF] text-white bg-[#0085FF] hover:bg-[#0085FF]/70 hover:text-white font-ocr !font-bold px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base'
-          onClick={() => push('/shop')}
+        <CustomShopLink
+          className=' border-[#0085FF] text-white bg-[#0085FF] hover:bg-[#0085FF]/70 rounded-xl 
+          hover:text-white font-ocr !font-bold px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base'
+          href='/shop'
         >
           Return to Home
-        </Button>
+        </CustomShopLink>
       </motion.div>
     </div>
   );

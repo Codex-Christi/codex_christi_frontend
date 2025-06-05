@@ -39,6 +39,7 @@ export type CartVariant = {
   variantId: string;
   quantity: number;
   title: string;
+  slug: string;
   itemDetail: ItemDetail;
 };
 

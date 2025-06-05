@@ -4,12 +4,13 @@ import React, { FC } from 'react';
 import Image from 'next/image';
 import SizeAndColorElem from './SizeAndColor';
 import { ItemQuantityComponent } from './ItemQuantityComponent';
+import Link from 'next/link';
 
 // Car Items Component
 const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
   {
     return cartItems.map((cartItem) => {
-      const { itemDetail: variant, title } = cartItem;
+      const { itemDetail: variant, title, slug } = cartItem;
       const productTitle = title;
       const { image, retail_price, _id, options } = variant;
 
@@ -24,13 +25,15 @@ const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
 
           {/* Item Image */}
           {image && (
-            <Image
-              src={image}
-              className='rounded-xl hover:cursor-pointer'
-              width={100}
-              height={100}
-              alt={title}
-            />
+            <Link href={`/shop/product/${slug}`}>
+              <Image
+                src={image}
+                className='rounded-xl hover:cursor-pointer'
+                width={100}
+                height={100}
+                alt={title}
+              />
+            </Link>
           )}
 
           {/* Title , price */}
@@ -38,7 +41,12 @@ const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
             className='text-left h-full flex flex-col justify-around col-span-1 
           md:col-span-2 hover:cursor-pointer'
           >
-            <h3 className='text-lg font-semibold font-ocr '>{productTitle}</h3>
+            <Link href={`/shop/product/${slug}`}>
+              <h3 className='text-lg font-semibold font-ocr '>
+                {productTitle}
+              </h3>
+            </Link>
+
             <h4>{`Price: $${retail_price} (each)`}</h4>
           </section>
 
@@ -64,6 +72,8 @@ const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
             className='flex md:hidden'
             cartItem={cartItem}
           />
+
+          {/* <Button></Button> */}
         </div>
       );
     });

@@ -11,7 +11,7 @@ export const AddToCart: FC = () => {
   // Hooks
   const {
     productVariants,
-    productMetaData: { title },
+    productMetaData: { title, slug },
   } = useProductDetailsContext();
   const { matchingVariant, resetVariantOptions, setMatchingVariant } =
     useCurrentVariant();
@@ -28,6 +28,7 @@ export const AddToCart: FC = () => {
           quantity: 1,
           itemDetail: matchingVariant,
           title,
+          slug,
         });
       } else {
         // Has only size
@@ -37,6 +38,7 @@ export const AddToCart: FC = () => {
           quantity: 1,
           itemDetail: matchingVariant,
           title,
+          slug,
         });
       }
       successToast({
@@ -61,6 +63,7 @@ export const AddToCart: FC = () => {
     productVariants,
     resetVariantOptions,
     setMatchingVariant,
+    slug,
     title,
   ]);
 
