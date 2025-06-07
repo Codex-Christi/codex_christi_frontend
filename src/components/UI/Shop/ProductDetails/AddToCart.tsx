@@ -121,7 +121,7 @@ const cartSuccessToast = ({
       <Link
         id='view-cart-toast-button'
         href='/shop/cart'
-        className='ml-5 bg-black text-white text-[.8rem] px-2 py-1 rounded-lg font-bold
+        className='ml-auto bg-black text-white text-[.8rem] px-2 py-1 rounded-lg font-bold
          !border border-black shadow-md shadow-black'
       >
         View Cart

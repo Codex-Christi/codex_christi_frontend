@@ -162,7 +162,7 @@ export const useCartStore = create<CartState>()(
 
       clearCart: () => set({ variants: [] }),
 
-      setVariants: (variants) => set({ variants: variants.reverse() }),
+      setVariants: (variants) => set({ variants }),
 
       // Remote sync methods
       pushRemoteCart: async () => {
