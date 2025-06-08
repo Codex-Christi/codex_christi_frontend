@@ -23,6 +23,7 @@ const getMaxandMinShippingPrice = (
       US_additional_shipping_fee,
       US_shipping_fee,
     } = current;
+    // new object
     const newObj = {
       EU_additional_shipping_fee,
       ROW_additional_shipping_fee,
@@ -47,8 +48,8 @@ const OrderSummary: FC = () => {
   const { variants: cartItems } = useCartStore();
   const subTotal = useMemo(
     () =>
-      cartItems.reduce((acc, item) => {
-        return acc + item.itemDetail.retail_price;
+      cartItems.reduce((acc, { itemDetail: { retail_price }, quantity }) => {
+        return acc + retail_price * quantity;
       }, 0),
     [cartItems]
   );
@@ -59,8 +60,8 @@ const OrderSummary: FC = () => {
 
   //   Funcs
   const getShippingEstimates = useCallback(async () => {
-    const filt = cartItems.map(({ itemDetail }) => {
-      return itemDetail.sku;
+    const filt = cartItems.flatMap(({ itemDetail, quantity }) => {
+      return Array(quantity).fill(itemDetail.sku);
     });
     if (filt) {
       const skuCatalogData = await getCatalogItems(
@@ -72,7 +73,7 @@ const OrderSummary: FC = () => {
       const minShippingFee = getMaxandMinShippingPrice(skuCatalogData, 'min');
       const maxShippingFee = getMaxandMinShippingPrice(skuCatalogData, 'max');
 
-      return { min: minShippingFee, max: maxShippingFee };
+      return { min: Math.ceil(minShippingFee), max: Math.ceil(maxShippingFee) };
     }
   }, [cartItems]);
 
@@ -92,7 +93,7 @@ const OrderSummary: FC = () => {
     <section
       className='bg-[#3D3D3D4D] backdrop-blur-[5px] text-white rounded-[20px] 
      w-full sm:w-[85vw] md:w-[80vw] lg:!w-[35%] xl:!w-[32.5%] py-8 lg:self-start mx-auto
-     px-5 flex flex-col'
+     px-5 flex flex-col select-none'
     >
       {/* Header */}
       <h1
@@ -106,6 +107,15 @@ const OrderSummary: FC = () => {
         <span>Subtotal </span>
         <span>${subTotal}</span>
       </h3>
+
+      {shippingEstimates && (
+        <h3 className='pt-2 font-normal flex text-xl justify-between'>
+          <span>Shipping Fee </span>
+          <span>
+            ${shippingEstimates.min} - ${shippingEstimates.max}
+          </span>
+        </h3>
+      )}
 
       <Button
         className={`w-[95%] text-center !mx-auto py-8 text-xl mt-10 rounded-3xl 
