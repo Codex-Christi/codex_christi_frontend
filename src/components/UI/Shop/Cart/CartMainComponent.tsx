@@ -3,10 +3,22 @@
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import { useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import CartItems from './CartItems';
 
+// Dynamic Imports
 const CartEmptyComponent = dynamic(
   () => import('./CartEmptyComponent').then((mod) => mod.CartEmptyComponent),
+  {
+    ssr: false,
+  }
+);
+const CartItems = dynamic(
+  () => import('./CartItems').then((mod) => mod.default),
+  {
+    ssr: false,
+  }
+);
+const OrderSummary = dynamic(
+  () => import('./OrderSummary').then((mod) => mod.default),
   {
     ssr: false,
   }
@@ -27,18 +39,24 @@ const CartMainComponent = () => {
 
   // JSX
   return (
-    <div className='px-2 py-4 md:px-[20px] lg:px-[24px] mx-auto'>
-      <h2 className='font-extrabold text-white text-4xl font-ocr my-5 text-center'>
-        Your Cart{' '}
-        {!isCartEmpty
-          ? `(${variants.length} item${variants.length > 1 ? 's' : ''})`
-          : ''}
-      </h2>
+    <div
+      className='px-2 py-4 md:px-[20px] lg:px-[24px] mx-auto mt-5 flex
+    flex-col lg:flex-row gap-6 xl:gap-10'
+    >
+      {/* Container for cart contents */}
       <div
         className='bg-[#3D3D3D4D] backdrop-blur-[5px] text-white rounded-[20px] 
-          grid gap-4 min-h-[60svh] w-full sm:w-[95vw] mx-auto
-          md:!w-[90vw] lg:!w-[85vw] maz-w-[1200px] py-12'
+          min-h-[20svh] w-full sm:w-[85vw] md:w-[80vw] mx-auto lg:!w-[90vw] xl:!w-[85vw] py-8
+          justify-center'
       >
+        {/* Cart Title */}
+        <h1 className=' font-light text-white text-4xl font-ocr text-left mb-4 pl-5'>
+          Your Cart{' '}
+          {!isCartEmpty
+            ? `(${variants.length} item${variants.length > 1 ? 's' : ''})`
+            : ''}
+        </h1>
+
         {isCartEmpty && <CartEmptyComponent />}
 
         {/* If the cart is not empty, render the cart items */}
@@ -49,6 +67,9 @@ const CartMainComponent = () => {
           </div>
         )}
       </div>
+
+      {/* Conatiner for Order Summary */}
+      {!isCartEmpty && variants && <OrderSummary />}
     </div>
   );
 };

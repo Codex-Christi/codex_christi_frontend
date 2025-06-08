@@ -36,7 +36,7 @@ export const ItemQuantityComponent: FC<{
         -
       </OperationButton>
       {/* Quantity digit */}
-      <h4 className={`text-[1.3rem] font-bold`}>{`${quantity}`}</h4>
+      <h4 className={`text-[1.05rem] font-bold`}>{`${quantity}`}</h4>
 
       {/* Increment quantity */}
       <OperationButton
