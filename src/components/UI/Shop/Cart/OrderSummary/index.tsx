@@ -4,6 +4,7 @@ import { getCatalogItems } from '@/actions/merchize/getItemCatalogInfo';
 import { Button } from '@/components/UI/primitives/button';
 import { CatalogItem } from '@/lib/datasetSearchers/merchize/catalog';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
+import Link from 'next/link';
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 
 /**
@@ -109,12 +110,28 @@ const OrderSummary: FC = () => {
       </h3>
 
       {shippingEstimates && (
-        <h3 className='pt-2 font-normal flex text-xl justify-between'>
-          <span>Shipping Fee </span>
-          <span>
-            ${shippingEstimates.min} - ${shippingEstimates.max}
-          </span>
-        </h3>
+        <>
+          <h3 className='pt-2 font-normal flex text-xl justify-between'>
+            <span>
+              Shipping Fee <span className='font-extrabold'>**</span>
+            </span>
+            <span>
+              ${shippingEstimates.min} - ${shippingEstimates.max}
+            </span>
+          </h3>
+
+          <p className='font-semibold pt-8'>
+            <span className='font-extrabold'>**</span> &nbsp; Shipping fees vary
+            by location. <br />
+            <Link
+              className='font-normal text-blue-200 underline underline-offset-2'
+              href='/shop/help/shipping-rates-and-supported-countries'
+              target='_blank'
+            >
+              Learn more
+            </Link>
+          </p>
+        </>
       )}
 
       <Button

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCartStore } from '@/stores/shop_stores/cartStore';
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 
 // Dynamic Imports
@@ -30,12 +30,6 @@ const CartMainComponent = () => {
   // Hooks
   const { variants } = useCartStore((state) => state);
   const isCartEmpty = useMemo(() => variants.length === 0, [variants.length]);
-
-  useEffect(() => {
-    if (!isCartEmpty) {
-      console.log(variants);
-    }
-  }, [isCartEmpty, variants]);
 
   // JSX
   return (
