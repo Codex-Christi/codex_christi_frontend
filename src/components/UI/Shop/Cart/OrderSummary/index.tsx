@@ -48,7 +48,7 @@ const getMaxandMinShippingPrice = (
     return (
       comparator(
         ...Object.values(passInObj).filter(
-          (v): v is number => typeof v === 'number'
+          (v): v is number => typeof v === 'number' && v > 0
         )
       ) + accum
     );
@@ -128,7 +128,7 @@ const OrderSummary: FC = () => {
               Shipping Fee <span className='font-extrabold'>**</span>
             </span>
             <span>
-              ${shippingEstimates.min} - ${shippingEstimates.max}
+              ${shippingEstimates.min} -${shippingEstimates.max}
             </span>
           </h3>
 
