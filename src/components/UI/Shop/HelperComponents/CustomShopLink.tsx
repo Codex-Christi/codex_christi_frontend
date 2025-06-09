@@ -16,6 +16,7 @@ interface CustomShopLinkProps extends LinkProps {
   activeProps?: ActiveInactiveProps;
   inactiveProps?: ActiveInactiveProps;
   ariaLabel?: string;
+  id?: string;
 }
 
 const CustomShopLink: FC<CustomShopLinkProps> = ({

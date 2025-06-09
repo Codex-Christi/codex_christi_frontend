@@ -15,6 +15,9 @@ const getMaxandMinShippingPrice = (
   findValue: 'max' | 'min'
 ) => {
   const comparator = findValue === 'max' ? Math.max : Math.min;
+  let sku = '';
+
+  //   Reducer
   return catalogData.reduce((accum, current) => {
     const {
       EU_additional_shipping_fee,
@@ -23,19 +26,28 @@ const getMaxandMinShippingPrice = (
       ROW_shipping_fee,
       US_additional_shipping_fee,
       US_shipping_fee,
+      SKU_variant,
     } = current;
+
     // new object
-    const newObj = {
-      EU_additional_shipping_fee,
-      ROW_additional_shipping_fee,
-      EU_shipping_fee,
-      ROW_shipping_fee,
-      US_additional_shipping_fee,
-      US_shipping_fee,
-    };
+    const passInObj =
+      sku === SKU_variant
+        ? {
+            EU_additional_shipping_fee,
+            ROW_additional_shipping_fee,
+            US_additional_shipping_fee,
+          }
+        : {
+            EU_shipping_fee,
+            ROW_shipping_fee,
+            US_shipping_fee,
+          };
+
+    sku = SKU_variant;
+
     return (
       comparator(
-        ...Object.values(newObj).filter(
+        ...Object.values(passInObj).filter(
           (v): v is number => typeof v === 'number'
         )
       ) + accum
@@ -121,8 +133,8 @@ const OrderSummary: FC = () => {
           </h3>
 
           <p className='font-semibold pt-8'>
-            <span className='font-extrabold'>**</span> &nbsp; Shipping fees vary
-            by location. <br />
+            <span className='font-extrabold'>**</span> &nbsp; Shipping fee
+            varies by location. <br />
             <Link
               className='font-normal text-blue-200 underline underline-offset-2'
               href='/shop/help/shipping-rates-and-supported-countries'

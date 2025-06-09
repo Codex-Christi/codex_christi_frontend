@@ -3,8 +3,8 @@
 import Categories from '@/components/UI/Shop/Index/Categories';
 import Deals from '@/components/UI/Shop/Index/Deals';
 import SpecialDeals from '@/components/UI/Shop/Index/SpecialDeals';
-import Link from 'next/link';
 import { FC } from 'react';
+import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 
 const Shop: FC = () => {
   return (
@@ -14,7 +14,7 @@ const Shop: FC = () => {
       <div className='relative px-2 py-12 md:px-[20px] lg:px-[24px] space-y-12'>
         <div className='bg-[linear-gradient(90deg,_#FFFFFF_0%,_#E6F3FF_100%)] md:rounded-full p-4 flex flex-wrap items-center gap-4 text-[#0085FF] text-center md:text-left'>
           <div className='flex items-center mx-auto md:mx-0'>
-            <Link href='' aria-label='Give us a call'>
+            <CustomShopLink href='' aria-label='Give us a call'>
               <svg width='80' height='80' viewBox='0 0 113 113' fill='none'>
                 <g filter='url(#filter0_d_634_1496)'>
                   <rect
@@ -69,9 +69,9 @@ const Shop: FC = () => {
                   </filter>
                 </defs>
               </svg>
-            </Link>
+            </CustomShopLink>
 
-            <Link href='' aria-label='Send us a mail'>
+            <CustomShopLink href='' aria-label='Send us a mail'>
               <svg width='80' height='80' viewBox='0 0 113 113' fill='none'>
                 <g filter='url(#filter0_d_634_1510)'>
                   <rect
@@ -128,7 +128,7 @@ const Shop: FC = () => {
                   </filter>
                 </defs>
               </svg>
-            </Link>
+            </CustomShopLink>
           </div>
 
           <div>

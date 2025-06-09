@@ -4,7 +4,7 @@ import React, { FC } from 'react';
 import Image from 'next/image';
 import SizeAndColorElem from './SizeAndColor';
 import { ItemQuantityComponent } from './ItemQuantityComponent';
-import Link from 'next/link';
+import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 
 // Car Items Component
 const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
@@ -27,7 +27,7 @@ const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
 
             {/* Item Image */}
             {image && (
-              <Link href={`/shop/product/${slug}`}>
+              <CustomShopLink href={`/shop/product/${slug}`}>
                 <Image
                   src={image}
                   className='rounded-xl hover:cursor-pointer'
@@ -35,7 +35,7 @@ const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
                   height={90}
                   alt={title}
                 />
-              </Link>
+              </CustomShopLink>
             )}
 
             {/* Title , price */}
@@ -43,11 +43,11 @@ const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
               className='text-left h-full flex flex-col justify-around col-span-1 
           md:col-span-2 xl:col-span-3 hover:cursor-pointer'
             >
-              <Link href={`/shop/product/${slug}`}>
+              <CustomShopLink href={`/shop/product/${slug}`}>
                 <h3 className='text-lg font-semibold hover:underline underline-offset-8 '>
                   {productTitle}
                 </h3>
-              </Link>
+              </CustomShopLink>
 
               <h4>{`Price: $${retail_price} (each)`}</h4>
             </section>

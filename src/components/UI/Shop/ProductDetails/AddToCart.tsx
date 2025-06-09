@@ -6,7 +6,7 @@ import { useProductDetailsContext } from '.';
 import { hasColorAndSize } from '@/app/shop/product/[id]/productDetailsSSR';
 import errorToast from '@/lib/error-toast';
 import { toast } from 'sonner';
-import Link from 'next/link';
+import CustomShopLink from '../HelperComponents/CustomShopLink';
 
 export const AddToCart: FC = () => {
   // Hooks
@@ -118,14 +118,14 @@ const cartSuccessToast = ({
   const toastID = toast.success(header, {
     description: message,
     action: (
-      <Link
+      <CustomShopLink
         id='view-cart-toast-button'
         href='/shop/cart'
         className='ml-auto bg-black text-white text-[.8rem] px-2 py-1 rounded-lg font-bold
          !border border-black shadow-md shadow-black'
       >
         View Cart
-      </Link>
+      </CustomShopLink>
     ),
     position: position,
   });
