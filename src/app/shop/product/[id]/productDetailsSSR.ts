@@ -213,7 +213,38 @@ export const fetchProductVariants = cache((productIDorSlug: string) => {
     }
 
     const json: ProductVariantsInterface = await res.json();
-    return json.data;
+
+    const variantsData = json.data;
+    // Example: log for the first variant if present
+    if (variantsData.length > 0) {
+      if (hasColorAndSize(json.data[0].options)) {
+        // CHECK FOR OPTION ABNORMALITIES AND RETRANSFORM
+        return variantsData.map((variant) => {
+          const options = variant.options;
+          if (options[1]?.attribute?.value_type === 'color') {
+            // This is when color comes before size
+            // Returns the retransformed array of options
+
+            const retransformed_options = [
+              options[0],
+              options[2],
+              options[1],
+            ].filter(Boolean) as ProductVariantOptions;
+
+            return { ...variant, options: retransformed_options };
+          } else {
+            return {
+              ...variant,
+              options: variant.options as ProductVariantOptions,
+            };
+          }
+        });
+      } else {
+        return variantsData;
+      }
+    }
+
+    return variantsData;
   })();
 
   productVariantsMemo.set(productIDorSlug, promise);

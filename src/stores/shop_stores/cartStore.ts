@@ -133,7 +133,7 @@ export const useCartStore = create<CartState>()(
                   ? { ...v, quantity: v.quantity + filtered.quantity }
                   : v
               )
-            : [...get().variants, filtered],
+            : [filtered, ...get().variants],
         });
       },
 
