@@ -3,6 +3,7 @@
 import Link from 'next/link';
 
 import dynamic from 'next/dynamic';
+import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 
 const ProductImageGallery = dynamic(() =>
   import('./ProductImageGallery').then((mod) => mod.ProductImageGallery)
@@ -10,11 +11,20 @@ const ProductImageGallery = dynamic(() =>
 const ProductDescription = dynamic(() =>
   import('./ProductDescription').then((mod) => mod.ProductDescription)
 );
+const ProductTitleAndSizesEtc = dynamic(
+  () => import('./ProductTitleAndSizesEtc')
+);
 
+// Component
 const ProductSummary = () => {
+  // Hooks
+  const { isMobileAndTablet } = useResponsiveSSRValue();
+
+  // JSX
   return (
-    <div className='grid gap-4'>
+    <div className='grid gap-4 lg:col-span-4 xl:col-span-2'>
       <ProductImageGallery />
+      {isMobileAndTablet && <ProductTitleAndSizesEtc />}
 
       <ProductDescription />
 

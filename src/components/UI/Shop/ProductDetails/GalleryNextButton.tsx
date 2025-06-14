@@ -9,8 +9,8 @@ export const GalleryNextButton: FC<{
   return (
     <Button
       name='gallery-next-button'
-      className='absolute top-[40%] right-2 text-black hover:bg-transparent hover:scale-125
-      shadow-lg shadow-gray-100 rounded-[50%] !py-6  px-1 bg-gray-50 hover:bg-gray-50'
+      className='absolute top-[40%] right-2 text-black hover:scale-125 bg-transparent
+      hover:shadow-lg hover:shadow-gray-100 rounded-[50%] !py-6  px-1 hover:bg-gray-50'
       type='button'
       onClick={() => {
         setCurrentItem((prevIndex) => {

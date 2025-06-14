@@ -8,6 +8,7 @@ const ProductTitleAndSizesEtc = dynamic(
 import Link from 'next/link';
 import { createContext, useContext, FC, useMemo, useEffect } from 'react';
 import { setupVariantAutoMatching } from './currentVariantStore';
+import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 
 interface ProductDetailsProps {
   // Define any props if needed
@@ -31,6 +32,7 @@ export const useProductDetailsContext = () => {
 
 const ProductDetails: FC<ProductDetailsProps> = ({ fetchedProductData }) => {
   // Hooks
+  const { isDesktopOnly } = useResponsiveSSRValue();
 
   // useEffects
   useEffect(() => {
@@ -46,11 +48,12 @@ const ProductDetails: FC<ProductDetailsProps> = ({ fetchedProductData }) => {
     <ProductDetailsContext.Provider
       value={useMemo(() => fetchedProductData, [fetchedProductData])}
     >
-      <div className='grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-2'>
+      <div className='grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-6 xl:grid-cols-3'>
         <ProductSummary />
-        <ProductTitleAndSizesEtc />
-        <div className='space-y-8 mt-4 lg:col-span-2'>
-          {/* <h2 className="font-extrabold text-white text-2xl px-8">
+        {isDesktopOnly && <ProductTitleAndSizesEtc />}
+      </div>
+      <div className='space-y-8 mt-4 lg:col-span-2'>
+        {/* <h2 className="font-extrabold text-white text-2xl px-8">
 					You might also like
 				</h2>
 
@@ -96,16 +99,15 @@ const ProductDetails: FC<ProductDetailsProps> = ({ fetchedProductData }) => {
 					))}
 				</div> */}
 
-          <div className='grid place-content-center gap-4'>
-            <p>Please tell us what you think.</p>
+        <div className='grid place-content-center gap-4'>
+          <p>Please tell us what you think.</p>
 
-            <Link
-              className='text-center bg-[#0085FF] px-4 py-3 rounded-lg text-white'
-              href='/shop/contact-us/'
-            >
-              Kindly give us a feedback!
-            </Link>
-          </div>
+          <Link
+            className='text-center bg-[#0085FF] px-4 py-3 rounded-lg text-white'
+            href='/shop/contact-us/'
+          >
+            Kindly give us a feedback!
+          </Link>
         </div>
       </div>
     </ProductDetailsContext.Provider>

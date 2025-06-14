@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Input } from '../../primitives/input';
 import { cn } from '@/lib/utils';
+import { useCurrentVariant } from './currentVariantStore';
 
 interface RadioOption {
   value: string | { name: string; value: string } | null | undefined;
@@ -20,6 +21,19 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({
   const [selectedValue, setSelectedValue] = React.useState<
     string | undefined
   >();
+
+  // Hooks
+  const { currentVariantOptions } = useCurrentVariant();
+
+  // useEffect
+  useEffect(() => {
+    const isMatchingVariantsAvailable = currentVariantOptions.some(
+      (elem) => elem != null && elem !== undefined && elem.value.length > 0
+    );
+    if (!isMatchingVariantsAvailable) {
+      setSelectedValue(undefined);
+    }
+  }, [currentVariantOptions]);
 
   // JSX
   return (

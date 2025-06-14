@@ -14,7 +14,8 @@ export const AddToCart: FC = () => {
     productVariants,
     productMetaData: { title, slug },
   } = useProductDetailsContext();
-  const { matchingVariant } = useCurrentVariant();
+  const { matchingVariant, setMatchingVariant, resetVariantOptions } =
+    useCurrentVariant();
   const { addToCart } = useCartStore((state) => state);
 
   // Handler
@@ -44,8 +45,8 @@ export const AddToCart: FC = () => {
       cartSuccessToast({
         message: 'Item added to cart successfully.',
       });
-      // resetVariantOptions();
-      // setMatchingVariant(null);
+      resetVariantOptions();
+      setMatchingVariant(null);
     } else {
       //No matching variant yet, but button was pressed,
       // indicating, nothing with color and size was selected
@@ -57,7 +58,15 @@ export const AddToCart: FC = () => {
         });
       }
     }
-  }, [addToCart, matchingVariant, productVariants, slug, title]);
+  }, [
+    addToCart,
+    matchingVariant,
+    productVariants,
+    resetVariantOptions,
+    setMatchingVariant,
+    slug,
+    title,
+  ]);
 
   // Jsx
   return (
