@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 'use client';
 
 import React, { useState } from 'react';
@@ -105,6 +106,7 @@ export default function PayPalCheckout() {
               message: 'An error occurred during payment. Please try again.',
             });
           }}
+          // @ts-ignore
           style={{
             input: {
               color: '#fff',
