@@ -106,7 +106,6 @@ export default function PayPalCheckout() {
               message: 'An error occurred during payment. Please try again.',
             });
           }}
-          // @ts-ignore
           style={{
             input: {
               color: '#fff',
@@ -120,7 +119,9 @@ export default function PayPalCheckout() {
               // @ts-ignore
               'border-radius': '10px !important',
             },
+            // @ts-ignore
             'input:focus': { border: '3px solid #fff' },
+            // @ts-ignore
             'input:is(:-webkit-autofill, :autofill)': {
               background: 'transparent !important',
             },
