@@ -121,8 +121,8 @@ export default function PayPalCheckout() {
             },
             // @ts-ignore
             'input:focus': { border: '3px solid #fff' },
-            // @ts-ignore
             'input:is(:-webkit-autofill, :autofill)': {
+              // @ts-ignore
               background: 'transparent !important',
             },
             'input::placeholder': {
