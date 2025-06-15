@@ -1,0 +1,1994 @@
+[
+  {
+    "country_iso2": "AF",
+    "country_iso3": "AFG",
+    "country_name": "Afghanistan",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "AL",
+    "country_iso3": "ALB",
+    "country_name": "Albania",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "DZ",
+    "country_iso3": "DZA",
+    "country_name": "Algeria",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "AS",
+    "country_iso3": "ASM",
+    "country_name": "American Samoa",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "AD",
+    "country_iso3": "AND",
+    "country_name": "Andorra",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "AO",
+    "country_iso3": "AGO",
+    "country_name": "Angola",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "AI",
+    "country_iso3": "AIA",
+    "country_name": "Anguilla",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "AQ",
+    "country_iso3": "ATA",
+    "country_name": "Antarctica",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "AG",
+    "country_iso3": "ATG",
+    "country_name": "Antigua and Barbuda",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "AR",
+    "country_iso3": "ARG",
+    "country_name": "Argentina",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "AM",
+    "country_iso3": "ARM",
+    "country_name": "Armenia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "AW",
+    "country_iso3": "ABW",
+    "country_name": "Aruba",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "AU",
+    "country_iso3": "AUS",
+    "country_name": "Australia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "AT",
+    "country_iso3": "AUT",
+    "country_name": "Austria",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "AZ",
+    "country_iso3": "AZE",
+    "country_name": "Azerbaijan",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BS",
+    "country_iso3": "BHS",
+    "country_name": "Bahamas",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BH",
+    "country_iso3": "BHR",
+    "country_name": "Bahrain",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BD",
+    "country_iso3": "BGD",
+    "country_name": "Bangladesh",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BB",
+    "country_iso3": "BRB",
+    "country_name": "Barbados",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BY",
+    "country_iso3": "BLR",
+    "country_name": "Belarus",
+    "printful": false,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "BE",
+    "country_iso3": "BEL",
+    "country_name": "Belgium",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BZ",
+    "country_iso3": "BLZ",
+    "country_name": "Belize",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BJ",
+    "country_iso3": "BEN",
+    "country_name": "Benin",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BM",
+    "country_iso3": "BMU",
+    "country_name": "Bermuda",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BT",
+    "country_iso3": "BTN",
+    "country_name": "Bhutan",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BO",
+    "country_iso3": "BOL",
+    "country_name": "Bolivia, Plurinational State of",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BQ",
+    "country_iso3": "BES",
+    "country_name": "Bonaire, Sint Eustatius and Saba",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BA",
+    "country_iso3": "BIH",
+    "country_name": "Bosnia and Herzegovina",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BW",
+    "country_iso3": "BWA",
+    "country_name": "Botswana",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BV",
+    "country_iso3": "BVT",
+    "country_name": "Bouvet Island",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BR",
+    "country_iso3": "BRA",
+    "country_name": "Brazil",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "IO",
+    "country_iso3": "IOT",
+    "country_name": "British Indian Ocean Territory",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BN",
+    "country_iso3": "BRN",
+    "country_name": "Brunei Darussalam",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BG",
+    "country_iso3": "BGR",
+    "country_name": "Bulgaria",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BF",
+    "country_iso3": "BFA",
+    "country_name": "Burkina Faso",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "BI",
+    "country_iso3": "BDI",
+    "country_name": "Burundi",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CV",
+    "country_iso3": "CPV",
+    "country_name": "Cabo Verde",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "KH",
+    "country_iso3": "KHM",
+    "country_name": "Cambodia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CM",
+    "country_iso3": "CMR",
+    "country_name": "Cameroon",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CA",
+    "country_iso3": "CAN",
+    "country_name": "Canada",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "KY",
+    "country_iso3": "CYM",
+    "country_name": "Cayman Islands",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CF",
+    "country_iso3": "CAF",
+    "country_name": "Central African Republic",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "TD",
+    "country_iso3": "TCD",
+    "country_name": "Chad",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CL",
+    "country_iso3": "CHL",
+    "country_name": "Chile",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CN",
+    "country_iso3": "CHN",
+    "country_name": "China",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CX",
+    "country_iso3": "CXR",
+    "country_name": "Christmas Island",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CC",
+    "country_iso3": "CCK",
+    "country_name": "Cocos (Keeling) Islands",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CO",
+    "country_iso3": "COL",
+    "country_name": "Colombia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "KM",
+    "country_iso3": "COM",
+    "country_name": "Comoros",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CG",
+    "country_iso3": "COG",
+    "country_name": "Congo",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "CD",
+    "country_iso3": "COD",
+    "country_name": "Congo, The Democratic Republic of the",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CK",
+    "country_iso3": "COK",
+    "country_name": "Cook Islands",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CR",
+    "country_iso3": "CRI",
+    "country_name": "Costa Rica",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "HR",
+    "country_iso3": "HRV",
+    "country_name": "Croatia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CU",
+    "country_iso3": "CUB",
+    "country_name": "Cuba",
+    "printful": false,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "CW",
+    "country_iso3": "CUW",
+    "country_name": "Cura\u00e7ao",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CY",
+    "country_iso3": "CYP",
+    "country_name": "Cyprus",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CZ",
+    "country_iso3": "CZE",
+    "country_name": "Czechia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CI",
+    "country_iso3": "CIV",
+    "country_name": "C\u00f4te d'Ivoire",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "DK",
+    "country_iso3": "DNK",
+    "country_name": "Denmark",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "DJ",
+    "country_iso3": "DJI",
+    "country_name": "Djibouti",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "DM",
+    "country_iso3": "DMA",
+    "country_name": "Dominica",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "DO",
+    "country_iso3": "DOM",
+    "country_name": "Dominican Republic",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "EC",
+    "country_iso3": "ECU",
+    "country_name": "Ecuador",
+    "printful": false,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "EG",
+    "country_iso3": "EGY",
+    "country_name": "Egypt",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "SV",
+    "country_iso3": "SLV",
+    "country_name": "El Salvador",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GQ",
+    "country_iso3": "GNQ",
+    "country_name": "Equatorial Guinea",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "ER",
+    "country_iso3": "ERI",
+    "country_name": "Eritrea",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "EE",
+    "country_iso3": "EST",
+    "country_name": "Estonia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SZ",
+    "country_iso3": "SWZ",
+    "country_name": "Eswatini",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "ET",
+    "country_iso3": "ETH",
+    "country_name": "Ethiopia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "FK",
+    "country_iso3": "FLK",
+    "country_name": "Falkland Islands (Malvinas)",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "FO",
+    "country_iso3": "FRO",
+    "country_name": "Faroe Islands",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "FJ",
+    "country_iso3": "FJI",
+    "country_name": "Fiji",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "FI",
+    "country_iso3": "FIN",
+    "country_name": "Finland",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "FR",
+    "country_iso3": "FRA",
+    "country_name": "France",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GF",
+    "country_iso3": "GUF",
+    "country_name": "French Guiana",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "PF",
+    "country_iso3": "PYF",
+    "country_name": "French Polynesia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "TF",
+    "country_iso3": "ATF",
+    "country_name": "French Southern Territories",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GA",
+    "country_iso3": "GAB",
+    "country_name": "Gabon",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GM",
+    "country_iso3": "GMB",
+    "country_name": "Gambia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GE",
+    "country_iso3": "GEO",
+    "country_name": "Georgia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "DE",
+    "country_iso3": "DEU",
+    "country_name": "Germany",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GH",
+    "country_iso3": "GHA",
+    "country_name": "Ghana",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "GI",
+    "country_iso3": "GIB",
+    "country_name": "Gibraltar",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GR",
+    "country_iso3": "GRC",
+    "country_name": "Greece",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GL",
+    "country_iso3": "GRL",
+    "country_name": "Greenland",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GD",
+    "country_iso3": "GRD",
+    "country_name": "Grenada",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GP",
+    "country_iso3": "GLP",
+    "country_name": "Guadeloupe",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GU",
+    "country_iso3": "GUM",
+    "country_name": "Guam",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GT",
+    "country_iso3": "GTM",
+    "country_name": "Guatemala",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GG",
+    "country_iso3": "GGY",
+    "country_name": "Guernsey",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GN",
+    "country_iso3": "GIN",
+    "country_name": "Guinea",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GW",
+    "country_iso3": "GNB",
+    "country_name": "Guinea-Bissau",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "GY",
+    "country_iso3": "GUY",
+    "country_name": "Guyana",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "HT",
+    "country_iso3": "HTI",
+    "country_name": "Haiti",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "HM",
+    "country_iso3": "HMD",
+    "country_name": "Heard Island and McDonald Islands",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "VA",
+    "country_iso3": "VAT",
+    "country_name": "Holy See (Vatican City State)",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "HN",
+    "country_iso3": "HND",
+    "country_name": "Honduras",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "HK",
+    "country_iso3": "HKG",
+    "country_name": "Hong Kong",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "HU",
+    "country_iso3": "HUN",
+    "country_name": "Hungary",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "IS",
+    "country_iso3": "ISL",
+    "country_name": "Iceland",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "IN",
+    "country_iso3": "IND",
+    "country_name": "India",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "ID",
+    "country_iso3": "IDN",
+    "country_name": "Indonesia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "IR",
+    "country_iso3": "IRN",
+    "country_name": "Iran, Islamic Republic of",
+    "printful": false,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "IQ",
+    "country_iso3": "IRQ",
+    "country_name": "Iraq",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "IE",
+    "country_iso3": "IRL",
+    "country_name": "Ireland",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "IM",
+    "country_iso3": "IMN",
+    "country_name": "Isle of Man",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "IL",
+    "country_iso3": "ISR",
+    "country_name": "Israel",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "IT",
+    "country_iso3": "ITA",
+    "country_name": "Italy",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "JM",
+    "country_iso3": "JAM",
+    "country_name": "Jamaica",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "JP",
+    "country_iso3": "JPN",
+    "country_name": "Japan",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "JE",
+    "country_iso3": "JEY",
+    "country_name": "Jersey",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "JO",
+    "country_iso3": "JOR",
+    "country_name": "Jordan",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "KZ",
+    "country_iso3": "KAZ",
+    "country_name": "Kazakhstan",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "KE",
+    "country_iso3": "KEN",
+    "country_name": "Kenya",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "KI",
+    "country_iso3": "KIR",
+    "country_name": "Kiribati",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "KP",
+    "country_iso3": "PRK",
+    "country_name": "Korea, Democratic People's Republic of",
+    "printful": false,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "KR",
+    "country_iso3": "KOR",
+    "country_name": "Korea, Republic of",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "KW",
+    "country_iso3": "KWT",
+    "country_name": "Kuwait",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "KG",
+    "country_iso3": "KGZ",
+    "country_name": "Kyrgyzstan",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "LA",
+    "country_iso3": "LAO",
+    "country_name": "Lao People's Democratic Republic",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "LV",
+    "country_iso3": "LVA",
+    "country_name": "Latvia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "LB",
+    "country_iso3": "LBN",
+    "country_name": "Lebanon",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "LS",
+    "country_iso3": "LSO",
+    "country_name": "Lesotho",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "LR",
+    "country_iso3": "LBR",
+    "country_name": "Liberia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "LY",
+    "country_iso3": "LBY",
+    "country_name": "Libya",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "LI",
+    "country_iso3": "LIE",
+    "country_name": "Liechtenstein",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "LT",
+    "country_iso3": "LTU",
+    "country_name": "Lithuania",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "LU",
+    "country_iso3": "LUX",
+    "country_name": "Luxembourg",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MO",
+    "country_iso3": "MAC",
+    "country_name": "Macao",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MG",
+    "country_iso3": "MDG",
+    "country_name": "Madagascar",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MW",
+    "country_iso3": "MWI",
+    "country_name": "Malawi",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MY",
+    "country_iso3": "MYS",
+    "country_name": "Malaysia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MV",
+    "country_iso3": "MDV",
+    "country_name": "Maldives",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "ML",
+    "country_iso3": "MLI",
+    "country_name": "Mali",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MT",
+    "country_iso3": "MLT",
+    "country_name": "Malta",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MH",
+    "country_iso3": "MHL",
+    "country_name": "Marshall Islands",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MQ",
+    "country_iso3": "MTQ",
+    "country_name": "Martinique",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MR",
+    "country_iso3": "MRT",
+    "country_name": "Mauritania",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MU",
+    "country_iso3": "MUS",
+    "country_name": "Mauritius",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "YT",
+    "country_iso3": "MYT",
+    "country_name": "Mayotte",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MX",
+    "country_iso3": "MEX",
+    "country_name": "Mexico",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "FM",
+    "country_iso3": "FSM",
+    "country_name": "Micronesia, Federated States of",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MD",
+    "country_iso3": "MDA",
+    "country_name": "Moldova, Republic of",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MC",
+    "country_iso3": "MCO",
+    "country_name": "Monaco",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MN",
+    "country_iso3": "MNG",
+    "country_name": "Mongolia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "ME",
+    "country_iso3": "MNE",
+    "country_name": "Montenegro",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MS",
+    "country_iso3": "MSR",
+    "country_name": "Montserrat",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MA",
+    "country_iso3": "MAR",
+    "country_name": "Morocco",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "MZ",
+    "country_iso3": "MOZ",
+    "country_name": "Mozambique",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MM",
+    "country_iso3": "MMR",
+    "country_name": "Myanmar",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "NA",
+    "country_iso3": "NAM",
+    "country_name": "Namibia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "NR",
+    "country_iso3": "NRU",
+    "country_name": "Nauru",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "NP",
+    "country_iso3": "NPL",
+    "country_name": "Nepal",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "NL",
+    "country_iso3": "NLD",
+    "country_name": "Netherlands",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "NC",
+    "country_iso3": "NCL",
+    "country_name": "New Caledonia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "NZ",
+    "country_iso3": "NZL",
+    "country_name": "New Zealand",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "NI",
+    "country_iso3": "NIC",
+    "country_name": "Nicaragua",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "NE",
+    "country_iso3": "NER",
+    "country_name": "Niger",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "NG",
+    "country_iso3": "NGA",
+    "country_name": "Nigeria",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "NU",
+    "country_iso3": "NIU",
+    "country_name": "Niue",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "NF",
+    "country_iso3": "NFK",
+    "country_name": "Norfolk Island",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MK",
+    "country_iso3": "MKD",
+    "country_name": "North Macedonia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MP",
+    "country_iso3": "MNP",
+    "country_name": "Northern Mariana Islands",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "NO",
+    "country_iso3": "NOR",
+    "country_name": "Norway",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "OM",
+    "country_iso3": "OMN",
+    "country_name": "Oman",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "PK",
+    "country_iso3": "PAK",
+    "country_name": "Pakistan",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "PW",
+    "country_iso3": "PLW",
+    "country_name": "Palau",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "PS",
+    "country_iso3": "PSE",
+    "country_name": "Palestine, State of",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "PA",
+    "country_iso3": "PAN",
+    "country_name": "Panama",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "PG",
+    "country_iso3": "PNG",
+    "country_name": "Papua New Guinea",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "PY",
+    "country_iso3": "PRY",
+    "country_name": "Paraguay",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "PE",
+    "country_iso3": "PER",
+    "country_name": "Peru",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "PH",
+    "country_iso3": "PHL",
+    "country_name": "Philippines",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "PN",
+    "country_iso3": "PCN",
+    "country_name": "Pitcairn",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "PL",
+    "country_iso3": "POL",
+    "country_name": "Poland",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "PT",
+    "country_iso3": "PRT",
+    "country_name": "Portugal",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "PR",
+    "country_iso3": "PRI",
+    "country_name": "Puerto Rico",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "QA",
+    "country_iso3": "QAT",
+    "country_name": "Qatar",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "RO",
+    "country_iso3": "ROU",
+    "country_name": "Romania",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "RU",
+    "country_iso3": "RUS",
+    "country_name": "Russian Federation",
+    "printful": false,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "RW",
+    "country_iso3": "RWA",
+    "country_name": "Rwanda",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "RE",
+    "country_iso3": "REU",
+    "country_name": "R\u00e9union",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "BL",
+    "country_iso3": "BLM",
+    "country_name": "Saint Barth\u00e9lemy",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SH",
+    "country_iso3": "SHN",
+    "country_name": "Saint Helena, Ascension and Tristan da Cunha",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "KN",
+    "country_iso3": "KNA",
+    "country_name": "Saint Kitts and Nevis",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "LC",
+    "country_iso3": "LCA",
+    "country_name": "Saint Lucia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "MF",
+    "country_iso3": "MAF",
+    "country_name": "Saint Martin (French part)",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "PM",
+    "country_iso3": "SPM",
+    "country_name": "Saint Pierre and Miquelon",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "VC",
+    "country_iso3": "VCT",
+    "country_name": "Saint Vincent and the Grenadines",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "WS",
+    "country_iso3": "WSM",
+    "country_name": "Samoa",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SM",
+    "country_iso3": "SMR",
+    "country_name": "San Marino",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "ST",
+    "country_iso3": "STP",
+    "country_name": "Sao Tome and Principe",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SA",
+    "country_iso3": "SAU",
+    "country_name": "Saudi Arabia",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "SN",
+    "country_iso3": "SEN",
+    "country_name": "Senegal",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "RS",
+    "country_iso3": "SRB",
+    "country_name": "Serbia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SC",
+    "country_iso3": "SYC",
+    "country_name": "Seychelles",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SL",
+    "country_iso3": "SLE",
+    "country_name": "Sierra Leone",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SG",
+    "country_iso3": "SGP",
+    "country_name": "Singapore",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "SX",
+    "country_iso3": "SXM",
+    "country_name": "Sint Maarten (Dutch part)",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SK",
+    "country_iso3": "SVK",
+    "country_name": "Slovakia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SI",
+    "country_iso3": "SVN",
+    "country_name": "Slovenia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SB",
+    "country_iso3": "SLB",
+    "country_name": "Solomon Islands",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SO",
+    "country_iso3": "SOM",
+    "country_name": "Somalia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "ZA",
+    "country_iso3": "ZAF",
+    "country_name": "South Africa",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "GS",
+    "country_iso3": "SGS",
+    "country_name": "South Georgia and the South Sandwich Islands",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SS",
+    "country_iso3": "SSD",
+    "country_name": "South Sudan",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "ES",
+    "country_iso3": "ESP",
+    "country_name": "Spain",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "LK",
+    "country_iso3": "LKA",
+    "country_name": "Sri Lanka",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SD",
+    "country_iso3": "SDN",
+    "country_name": "Sudan",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SR",
+    "country_iso3": "SUR",
+    "country_name": "Suriname",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SJ",
+    "country_iso3": "SJM",
+    "country_name": "Svalbard and Jan Mayen",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SE",
+    "country_iso3": "SWE",
+    "country_name": "Sweden",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "CH",
+    "country_iso3": "CHE",
+    "country_name": "Switzerland",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "SY",
+    "country_iso3": "SYR",
+    "country_name": "Syrian Arab Republic",
+    "printful": false,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "TW",
+    "country_iso3": "TWN",
+    "country_name": "Taiwan, Province of China",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "TJ",
+    "country_iso3": "TJK",
+    "country_name": "Tajikistan",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "TZ",
+    "country_iso3": "TZA",
+    "country_name": "Tanzania, United Republic of",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "TH",
+    "country_iso3": "THA",
+    "country_name": "Thailand",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "TL",
+    "country_iso3": "TLS",
+    "country_name": "Timor-Leste",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "TG",
+    "country_iso3": "TGO",
+    "country_name": "Togo",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "TK",
+    "country_iso3": "TKL",
+    "country_name": "Tokelau",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "TO",
+    "country_iso3": "TON",
+    "country_name": "Tonga",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "TT",
+    "country_iso3": "TTO",
+    "country_name": "Trinidad and Tobago",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "TN",
+    "country_iso3": "TUN",
+    "country_name": "Tunisia",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "TR",
+    "country_iso3": "TUR",
+    "country_name": "Turkey",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "TM",
+    "country_iso3": "TKM",
+    "country_name": "Turkmenistan",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "TC",
+    "country_iso3": "TCA",
+    "country_name": "Turks and Caicos Islands",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "TV",
+    "country_iso3": "TUV",
+    "country_name": "Tuvalu",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "UG",
+    "country_iso3": "UGA",
+    "country_name": "Uganda",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "UA",
+    "country_iso3": "UKR",
+    "country_name": "Ukraine",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "AE",
+    "country_iso3": "ARE",
+    "country_name": "United Arab Emirates",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "GB",
+    "country_iso3": "GBR",
+    "country_name": "United Kingdom",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "US",
+    "country_iso3": "USA",
+    "country_name": "United States",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "UM",
+    "country_iso3": "UMI",
+    "country_name": "United States Minor Outlying Islands",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "UY",
+    "country_iso3": "URY",
+    "country_name": "Uruguay",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "UZ",
+    "country_iso3": "UZB",
+    "country_name": "Uzbekistan",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "VU",
+    "country_iso3": "VUT",
+    "country_name": "Vanuatu",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "VE",
+    "country_iso3": "VEN",
+    "country_name": "Venezuela, Bolivarian Republic of",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "VN",
+    "country_iso3": "VNM",
+    "country_name": "Viet Nam",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "VG",
+    "country_iso3": "VGB",
+    "country_name": "Virgin Islands, British",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "VI",
+    "country_iso3": "VIR",
+    "country_name": "Virgin Islands, U.S.",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "WF",
+    "country_iso3": "WLF",
+    "country_name": "Wallis and Futuna",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "EH",
+    "country_iso3": "ESH",
+    "country_name": "Western Sahara",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "YE",
+    "country_iso3": "YEM",
+    "country_name": "Yemen",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "ZM",
+    "country_iso3": "ZMB",
+    "country_name": "Zambia",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  },
+  {
+    "country_iso2": "ZW",
+    "country_iso3": "ZWE",
+    "country_name": "Zimbabwe",
+    "printful": true,
+    "merchize": false,
+    "both": false
+  },
+  {
+    "country_iso2": "AX",
+    "country_iso3": "ALA",
+    "country_name": "\u00c5land Islands",
+    "printful": true,
+    "merchize": true,
+    "both": true
+  }
+]
