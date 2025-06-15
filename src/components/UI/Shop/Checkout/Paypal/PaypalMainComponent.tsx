@@ -112,9 +112,12 @@ export default function PayPalCheckout() {
               color: '#fff',
               'font-size': '14px',
               'font-family': 'Inter',
+              // @ts-ignore
               background: 'transparent',
+              // @ts-ignore
               border: '1px solid #fff',
               padding: '1rem 2rem',
+              // @ts-ignore
               'border-radius': '10px !important',
             },
             'input:focus': { border: '3px solid #fff' },
