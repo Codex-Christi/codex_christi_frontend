@@ -7,6 +7,7 @@ import { useCartStore } from '@/stores/shop_stores/cartStore';
 import Link from 'next/link';
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { FaAngleRight } from 'react-icons/fa6';
+import CustomShopLink from '../../HelperComponents/CustomShopLink';
 
 /**
  * Gets the max and min shipping fee for an order (cart instance)
@@ -147,13 +148,14 @@ const OrderSummary: FC = () => {
         </>
       )}
 
-      <Button
-        className={`w-[95%] text-center !mx-auto py-8 text-xl mt-10 rounded-3xl 
-            bg-white text-black hover:bg-gray-200 flex gap-2`}
-        name='Checkout Button'
+      <CustomShopLink
+        href='/shop/checkout'
+        className={`w-[95%] text-center !mx-auto py-4 px-4 text-xl mt-10 rounded-3xl 
+            bg-white text-black hover:bg-gray-200  gap-2 !flex justify-center items-center`}
+        // name='Checkout Button'
       >
         <h4>Proceed to Checkout</h4> <FaAngleRight size={22.5} />
-      </Button>
+      </CustomShopLink>
     </section>
   );
 };
