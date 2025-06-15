@@ -132,8 +132,9 @@ export const fetchExternalProductID = cache((productIDorSlug: string) => {
   }
 
   const isUUID = isValidUUID(productIDorSlug);
+
   const idOrSlugEndpoint = isUUID
-    ? `${baseURL}/product/${productIDorSlug}/filter-by-id}`
+    ? `${baseURL}/product/${productIDorSlug}/filter-by-id`
     : ` ${baseURL}/product/filter-by-slug/${productIDorSlug}`;
 
   const promise = (async () => {
