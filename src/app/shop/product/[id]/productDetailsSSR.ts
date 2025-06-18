@@ -5,6 +5,7 @@ import { cache } from 'react';
 const merchizeToken = process.env.MERCHIZE_TOKEN!;
 const baseURL = process.env.NEXT_PUBLIC_BASE_URL!;
 const merchizeBaseURL = process.env.MERCHIZE_BASE_URL!;
+const merchizeAPIKey = process.env.MERRCHIZE_API_KEY!;
 
 const cacheForDays = (days: number): number => 60 * 60 * 24 * days;
 
@@ -172,7 +173,10 @@ export const fetchBaseProduct = cache(
       const res = await fetch(
         `${merchizeBaseURL}/product/products/${externalProductID}`,
         {
-          headers: { Authorization: `Bearer ${merchizeToken}` },
+          headers: {
+            'X-API-KEY': `${merchizeAPIKey}`,
+            // Authorization: `Bearer ${merchizeToken}`,
+          },
           next: { revalidate: cacheForDays(7) },
         }
       );

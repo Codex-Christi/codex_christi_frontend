@@ -1,6 +1,5 @@
-import CheckoutPage from '@/components/UI/Shop/ProductCheckout';
+import CheckoutPage from '@/components/UI/Shop/Checkout/ProductCheckout';
 import { Metadata } from 'next';
-import PayPalCheckout from '@/components/UI/Shop/Checkout/Paypal/PaypalMainComponent';
 
 export const metadata: Metadata = {
   title: 'Checkout | Codex Christi',
@@ -11,7 +10,6 @@ const Checkout = () => {
   return (
     <>
       <CheckoutPage />
-      <PayPalCheckout />
     </>
   );
 };
