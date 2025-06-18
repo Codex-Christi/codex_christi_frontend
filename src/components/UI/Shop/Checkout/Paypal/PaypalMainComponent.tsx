@@ -86,116 +86,115 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
 
   return (
     <PayPalScriptProvider options={initialOptions}>
-      <div className='space-y-6 w-full max-w-[700px]'>
+      <div className='w-full mx-auto'>
         {/* Paypal Buttons */}
-        {mode === 'paypal_buttons' && (
-          <>
-            <h2 className='text-xl font-semibold'>Pay with PayPal</h2>
+        <section
+          className={`${mode === 'paypal_buttons' ? 'block' : 'hidden'} w-full !mx-auto`}
+        >
+          <PayPalButtons
+            createOrder={createOrder}
+            onApprove={onApprove}
+            style={{
+              layout: 'horizontal',
+              color: 'blue',
+              shape: 'pill',
+              label: 'pay',
+              height: 40,
+            }}
+          />
+        </section>
 
-            <PayPalButtons
-              createOrder={createOrder}
-              onApprove={onApprove}
-              style={{
-                layout: 'horizontal',
-                color: 'blue',
-                shape: 'pill',
-                label: 'pay',
-                height: 40,
-              }}
-            />
-          </>
-        )}
-
-        {mode === 'card' && (
-          <>
-            <h3 className='text-lg font-medium'>Or pay with card</h3>
-
-            <PayPalCardFieldsProvider
-              createOrder={createOrder}
-              onApprove={onApprove}
-              onError={(err) => {
-                console.error('PayPal Card Fields Error:', err);
-                errorToast({
-                  message:
-                    'An error occurred during payment. Please try again.',
-                });
-              }}
-              style={{
-                input: {
-                  color: '#fff',
-                  'font-size': '14px',
-                  'font-family': 'Inter',
-                  // @ts-ignore
-                  background: 'transparent',
-                  // @ts-ignore
-                  border: '1px solid #fff',
-                  padding: '1rem 2rem',
-                  // @ts-ignore
-                  'border-radius': '10px !important',
-                },
+        {/* Paypal Card Field Providers and Fields */}
+        <section
+          className={`${mode === 'card' ? 'block' : 'hidden'} w-full !mx-auto`}
+        >
+          <PayPalCardFieldsProvider
+            createOrder={createOrder}
+            onApprove={onApprove}
+            onError={(err) => {
+              console.error('PayPal Card Fields Error:', err);
+              errorToast({
+                message: 'An error occurred during payment. Please try again.',
+              });
+            }}
+            style={{
+              input: {
+                color: '#fff',
+                'font-size': '14px',
+                'font-family': 'Inter',
                 // @ts-ignore
-                'input:focus': { border: '3px solid #fff' },
-                'input:is(:-webkit-autofill, :autofill)': {
-                  // @ts-ignore
-                  background: 'transparent !important',
-                },
-                'input::placeholder': {
-                  color: '#ccc !important',
-                },
-                '.invalid': { color: '#DC2626' },
-              }}
-            >
-              {/* Card Field Inputs Start Here */}
-              <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                <PayPalNameField />
-                <PayPalNumberField />
-                <PayPalExpiryField />
-                <PayPalCVVField />
+                background: 'transparent',
+                // @ts-ignore
+                border: '1px solid #fff',
+                padding: '1rem 2rem',
+                // @ts-ignore
+                'border-radius': '10px !important',
+              },
+              // @ts-ignore
+              'input:focus': { border: '3px solid #fff' },
+              'input:is(:-webkit-autofill, :autofill)': {
+                // @ts-ignore
+                background: 'transparent !important',
+              },
+              'input::placeholder': {
+                color: '#ccc !important',
+              },
+              '.invalid': { color: '#DC2626' },
+            }}
+          >
+            {/* Card Field Inputs Start Here */}
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+              <PayPalNameField />
+              <PayPalNumberField />
+              <PayPalExpiryField />
+              <PayPalCVVField />
 
-                {/* Other input fields for card details */}
-                {(
-                  [
-                    { placeholder: 'Address line 1', strName: 'addressLine1' },
-                    { placeholder: 'Address line 2', strName: 'addressLine2' },
-                    { placeholder: 'State / Province', strName: 'adminArea1' },
-                    { placeholder: 'City / Town', strName: 'adminArea2' },
-                    {
-                      placeholder: 'Country Code (e.g. US)',
-                      strName: 'countryCode',
-                    },
-                    { placeholder: 'Postal Code', strName: 'postalCode' },
-                  ] as {
-                    placeholder: string;
-                    strName: keyof typeof billingAddress;
-                  }[]
-                ).map((each) => {
-                  const { strName, placeholder } = each;
-                  return (
-                    <Input
-                      className='bg-transparent placeholder:text-[#ccc] !py-[1rem] !px-[2rem] text-[14px]
+              {/* Other input fields for card details */}
+              {(
+                [
+                  { placeholder: 'Address line 1', strName: 'addressLine1' },
+                  { placeholder: 'Address line 2', strName: 'addressLine2' },
+                  { placeholder: 'State / Province', strName: 'adminArea1' },
+                  { placeholder: 'City / Town', strName: 'adminArea2' },
+                  {
+                    placeholder: 'Country Code (e.g. US)',
+                    strName: 'countryCode',
+                  },
+                  { placeholder: 'Postal Code', strName: 'postalCode' },
+                ] as {
+                  placeholder: string;
+                  strName: keyof typeof billingAddress;
+                }[]
+              ).map((each) => {
+                const { strName, placeholder } = each;
+                return (
+                  <Input
+                    className='bg-transparent placeholder:text-[#ccc] !py-[1rem] !px-[2rem] text-[14px]
                   h-[unset] rounded-[10px] w-full'
-                      key={strName}
-                      name={placeholder}
-                      placeholder={placeholder}
-                      value={billingAddress[strName]}
-                      onChange={(e) =>
-                        handleBillingAddressChange(strName, e.target.value)
-                      }
-                    />
-                  );
-                })}
-              </div>
+                    key={strName}
+                    name={placeholder}
+                    placeholder={placeholder}
+                    value={billingAddress[strName]}
+                    onChange={(e) =>
+                      handleBillingAddressChange(strName, e.target.value)
+                    }
+                  />
+                );
+              })}
+            </div>
 
-              <SubmitPayment isPaying={isPaying} setIsPaying={setIsPaying} />
-            </PayPalCardFieldsProvider>
-          </>
-        )}
+            <SubmitPaypalCardPaymentButton
+              isPaying={isPaying}
+              setIsPaying={setIsPaying}
+            />
+          </PayPalCardFieldsProvider>
+        </section>
       </div>
     </PayPalScriptProvider>
   );
 };
 
-function SubmitPayment({
+function SubmitPaypalCardPaymentButton({
   isPaying,
   setIsPaying,
 }: {
@@ -227,7 +226,8 @@ function SubmitPayment({
       name='Pay with Card'
       onClick={handleClick}
       disabled={isPaying}
-      className='mt-4 ml-auto'
+      className='border-[#0085FF] text-white bg-[#0085FF] hover:bg-[#0085FF]/70 hover:text-white 
+      !font-bold px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base text-center !my-5 w-full'
     >
       {isPaying ? <Loader className='w-4 h-4 animate-spin' /> : 'Pay with Card'}
     </Button>
