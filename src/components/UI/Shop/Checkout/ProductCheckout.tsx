@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/UI/primitives/checkbox';
 import { useState } from 'react';
 import { Button } from '@/components/UI/primitives/button';
 import dynamic from 'next/dynamic';
+import { Label } from '../../primitives/label';
 
 export type CheckoutOptions = 'card' | 'paypal_buttons' | 'google_pay' | '';
 
@@ -42,8 +43,14 @@ const CheckoutPage = () => {
                   className={`w-[1.15rem] h-[1.15rem] border-white text-white`}
                   checked={payOption === 'card'}
                   onCheckedChange={() => setPayOption('card')}
+                  id='paypal_card_checkbox'
                 />
-                Credit/Debit Card
+                <Label
+                  htmlFor='paypal_card_checkbox'
+                  className='cursor-pointer'
+                >
+                  Credit/Debit Card
+                </Label>
               </p>
               {/*  */}
 
@@ -53,13 +60,16 @@ const CheckoutPage = () => {
                   className={`w-[1.15rem] h-[1.15rem] border-white text-white`}
                   checked={payOption === 'paypal_buttons'}
                   onCheckedChange={() => setPayOption('paypal_buttons')}
+                  id='paypal_buttons'
                 />
 
-                <Image
-                  className='w-10 h-auto'
-                  src={PayPal}
-                  alt='Pay with Paypal'
-                />
+                <Label htmlFor='paypal_buttons' className='cursor-pointer'>
+                  <Image
+                    className='w-10 h-auto'
+                    src={PayPal}
+                    alt='Pay with Paypal'
+                  />
+                </Label>
               </p>
               {/*  */}
 

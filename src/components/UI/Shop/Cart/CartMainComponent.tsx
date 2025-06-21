@@ -57,7 +57,7 @@ const CartMainComponent = () => {
         {!isCartEmpty && variants && (
           <div className='flex flex-col gap-8 max-h-[90vh] px-5 overflow-y-auto scrollbar'>
             {/* All Cart Items */}
-            <CartItems cartItems={variants.reverse()} />
+            <CartItems cartItems={variants} />
           </div>
         )}
       </div>

@@ -1,7 +1,27 @@
 import Image from 'next/image';
 import ProductImage from '@/assets/img/t-shirt-2.png';
+import { useEffect } from 'react';
+import { getOrderFinalDetails } from '@/actions/shop/checkout/getOrderFinalDetails';
+import { useCartStore } from '@/stores/shop_stores/cartStore';
 
 const OrderSummary = () => {
+  const cart = useCartStore((store) => store.variants);
+
+  useEffect(() => {
+    const func = async () => {
+      const orderDetailsFromServer = await getOrderFinalDetails(
+        cart,
+        'USA',
+        'merchize'
+      );
+
+      console.log(orderDetailsFromServer);
+    };
+
+    func();
+  }, [cart]);
+
+  // Main JSX
   return (
     <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[10px] md:p-10 space-y-8 lg:col-span-5'>
       <h2 className='border-b border-white pb-1 text-xl font-bold'>

@@ -206,7 +206,7 @@ export const fetchProductVariants = cache((productIDorSlug: string) => {
     const res = await fetch(
       `${merchizeBaseURL}/product/products/${productIDorSlug}/all-variants`,
       {
-        headers: { Authorization: `Bearer ${merchizeToken}` },
+        headers: { 'X-API-KEY': `${merchizeAPIKey}` },
         next: { revalidate: cacheForDays(7) },
       }
     );

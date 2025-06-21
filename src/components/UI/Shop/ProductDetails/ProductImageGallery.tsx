@@ -72,7 +72,7 @@ export const ProductImageGallery: FC = () => {
               onContextMenu={preventImageClickandDrag}
               onDragStart={preventImageClickandDrag}
               priority
-              className='rounded-[20px] size-full object-cover object-top aspect-[16/13]'
+              className='rounded-[20px] size-full object-cover object-top aspect-[16/18] md:aspect-[16/13]'
               width={512}
               height={288}
               src={imagesArr[currentItem]}

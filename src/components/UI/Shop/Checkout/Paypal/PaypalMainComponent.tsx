@@ -12,6 +12,7 @@ import {
   PayPalCVVField,
   usePayPalCardFields,
 } from '@paypal/react-paypal-js';
+import { OnApproveData } from '@paypal/paypal-js';
 import { Input } from '@/components/UI/primitives/input';
 import { Button } from '@/components/UI/primitives/button';
 import { Loader } from 'lucide-react';
@@ -34,7 +35,7 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
     'buyer-country': 'US',
     currency: 'USD',
     components: 'buttons,card-fields',
-    // 'data-sdk-integration-source': 'developer-studio',
+    'data-sdk-integration-source': 'developer-studio',
   };
 
   const [billingAddress, setBillingAddress] = useState({
@@ -54,7 +55,7 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
   };
 
   const createOrder = async () => {
-    const response = await fetch('/api/orders', {
+    const response = await fetch('/next-api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -69,7 +70,7 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
     );
   };
 
-  const onApprove = async (data: any) => {
+  const onApprove = async (data: OnApproveData) => {
     const res = await fetch(`/api/orders/${data.orderID}/capture`, {
       method: 'POST',
     });
@@ -94,6 +95,9 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
           <PayPalButtons
             createOrder={createOrder}
             onApprove={onApprove}
+            onError={(err) => {
+              errorToast({ message: String(err) });
+            }}
             style={{
               layout: 'horizontal',
               color: 'blue',
@@ -194,6 +198,7 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
   );
 };
 
+// Pay Now button
 function SubmitPaypalCardPaymentButton({
   isPaying,
   setIsPaying,
