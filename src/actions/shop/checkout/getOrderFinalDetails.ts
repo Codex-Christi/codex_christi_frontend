@@ -14,10 +14,10 @@ export const getOrderFinalDetails = async (
   supplier: dropShippingSupplier
 ) => {
   const countrySupport = await getCountrySupport(country_iso3, supplier);
-  const finalPricesWithDelivery = await getMerchizeTotalWIthShipping(
+  const finalPricesWithShippingFee = await getMerchizeTotalWIthShipping(
     cart,
     country_iso3
   );
 
-  return { countrySupport, finalPricesWithDelivery };
+  return { countrySupport, finalPricesWithShippingFee };
 };

@@ -1,13 +1,11 @@
 'use server';
 
-import {
-  getCurrency,
-  ShippingCountryObj,
-} from '@/lib/datasetSearchers/shippingSupportMerchize';
+import { ShippingCountryObj } from '@/lib/datasetSearchers/shippingSupportMerchize';
 import { CartVariant } from '@/stores/shop_stores/cartStore';
 import { getCatalogItems } from './getItemCatalogInfo';
 import { CatalogItem } from '@/lib/datasetSearchers/merchize/catalog';
 import { europeanIso3Codes } from '@/datasets/shop_general/europeISO3Codes';
+import { getDollarMultiplier } from '../shop/general/currencyConvert';
 
 export const getMerchizeTotalWIthShipping = async (
   cart: CartVariant[],
@@ -23,7 +21,7 @@ export const getMerchizeTotalWIthShipping = async (
 
     const shippingPriceObj = await getShippingPriceMerchizecatalog(
       cartSKUCatalogShippingData,
-      'USA'
+      country_iso3
     );
 
     const variantwithCorrespondingParentProduct =
@@ -46,6 +44,9 @@ export const getMerchizeTotalWIthShipping = async (
   }
 };
 
+// Function to calculate shipping price based on catalog items and country
+// This function calculates the total shipping price based on the catalog items and the country ISO3 code.
+// It uses the catalog items to determine the shipping fees based on the region (US, EU, or ROW).
 export const getShippingPriceMerchizecatalog = async (
   catalogArr: CatalogItem[],
   country_iso3: ShippingCountryObj['country_iso3']
@@ -72,8 +73,19 @@ export const getShippingPriceMerchizecatalog = async (
 
   const shippingNum = Math.ceil(shippingPriceServer);
 
+  const dollarMultiplierResult = await getDollarMultiplier(country_iso3);
+  let shippingPriceNum: number | null = null;
+  if ('multiplier' in dollarMultiplierResult) {
+    shippingPriceNum = dollarMultiplierResult.multiplier * shippingNum;
+  } else {
+    // Handle error case, e.g., set shippingPriceNum to 0 or null
+    shippingPriceNum = shippingNum * 1.5;
+    // Optionally, you can log or throw the error
+    // console.error(dollarMultiplierResult.error);
+  }
+
   return {
-    shippingPriceNum: shippingNum,
-    currency: await getCurrency(country_iso3),
+    shippingPriceNum: Math.ceil(shippingPriceNum * 100) / 100,
+    currency: dollarMultiplierResult.currency,
   };
 };
