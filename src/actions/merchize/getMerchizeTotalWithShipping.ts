@@ -24,7 +24,7 @@ export const getMerchizeTotalWIthShipping = async (
       country_iso3
     );
 
-    const variantwithCorrespondingParentProduct =
+    const variantsWithCorrespondingParentProduct =
       // Filtering the cart to only include items that are in the SKU catalog
       //   'Filtered Cart Items:',
       cart
@@ -89,3 +89,10 @@ export const getShippingPriceMerchizecatalog = async (
     currency: dollarMultiplierResult.currency,
   };
 };
+
+const realTimePriceFromMerchize = async (
+  variantsAndParents: {
+    variantId: string;
+    parentID: string | undefined;
+  }[]
+) => {};
