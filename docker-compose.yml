@@ -30,7 +30,7 @@ services:
       - .env.production
     volumes:
       - 'app_build:/app/.next'
-    command: ['yarn', 'build-with-env']
+    command: ['yarn', 'build']
 
 volumes:
   # The volume that is going to store the .next directory where the built
