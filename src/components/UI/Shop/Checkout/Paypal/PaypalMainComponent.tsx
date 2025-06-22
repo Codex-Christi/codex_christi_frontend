@@ -16,6 +16,9 @@ import dynamic from 'next/dynamic';
 const MyPayPalCardFields = dynamic(() =>
   import('./MyPaypalCardFields').then((comp) => comp.default)
 );
+const MyPaypalButtons = dynamic(() =>
+  import('./MyPaypalButtons').then((comp) => comp.default)
+);
 
 const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
   // Hooks
@@ -119,25 +122,12 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
     <PayPalScriptProvider options={initialOptions}>
       <div className='w-full mx-auto'>
         {/* Paypal Buttons */}
-        <section
-          className={`${mode === 'paypal_buttons' ? 'block' : 'hidden'} w-full !mx-auto`}
-        >
-          <PayPalButtons
-            createOrder={createOrder}
-            onApprove={onApprove}
-            onError={(err) => {
-              console.error(String(err));
-              errorToast({ message: String(err) });
-            }}
-            style={{
-              layout: 'horizontal',
-              color: 'blue',
-              shape: 'pill',
-              label: 'pay',
-              height: 40,
-            }}
-          />
-        </section>
+
+        <MyPaypalButtons
+          mode={mode}
+          createOrder={createOrder}
+          onApprove={onApprove}
+        />
 
         {/* Paypal Card Fields */}
         <MyPayPalCardFields

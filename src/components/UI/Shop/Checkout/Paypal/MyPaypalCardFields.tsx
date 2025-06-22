@@ -21,9 +21,9 @@ import { Loader } from 'lucide-react';
   /* Paypal Card Field Providers and Fields */
 }
 
-interface PayPalCardFieldInterface {
+export interface MyPayPalCardFieldInterface {
   mode: CheckoutOptions;
-  createOrder: () => Promise<string | undefined>;
+  createOrder: () => Promise<string>;
   billingAddress: {
     addressLine1: string;
     addressLine2: string;
@@ -45,7 +45,7 @@ interface PayPalCardFieldInterface {
   onApprove: (data: OnApproveData) => Promise<void>;
 }
 
-const MyPayPalCardFields: FC<PayPalCardFieldInterface> = (props) => {
+const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = (props) => {
   // Props
   const {
     mode,
