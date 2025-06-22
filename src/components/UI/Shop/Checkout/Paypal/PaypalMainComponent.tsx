@@ -1,16 +1,13 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 'use client';
 
 import { FC, useState } from 'react';
-import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
+import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { OnApproveData } from '@paypal/paypal-js';
-
 import errorToast from '@/lib/error-toast';
 import { CheckoutOptions } from '../ProductCheckout';
 import { createOrderAction } from '@/actions/shop/paypal/createOrderAction';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import successToast from '@/lib/success-toast';
-
 import dynamic from 'next/dynamic';
 
 const MyPayPalCardFields = dynamic(() =>

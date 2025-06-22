@@ -1,6 +1,7 @@
 'use server';
 import { CartVariant } from '@/stores/shop_stores/cartStore';
 import { headers } from 'next/headers';
+import { cache } from 'react';
 import 'server-only';
 
 interface BillingAddressInterfacebillingAddress {
@@ -12,46 +13,54 @@ interface BillingAddressInterfacebillingAddress {
   postalCode: string;
 }
 
-export const createOrderAction = async (
-  cart: CartVariant[],
-  billingAddress: BillingAddressInterfacebillingAddress,
-  customer?: { name: string; email: string }
-) => {
-  if (!cart) {
-    throw new Error('Missing cart');
-  } else if (!Array.isArray(cart)) {
-    throw new Error('Cart must be an array');
-  }
-  if (!billingAddress) {
-    throw new Error('Missing billingAddress');
-  }
-  //   if (!customer) {
-  //     throw new Error('Missing customer');
-  //   }
+export const createOrderAction = cache(
+  async (
+    cart: CartVariant[],
+    billingAddress: BillingAddressInterfacebillingAddress,
+    customer?: { name: string; email: string }
+  ) => {
+    if (!cart) {
+      throw new Error('Missing cart');
+    } else if (!Array.isArray(cart)) {
+      throw new Error('Cart must be an array');
+    }
+    if (!billingAddress) {
+      throw new Error('Missing billingAddress');
+    }
+    //   if (!customer) {
+    //     throw new Error('Missing customer');
+    //   }
 
-  //   Main Fetcher
+    //   Main Fetcher
 
-  const headersList = await headers();
-  const host = headersList.get('host');
+    const headersList = await headers();
+    const protocol = headersList.get('x-forwarded-proto') || 'http'; // Default to http if header is missing
+    const host = headersList.get('host');
 
-  const response = await fetch(`${host}/next-api/paypal/orders/create-order`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      cart,
-      billingAddress,
-      customer: { name: 'Saint', email: 'derer@wee.com' },
-    }),
-  });
+    console.log(`${protocol}://${host}/next-api/paypal/orders/create-order`);
 
-  if (!response.ok) {
-    console.log(response);
-
-    const errorText = await response.text();
-    throw new Error(
-      `Request failed: ${response.status} ${response.statusText} - ${errorText}`
+    const response = await fetch(
+      `${protocol}://${host}/next-api/paypal/orders/create-order`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cart,
+          billingAddress,
+          customer: { name: 'Saint', email: 'derer@wee.com' },
+        }),
+      }
     );
-  }
 
-  return await response.json();
-};
+    if (!response.ok) {
+      console.log(response);
+
+      const errorText = await response.text();
+      throw new Error(
+        `Request failed: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    return await response.json();
+  }
+);
