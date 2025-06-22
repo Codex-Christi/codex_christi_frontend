@@ -19,7 +19,9 @@ export async function getDollarMultiplier(
     }
 
     // Get currency from map
-    let currencyCode = await getCurrency(code);
+    const currencyData = await getCurrency(code);
+    let { currency: currencyCode } = currencyData;
+    const { currency_symbol } = currencyData;
 
     // Validate currency exists
     if (!currencyCode) {
@@ -69,7 +71,8 @@ export async function getDollarMultiplier(
     return {
       multiplier,
       currency: currencyCode,
-      ...(warnings.length > 0 && { warning: warnings.join(' ') }),
+      currency_symbol: currency_symbol,
+      ...(warnings.length > 0 ? { warnings } : {}),
     };
   } catch (error) {
     console.error(`Conversion failed for ${countryCode}:`, error);

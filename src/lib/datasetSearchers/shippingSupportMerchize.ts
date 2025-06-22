@@ -8,6 +8,7 @@ export type ShippingCountryObj = {
   country_iso3: string;
   country_name: string;
   currency: string;
+  currency_symbol: string;
   printful: boolean;
   merchize: boolean;
   both: boolean;
@@ -49,5 +50,7 @@ export async function getCurrency(
   const map = await loadCatalog();
   const country = map.get(country_iso3);
 
-  return country?.currency;
+  const { currency, currency_symbol } = country ? country : {};
+
+  return { currency, currency_symbol };
 }

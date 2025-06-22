@@ -1,25 +1,33 @@
 import Image from 'next/image';
 import ProductImage from '@/assets/img/t-shirt-2.png';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getOrderFinalDetails } from '@/actions/shop/checkout/getOrderFinalDetails';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 
 const OrderSummary = () => {
   const cart = useCartStore((store) => store.variants);
 
+  const [serverOrderDetails, setServerOrderDetails] = useState<Awaited<
+    ReturnType<typeof getOrderFinalDetails>
+  > | null>(null);
+
   useEffect(() => {
     const func = async () => {
       const orderDetailsFromServer = await getOrderFinalDetails(
         cart,
-        'USA',
+        'DEU',
         'merchize'
       );
 
-      console.log(orderDetailsFromServer);
+      setServerOrderDetails(orderDetailsFromServer);
     };
 
     func();
   }, [cart]);
+
+  // Destructuring
+  const { retailPriceTotalNum, shippingPriceNum, currency, currency_symbol } =
+    serverOrderDetails?.finalPricesWithShippingFee ?? {};
 
   // Main JSX
   return (
@@ -67,24 +75,26 @@ const OrderSummary = () => {
           </button>
         </div>
 
-        <div className='space-y-2'>
-          <p className='flex items-center justify-between gap-4 font-semibold'>
-            <span>Subtotal</span>
+        {/* Order Details Final */}
+        {serverOrderDetails?.finalPricesWithShippingFee && (
+          <div className='space-y-2'>
+            <p className='flex items-center justify-between gap-4 font-semibold'>
+              <span>Subtotal</span>
 
-            <span>N34,700</span>
-          </p>
+              <span>{`${currency_symbol} ${retailPriceTotalNum}`}</span>
+            </p>
 
-          <p className='flex items-center justify-between gap-4 font-semibold'>
-            <span>Shipping/Delivery Fee</span>
+            <p className='flex items-center justify-between gap-4 font-semibold'>
+              <span>Shipping/Delivery Fee</span>
 
-            <span>N3,000</span>
-          </p>
-        </div>
+              <span>{`${currency_symbol} ${shippingPriceNum}`}</span>
+            </p>
+          </div>
+        )}
 
         <p className='flex items-center justify-between gap-4 font-semibold'>
           <span>Total</span>
-
-          <span className='text-lg'>N37,700</span>
+          <span className='text-lg'>{`${(retailPriceTotalNum ?? 0) + (shippingPriceNum ?? 0)} ${currency}`}</span>
         </p>
       </div>
     </div>

@@ -6,7 +6,6 @@ import GooglePay from '@/assets/img/gpay.png';
 import Link from 'next/link';
 import { Checkbox } from '@/components/UI/primitives/checkbox';
 import { useState } from 'react';
-import { Button } from '@/components/UI/primitives/button';
 import dynamic from 'next/dynamic';
 import { Label } from '../../primitives/label';
 
