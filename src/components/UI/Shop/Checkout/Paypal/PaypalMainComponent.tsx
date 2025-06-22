@@ -18,22 +18,25 @@ import { Button } from '@/components/UI/primitives/button';
 import { Loader } from 'lucide-react';
 import errorToast from '@/lib/error-toast';
 import { CheckoutOptions } from '../ProductCheckout';
+import { createOrderAction } from '@/actions/shop/paypal/createOrderAction';
+import { useCartStore } from '@/stores/shop_stores/cartStore';
+import successToast from '@/lib/success-toast';
 
 const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
   // Hooks
   const { mode } = props;
+  const cart = useCartStore((store) => store.variants);
 
   // State Values
   const [isPaying, setIsPaying] = useState(false);
 
   const initialOptions = {
-    clientId: process.env.NEXT_PAYPAL_CLIENT_ID!,
-    'client-id':
-      'AVcDvH0fKfAjo2YtUKnmlaWyqoNgxauhAS2dI6ZwIpidqUudBnnS99a-J1h44JuWbFLcAfntTI03Vwaj',
+    clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
+    'client-id': process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
     'enable-funding': 'venmo',
-    'disable-funding': '',
     'buyer-country': 'US',
     currency: 'USD',
+    intent: 'authorize',
     components: 'buttons,card-fields',
     'data-sdk-integration-source': 'developer-studio',
   };
@@ -55,33 +58,64 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
   };
 
   const createOrder = async () => {
-    const response = await fetch('/next-api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cart: [{ sku: '1blwyeo8', quantity: 2 }],
-        billingAddress,
-      }),
-    });
-    const orderData = await response.json();
-    if (orderData.id) return orderData.id;
-    throw new Error(
-      orderData?.details?.[0]?.description || 'Order creation failed'
-    );
+    try {
+      const response = await createOrderAction(cart, billingAddress);
+      //
+      const orderData = await JSON.parse(response);
+
+      if (orderData.id) {
+        return orderData.id;
+      } else {
+        const errorDetail = orderData?.result;
+        const errorMessage = errorDetail
+          ? `${errorDetail.error} ${errorDetail.error_description} (${orderData.debug_id ?? ''})`
+          : JSON.stringify(orderData);
+
+        throw new Error(errorMessage);
+      }
+    } catch (err) {
+      console.log(err);
+
+      errorToast({
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
   };
 
-  const onApprove = async (data: OnApproveData) => {
-    const res = await fetch(`/api/orders/${data.orderID}/capture`, {
+  const onApprove = async (data: OnApproveData): Promise<void> => {
+    const authRes = await fetch('/next-api/paypal/orders/authorize', {
       method: 'POST',
+      body: JSON.stringify({ orderID: data.orderID }),
     });
-    const orderData = await res.json();
-    const transaction =
-      orderData?.purchase_units?.[0]?.payments?.captures?.[0] ||
-      orderData?.purchase_units?.[0]?.payments?.authorizations?.[0];
-    if (!transaction || transaction.status === 'DECLINED') {
-      alert('Payment declined or incomplete');
+
+    // console.log(authRes);
+
+    const authData = JSON.parse(await authRes.json());
+
+    console.log(authData);
+
+    const authorizationId =
+      authData?.purchase_units?.[0]?.payments?.authorizations?.[0]?.id;
+
+    if (!authorizationId) {
+      errorToast({ message: 'Missing authorization ID' });
+      return;
+    }
+
+    const capRes = await fetch('/next-api/paypal/orders/capture', {
+      method: 'POST',
+      body: JSON.stringify({ authorizationId }),
+    });
+
+    const captured = JSON.parse(await capRes.json());
+
+    if (captured?.status === 'COMPLETED') {
+      successToast({
+        message: `Transaction complete: ${captured.id},`,
+        header: 'Payment Successfull!',
+      });
     } else {
-      alert(`Transaction ${transaction.status}: ${transaction.id}`);
+      errorToast({ message: `Capture failed` });
     }
   };
 
@@ -96,6 +130,7 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
             createOrder={createOrder}
             onApprove={onApprove}
             onError={(err) => {
+              console.error(String(err));
               errorToast({ message: String(err) });
             }}
             style={{

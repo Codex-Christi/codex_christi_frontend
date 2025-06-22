@@ -15,7 +15,7 @@ const OrderSummary = () => {
     const func = async () => {
       const orderDetailsFromServer = await getOrderFinalDetails(
         cart,
-        'DEU',
+        'NGA',
         'merchize'
       );
 
@@ -36,7 +36,7 @@ const OrderSummary = () => {
         Order Summary
       </h2>
 
-      <div className='grid gap-12'>
+      <div className='grid gap-12 select-none cursor-pointer'>
         <div className='flex items-start justify-between gap-4'>
           <div className='flex items-center gap-4'>
             <Image
@@ -92,10 +92,14 @@ const OrderSummary = () => {
           </div>
         )}
 
-        <p className='flex items-center justify-between gap-4 font-semibold'>
-          <span>Total</span>
-          <span className='text-lg'>{`${(retailPriceTotalNum ?? 0) + (shippingPriceNum ?? 0)} ${currency}`}</span>
-        </p>
+        {serverOrderDetails?.finalPricesWithShippingFee && (
+          <p className='flex items-center justify-between gap-4 font-semibold'>
+            <span>Total</span>
+            <span className='text-lg'>{`${(
+              (retailPriceTotalNum ?? 0) + (shippingPriceNum ?? 0)
+            ).toLocaleString()} ${currency}`}</span>
+          </p>
+        )}
       </div>
     </div>
   );

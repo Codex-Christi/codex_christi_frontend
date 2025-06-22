@@ -6,28 +6,44 @@ import { useCurrentVariant } from './currentVariantStore';
 import { GalleryPrevButton } from './GalleryPrevButton';
 import { GalleryNextButton } from './GalleryNextButton';
 import useAuthStore from '@/stores/authStore';
-import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
+// import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 export const ProductImageGallery: FC = () => {
   const [currentItem, setCurrentItem] = useState(0);
 
   const productDetailsContext = useProductDetailsContext();
-  const matchingVariant = useCurrentVariant((state) => state.matchingVariant);
+  const { matchingVariant, setMatchingVariant } = useCurrentVariant(
+    (state) => state
+  );
 
   const metadata = productDetailsContext.productMetaData;
-  const imagesArr = useMemo(() => {
+  // Compute image URLs for gallery
+  const images = useMemo(() => {
     const image_uris = matchingVariant?.image_uris ?? [];
     return image_uris && image_uris.length > 0
       ? image_uris.map((uri) => `https://d2dytk4tvgwhb4.cloudfront.net/${uri}`)
       : [metadata.image];
   }, [matchingVariant?.image_uris, metadata.image]);
+
   const isAuthenticated = useAuthStore((store) => store.isAuthenticated);
 
-  useEffect(() => {
-    if (imagesArr.length === 1) setCurrentItem(0);
-  }, [imagesArr.length]);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const preventImageClickandDrag = (e: React.MouseEvent<HTMLImageElement>) => {
+  useEffect(() => {
+    // Reset current image index and variant when URL changes
+    setCurrentItem(0);
+    setMatchingVariant(null);
+  }, [pathname, searchParams, setMatchingVariant]);
+
+  useEffect(() => {
+    // Ensure currentItem is 0 if only one image
+    if (images.length === 1) setCurrentItem(0);
+  }, [images.length]);
+
+  // Prevent right-click and drag on images
+  const preventImageClickAndDrag = (e: React.MouseEvent<HTMLImageElement>) => {
     e.preventDefault();
   };
 
@@ -36,14 +52,13 @@ export const ProductImageGallery: FC = () => {
       className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-2 lg:p-8 
     flex flex-col gap-8 items-start sm:gap-12 sm:flex-row lg:flex-col-reverse xl:flex-row'
     >
-      {/* Thumbnail Image Section*/}
-
+      {/* Thumbnails */}
       <div
         className='grid gap-4 grid-cols-5 order-2 sm:grid-cols-1  sm:order-1 
        lg:grid-cols-5 xl:grid-cols-1 xl:order-1'
       >
-        {imagesArr &&
-          imagesArr.map((image, index) => (
+        {images &&
+          images.map((image, index) => (
             <div
               className={`rounded-[15px] sm:rounded-[20px] size-14 sm:size-20 border-2 cursor-pointer 
                 ${index === currentItem ? 'border-white' : 'border-transparent'}`}
@@ -51,51 +66,51 @@ export const ProductImageGallery: FC = () => {
               onClick={() => setCurrentItem(index)}
             >
               <Image
-                onContextMenu={preventImageClickandDrag}
-                onDragStart={preventImageClickandDrag}
-                priority
+                onContextMenu={preventImageClickAndDrag}
+                onDragStart={preventImageClickAndDrag}
+                alt={metadata?.title || 'Product image'}
                 className='rounded-[20px] transition-all'
                 src={image}
                 width={80}
                 height={80}
-                alt='Dummy product name'
                 quality={100}
               />
             </div>
           ))}
       </div>
-      {/* Main Image Section */}
+      {/* Main Image */}
       <div className='flex items-start w-full h-full gap-4 sm:gap-8 sm:order-2'>
         <div className='rounded-[20px] w-[95%] h-full relative'>
-          {imagesArr[currentItem] && (
+          {images[currentItem] && (
             <Image
-              onContextMenu={preventImageClickandDrag}
-              onDragStart={preventImageClickandDrag}
+              onContextMenu={preventImageClickAndDrag}
+              onDragStart={preventImageClickAndDrag}
               priority
               className='rounded-[20px] size-full object-cover object-top aspect-[16/18] md:aspect-[16/13]'
               width={512}
               height={288}
-              src={imagesArr[currentItem]}
+              src={images[currentItem]}
               alt='Dummy product name'
               quality={100}
             />
           )}
 
-          {/* Navigation Buttons */}
-          {imagesArr.length > 1 && (
+          {/* Gallery navigation */}
+          {images.length > 1 && (
             <>
               <GalleryPrevButton
                 setCurrentItem={setCurrentItem}
-                imagesArr={imagesArr}
+                imagesArr={images}
               />
               <GalleryNextButton
                 setCurrentItem={setCurrentItem}
-                imagesArr={imagesArr}
+                imagesArr={images}
               />
             </>
           )}
         </div>
 
+        {/* Action buttons */}
         <div className='grid gap-8'>
           <Link href=''>
             <svg width='26' height='26' viewBox='0 0 26 26' fill='none'>
@@ -112,7 +127,7 @@ export const ProductImageGallery: FC = () => {
             </svg>
           </Link>
 
-          {/* Wishlist Button */}
+          {/* Wishlist button, only if authenticated */}
           {isAuthenticated && (
             <Link href=''>
               <svg width='30' height='26' viewBox='0 0 30 26' fill='none'>
