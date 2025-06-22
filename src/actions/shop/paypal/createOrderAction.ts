@@ -18,13 +18,31 @@ type OptionalBillingConfig<T extends boolean> = T extends true
   ? { billingAddress: BillingAddressInterface }
   : null | object;
 
+interface CreateOrderActionInterface {
+  acceptBilling: boolean;
+  cart: CartVariant[];
+  customer?: { name: string; email: string };
+}
+
+interface BillingEnabledCreate extends CreateOrderActionInterface {
+  acceptBilling: true;
+  billingAddress: BillingAddressInterface;
+}
+
+interface BillingDisabledCreate extends CreateOrderActionInterface {
+  acceptBilling: false;
+  billingAddress: never;
+}
+
+export type createOrderActionConfig =
+  | BillingEnabledCreate
+  | BillingDisabledCreate;
+
 export const createOrderAction = cache(
-  async <T extends boolean>(
-    acceptBilling: T,
-    cart: CartVariant[],
-    billingAddress: OptionalBillingConfig<T>,
-    customer?: { name: string; email: string }
-  ) => {
+  async (data: createOrderActionConfig) => {
+    // Destructure
+    const { cart, customer, acceptBilling, billingAddress } = data;
+
     // Validate Cart
     if (!cart) {
       throw new Error('Missing cart');
@@ -35,7 +53,10 @@ export const createOrderAction = cache(
     } else if (
       !cart.every(
         (item) =>
-          item && typeof item === 'object' && 'id' in item && 'quantity' in item
+          item &&
+          typeof item === 'object' &&
+          'variantId' in item &&
+          'quantity' in item
       )
     ) {
       throw new Error(
@@ -44,16 +65,18 @@ export const createOrderAction = cache(
     }
 
     // Validate Billing Address
-    if (acceptBilling) {
+    if (acceptBilling === true) {
       if (!billingAddress) {
         throw new Error('Missing billingAddress');
       }
       const parseResult = billingAddressSchema.safeParse(billingAddress);
       if (!parseResult.success) {
         const errorObj = parseResult.error.flatten().fieldErrors;
-        const errorMessages = Object.entries(errorObj)
-          .map(([key, value]) => `${key}: ${(value || []).join(', ')}`)
-          .join('; ');
+        const errorMessages = Object.values(errorObj)
+          .map((value) => value)
+          .join(' \n');
+        console.log(errorMessages);
+
         throw new Error(errorMessages);
       }
     }

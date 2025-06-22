@@ -57,9 +57,17 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
   const createOrder = async (acceptBilling: boolean): Promise<string> => {
     try {
       const response = await createOrderAction(
-        acceptBilling,
-        cart,
-        acceptBilling ? billingAddress : null
+        acceptBilling
+          ? {
+              acceptBilling: true,
+              cart,
+              billingAddress,
+            }
+          : {
+              acceptBilling: false,
+              cart,
+              billingAddress: undefined as never,
+            }
       );
       //
       const orderData = await JSON.parse(response);

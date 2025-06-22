@@ -5,17 +5,18 @@ import {
   CheckoutPaymentIntent,
 } from '@paypal/paypal-server-sdk';
 import { paypalClient } from '@/lib/paymentClients/paypalClient';
+import { createOrderActionConfig } from '@/actions/shop/paypal/createOrderAction';
 
 const orders = new OrdersController(paypalClient);
 
 export async function POST(req: Request) {
-  const body = await req.json();
-  const { cart, billingAddress, customer } = body;
+  const body: createOrderActionConfig = await req.json();
+  const { cart, billingAddress, customer, acceptBilling } = body;
   try {
     if (!cart) {
       throw new Error('Missing cart');
     }
-    if (!billingAddress) {
+    if (!billingAddress && acceptBilling === true) {
       throw new Error('Missing billingAddress');
     }
     if (!customer) {
