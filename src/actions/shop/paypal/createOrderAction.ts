@@ -1,5 +1,6 @@
 'use server';
 import { CartVariant } from '@/stores/shop_stores/cartStore';
+import { headers } from 'next/headers';
 import 'server-only';
 
 interface BillingAddressInterfacebillingAddress {
@@ -29,18 +30,19 @@ export const createOrderAction = async (
   //   }
 
   //   Main Fetcher
-  const response = await fetch(
-    `${process.env.NEXT_INTERNAL_BASE_URL}/next-api/paypal/orders/create-order`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cart,
-        billingAddress,
-        customer: { name: 'Saint', email: 'derer@wee.com' },
-      }),
-    }
-  );
+
+  const headersList = await headers();
+  const host = headersList.get('host');
+
+  const response = await fetch(`${host}/next-api/paypal/orders/create-order`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      cart,
+      billingAddress,
+      customer: { name: 'Saint', email: 'derer@wee.com' },
+    }),
+  });
 
   if (!response.ok) {
     console.log(response);

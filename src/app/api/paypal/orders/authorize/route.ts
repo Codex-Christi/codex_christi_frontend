@@ -1,20 +1,9 @@
 // POST /api/paypal/authorize
 import { NextResponse } from 'next/server';
-import {
-  OrdersController,
-  Client,
-  Environment,
-} from '@paypal/paypal-server-sdk';
+import { OrdersController } from '@paypal/paypal-server-sdk';
+import { paypalClient } from '@/lib/paymentClients/paypalClient';
 
-const client = new Client({
-  environment: Environment.Sandbox,
-  clientCredentialsAuthCredentials: {
-    oAuthClientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
-    oAuthClientSecret: process.env.PAYPAL_CLIENT_SECRET!,
-  },
-});
-
-const orders = new OrdersController(client);
+const orders = new OrdersController(paypalClient);
 
 export async function POST(req: Request) {
   const { orderID } = await req.json();

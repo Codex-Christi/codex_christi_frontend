@@ -1,20 +1,9 @@
 // POST /api/paypal/capture
 import { NextResponse } from 'next/server';
-import {
-  PaymentsController,
-  Client,
-  Environment,
-} from '@paypal/paypal-server-sdk';
+import { PaymentsController } from '@paypal/paypal-server-sdk';
+import { paypalClient } from '@/lib/paymentClients/paypalClient';
 
-const client = new Client({
-  environment: Environment.Sandbox,
-  clientCredentialsAuthCredentials: {
-    oAuthClientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
-    oAuthClientSecret: process.env.PAYPAL_CLIENT_SECRET!,
-  },
-});
-
-const payments = new PaymentsController(client);
+const payments = new PaymentsController(paypalClient);
 
 export async function POST(req: Request) {
   const { authorizationId } = await req.json();

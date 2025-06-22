@@ -15,7 +15,7 @@ const OrderSummary = () => {
     const func = async () => {
       const orderDetailsFromServer = await getOrderFinalDetails(
         cart,
-        'NGA',
+        'USA',
         'merchize'
       );
 
