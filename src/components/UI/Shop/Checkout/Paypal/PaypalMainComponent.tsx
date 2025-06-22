@@ -5,7 +5,10 @@ import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { OnApproveData } from '@paypal/paypal-js';
 import errorToast from '@/lib/error-toast';
 import { CheckoutOptions } from '../ProductCheckout';
-import { createOrderAction } from '@/actions/shop/paypal/createOrderAction';
+import {
+  BillingAddressInterface,
+  createOrderAction,
+} from '@/actions/shop/paypal/createOrderAction';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import successToast from '@/lib/success-toast';
 import dynamic from 'next/dynamic';
@@ -33,14 +36,16 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
     'data-sdk-integration-source': 'developer-studio',
   };
 
-  const [billingAddress, setBillingAddress] = useState({
-    addressLine1: '',
-    addressLine2: '',
-    adminArea1: '',
-    adminArea2: '',
-    countryCode: '',
-    postalCode: '',
-  });
+  const [billingAddress, setBillingAddress] = useState<BillingAddressInterface>(
+    {
+      addressLine1: '',
+      addressLine2: '',
+      adminArea1: '',
+      adminArea2: '',
+      countryCode: '',
+      postalCode: '',
+    }
+  );
 
   const handleBillingAddressChange = (
     field: keyof typeof billingAddress,
@@ -49,9 +54,13 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
     setBillingAddress((prev) => ({ ...prev, [field]: value }));
   };
 
-  const createOrder = async (): Promise<string> => {
+  const createOrder = async (acceptBilling: boolean): Promise<string> => {
     try {
-      const response = await createOrderAction(cart, billingAddress);
+      const response = await createOrderAction(
+        acceptBilling,
+        cart,
+        acceptBilling ? billingAddress : null
+      );
       //
       const orderData = await JSON.parse(response);
 

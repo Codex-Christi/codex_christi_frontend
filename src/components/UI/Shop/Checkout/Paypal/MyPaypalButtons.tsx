@@ -18,7 +18,7 @@ const MyPaypalButtons: FC<
       className={`${mode === 'paypal_buttons' ? 'block' : 'hidden'} w-full !mx-auto`}
     >
       <PayPalButtons
-        createOrder={createOrder}
+        createOrder={() => createOrder(false)}
         onApprove={onApprove}
         onError={(err) => {
           console.error(String(err));

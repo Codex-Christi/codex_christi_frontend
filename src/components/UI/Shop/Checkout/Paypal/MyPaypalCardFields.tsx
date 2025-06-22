@@ -23,7 +23,7 @@ import { Loader } from 'lucide-react';
 
 export interface MyPayPalCardFieldInterface {
   mode: CheckoutOptions;
-  createOrder: () => Promise<string>;
+  createOrder: (acceptBilling: boolean) => Promise<string>;
   billingAddress: {
     addressLine1: string;
     addressLine2: string;
@@ -64,7 +64,7 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = (props) => {
       className={`${mode === 'card' ? 'block' : 'hidden'} w-full !mx-auto`}
     >
       <PayPalCardFieldsProvider
-        createOrder={createOrder}
+        createOrder={() => createOrder(true)}
         onApprove={onApprove}
         onError={(err) => {
           console.error('PayPal Card Fields Error:', err);
