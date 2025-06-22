@@ -40,7 +40,7 @@ export const createOrderAction = cache(
     console.log(`${protocol}://${host}/next-api/paypal/orders/create-order`);
 
     const response = await fetch(
-      `${protocol}://${host}/next-api/paypal/orders/create-order`,
+      `${protocol}://localhost:3000/next-api/paypal/orders/create-order`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
