@@ -10,12 +10,14 @@ import {
   usePayPalCardFields,
 } from '@paypal/react-paypal-js';
 import { FC, useEffect, useRef, useState } from 'react';
-import { CheckoutOptions } from '../ProductCheckout';
+import { CheckoutOptions } from '../PaymentSection';
 import { OnApproveData } from '@paypal/paypal-js';
 import loadingToast from '@/lib/loading-toast';
 import { toast } from 'sonner';
 import { Button } from '@/components/UI/primitives/button';
 import { Loader } from 'lucide-react';
+import { BillingAddressInterface } from '@/actions/shop/paypal/createOrderAction';
+import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
 
 {
   /* Paypal Card Field Providers and Fields */
@@ -130,9 +132,9 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = (props) => {
                 name={placeholder}
                 placeholder={placeholder}
                 value={billingAddress[strName]}
-                onChange={(e) =>
-                  handleBillingAddressChange(strName, e.target.value)
-                }
+                onChange={(e) => {
+                  handleBillingAddressChange(strName, e.target.value);
+                }}
               />
             );
           })}
@@ -141,6 +143,7 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = (props) => {
         <SubmitPaypalCardPaymentButton
           isPaying={isPaying}
           setIsPaying={setIsPaying}
+          billingAddress={billingAddress}
         />
       </PayPalCardFieldsProvider>
     </section>
@@ -151,9 +154,11 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = (props) => {
 function SubmitPaypalCardPaymentButton({
   isPaying,
   setIsPaying,
+  billingAddress,
 }: {
   isPaying: boolean;
   setIsPaying: (val: boolean) => void;
+  billingAddress: BillingAddressInterface;
 }) {
   const { cardFieldsForm } = usePayPalCardFields();
 
@@ -180,9 +185,28 @@ function SubmitPaypalCardPaymentButton({
 
     setIsPaying(true);
     try {
-      await cardFieldsForm.submit();
+      // Validate Billing Address
+      if (!billingAddress) {
+        throw new Error('Missing billingAddress');
+      }
+      const parseResult = billingAddressSchema.safeParse(billingAddress);
+
+      if (!parseResult.success) {
+        const errorObj = parseResult.error.flatten().fieldErrors;
+        const errorMessages = Object.values(errorObj)
+          .map((value) => value)
+          .join(' \n');
+
+        throw new Error(errorMessages);
+      } else {
+        await (
+          cardFieldsForm.submit as (params: {
+            billingAddress: BillingAddressInterface;
+          }) => Promise<void>
+        )({ billingAddress });
+      }
     } catch (err) {
-      console.error(err);
+      errorToast({ message: String(err) as string });
     } finally {
       setIsPaying(false);
     }

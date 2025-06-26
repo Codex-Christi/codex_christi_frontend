@@ -1,5 +1,4 @@
 'use server';
-import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
 import { CartVariant } from '@/stores/shop_stores/cartStore';
 import { headers } from 'next/headers';
 import { cache } from 'react';
@@ -14,34 +13,15 @@ export interface BillingAddressInterface {
   postalCode: string;
 }
 
-type OptionalBillingConfig<T extends boolean> = T extends true
-  ? { billingAddress: BillingAddressInterface }
-  : null | object;
-
-interface CreateOrderActionInterface {
-  acceptBilling: boolean;
+export interface CreateOrderActionInterface {
   cart: CartVariant[];
   customer?: { name: string; email: string };
 }
 
-interface BillingEnabledCreate extends CreateOrderActionInterface {
-  acceptBilling: true;
-  billingAddress: BillingAddressInterface;
-}
-
-interface BillingDisabledCreate extends CreateOrderActionInterface {
-  acceptBilling: false;
-  billingAddress: never;
-}
-
-export type createOrderActionConfig =
-  | BillingEnabledCreate
-  | BillingDisabledCreate;
-
 export const createOrderAction = cache(
-  async (data: createOrderActionConfig) => {
+  async (data: CreateOrderActionInterface) => {
     // Destructure
-    const { cart, customer, acceptBilling, billingAddress } = data;
+    const { cart, customer } = data;
 
     // Validate Cart
     if (!cart) {
@@ -64,22 +44,6 @@ export const createOrderAction = cache(
       );
     }
 
-    // Validate Billing Address
-    if (acceptBilling === true) {
-      if (!billingAddress) {
-        throw new Error('Missing billingAddress');
-      }
-      const parseResult = billingAddressSchema.safeParse(billingAddress);
-      if (!parseResult.success) {
-        const errorObj = parseResult.error.flatten().fieldErrors;
-        const errorMessages = Object.values(errorObj)
-          .map((value) => value)
-          .join(' \n');
-        console.log(errorMessages);
-
-        throw new Error(errorMessages);
-      }
-    }
     //   if (!customer) {
     //     throw new Error('Missing customer');
     //   }
@@ -98,7 +62,6 @@ export const createOrderAction = cache(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             cart,
-            billingAddress: acceptBilling ? billingAddress : undefined,
             customer: { name: 'Saint', email: 'derer@wee.com' },
           }),
         }

@@ -1,10 +1,10 @@
 'use client';
 
-import { FC, useState } from 'react';
+import { FC, useCallback, useState } from 'react';
 import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { OnApproveData } from '@paypal/paypal-js';
 import errorToast from '@/lib/error-toast';
-import { CheckoutOptions } from '../ProductCheckout';
+import { CheckoutOptions } from '../PaymentSection';
 import {
   BillingAddressInterface,
   createOrderAction,
@@ -20,6 +20,7 @@ const MyPaypalButtons = dynamic(() =>
   import('./MyPaypalButtons').then((comp) => comp.default)
 );
 
+// Main Compponents
 const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
   // Hooks
   const { mode } = props;
@@ -54,21 +55,12 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
     setBillingAddress((prev) => ({ ...prev, [field]: value }));
   };
 
-  const createOrder = async (acceptBilling: boolean): Promise<string> => {
+  // Create order async function
+  const createOrder = useCallback(async (): Promise<string> => {
     try {
-      const response = await createOrderAction(
-        acceptBilling
-          ? {
-              acceptBilling: true,
-              cart,
-              billingAddress,
-            }
-          : {
-              acceptBilling: false,
-              cart,
-              billingAddress: undefined as never,
-            }
-      );
+      const response = await createOrderAction({
+        cart,
+      });
       //
       const orderData = await JSON.parse(response);
 
@@ -91,7 +83,7 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
       // Always throw to ensure a string is never returned as undefined
       throw new Error('Failed to create PayPal order');
     }
-  };
+  }, [cart]);
 
   const onApprove = async (data: OnApproveData): Promise<void> => {
     const authRes = await fetch('/next-api/paypal/orders/authorize', {

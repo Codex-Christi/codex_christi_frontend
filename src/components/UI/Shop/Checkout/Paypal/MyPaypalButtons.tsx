@@ -30,6 +30,7 @@ const MyPaypalButtons: FC<
           shape: 'pill',
           label: 'pay',
           height: 40,
+          tagline: false,
         }}
       />
     </section>

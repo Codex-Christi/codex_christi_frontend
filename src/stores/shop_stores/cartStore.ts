@@ -62,9 +62,9 @@ interface CartState {
 const SECRET_KEY = process.env.NEXT_PUBLIC_CART_KEY || 'fallback-secret';
 
 // LocalStorage encryption
-const encrypt = (data: string) =>
+export const encrypt = (data: string) =>
   CryptoJS.AES.encrypt(data, SECRET_KEY).toString();
-const decrypt = (data: string) => {
+export const decrypt = (data: string) => {
   try {
     const bytes = CryptoJS.AES.decrypt(data, SECRET_KEY);
     return bytes.toString(CryptoJS.enc.Utf8);
