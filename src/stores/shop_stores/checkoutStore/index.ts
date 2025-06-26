@@ -1,5 +1,6 @@
 import { encrypt, decrypt } from '../cartStore';
 import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
+import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { create } from 'zustand';
 import { persist, PersistStorage, StorageValue } from 'zustand/middleware';
 
@@ -21,8 +22,8 @@ interface ShopCheckoutStoreInterface extends CheckoutPickType {
     google_account_email: string;
   } | null;
   delivery_address: {
-    shiiping_address_line_1: string | null;
-    shiiping_address_line_2: string | null;
+    shipping_address_line_1: string | null;
+    shipping_address_line_2: string | null;
     shipping_city: string | null;
     shipping_state: string | null;
     shipping_country: string | null;
@@ -77,8 +78,8 @@ const initialObj = {
   email: '',
   payment_method: null,
   delivery_address: {
-    shiiping_address_line_1: null,
-    shiiping_address_line_2: null,
+    shipping_address_line_1: null,
+    shipping_address_line_2: null,
     shipping_city: null,
     shipping_state: null,
     shipping_country: null,
@@ -86,9 +87,16 @@ const initialObj = {
 };
 
 export const shopCheckoutStore = create<ShopCheckoutState>()(
+  // Hooks
+  // const {userMainProfile} = useUserMainProfileStore((state)=>state)
+
   persist(
     (set, get) => ({
       ...initialObj,
+      first_name:
+        useUserMainProfileStore.getState().userMainProfile?.first_name,
+      last_name: useUserMainProfileStore.getState().userMainProfile?.last_name,
+      email: useUserMainProfileStore.getState().userMainProfile?.email,
       setFirstName: (first_name) => set({ first_name }),
       setLastName: (last_name) => set({ last_name }),
       setEmail: (email) => set({ email }),
