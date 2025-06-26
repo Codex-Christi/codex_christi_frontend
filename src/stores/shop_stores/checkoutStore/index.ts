@@ -1,0 +1,116 @@
+import { encrypt, decrypt } from '../cartStore';
+import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
+import { create } from 'zustand';
+import { persist, PersistStorage, StorageValue } from 'zustand/middleware';
+
+// Get encryption key from environment variable
+const SECRET_KEY = process.env.NEXT_PUBLIC_CART_KEY || 'fallback-secret';
+
+type CheckoutPickType = Pick<
+  UserProfileDataInterface,
+  'first_name' | 'last_name' | 'email'
+>;
+interface ShopCheckoutStoreInterface extends CheckoutPickType {
+  payment_method: {
+    payment_method: 'credit_card' | '';
+    name: string;
+    card_number: string;
+    expiry_date: string;
+    card_holder_name: string;
+    paypal_email: string;
+    google_account_email: string;
+  } | null;
+  delivery_address: {
+    shiiping_address_line_1: string | null;
+    shiiping_address_line_2: string | null;
+    shipping_city: string | null;
+    shipping_state: string | null;
+    shipping_country: string | null;
+  };
+}
+
+interface ShopCheckoutState extends ShopCheckoutStoreInterface {
+  setFirstName: (first_name: ShopCheckoutStoreInterface['first_name']) => void;
+  setLastName: (last_name: ShopCheckoutStoreInterface['last_name']) => void;
+  setEmail: (email: ShopCheckoutStoreInterface['email']) => void;
+  setPaymentMehod: (
+    payment_method: ShopCheckoutStoreInterface['payment_method']
+  ) => void;
+  setDeliveryAddress: (
+    delivery_address: ShopCheckoutStoreInterface['delivery_address']
+  ) => void;
+}
+
+const encryptedStorage: PersistStorage<{
+  shopCheckoutData: ShopCheckoutStoreInterface;
+}> = {
+  getItem: (name: string) => {
+    try {
+      const encrypted = localStorage.getItem(name);
+      if (!encrypted) return null;
+      const decrypted = decrypt(encrypted);
+      return JSON.parse(decrypted);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (
+    name: string,
+    value: StorageValue<{
+      shopCheckoutData: ShopCheckoutStoreInterface;
+    }>
+  ) => {
+    try {
+      const stringified = JSON.stringify(value);
+      const encrypted = encrypt(stringified);
+      localStorage.setItem(name, encrypted);
+    } catch {
+      // Handle error, maybe fail silently
+    }
+  },
+  removeItem: (name: string) => localStorage.removeItem(name),
+};
+
+const initialObj = {
+  first_name: '',
+  last_name: '',
+  email: '',
+  payment_method: null,
+  delivery_address: {
+    shiiping_address_line_1: null,
+    shiiping_address_line_2: null,
+    shipping_city: null,
+    shipping_state: null,
+    shipping_country: null,
+  },
+};
+
+export const shopCheckoutStore = create<ShopCheckoutState>()(
+  persist(
+    (set, get) => ({
+      ...initialObj,
+      setFirstName: (first_name) => set({ first_name }),
+      setLastName: (last_name) => set({ last_name }),
+      setEmail: (email) => set({ email }),
+      setPaymentMehod: (payment_method) => set({ payment_method }),
+      setDeliveryAddress: (delivery_address) => set({ delivery_address }),
+      clearCheckout: () => {
+        set(initialObj);
+        localStorage.removeItem('checkout-storage');
+      },
+    }),
+    {
+      name: 'checkout-storage',
+      storage: encryptedStorage,
+      partialize: (state) => ({
+        shopCheckoutData: {
+          email: state.email,
+          first_name: state.first_name,
+          last_name: state.last_name,
+          payment_method: state.payment_method,
+          delivery_address: state.delivery_address,
+        },
+      }),
+    }
+  )
+);
