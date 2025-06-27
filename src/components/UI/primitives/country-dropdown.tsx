@@ -88,7 +88,7 @@ const CountryDropdownComponent = (
 
   const handleSelect = useCallback(
     (country: Country) => {
-      console.log('🌍 CountryDropdown value: ', country);
+      // console.log('🌍 CountryDropdown value: ', country);
       setSelectedCountry(country);
       onChange?.(country);
       setOpen(false);
@@ -97,7 +97,10 @@ const CountryDropdownComponent = (
   );
 
   const triggerClasses = cn(
-    'flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
+    `flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 
+    text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 
+    focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 autofill:!bg-transparent rounded-3xl
+   `,
     slim === true && 'w-20'
   );
 
@@ -139,11 +142,11 @@ const CountryDropdownComponent = (
         side='bottom'
         className='min-w-[--radix-popper-anchor-width] p-0 !bg-transparent '
       >
-        <Command className='w-full max-h-[200px] sm:max-h-[270px] bg-transparent'>
-          <CommandList className='!text-white'>
-            <div className='sticky top-0 z-10 bg-gray-950 bg-opacity-90 !text-white'>
+        <Command className='w-full max-h-[200px] sm:max-h-[270px] bg-gray-950 bg-opacity-50 backdrop-blur-2xl'>
+          <CommandList className='!text-white bg-gray-950 bg-opacity-50'>
+            <div className='sticky top-0 z-10 !text-white'>
               <CommandInput
-                className='!text-white'
+                className='!text-white !bg-black'
                 placeholder='Search country...'
               />
             </div>

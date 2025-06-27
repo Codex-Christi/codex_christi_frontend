@@ -16,8 +16,10 @@ const OrderSummary = dynamic(() =>
 const PaymentSection = dynamic(() =>
   import('./PaymentSection').then((comp) => comp.default)
 );
-const UserCheckoutSummary = dynamic(() =>
-  import('./UserCheckoutSummary').then((comp) => comp.UserCheckoutSummary)
+const BasicCheckoutInfo = dynamic(() =>
+  import('./UserCheckoutSummary/BasicCheckoutInfo').then(
+    (comp) => comp.BasicCheckoutInfo
+  )
 );
 
 const CheckoutAccordionContext = createContext<{
@@ -51,7 +53,7 @@ const CheckoutPage = () => {
     >
       <div className='grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-12'>
         <Accordion
-          className='bg-[#4C3D3D3D] backdrop-blur-[10px] !px-2 rounded-[10px] md:p-10 space-y-8 lg:col-span-7'
+          className='bg-[#4C3D3D3D] backdrop-blur-[10px] pt-10 !px-2 rounded-[10px] md:p-10 space-y-8 lg:col-span-7'
           type='single'
           value={openItem}
           onValueChange={setOpenItem}
@@ -63,7 +65,7 @@ const CheckoutPage = () => {
           >
             {/* Note: AccordionTrigger is not needed if you only want programmable control */}
             <AccordionContent className='w-full'>
-              <UserCheckoutSummary />
+              <BasicCheckoutInfo />
             </AccordionContent>
           </AccordionItem>
 
