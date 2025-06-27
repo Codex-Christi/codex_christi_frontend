@@ -4,9 +4,6 @@ import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { create } from 'zustand';
 import { persist, PersistStorage, StorageValue } from 'zustand/middleware';
 
-// Get encryption key from environment variable
-const SECRET_KEY = process.env.NEXT_PUBLIC_CART_KEY || 'fallback-secret';
-
 type CheckoutPickType = Pick<
   UserProfileDataInterface,
   'first_name' | 'last_name' | 'email'
