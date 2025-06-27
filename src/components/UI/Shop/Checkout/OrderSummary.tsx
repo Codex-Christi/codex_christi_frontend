@@ -3,9 +3,13 @@ import ProductImage from '@/assets/img/t-shirt-2.png';
 import { useEffect, useState } from 'react';
 import { getOrderFinalDetails } from '@/actions/shop/checkout/getOrderFinalDetails';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
+import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 
 const OrderSummary = () => {
   const cart = useCartStore((store) => store.variants);
+  const country = useShopCheckoutStore(
+    (state) => state.delivery_address.shipping_country
+  );
 
   const [serverOrderDetails, setServerOrderDetails] = useState<Awaited<
     ReturnType<typeof getOrderFinalDetails>
@@ -15,7 +19,7 @@ const OrderSummary = () => {
     const func = async () => {
       const orderDetailsFromServer = await getOrderFinalDetails(
         cart,
-        'USA',
+        country ? country : 'USA',
         'merchize'
       );
 
@@ -23,7 +27,7 @@ const OrderSummary = () => {
     };
 
     func();
-  }, [cart]);
+  }, [cart, country]);
 
   // Destructuring
   const { retailPriceTotalNum, shippingPriceNum, currency, currency_symbol } =

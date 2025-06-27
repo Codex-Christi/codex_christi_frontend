@@ -83,12 +83,12 @@ const initialObj = {
   },
 };
 
-export const shopCheckoutStore = create<ShopCheckoutState>()(
+export const useShopCheckoutStore = create<ShopCheckoutState>()(
   // Hooks
   // const {userMainProfile} = useUserMainProfileStore((state)=>state)
 
   persist(
-    (set, get) => ({
+    (set) => ({
       ...initialObj,
       first_name:
         useUserMainProfileStore.getState().userMainProfile?.first_name,
@@ -100,7 +100,14 @@ export const shopCheckoutStore = create<ShopCheckoutState>()(
       setPaymentMehod: (payment_method) => set({ payment_method }),
       setDeliveryAddress: (delivery_address) => set({ delivery_address }),
       clearCheckout: () => {
-        set(initialObj);
+        set({
+          ...initialObj,
+          first_name:
+            useUserMainProfileStore.getState().userMainProfile?.first_name,
+          last_name:
+            useUserMainProfileStore.getState().userMainProfile?.last_name,
+          email: useUserMainProfileStore.getState().userMainProfile?.email,
+        });
         localStorage.removeItem('checkout-storage');
       },
     }),

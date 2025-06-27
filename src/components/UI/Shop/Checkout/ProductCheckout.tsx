@@ -22,9 +22,9 @@ const BasicCheckoutInfo = dynamic(() =>
   )
 );
 
-const CheckoutAccordionContext = createContext<{
+export const CheckoutAccordionContext = createContext<{
   handleOpenItem: (
-    itemValue: 'user-checkout-summary' | 'payment-section'
+    itemValue: 'basic-checkout-info' | 'delivery-details' | 'payment-section'
   ) => void;
   handleCloseAccordion: () => void;
 }>({
@@ -34,10 +34,10 @@ const CheckoutAccordionContext = createContext<{
 
 // Main Component
 const CheckoutPage = () => {
-  const [openItem, setOpenItem] = useState('user-checkout-summary'); // State to hold the value of the open item (string for single type)
+  const [openItem, setOpenItem] = useState('basic-checkout-info'); // State to hold the value of the open item (string for single type)
 
   const handleOpenItem = (
-    itemValue: 'user-checkout-summary' | 'payment-section'
+    itemValue: 'basic-checkout-info' | 'delivery-details' | 'payment-section'
   ) => {
     setOpenItem(itemValue); // Update the state to open the desired item
   };
@@ -60,7 +60,7 @@ const CheckoutPage = () => {
         >
           {/* User Checkout Info Section */}
           <AccordionItem
-            value='user-checkout-summary'
+            value='basic-checkout-info'
             className='border-none px-4'
           >
             {/* Note: AccordionTrigger is not needed if you only want programmable control */}
