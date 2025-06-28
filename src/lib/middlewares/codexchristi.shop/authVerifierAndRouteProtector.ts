@@ -12,14 +12,8 @@ export const authVerifierAndRouteProtector = async (req: NextRequest) => {
       // Check if the referrer and URL are the same
       // and if the session is valid for GET requests
 
-      if ((referrer ?? true) && url && (referrer ? referrer === url : true)) {
-        if ((await verifySession()) === true && req.method === 'GET') {
-          return NextResponse.redirect(
-            new URL('/shop/account-overview', req.url)
-          ); // Redirect to the referrer if session is valid
-        } else {
-          return NextResponse.next(); // Proceed with the request if session is valid
-        }
+      if (url && (referrer ? referrer === url : true)) {
+        checkAndRedirect(req);
       } else {
         return redirectToReferrer(req);
       }
@@ -27,7 +21,8 @@ export const authVerifierAndRouteProtector = async (req: NextRequest) => {
       console.error('Error verifying session:', error);
     }
   } else {
-    return redirectToReferrer(req);
+    // return redirectToReferrer(req);
+    checkAndRedirect(req);
   }
 };
 
@@ -41,4 +36,12 @@ const redirectToReferrer = (req: NextRequest) => {
 
   // Or redirect to a default URL if no referrer is found
   return NextResponse.redirect(new URL('/', req.url));
+};
+
+const checkAndRedirect = async (req: NextRequest) => {
+  if ((await verifySession()) === true && req.method === 'GET') {
+    return NextResponse.redirect(new URL('/shop/account-overview', req.url)); // Redirect to the referrer if session is valid
+  } else {
+    return NextResponse.next(); // Proceed with the request if session is valid
+  }
 };
