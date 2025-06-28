@@ -8,7 +8,7 @@ import useAuthStore from '@/stores/authStore';
 const WaitlistButton = () => {
   // Hooks
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const isAuthenticated = useAuthStore((store) => store.isAuthenticated);
 
   // Main JSX
   return (

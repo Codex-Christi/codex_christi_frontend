@@ -8,7 +8,7 @@ export async function verifySession() {
   const payload = await decrypt(session?.value); // Decrypt session
 
   if (!session || !payload) {
-    return null;
+    return false;
   } else {
     if (payload.exp) {
       const { exp } = payload;
@@ -30,7 +30,7 @@ export async function verifySession() {
         return true;
       }
     }
-    return null;
+    return false;
   }
 }
 

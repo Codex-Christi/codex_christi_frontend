@@ -11,7 +11,8 @@ export const authVerifierAndRouteProtector = async (req: NextRequest) => {
 
       // Check if the referrer and URL are the same
       // and if the session is valid for GET requests
-      if (referrer && url && referrer === url) {
+
+      if ((referrer ?? true) && url && (referrer ? referrer === url : true)) {
         if ((await verifySession()) === true && req.method === 'GET') {
           return NextResponse.redirect(
             new URL('/shop/account-overview', req.url)
