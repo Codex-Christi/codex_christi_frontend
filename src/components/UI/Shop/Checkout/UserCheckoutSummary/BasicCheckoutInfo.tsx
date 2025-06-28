@@ -15,48 +15,103 @@ import { SignUpFormSchema } from '@/lib/formSchemas/signUpFormSchema';
 import { EmailInput, NameInput } from '@/components/UI/Auth/FormFields';
 import { FaAngleDoubleDown } from 'react-icons/fa';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
-import { useContext } from 'react';
+import { useContext, useMemo } from 'react';
 import { CheckoutAccordionContext } from '../ProductCheckout';
+import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
+import { DeliveryAddressInputFields } from './DeliveryAddressInputFields';
+import errorToast from '@/lib/error-toast';
 
 const signupExtSchema = SignUpFormSchema.pick({
   firstname: true,
   lastname: true,
   email: true,
 });
-const FormSchema = z
+const deliveryAddressSchema = billingAddressSchema.pick({
+  addressLine1: true,
+  addressLine2: true,
+  adminArea1: true,
+  adminArea2: true,
+  postalCode: true,
+});
+
+const BasicCheckoutInfoFormSchema = z
   .object({
     country: z.string({
       required_error: 'Please select a country',
     }),
   })
-  .merge(signupExtSchema);
+  .merge(signupExtSchema)
+  .merge(deliveryAddressSchema);
 
-type FormSchema = z.infer<typeof FormSchema>;
+export type BasicCheckoutInfoFormSchema = z.infer<
+  typeof BasicCheckoutInfoFormSchema
+>;
 
+// Main Form Component Starts Here
 export const BasicCheckoutInfo = () => {
   // Hooks
   const { handleOpenItem } = useContext(CheckoutAccordionContext);
 
-  const basicCheckoutInfoForm = useForm<z.infer<typeof FormSchema>>({
-    resolver: zodResolver(FormSchema),
-    defaultValues: useShopCheckoutStore((state) => {
-      const { delivery_address, first_name, last_name, email } = state;
+  const { delivery_address, first_name, last_name, email } =
+    useShopCheckoutStore((state) => state);
 
-      const { shipping_country } = delivery_address;
+  const {
+    shipping_address_line_1,
+    shipping_address_line_2,
+    shipping_city,
+    shipping_country,
+    shipping_state,
+    zip_code,
+  } = delivery_address || {};
 
-      return {
-        country: shipping_country ?? undefined,
-        firstname: first_name,
-        lastname: last_name,
-        email,
-      };
-    }),
+  // Extract Default Values
+  const storeValues = useMemo(() => {
+    return {
+      country: shipping_country ?? undefined,
+      firstname: first_name ?? '',
+      lastname: last_name ?? '',
+      email: email ?? '',
+      // Extract addressLine1 from delivery_address
+      addressLine1: shipping_address_line_1 ?? '',
+      addressLine2: shipping_address_line_2 ?? '',
+      adminArea1: shipping_city ?? '',
+      adminArea2: shipping_state ?? '',
+      postalCode: zip_code ?? '',
+    };
+  }, [
+    email,
+    first_name,
+    last_name,
+    shipping_address_line_1,
+    shipping_address_line_2,
+    shipping_city,
+    shipping_country,
+    shipping_state,
+    zip_code,
+  ]);
+
+  // useForm Hook Starts Here
+  const basicCheckoutInfoForm = useForm<
+    z.infer<typeof BasicCheckoutInfoFormSchema>
+  >({
+    resolver: zodResolver(BasicCheckoutInfoFormSchema),
+    defaultValues: storeValues,
   });
 
-  function onSubmit(data: z.infer<typeof FormSchema>) {
-    console.log(data);
+  // Handlers
+  function onSubmit(data: z.infer<typeof BasicCheckoutInfoFormSchema>) {
     // Only spread the rest of the data except country
-    const { country, firstname, lastname, ...rest } = data;
+    const {
+      country,
+      firstname,
+      lastname,
+      addressLine1,
+      addressLine2,
+      adminArea1,
+      adminArea2,
+      postalCode,
+      ...rest
+    } = data;
     useShopCheckoutStore.setState((state) => ({
       ...state,
       first_name: firstname,
@@ -64,22 +119,34 @@ export const BasicCheckoutInfo = () => {
       delivery_address: {
         ...state.delivery_address,
         shipping_country: country,
+        shipping_address_line_1: addressLine1,
+        shipping_address_line_2: addressLine2 ?? '',
+        shipping_city: adminArea1,
+        shipping_state: adminArea2,
+        zip_code: postalCode,
       },
       ...rest,
     }));
     // Move Accordion to Delivery Details
-    handleOpenItem('delivery-details');
+    handleOpenItem('payment-section');
   }
 
+  // Main JSX
   return (
     <>
       <h2 className='border-b max-w-fit mb-10 border-white pb-1 text-xl font-bold'>
-        User Information
+        Contact and Delivery Information
       </h2>
       <Form {...basicCheckoutInfoForm}>
         <form
-          onSubmit={basicCheckoutInfoForm.handleSubmit(onSubmit)}
-          className='w-full  grid grid-cols-1 md:grid-cols-2 gap-x-20 gap-y-1 md:gap-y-4 items-center'
+          onSubmit={basicCheckoutInfoForm.handleSubmit(onSubmit, (errors) => {
+            errorToast({
+              message: 'Check form and correct errors',
+              header: 'Incorrect details!',
+            });
+            console.log(errors);
+          })}
+          className='w-full  grid grid-cols-1 md:grid-cols-2 gap-x-20 gap-3 items-center'
         >
           {/* First Name Input*/}
           <NameInput
@@ -99,6 +166,9 @@ export const BasicCheckoutInfo = () => {
             inputName='email'
           />
 
+          {/* Dleivery Address Input Fields */}
+          <DeliveryAddressInputFields currentZodForm={basicCheckoutInfoForm} />
+
           {/* Country Input */}
           <FormField
             control={basicCheckoutInfoForm.control}
@@ -117,6 +187,8 @@ export const BasicCheckoutInfo = () => {
               </FormItem>
             )}
           />
+          {/*  */}
+
           <Button
             name='Checkout Summary Submit'
             type='submit'
@@ -126,7 +198,7 @@ export const BasicCheckoutInfo = () => {
             backdrop-blur-md shadow-md shadow-gray-400 flex gap-6'
             // border-[#0085FF] text-white bg-[#0085FF] hover:bg-[#0085FF]/70 hover:text-white
           >
-            <h4>Choose Delivery Address</h4>
+            <h4>Choose Payment Method</h4>
             <FaAngleDoubleDown size={22.5} />
             <style jsx>
               {`

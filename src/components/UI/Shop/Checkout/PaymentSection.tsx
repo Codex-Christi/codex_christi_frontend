@@ -5,7 +5,10 @@ import PayPal from '@/assets/img/paypal.png';
 import GooglePay from '@/assets/img/gpay.png';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { useContext, useState } from 'react';
+import { Button } from '../../primitives/button';
+import { FaAngleDoubleUp } from 'react-icons/fa';
+import { CheckoutAccordionContext } from './ProductCheckout';
 
 // Dynamic Imports
 const PayPalCheckout = dynamic(() =>
@@ -16,14 +19,32 @@ export type CheckoutOptions = 'card' | 'paypal_buttons' | 'google_pay' | '';
 
 // Main Compoenent
 const PaymentSection = () => {
+  // Hooks
+  // Hooks
+  const { handleOpenItem } = useContext(CheckoutAccordionContext);
+
+  // States
   const [payOption, setPayOption] = useState<CheckoutOptions>('');
 
   // JSX
   return (
     <>
-      <h2 className='border-b max-w-fit mb-10 border-white pb-1 text-xl font-bold'>
-        Payment Method
-      </h2>
+      <section className='flex justify-between w-full items-center mb-10'>
+        <h2 className='border-b max-w-fit  border-white text-xl font-bold'>
+          Payment Method
+        </h2>
+
+        <Button
+          variant={'outline'}
+          className='bg-transparent shadow-md shadow-gray-400 flex gap-2'
+          name='Back to Delivery Information'
+          onClick={() => {
+            handleOpenItem('basic-checkout-info');
+          }}
+        >
+          <h4>Edit Delivery Info</h4> <FaAngleDoubleUp size={17.5} />
+        </Button>
+      </section>
 
       <div className='grid gap-8'>
         <div className='space-y-4'>

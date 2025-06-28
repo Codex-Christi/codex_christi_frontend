@@ -24,6 +24,7 @@ interface ShopCheckoutStoreInterface extends CheckoutPickType {
     shipping_city: string | null;
     shipping_state: string | null;
     shipping_country: string | null;
+    zip_code: string | null;
   };
 }
 
@@ -80,6 +81,7 @@ const initialObj = {
     shipping_city: null,
     shipping_state: null,
     shipping_country: null,
+    zip_code: null,
   },
 };
 
@@ -94,6 +96,7 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
         useUserMainProfileStore.getState().userMainProfile?.first_name,
       last_name: useUserMainProfileStore.getState().userMainProfile?.last_name,
       email: useUserMainProfileStore.getState().userMainProfile?.email,
+      payment_method: null,
       setFirstName: (first_name) => set({ first_name }),
       setLastName: (last_name) => set({ last_name }),
       setEmail: (email) => set({ email }),
@@ -107,6 +110,7 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
           last_name:
             useUserMainProfileStore.getState().userMainProfile?.last_name,
           email: useUserMainProfileStore.getState().userMainProfile?.email,
+          payment_method: null,
         });
         localStorage.removeItem('checkout-storage');
       },

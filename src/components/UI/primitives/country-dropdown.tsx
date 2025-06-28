@@ -144,7 +144,7 @@ const CountryDropdownComponent = (
       >
         <Command className='w-full max-h-[200px] sm:max-h-[270px] bg-gray-950 bg-opacity-50 backdrop-blur-2xl'>
           <CommandList className='!text-white bg-gray-950 bg-opacity-50'>
-            <div className='sticky top-0 z-10 !text-white'>
+            <div className='sticky top-0 z-10 !text-white !bg-black'>
               <CommandInput
                 className='!text-white !bg-black'
                 placeholder='Search country...'

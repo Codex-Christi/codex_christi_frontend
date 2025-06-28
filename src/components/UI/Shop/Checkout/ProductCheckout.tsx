@@ -7,7 +7,6 @@ import {
   AccordionContent,
   AccordionItem,
 } from '@/components/UI/primitives/accordion';
-import { Button } from '../../primitives/button';
 
 // Dynamic Imports
 const OrderSummary = dynamic(() =>
@@ -24,7 +23,7 @@ const BasicCheckoutInfo = dynamic(() =>
 
 export const CheckoutAccordionContext = createContext<{
   handleOpenItem: (
-    itemValue: 'basic-checkout-info' | 'delivery-details' | 'payment-section'
+    itemValue: 'basic-checkout-info' | 'payment-section'
   ) => void;
   handleCloseAccordion: () => void;
 }>({
@@ -37,7 +36,7 @@ const CheckoutPage = () => {
   const [openItem, setOpenItem] = useState('basic-checkout-info'); // State to hold the value of the open item (string for single type)
 
   const handleOpenItem = (
-    itemValue: 'basic-checkout-info' | 'delivery-details' | 'payment-section'
+    itemValue: 'basic-checkout-info' | 'payment-section'
   ) => {
     setOpenItem(itemValue); // Update the state to open the desired item
   };
