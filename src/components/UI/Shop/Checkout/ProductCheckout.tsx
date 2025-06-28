@@ -7,6 +7,7 @@ import {
   AccordionContent,
   AccordionItem,
 } from '@/components/UI/primitives/accordion';
+import { ServerOrderDetailsComponent } from './ServerOrderDetailsComponent';
 
 // Dynamic Imports
 const OrderSummary = dynamic(() =>
@@ -47,40 +48,42 @@ const CheckoutPage = () => {
 
   // JSX
   return (
-    <CheckoutAccordionContext.Provider
-      value={{ handleCloseAccordion, handleOpenItem }}
-    >
-      <div className='grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-12'>
-        <Accordion
-          className='bg-[#4C3D3D3D] backdrop-blur-[10px] pt-10 !px-2 rounded-[10px] md:p-10 space-y-8 lg:col-span-7'
-          type='single'
-          value={openItem}
-          onValueChange={setOpenItem}
-        >
-          {/* User Checkout Info Section */}
-          <AccordionItem
-            value='basic-checkout-info'
-            className='border-none px-4'
+    <ServerOrderDetailsComponent>
+      <CheckoutAccordionContext.Provider
+        value={{ handleCloseAccordion, handleOpenItem }}
+      >
+        <div className='grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-12'>
+          <Accordion
+            className='bg-[#4C3D3D3D] backdrop-blur-[10px] pt-10 !px-2 rounded-[10px] md:p-10 space-y-8 lg:col-span-7'
+            type='single'
+            value={openItem}
+            onValueChange={setOpenItem}
           >
-            {/* Note: AccordionTrigger is not needed if you only want programmable control */}
-            <AccordionContent className='w-full'>
-              <BasicCheckoutInfo />
-            </AccordionContent>
-          </AccordionItem>
+            {/* User Checkout Info Section */}
+            <AccordionItem
+              value='basic-checkout-info'
+              className='border-none px-4'
+            >
+              {/* Note: AccordionTrigger is not needed if you only want programmable control */}
+              <AccordionContent className='w-full'>
+                <BasicCheckoutInfo />
+              </AccordionContent>
+            </AccordionItem>
 
-          {/* Payment details section */}
-          <AccordionItem value='payment-section' className='border-none px-4'>
-            {/* Note: AccordionTrigger is not needed if you only want programmable control */}
-            <AccordionContent>
-              <PaymentSection />
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+            {/* Payment details section */}
+            <AccordionItem value='payment-section' className='border-none px-4'>
+              {/* Note: AccordionTrigger is not needed if you only want programmable control */}
+              <AccordionContent>
+                <PaymentSection />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
 
-        {/* Order Summary, on it's own */}
-        <OrderSummary />
-      </div>
-    </CheckoutAccordionContext.Provider>
+          {/* Order Summary, on it's own */}
+          <OrderSummary />
+        </div>
+      </CheckoutAccordionContext.Provider>
+    </ServerOrderDetailsComponent>
   );
 };
 

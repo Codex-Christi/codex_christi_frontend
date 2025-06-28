@@ -1,33 +1,13 @@
 import Image from 'next/image';
 import ProductImage from '@/assets/img/t-shirt-2.png';
-import { useEffect, useState } from 'react';
-import { getOrderFinalDetails } from '@/actions/shop/checkout/getOrderFinalDetails';
-import { useCartStore } from '@/stores/shop_stores/cartStore';
-import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 
+import { ServerOrderDetailsContext } from './ServerOrderDetailsComponent';
+import { useContext } from 'react';
+
+// Main Component
 const OrderSummary = () => {
-  const cart = useCartStore((store) => store.variants);
-  const country = useShopCheckoutStore(
-    (state) => state.delivery_address.shipping_country
-  );
-
-  const [serverOrderDetails, setServerOrderDetails] = useState<Awaited<
-    ReturnType<typeof getOrderFinalDetails>
-  > | null>(null);
-
-  useEffect(() => {
-    const func = async () => {
-      const orderDetailsFromServer = await getOrderFinalDetails(
-        cart,
-        country ? country : 'USA',
-        'merchize'
-      );
-
-      setServerOrderDetails(orderDetailsFromServer);
-    };
-
-    func();
-  }, [cart, country]);
+  // Hooks
+  const serverOrderDetails = useContext(ServerOrderDetailsContext);
 
   // Destructuring
   const { retailPriceTotalNum, shippingPriceNum, currency, currency_symbol } =

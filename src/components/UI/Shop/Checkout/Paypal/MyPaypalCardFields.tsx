@@ -26,39 +26,34 @@ import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billin
 export interface MyPayPalCardFieldInterface {
   mode: CheckoutOptions;
   createOrder: (acceptBilling: boolean) => Promise<string>;
-  billingAddress: {
-    addressLine1: string;
-    addressLine2: string;
-    adminArea1: string;
-    adminArea2: string;
-    countryCode: string;
-    postalCode: string;
-  };
-  handleBillingAddressChange: (
-    field:
-      | 'addressLine1'
-      | 'addressLine2'
-      | 'adminArea1'
-      | 'adminArea2'
-      | 'countryCode'
-      | 'postalCode',
-    value: string
-  ) => void;
+
   onApprove: (data: OnApproveData) => Promise<void>;
 }
 
 const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = (props) => {
   // Props
-  const {
-    mode,
-    createOrder,
-    billingAddress,
-    handleBillingAddressChange,
-    onApprove,
-  } = props;
+  const { mode, createOrder, onApprove } = props;
 
   // State Values
   const [isPaying, setIsPaying] = useState(false);
+
+  const [billingAddress, setBillingAddress] = useState<BillingAddressInterface>(
+    {
+      addressLine1: '',
+      addressLine2: '',
+      adminArea1: '',
+      adminArea2: '',
+      countryCode: '',
+      postalCode: '',
+    }
+  );
+
+  const handleBillingAddressChange = (
+    field: keyof typeof billingAddress,
+    value: string
+  ) => {
+    setBillingAddress((prev) => ({ ...prev, [field]: value }));
+  };
 
   // Main JSx
   return (

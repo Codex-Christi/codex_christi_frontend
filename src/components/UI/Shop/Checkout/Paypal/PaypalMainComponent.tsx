@@ -1,17 +1,18 @@
 'use client';
-
-import { FC, useCallback, useState } from 'react';
-import { PayPalScriptProvider } from '@paypal/react-paypal-js';
+import { FC, useCallback, useContext, useEffect, useRef } from 'react';
+import {
+  DISPATCH_ACTION,
+  PayPalScriptProvider,
+  usePayPalScriptReducer,
+} from '@paypal/react-paypal-js';
 import { OnApproveData } from '@paypal/paypal-js';
 import errorToast from '@/lib/error-toast';
 import { CheckoutOptions } from '../PaymentSection';
-import {
-  BillingAddressInterface,
-  createOrderAction,
-} from '@/actions/shop/paypal/createOrderAction';
+import { createOrderAction } from '@/actions/shop/paypal/createOrderAction';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
-import successToast from '@/lib/success-toast';
 import dynamic from 'next/dynamic';
+import { ServerOrderDetailsContext } from '../ServerOrderDetailsComponent';
+import successToast from '@/lib/success-toast';
 
 const MyPayPalCardFields = dynamic(() =>
   import('./MyPaypalCardFields').then((comp) => comp.default)
@@ -20,48 +21,54 @@ const MyPaypalButtons = dynamic(() =>
   import('./MyPaypalButtons').then((comp) => comp.default)
 );
 
-// Main Compponents
-const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
-  // Hooks
+// Provider Script Initializer Options - MADE STATIC
+const initialOptions = {
+  clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
+  'enable-funding': 'venmo',
+  'buyer-country': 'US',
+  currency: 'USD',
+  intent: 'authorize',
+  components: 'buttons,card-fields', // KEEP THIS FIXED
+  'data-sdk-integration-source': 'developer-studio',
+};
+
+// Main Components
+const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   const { mode } = props;
   const cart = useCartStore((store) => store.variants);
+  const serverOrderDetails = useContext(ServerOrderDetailsContext);
+  const [, dispatch] = usePayPalScriptReducer();
 
-  const initialOptions = {
-    clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
-    'client-id': process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
-    'enable-funding': 'venmo',
-    'buyer-country': 'US',
-    currency: 'USD',
-    intent: 'authorize',
-    components: 'buttons,card-fields',
-    'data-sdk-integration-source': 'developer-studio',
-  };
+  const { countrySupport } = serverOrderDetails || {};
+  const { country_iso2, currency } = countrySupport?.country || {};
 
-  const [billingAddress, setBillingAddress] = useState<BillingAddressInterface>(
-    {
-      addressLine1: '',
-      addressLine2: '',
-      adminArea1: '',
-      adminArea2: '',
-      countryCode: '',
-      postalCode: '',
+  // Track previous values to prevent unnecessary resets
+  const prevCurrency = useRef(currency);
+  const prevCountry = useRef(country_iso2);
+
+  // Reset options only when necessary
+  useEffect(() => {
+    if (
+      currency !== prevCurrency.current ||
+      country_iso2 !== prevCountry.current
+    ) {
+      dispatch({
+        type: DISPATCH_ACTION.RESET_OPTIONS,
+        value: {
+          ...initialOptions,
+          currency: currency ?? initialOptions.currency,
+          'buyer-country': country_iso2 ?? initialOptions['buyer-country'],
+        },
+      });
+      prevCurrency.current = currency;
+      prevCountry.current = country_iso2;
     }
-  );
-
-  const handleBillingAddressChange = (
-    field: keyof typeof billingAddress,
-    value: string
-  ) => {
-    setBillingAddress((prev) => ({ ...prev, [field]: value }));
-  };
+  }, [currency, country_iso2, dispatch]);
 
   // Create order async function
   const createOrder = useCallback(async (): Promise<string> => {
     try {
-      const response = await createOrderAction({
-        cart,
-      });
-      //
+      const response = await createOrderAction({ cart });
       const orderData = await JSON.parse(response);
 
       if (orderData.id) {
@@ -75,16 +82,14 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
         throw new Error(errorMessage);
       }
     } catch (err) {
-      console.log(err);
-
       errorToast({
         message: err instanceof Error ? err.message : String(err),
       });
-      // Always throw to ensure a string is never returned as undefined
       throw new Error('Failed to create PayPal order');
     }
   }, [cart]);
 
+  // Approve Handler (unchanged)
   const onApprove = async (data: OnApproveData): Promise<void> => {
     const authRes = await fetch('/next-api/paypal/orders/authorize', {
       method: 'POST',
@@ -125,27 +130,28 @@ const PayPalCheckout: FC<{ mode: CheckoutOptions }> = (props) => {
   };
 
   return (
+    <div className='w-full mx-auto'>
+      <MyPaypalButtons
+        mode={mode}
+        createOrder={createOrder}
+        onApprove={onApprove}
+      />
+
+      <MyPayPalCardFields
+        mode={mode}
+        createOrder={createOrder}
+        onApprove={onApprove}
+      />
+    </div>
+  );
+};
+
+const PaypalCheckout: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
+  return (
     <PayPalScriptProvider options={initialOptions}>
-      <div className='w-full mx-auto'>
-        {/* Paypal Buttons */}
-
-        <MyPaypalButtons
-          mode={mode}
-          createOrder={createOrder}
-          onApprove={onApprove}
-        />
-
-        {/* Paypal Card Fields */}
-        <MyPayPalCardFields
-          mode={mode}
-          billingAddress={billingAddress}
-          createOrder={createOrder}
-          handleBillingAddressChange={handleBillingAddressChange}
-          onApprove={onApprove}
-        />
-      </div>
+      <PayPalCheckoutChildren mode={mode} />
     </PayPalScriptProvider>
   );
 };
 
-export default PayPalCheckout;
+export default PaypalCheckout;

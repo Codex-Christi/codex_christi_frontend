@@ -44,9 +44,9 @@ export const createOrderAction = cache(
       );
     }
 
-    //   if (!customer) {
-    //     throw new Error('Missing customer');
-    //   }
+    if (!customer) {
+      throw new Error('Missing customer');
+    }
 
     //   Main Fetcher
 
