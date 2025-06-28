@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-import { Input } from '@/components/UI/primitives/input';
-import errorToast from '@/lib/error-toast';
+'use client';
+import { FC, useEffect, useRef, useState } from 'react';
 import {
   PayPalCardFieldsProvider,
   PayPalCVVField,
@@ -9,33 +9,63 @@ import {
   PayPalNumberField,
   usePayPalCardFields,
 } from '@paypal/react-paypal-js';
-import { FC, useEffect, useRef, useState } from 'react';
-import { CheckoutOptions } from '../PaymentSection';
 import { OnApproveData } from '@paypal/paypal-js';
-import loadingToast from '@/lib/loading-toast';
-import { toast } from 'sonner';
+import { Input } from '@/components/UI/primitives/input';
 import { Button } from '@/components/UI/primitives/button';
 import { Loader } from 'lucide-react';
-import { BillingAddressInterface } from '@/actions/shop/paypal/createOrderAction';
+import { toast } from 'sonner';
+import errorToast from '@/lib/error-toast';
+import loadingToast from '@/lib/loading-toast';
 import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
+import { CheckoutOptions } from '../PaymentSection';
+import { BillingAddressInterface } from '@/actions/shop/paypal/createOrderAction';
 
 {
   /* Paypal Card Field Providers and Fields */
 }
 
+// Extend global types to avoid 'any' usage
+declare global {
+  interface Window {
+    // @ts-expect-error: Extending 'paypal' on Window conflicts with existing PayPalNamespace definition
+    paypal?: {
+      CardFields?: (options: {
+        createOrder: () => Promise<string>;
+        onApprove: (data: OnApproveData) => Promise<void>;
+        onError?: (err: unknown) => void;
+      }) => {
+        isEligible: () => boolean;
+      };
+    };
+  }
+}
+
 export interface MyPayPalCardFieldInterface {
   mode: CheckoutOptions;
   createOrder: (acceptBilling: boolean) => Promise<string>;
-
   onApprove: (data: OnApproveData) => Promise<void>;
 }
 
-const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = (props) => {
-  // Props
-  const { mode, createOrder, onApprove } = props;
+const billingFields: {
+  placeholder: string;
+  strName: keyof BillingAddressInterface;
+}[] = [
+  { placeholder: 'Address line 1', strName: 'addressLine1' },
+  { placeholder: 'Address line 2', strName: 'addressLine2' },
+  { placeholder: 'State / Province', strName: 'adminArea1' },
+  { placeholder: 'City / Town', strName: 'adminArea2' },
+  { placeholder: 'Country Code (e.g. US)', strName: 'countryCode' },
+  { placeholder: 'Postal Code', strName: 'postalCode' },
+];
 
+const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({
+  mode,
+  createOrder,
+  onApprove,
+}) => {
   // State Values
   const [isPaying, setIsPaying] = useState(false);
+  const [isEligible, setIsEligible] = useState<boolean | null>(null);
 
   const [billingAddress, setBillingAddress] = useState<BillingAddressInterface>(
     {
@@ -54,6 +84,65 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = (props) => {
   ) => {
     setBillingAddress((prev) => ({ ...prev, [field]: value }));
   };
+
+  // Check CardFields eligibility based on PayPal SDK and buyer-country
+  useEffect(() => {
+    let isMounted = true;
+    let interval: NodeJS.Timeout;
+
+    const checkEligibility = () => {
+      const cardFieldsFactory = window?.paypal?.CardFields;
+      if (typeof cardFieldsFactory === 'function') {
+        const instance = cardFieldsFactory({
+          createOrder: () => createOrder(true),
+          onApprove,
+          onError: (err: unknown) => {
+            console.error('CardFields error (eligibility check):', err);
+          },
+        });
+        if (isMounted) setIsEligible(instance?.isEligible?.() ?? false);
+      } else {
+        interval = setInterval(() => {
+          const check = window?.paypal?.CardFields;
+          if (typeof check === 'function') {
+            clearInterval(interval);
+            checkEligibility();
+          }
+        }, 200);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      checkEligibility();
+    }
+
+    return () => {
+      isMounted = false;
+      if (interval) clearInterval(interval);
+    };
+  }, [createOrder, onApprove]);
+
+  // Hide component if not card mode
+  if (mode !== 'card') return null;
+
+  // Loading message
+  if (isEligible === null) {
+    return (
+      <p className='text-sm text-muted-foreground'>
+        Checking card eligibility…
+      </p>
+    );
+  }
+
+  // Ineligible message
+  if (!isEligible) {
+    return (
+      <div className='text-sm text-red-500 mt-2'>
+        🚫 Credit/debit card payments are not available in your region. Please
+        use another method such as PayPal.
+      </div>
+    );
+  }
 
   // Main JSx
   return (
@@ -102,37 +191,19 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = (props) => {
           <PayPalCVVField />
 
           {/* Other input fields for card details */}
-          {(
-            [
-              { placeholder: 'Address line 1', strName: 'addressLine1' },
-              { placeholder: 'Address line 2', strName: 'addressLine2' },
-              { placeholder: 'State / Province', strName: 'adminArea1' },
-              { placeholder: 'City / Town', strName: 'adminArea2' },
-              {
-                placeholder: 'Country Code (e.g. US)',
-                strName: 'countryCode',
-              },
-              { placeholder: 'Postal Code', strName: 'postalCode' },
-            ] as {
-              placeholder: string;
-              strName: keyof typeof billingAddress;
-            }[]
-          ).map((each) => {
-            const { strName, placeholder } = each;
-            return (
-              <Input
-                className='bg-transparent placeholder:text-[#ccc] !py-[1rem] !px-[2rem] text-[14px]
+          {billingFields.map(({ strName, placeholder }) => (
+            <Input
+              className='bg-transparent placeholder:text-[#ccc] !py-[1rem] !px-[2rem] text-[14px]
         h-[unset] rounded-[10px] w-full'
-                key={strName}
-                name={placeholder}
-                placeholder={placeholder}
-                value={billingAddress[strName]}
-                onChange={(e) => {
-                  handleBillingAddressChange(strName, e.target.value);
-                }}
-              />
-            );
-          })}
+              key={strName}
+              name={placeholder}
+              placeholder={placeholder}
+              value={billingAddress[strName]}
+              onChange={(e) => {
+                handleBillingAddressChange(strName, e.target.value);
+              }}
+            />
+          ))}
         </div>
 
         <SubmitPaypalCardPaymentButton

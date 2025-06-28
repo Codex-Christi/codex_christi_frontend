@@ -13,6 +13,8 @@ import { useCartStore } from '@/stores/shop_stores/cartStore';
 import dynamic from 'next/dynamic';
 import { ServerOrderDetailsContext } from '../ServerOrderDetailsComponent';
 import successToast from '@/lib/success-toast';
+import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
+import { PAYPAL_CURRENCY_CODES } from '@/datasets/shop_general/paypal_currency_specifics';
 
 const MyPayPalCardFields = dynamic(() =>
   import('./MyPaypalCardFields').then((comp) => comp.default)
@@ -34,13 +36,21 @@ const initialOptions = {
 
 // Main Components
 const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
+  // Props
   const { mode } = props;
+
+  // Hooks
   const cart = useCartStore((store) => store.variants);
   const serverOrderDetails = useContext(ServerOrderDetailsContext);
   const [, dispatch] = usePayPalScriptReducer();
+  const { first_name, last_name, email } = useShopCheckoutStore(
+    (state) => state
+  );
 
+  // Destructuring
   const { countrySupport } = serverOrderDetails || {};
-  const { country_iso2, currency } = countrySupport?.country || {};
+  const { country_iso2, currency, country_iso3 } =
+    countrySupport?.country || {};
 
   // Track previous values to prevent unnecessary resets
   const prevCurrency = useRef(currency);
@@ -56,7 +66,13 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
         type: DISPATCH_ACTION.RESET_OPTIONS,
         value: {
           ...initialOptions,
-          currency: currency ?? initialOptions.currency,
+          currency:
+            currency &&
+            PAYPAL_CURRENCY_CODES.includes(
+              currency as (typeof PAYPAL_CURRENCY_CODES)[number]
+            )
+              ? currency
+              : 'USD',
           'buyer-country': country_iso2 ?? initialOptions['buyer-country'],
         },
       });
@@ -68,7 +84,15 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   // Create order async function
   const createOrder = useCallback(async (): Promise<string> => {
     try {
-      const response = await createOrderAction({ cart });
+      const response = await createOrderAction({
+        cart,
+        customer: {
+          name: `${first_name} ${last_name}`,
+          email: email ?? 'john@example.com',
+        },
+        country: country_iso2 ?? 'US',
+        country_iso_3: country_iso3 ?? 'USA',
+      });
       const orderData = await JSON.parse(response);
 
       if (orderData.id) {
@@ -87,7 +111,7 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
       });
       throw new Error('Failed to create PayPal order');
     }
-  }, [cart]);
+  }, [cart, country_iso2, country_iso3, email, first_name, last_name]);
 
   // Approve Handler (unchanged)
   const onApprove = async (data: OnApproveData): Promise<void> => {
