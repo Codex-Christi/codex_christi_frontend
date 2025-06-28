@@ -36,7 +36,7 @@ const PaymentSection = () => {
 
         <Button
           variant={'outline'}
-          className='bg-transparent shadow-md shadow-gray-400 flex gap-2'
+          className='bg-transparent flex gap-2'
           name='Back to Delivery Information'
           onClick={() => {
             handleOpenItem('basic-checkout-info');
