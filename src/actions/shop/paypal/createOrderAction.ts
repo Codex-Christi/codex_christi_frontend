@@ -18,12 +18,13 @@ export interface CreateOrderActionInterface {
   customer?: { name: string; email: string };
   country: string;
   country_iso_3: string;
+  initialCurrency: string;
 }
 
 export const createOrderAction = cache(
   async (data: CreateOrderActionInterface) => {
     // Destructure
-    const { cart, customer, country, country_iso_3 } = data;
+    const { cart, customer, country, country_iso_3, initialCurrency } = data;
 
     // Validate Cart
     if (!cart) {
@@ -67,6 +68,7 @@ export const createOrderAction = cache(
             customer: { name: customer.name, email: customer.email },
             country,
             country_iso_3,
+            initialCurrency,
           }),
         }
       );

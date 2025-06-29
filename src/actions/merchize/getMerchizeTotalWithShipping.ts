@@ -98,6 +98,7 @@ export const getShippingPriceMerchizecatalog = cache(
     }
 
     return {
+      multiplier: dollarMultiplierResult.multiplier,
       shippingPriceNum: Math.ceil((shippingPriceNum ?? 0) * 100) / 100,
       currency: dollarMultiplierResult.currency,
     };

@@ -8,7 +8,7 @@ type CheckoutPickType = Pick<
   UserProfileDataInterface,
   'first_name' | 'last_name' | 'email'
 >;
-interface ShopCheckoutStoreInterface extends CheckoutPickType {
+export interface ShopCheckoutStoreInterface extends CheckoutPickType {
   payment_method: {
     payment_method: 'credit_card' | '';
     name: string;

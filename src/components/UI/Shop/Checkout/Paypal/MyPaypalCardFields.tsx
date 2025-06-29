@@ -12,6 +12,7 @@ import {
 import { OnApproveData } from '@paypal/paypal-js';
 import { Input } from '@/components/UI/primitives/input';
 import { Button } from '@/components/UI/primitives/button';
+import { Skeleton } from '@/components/UI/primitives/skeleton';
 import { Loader } from 'lucide-react';
 import { toast } from 'sonner';
 import errorToast from '@/lib/error-toast';
@@ -63,7 +64,6 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({
   createOrder,
   onApprove,
 }) => {
-  // State Values
   const [isPaying, setIsPaying] = useState(false);
   const [isEligible, setIsEligible] = useState<boolean | null>(null);
 
@@ -85,7 +85,6 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({
     setBillingAddress((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Check CardFields eligibility based on PayPal SDK and buyer-country
   useEffect(() => {
     let isMounted = true;
     let interval: NodeJS.Timeout;
@@ -122,19 +121,18 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({
     };
   }, [createOrder, onApprove]);
 
-  // Hide component if not card mode
   if (mode !== 'card') return null;
 
-  // Loading message
   if (isEligible === null) {
     return (
-      <p className='text-sm text-muted-foreground'>
-        Checking card eligibility…
-      </p>
+      <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+        {[...Array(8)].map((_, i) => (
+          <Skeleton key={i} className='h-10 rounded-md w-full' />
+        ))}
+      </div>
     );
   }
 
-  // Ineligible message
   if (!isEligible) {
     return (
       <div className='text-sm text-red-500 mt-2'>
@@ -144,7 +142,6 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({
     );
   }
 
-  // Main JSx
   return (
     <section
       className={`${mode === 'card' ? 'block' : 'hidden'} w-full !mx-auto`}
@@ -183,14 +180,12 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({
           '.invalid': { color: '#DC2626' },
         }}
       >
-        {/* Card Field Inputs Start Here */}
         <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
           <PayPalNameField />
           <PayPalNumberField />
           <PayPalExpiryField />
           <PayPalCVVField />
 
-          {/* Other input fields for card details */}
           {billingFields.map(({ strName, placeholder }) => (
             <Input
               className='bg-transparent placeholder:text-[#ccc] !py-[1rem] !px-[2rem] text-[14px]
@@ -216,7 +211,6 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({
   );
 };
 
-// Pay Now button
 function SubmitPaypalCardPaymentButton({
   isPaying,
   setIsPaying,
@@ -227,7 +221,6 @@ function SubmitPaypalCardPaymentButton({
   billingAddress: BillingAddressInterface;
 }) {
   const { cardFieldsForm } = usePayPalCardFields();
-
   const loadToastRef = useRef<string | number | null>(null);
 
   useEffect(() => {
@@ -251,7 +244,6 @@ function SubmitPaypalCardPaymentButton({
 
     setIsPaying(true);
     try {
-      // Validate Billing Address
       if (!billingAddress) {
         throw new Error('Missing billingAddress');
       }

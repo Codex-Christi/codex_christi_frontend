@@ -3,38 +3,77 @@ import { NextResponse } from 'next/server';
 import {
   OrdersController,
   CheckoutPaymentIntent,
+  OrderRequest,
+  ItemCategory,
+  Item,
 } from '@paypal/paypal-server-sdk';
 import { paypalClient } from '@/lib/paymentClients/paypalClient';
 import { CreateOrderActionInterface } from '@/actions/shop/paypal/createOrderAction';
 import { getOrderFinalDetails } from '@/actions/shop/checkout/getOrderFinalDetails';
-import { currencyCodesWithoutDecimalPrecision } from '@/datasets/shop_general/paypal_currency_specifics';
+import {
+  currencyCodesWithoutDecimalPrecision,
+  PAYPAL_CURRENCY_CODES,
+} from '@/datasets/shop_general/paypal_currency_specifics';
 
 const orders = new OrdersController(paypalClient);
 
+const no_Shipping_Prefernce = {
+  experienceContext: {
+    shippingPreference: 'NO_SHIPPING',
+  },
+};
+
 export async function POST(req: Request) {
   const body: CreateOrderActionInterface = await req.json();
-  const { cart, customer, country, country_iso_3 } = body;
+  const { cart, customer, country, country_iso_3, initialCurrency } = body;
   try {
     if (!cart) {
       throw new Error('Missing cart');
     }
-    // if (!billingAddress && acceptBilling === true) {
-    //   throw new Error('Missing billingAddress');
-    // }
     if (!customer) {
       throw new Error('Missing customer');
     }
 
+    // To check if paypal supports country's currency
+    const payPalSupportsCurrency = PAYPAL_CURRENCY_CODES.includes(
+      initialCurrency as (typeof PAYPAL_CURRENCY_CODES)[number]
+    );
+
     // 🛡 Validate cart on server (don't trust client prices)
     const orderDetailsFromServer = await getOrderFinalDetails(
       cart,
-      country_iso_3 ? country_iso_3 : 'USA',
+      country_iso_3 ? (payPalSupportsCurrency ? country_iso_3 : 'USA') : 'USA',
       'merchize'
     );
 
     const { finalPricesWithShippingFee } = orderDetailsFromServer || {};
-    const { currency, retailPriceTotalNum, shippingPriceNum } =
+    const { currency, retailPriceTotalNum, shippingPriceNum, multiplier } =
       finalPricesWithShippingFee || {};
+
+    // Traverse, copy and format cart for context
+    const cartItemsForPaypalBodyContext = cart.map((cartItem) => {
+      const { title, itemDetail, quantity } = cartItem;
+      const { image, product: productID, sku, retail_price } = itemDetail;
+      const itemConvertedPrice = retail_price * (multiplier ?? 1);
+
+      return {
+        name: title,
+        unitAmount: {
+          currencyCode: currency,
+          value: String(
+            currencyCodesWithoutDecimalPrecision.includes(currency ?? 'USD')
+              ? Math.ceil(itemConvertedPrice)
+              : itemConvertedPrice
+          ),
+        },
+        quantity: String(quantity),
+        description: title,
+        sku,
+        url: `https://codexchristi.shop/product/${productID}`,
+        category: ItemCategory.PhysicalGoods,
+        imageUrl: image,
+      } as Item;
+    });
 
     if (retailPriceTotalNum && shippingPriceNum) {
       const totalAmount = currencyCodesWithoutDecimalPrecision.includes(
@@ -52,8 +91,22 @@ export async function POST(req: Request) {
               amount: {
                 currencyCode,
                 value: totalAmount.toString(),
+                breakdown: {
+                  itemTotal: {
+                    currencyCode: currencyCode,
+                    value: String(retailPriceTotalNum),
+                  },
+                  shipping: { currencyCode, value: String(shippingPriceNum) },
+                },
+              },
+              shipping: {
+                name: {
+                  fullName: customer.name,
+                },
+                emailAddress: customer.email,
               },
               customId: customer?.email ?? '',
+              items: cartItemsForPaypalBodyContext,
             },
           ],
           payer: {
@@ -62,7 +115,19 @@ export async function POST(req: Request) {
             address: { countryCode: country },
             emailAddress: customer.email,
           },
-        },
+          paymentSource: {
+            paypal: no_Shipping_Prefernce,
+            card: {
+              ...no_Shipping_Prefernce,
+              attributes: {
+                verification: {
+                  method: 'SCA_WHEN_REQUIRED',
+                },
+              },
+            },
+            venmo: no_Shipping_Prefernce,
+          },
+        } as OrderRequest,
         prefer: 'return=representation',
       };
 

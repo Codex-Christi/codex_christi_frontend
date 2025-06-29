@@ -1,5 +1,5 @@
 'use client';
-import { FC, useCallback, useContext, useEffect, useRef } from 'react';
+import { FC, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import {
   DISPATCH_ACTION,
   PayPalScriptProvider,
@@ -28,7 +28,7 @@ const initialOptions = {
   clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
   'enable-funding': 'venmo',
   'buyer-country': 'US',
-  currency: 'USD',
+  // currency: 'USD',
   intent: 'authorize',
   components: 'buttons,card-fields', // KEEP THIS FIXED
   'data-sdk-integration-source': 'developer-studio',
@@ -56,6 +56,15 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   const prevCurrency = useRef(currency);
   const prevCountry = useRef(country_iso2);
 
+  // To check if paypal supports country's currency
+  const payPalSupportsCurrency = useMemo(
+    () =>
+      PAYPAL_CURRENCY_CODES.includes(
+        currency as (typeof PAYPAL_CURRENCY_CODES)[number]
+      ),
+    [currency]
+  );
+
   // Reset options only when necessary
   useEffect(() => {
     if (
@@ -66,20 +75,14 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
         type: DISPATCH_ACTION.RESET_OPTIONS,
         value: {
           ...initialOptions,
-          currency:
-            currency &&
-            PAYPAL_CURRENCY_CODES.includes(
-              currency as (typeof PAYPAL_CURRENCY_CODES)[number]
-            )
-              ? currency
-              : 'USD',
+          currency: payPalSupportsCurrency ? currency : 'USD',
           'buyer-country': country_iso2 ?? initialOptions['buyer-country'],
         },
       });
       prevCurrency.current = currency;
       prevCountry.current = country_iso2;
     }
-  }, [currency, country_iso2, dispatch]);
+  }, [currency, country_iso2, dispatch, payPalSupportsCurrency]);
 
   // Create order async function
   const createOrder = useCallback(async (): Promise<string> => {
@@ -92,18 +95,44 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
         },
         country: country_iso2 ?? 'US',
         country_iso_3: country_iso3 ?? 'USA',
+        initialCurrency: currency ?? 'USD',
       });
-      const orderData = await JSON.parse(response);
+
+      const orderData =
+        typeof response === 'string' ? JSON.parse(response) : response;
 
       if (orderData.id) {
         return orderData.id as string;
       } else {
-        const errorDetail = orderData?.result;
-        const errorMessage = errorDetail
-          ? `${errorDetail.error} ${errorDetail.error_description} (${orderData.debug_id ?? ''})`
-          : JSON.stringify(orderData);
+        type PaypalErrorDetail = { description: string; issue: string };
+        type PaypalErrorResponse = {
+          details: PaypalErrorDetail[];
+          links: { href: string }[];
+          debug_id: string;
+        };
 
-        throw new Error(errorMessage);
+        const statCode = orderData.statusCode as number;
+
+        if (typeof orderData === 'object' && statCode > 400 && statCode < 499) {
+          const {
+            details: [errorDetail, ,],
+            links: [{ href }],
+            debug_id,
+          } = JSON.parse(response.body as string) as PaypalErrorResponse;
+
+          const { description, issue } = errorDetail;
+
+          const errorMessage = errorDetail
+            ? ` ${description} Debug ID: (${(debug_id as string) ?? ''})
+            Learn more at ${href}`
+            : JSON.stringify(orderData);
+
+          errorToast({ header: issue, message: errorMessage });
+
+          return errorMessage;
+        } else {
+          throw new Error(orderData);
+        }
       }
     } catch (err) {
       errorToast({
@@ -111,7 +140,15 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
       });
       throw new Error('Failed to create PayPal order');
     }
-  }, [cart, country_iso2, country_iso3, email, first_name, last_name]);
+  }, [
+    cart,
+    country_iso2,
+    country_iso3,
+    currency,
+    email,
+    first_name,
+    last_name,
+  ]);
 
   // Approve Handler (unchanged)
   const onApprove = async (data: OnApproveData): Promise<void> => {
