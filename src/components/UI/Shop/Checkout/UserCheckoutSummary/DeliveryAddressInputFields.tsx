@@ -28,7 +28,7 @@ export const DeliveryAddressInputFields = ({
           { placeholder: 'Postal Code', strName: 'postalCode' },
         ] as {
           placeholder: string;
-          strName: keyof BillingAddress;
+          strName: string;
         }[]
       ).map((each) => {
         const { strName, placeholder } = each;
