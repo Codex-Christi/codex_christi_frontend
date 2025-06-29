@@ -23,7 +23,10 @@ const no_Shipping_Prefernce = {
   },
 };
 
+// Main POST endpoint receiver
 export async function POST(req: Request) {
+  const { origin } = new URL(req.url); // ← Edge‑safe way to get your app's origin
+
   const body: CreateOrderActionInterface = await req.json();
   const { cart, customer, country, country_iso_3, initialCurrency } = body;
   try {
@@ -33,6 +36,8 @@ export async function POST(req: Request) {
     if (!customer) {
       throw new Error('Missing customer');
     }
+
+    console.log(initialCurrency);
 
     // To check if paypal supports country's currency
     const payPalSupportsCurrency = PAYPAL_CURRENCY_CODES.includes(
@@ -71,7 +76,7 @@ export async function POST(req: Request) {
         sku,
         url: `https://codexchristi.shop/product/${productID}`,
         category: ItemCategory.PhysicalGoods,
-        imageUrl: image,
+        imageUrl: `${origin}/next-api/img-proxy?src=${encodeURIComponent(image ?? '')}`,
       } as Item;
     });
 
@@ -81,6 +86,7 @@ export async function POST(req: Request) {
       )
         ? Math.ceil(retailPriceTotalNum + shippingPriceNum)
         : Math.ceil((retailPriceTotalNum + shippingPriceNum) * 100) / 100; // TODO: calculate securely from SKU/DB
+
       const currencyCode = currency ?? 'USD';
 
       const payload = {

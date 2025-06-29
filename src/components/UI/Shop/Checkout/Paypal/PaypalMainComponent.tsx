@@ -113,7 +113,11 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
 
         const statCode = orderData.statusCode as number;
 
-        if (typeof orderData === 'object' && statCode > 400 && statCode < 499) {
+        if (
+          typeof orderData === 'object' &&
+          statCode >= 400 &&
+          statCode <= 499
+        ) {
           const {
             details: [errorDetail, ,],
             links: [{ href }],
