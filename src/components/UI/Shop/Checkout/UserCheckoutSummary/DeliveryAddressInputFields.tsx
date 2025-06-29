@@ -1,12 +1,6 @@
 import { FieldValues, UseFormReturn } from 'react-hook-form';
-import { MyPayPalCardFieldInterface } from '../Paypal/MyPaypalCardFields';
 import { GenericCheckoutInfoInput } from './GenericCheckoutInfoInput';
 import { BasicCheckoutInfoFormSchema } from './BasicCheckoutInfo';
-
-type BillingAddress = Omit<
-  MyPayPalCardFieldInterface['billingAddress'],
-  'countryCode'
->;
 
 interface DeliveryInputFieldsProps<T extends FieldValues> {
   //   billingAddress: BillingAddress;
@@ -41,8 +35,8 @@ export const DeliveryAddressInputFields = ({
         return (
           <GenericCheckoutInfoInput
             currentZodForm={currentZodForm}
-            key={strName}
-            inputName={strName}
+            key={strName as string}
+            inputName={strName as string}
             placeholder={placeholder}
             labelString={placeholder}
           />
