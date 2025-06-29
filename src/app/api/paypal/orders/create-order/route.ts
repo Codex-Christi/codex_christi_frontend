@@ -23,6 +23,8 @@ const no_Shipping_Prefernce = {
   },
 };
 
+const isDevelopemnt = process.env.NODE_ENV === 'development';
+
 // Main POST endpoint receiver
 export async function POST(req: Request) {
   const { origin } = new URL(req.url); // ← Edge‑safe way to get your app's origin
@@ -36,9 +38,6 @@ export async function POST(req: Request) {
     if (!customer) {
       throw new Error('Missing customer');
     }
-
-    console.log(initialCurrency);
-
     // To check if paypal supports country's currency
     const payPalSupportsCurrency = PAYPAL_CURRENCY_CODES.includes(
       initialCurrency as (typeof PAYPAL_CURRENCY_CODES)[number]
@@ -76,7 +75,7 @@ export async function POST(req: Request) {
         sku,
         url: `https://codexchristi.shop/product/${productID}`,
         category: ItemCategory.PhysicalGoods,
-        imageUrl: `${origin}/next-api/img-proxy?src=${encodeURIComponent(image ?? '')}`,
+        imageUrl: `${isDevelopemnt ? 'https://codexchristi.shop' : origin}/next-api/img-proxy?src=${encodeURIComponent(image ?? '')}`,
       } as Item;
     });
 
