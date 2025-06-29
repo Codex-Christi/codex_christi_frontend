@@ -2,44 +2,32 @@
 export const runtime = 'edge';
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const src = searchParams.get('src');
-  if (!src) {
-    return new Response(JSON.stringify({ error: 'Missing `src`' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+  const url = new URL(request.url);
+  const srcParam = url.searchParams.get('src');
+  if (!srcParam) {
+    return new Response('Missing src', { status: 400 });
   }
 
-  let imageUrl: string;
+  let src: string;
   try {
-    imageUrl = decodeURIComponent(src);
-    new URL(imageUrl); // validity check
+    src = decodeURIComponent(srcParam);
+    new URL(src); // validate it
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid `src` URL' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response('Invalid src URL', { status: 400 });
   }
 
-  try {
-    const res = await fetch(imageUrl);
-    if (!res.ok) return new Response(null, { status: res.status });
+  const res = await fetch(src);
+  if (!res.ok) return new Response(null, { status: res.status });
 
-    const contentType = res.headers.get('Content-Type') || 'image/jpeg';
-    const buffer = await res.arrayBuffer();
+  const arrayBuffer = await res.arrayBuffer();
+  const contentType = res.headers.get('Content-Type') ?? 'image/jpeg';
 
-    return new Response(buffer, {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable',
-      },
-    });
-  } catch {
-    return new Response(JSON.stringify({ error: 'Failed fetching image' }), {
-      status: 502,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  return new Response(arrayBuffer, {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      // No 'jpeg' in filename but PayPal cares only about URL ending
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    },
+  });
 }

@@ -75,7 +75,7 @@ export async function POST(req: Request) {
         sku,
         url: `https://codexchristi.shop/product/${productID}`,
         category: ItemCategory.PhysicalGoods,
-        imageUrl: `${'https://codexchristi.shop'}/next-api/img-proxy?src=${encodeURIComponent(image ?? '')}`,
+        imageUrl: `${'https://codexchristi.shop'}/next-api/img-proxy?src=${encodeURIComponent(image ?? '')}.jpeg`,
       } as Item;
     });
 
