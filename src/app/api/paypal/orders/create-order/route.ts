@@ -14,6 +14,9 @@ import {
   currencyCodesWithoutDecimalPrecision,
   PAYPAL_CURRENCY_CODES,
 } from '@/datasets/shop_general/paypal_currency_specifics';
+import { removeOrKeepDecimalPrecision } from '@/actions/merchize/getMerchizeTotalWithShipping';
+
+const uidRegex = /mockup-backgrounds%252F([a-z0-9-]{36})/g;
 
 const orders = new OrdersController(paypalClient);
 
@@ -22,8 +25,6 @@ const no_Shipping_Prefernce = {
     shippingPreference: 'NO_SHIPPING',
   },
 };
-
-const isDevelopemnt = process.env.NODE_ENV === 'development';
 
 // Main POST endpoint receiver
 export async function POST(req: Request) {
@@ -49,13 +50,12 @@ export async function POST(req: Request) {
       country_iso_3 ? (payPalSupportsCurrency ? country_iso_3 : 'USA') : 'USA',
       'merchize'
     );
-
     const { finalPricesWithShippingFee } = orderDetailsFromServer || {};
     const { currency, retailPriceTotalNum, shippingPriceNum, multiplier } =
       finalPricesWithShippingFee || {};
 
     // Traverse, copy and format cart for context
-    const cartItemsForPaypalBodyContext = cart.map((cartItem) => {
+    const cartItemsForPaypalBodyContext = cart.map(async (cartItem) => {
       const { title, itemDetail, quantity } = cartItem;
       const { image, product: productID, sku, retail_price } = itemDetail;
       const itemConvertedPrice = retail_price * (multiplier ?? 1);
@@ -65,9 +65,7 @@ export async function POST(req: Request) {
         unitAmount: {
           currencyCode: currency,
           value: String(
-            currencyCodesWithoutDecimalPrecision.includes(currency ?? 'USD')
-              ? Math.ceil(itemConvertedPrice)
-              : itemConvertedPrice
+            await removeOrKeepDecimalPrecision(currency!, itemConvertedPrice)
           ),
         },
         quantity: String(quantity),
@@ -75,16 +73,19 @@ export async function POST(req: Request) {
         sku,
         url: `https://codexchristi.shop/product/${productID}`,
         category: ItemCategory.PhysicalGoods,
-        imageUrl: `${'https://codexchristi.shop'}/next-api/img-proxy?src=${encodeURIComponent(image ?? '')}.jpeg`,
+        // imageUrl: image,
+        imageUrl: `${buildPaypalProxyUrl(image!, origin)}`,
       } as Item;
     });
 
     if (retailPriceTotalNum && shippingPriceNum) {
-      const totalAmount = currencyCodesWithoutDecimalPrecision.includes(
-        currency ?? 'USD'
-      )
-        ? Math.ceil(retailPriceTotalNum + shippingPriceNum)
-        : Math.ceil((retailPriceTotalNum + shippingPriceNum) * 100) / 100; // TODO: calculate securely from SKU/DB
+      const totalAmountWithShipping = retailPriceTotalNum + shippingPriceNum; // TODO: calculate securely from SKU/DB
+
+      const resolvedCartItems = await Promise.all(
+        cartItemsForPaypalBodyContext
+      );
+
+      console.log('Cart Items for PayPal Body Context:', resolvedCartItems);
 
       const currencyCode = currency ?? 'USD';
 
@@ -95,13 +96,16 @@ export async function POST(req: Request) {
             {
               amount: {
                 currencyCode,
-                value: totalAmount.toString(),
+                value: String(totalAmountWithShipping),
                 breakdown: {
                   itemTotal: {
                     currencyCode: currencyCode,
                     value: String(retailPriceTotalNum),
                   },
-                  shipping: { currencyCode, value: String(shippingPriceNum) },
+                  shipping: {
+                    currencyCode,
+                    value: String(shippingPriceNum),
+                  },
                 },
               },
               shipping: {
@@ -111,7 +115,11 @@ export async function POST(req: Request) {
                 emailAddress: customer.email,
               },
               customId: customer?.email ?? '',
-              items: cartItemsForPaypalBodyContext,
+              items: !currencyCodesWithoutDecimalPrecision.includes(
+                currency ?? 'USD'
+              )
+                ? resolvedCartItems
+                : undefined, // Only send items if the currency supports decimal precision
             },
           ],
           payer: {
@@ -147,4 +155,19 @@ export async function POST(req: Request) {
 
     return NextResponse.json(err);
   }
+}
+
+// app/api/img-proxy/[...slug]/route.ts
+export const dynamic = 'force-static';
+function buildPaypalProxyUrl(cloudFrontUrl: string, origin: string): string {
+  // Remove the base
+  const path = cloudFrontUrl.replace(
+    'https://d2dytk4tvgwhb4.cloudfront.net/',
+    ''
+  );
+  const [meta, filename] = path.split(/\/(?=[^/]+$)/); // split before filename
+
+  // Encode the meta string entirely so PayPal sees only safe chars
+  const encodedMeta = encodeURIComponent(meta);
+  return `${origin}/api/image-proxy/${encodedMeta}/${filename}`;
 }

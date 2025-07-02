@@ -139,6 +139,8 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
         }
       }
     } catch (err) {
+      console.log(JSON.stringify(err));
+
       errorToast({
         message: err instanceof Error ? err.message : String(err),
       });

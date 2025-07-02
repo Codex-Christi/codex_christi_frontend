@@ -8,6 +8,7 @@ import { CatalogItem } from '@/lib/datasetSearchers/merchize/catalog';
 import { europeanIso3Codes } from '@/datasets/shop_general/europeISO3Codes';
 import { getDollarMultiplier } from '../shop/general/currencyConvert';
 import { cache } from 'react';
+import { currencyCodesWithoutDecimalPrecision } from '@/datasets/shop_general/paypal_currency_specifics';
 
 const merchizeAPIKey = process.env.MERRCHIZE_API_KEY!;
 const merchizeBaseURL = process.env.MERCHIZE_BASE_URL;
@@ -50,7 +51,26 @@ export const getMerchizeTotalWIthShipping = cache(
         country_iso3
       );
 
-      return { ...shippingPriceObj, ...realTimePriceTotal };
+      // Use removeOrKeepDecimalPrecision for both shipping and retail price
+      const currency =
+        shippingPriceObj.currency || realTimePriceTotal.currency || 'USD';
+
+      return {
+        ...shippingPriceObj,
+        ...realTimePriceTotal,
+        shippingPriceNum: Number(
+          await removeOrKeepDecimalPrecision(
+            currency,
+            shippingPriceObj.shippingPriceNum
+          )
+        ),
+        retailPriceTotalNum: Number(
+          await removeOrKeepDecimalPrecision(
+            currency,
+            realTimePriceTotal.retailPriceTotalNum
+          )
+        ),
+      };
     }
   }
 );
@@ -195,3 +215,14 @@ const realTimePriceFromMerchize = cache(
     }
   }
 );
+
+// Removes or keeps decimal precision based on currency
+// // For currencies without decimal precision (like JPY), it returns an integer.
+export const removeOrKeepDecimalPrecision = async (
+  curr: string,
+  num: number
+) => {
+  return currencyCodesWithoutDecimalPrecision.includes(curr ?? 'USD')
+    ? num.toFixed(0)
+    : num.toFixed(1);
+};
