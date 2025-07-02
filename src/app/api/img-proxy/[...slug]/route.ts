@@ -4,9 +4,9 @@ export const runtime = 'edge';
 
 export async function GET(
   req: Request,
-  { params }: { params: { slug: string[] } }
+  { params }: { params: { slug: Promise<string[]> } }
 ) {
-  const slug = params.slug;
+  const slug = await params.slug;
   if (!slug || slug.length < 2) {
     return new Response('Invalid proxy URL structure', { status: 400 });
   }
