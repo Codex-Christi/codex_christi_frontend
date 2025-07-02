@@ -28,7 +28,7 @@ const no_Shipping_Prefernce = {
 
 // Main POST endpoint receiver
 export async function POST(req: Request) {
-  const { origin } = new URL(req.url); // ← Edge‑safe way to get your app's origin
+  // const { origin } = new URL(req.url); // ← Edge‑safe way to get your app's origin
 
   const body: CreateOrderActionInterface = await req.json();
   const { cart, customer, country, country_iso_3, initialCurrency } = body;
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
         url: `https://codexchristi.shop/product/${productID}`,
         category: ItemCategory.PhysicalGoods,
         // imageUrl: image,
-        imageUrl: `${buildPaypalProxyUrl(image!, origin)}`,
+        imageUrl: `${buildPaypalProxyUrl(image!, 'https://codexchristi.shop')}`,
       } as Item;
     });
 

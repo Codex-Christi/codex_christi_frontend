@@ -11,7 +11,6 @@ function LoggedinProvider({ children }: { children: ReactNode }) {
 
   // useEffects
   useEffect(() => {
-    alert('Checking if LoggedInProvider works on codexchristi.shop');
     if (!isAuthenticated) {
       autoUpDateSession();
     }
