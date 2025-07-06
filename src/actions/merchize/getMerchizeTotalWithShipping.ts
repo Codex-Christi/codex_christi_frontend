@@ -224,5 +224,5 @@ export const removeOrKeepDecimalPrecision = async (
 ) => {
   return currencyCodesWithoutDecimalPrecision.includes(curr ?? 'USD')
     ? num.toFixed(0)
-    : num.toFixed(1);
+    : Math.round((num + Number.EPSILON) * 100) / 100;
 };

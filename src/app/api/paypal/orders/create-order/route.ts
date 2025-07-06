@@ -16,13 +16,12 @@ import {
 } from '@/datasets/shop_general/paypal_currency_specifics';
 import { removeOrKeepDecimalPrecision } from '@/actions/merchize/getMerchizeTotalWithShipping';
 
-const uidRegex = /mockup-backgrounds%252F([a-z0-9-]{36})/g;
-
 const orders = new OrdersController(paypalClient);
 
 const no_Shipping_Prefernce = {
   experienceContext: {
     shippingPreference: 'NO_SHIPPING',
+    brandName: 'Codex Christi',
   },
 };
 
@@ -57,7 +56,7 @@ export async function POST(req: Request) {
     // Traverse, copy and format cart for context
     const cartItemsForPaypalBodyContext = cart.map(async (cartItem) => {
       const { title, itemDetail, quantity } = cartItem;
-      const { image, product: productID, sku, retail_price } = itemDetail;
+      const { product: productID, sku, retail_price } = itemDetail;
       const itemConvertedPrice = retail_price * (multiplier ?? 1);
 
       return {
@@ -73,8 +72,6 @@ export async function POST(req: Request) {
         sku,
         url: `https://codexchristi.shop/product/${productID}`,
         category: ItemCategory.PhysicalGoods,
-        // imageUrl: image,
-        imageUrl: `${buildPaypalProxyUrl(image!, 'https://codexchristi.shop')}`,
       } as Item;
     });
 
@@ -85,7 +82,17 @@ export async function POST(req: Request) {
         cartItemsForPaypalBodyContext
       );
 
-      console.log('Cart Items for PayPal Body Context:', resolvedCartItems);
+      console.log(
+        '\n',
+        'Cart Items for PayPal Body Context:',
+        resolvedCartItems.reduce(
+          (a, b) => a + Number(b.unitAmount.value) * Number(b.quantity),
+          0
+        ),
+        '\n'
+      );
+
+      console.log(retailPriceTotalNum);
 
       const currencyCode = currency ?? 'USD';
 
@@ -155,19 +162,4 @@ export async function POST(req: Request) {
 
     return NextResponse.json(err);
   }
-}
-
-// app/api/img-proxy/[...slug]/route.ts
-export const dynamic = 'force-static';
-function buildPaypalProxyUrl(cloudFrontUrl: string, origin: string): string {
-  // Remove the base
-  const path = cloudFrontUrl.replace(
-    'https://d2dytk4tvgwhb4.cloudfront.net/',
-    ''
-  );
-  const [meta, filename] = path.split(/\/(?=[^/]+$)/); // split before filename
-
-  // Encode the meta string entirely so PayPal sees only safe chars
-  const encodedMeta = encodeURIComponent(meta);
-  return `${origin}/api/image-proxy/${encodedMeta}/${filename}`;
 }
