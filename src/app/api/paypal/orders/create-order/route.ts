@@ -60,14 +60,10 @@ export async function POST(req: Request) {
 
     // Adjust total and shipping prices and item prices based on currency
     const getAdjAmount = (num: number) =>
-      payPalSupportsCurrency
-        ? num
-        : num > 1
-          ? num / (multiplier ?? 1)
-          : num * (multiplier ?? 1);
+      payPalSupportsCurrency ? num : num / (multiplier ?? 1);
 
-    console.log('Main Price =>', retailPriceTotalNum);
-    console.log('Multiplier =>', multiplier);
+    console.log('Main Price =>', getAdjAmount(retailPriceTotalNum!));
+    console.log('multiplier', multiplier);
 
     // const adjTotal = getAdjAmount(retailPriceTotalNum!);
     const adjShipping = getAdjAmount(shippingPriceNum!);
@@ -82,7 +78,7 @@ export async function POST(req: Request) {
             value: String(
               await removeOrKeepDecimalPrecision(
                 currency!,
-                getAdjAmount(itemDetail.retail_price)
+                getAdjAmount(itemDetail.retail_price * (multiplier ?? 1))
               )
             ),
           },

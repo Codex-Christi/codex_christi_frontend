@@ -25,6 +25,7 @@ type ItemDetail = {
   retail_price: number;
   is_default: boolean;
   sku?: string;
+  sku_seller?: string;
   title: string;
   weight?: number;
   options: VariantOption[] | ProductVariantOptions;
