@@ -12,6 +12,8 @@ const MyPaypalButtons: FC<
   // Props
   const { mode, createOrder, onApprove } = props;
 
+  if (mode !== 'paypal_buttons') return null;
+
   // Main JSX
   return (
     <section

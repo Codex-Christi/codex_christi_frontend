@@ -74,16 +74,28 @@ export const createOrderAction = cache(
       );
 
       if (!response.ok) {
-        console.log(response);
-
         const errorText = await response.text();
         throw new Error(
           `Request failed: ${response.status} ${response.statusText} - ${errorText}`
         );
       }
       return await response.json();
-    } catch (err) {
-      throw err;
+    } catch (err: unknown) {
+      let errorText = '';
+      let status = '';
+      let statusText = '';
+      if (err instanceof Response) {
+        errorText = await err.text();
+        status = err.status.toString();
+        statusText = err.statusText;
+      } else if (err instanceof Error) {
+        errorText = err.message;
+      } else {
+        errorText = String(err);
+      }
+      console.log(`Request failed: ${status} ${statusText} - ${errorText}`);
+
+      throw new Error(`Request failed: ${status} ${statusText} - ${errorText}`);
     }
   }
 );

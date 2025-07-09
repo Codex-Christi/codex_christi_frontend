@@ -1,5 +1,5 @@
 'use client';
-import { FC, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
+import { FC, useCallback, useContext, useEffect, useMemo } from 'react';
 import {
   DISPATCH_ACTION,
   PayPalScriptProvider,
@@ -52,9 +52,9 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   const { country_iso2, currency, country_iso3 } =
     countrySupport?.country || {};
 
-  // Track previous values to prevent unnecessary resets
-  const prevCurrency = useRef(currency);
-  const prevCountry = useRef(country_iso2);
+  // // Track previous values to prevent unnecessary resets
+  // const prevCurrency = useRef(currency);
+  // const prevCountry = useRef(country_iso2);
 
   // To check if paypal supports country's currency
   const payPalSupportsCurrency = useMemo(
@@ -67,22 +67,21 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
 
   // Reset options only when necessary
   useEffect(() => {
-    if (
-      currency !== prevCurrency.current ||
-      country_iso2 !== prevCountry.current
-    ) {
-      dispatch({
-        type: DISPATCH_ACTION.RESET_OPTIONS,
-        value: {
-          ...initialOptions,
-          currency: payPalSupportsCurrency ? currency : 'USD',
-          'buyer-country': country_iso2 ?? initialOptions['buyer-country'],
-        },
-      });
-      prevCurrency.current = currency;
-      prevCountry.current = country_iso2;
-    }
-  }, [currency, country_iso2, dispatch, payPalSupportsCurrency]);
+    // if (
+    //   currency !== prevCurrency.current ||
+    //   country_iso2 !== prevCountry.current
+    // ) {
+    dispatch({
+      type: DISPATCH_ACTION.RESET_OPTIONS,
+      value: {
+        ...initialOptions,
+        currency: payPalSupportsCurrency ? currency : 'USD',
+        'buyer-country': country_iso2 ?? initialOptions['buyer-country'],
+      },
+    });
+    // prevCurrency.current = currency;
+    // prevCountry.current = country_iso2;
+  }, [country_iso2, currency, dispatch, payPalSupportsCurrency]);
 
   // Create order async function
   const createOrder = useCallback(async (): Promise<string> => {
@@ -138,8 +137,8 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
           throw new Error(orderData);
         }
       }
-    } catch (err) {
-      console.log(JSON.stringify(err));
+    } catch (err: unknown) {
+      console.log(err);
 
       errorToast({
         message: err instanceof Error ? err.message : String(err),

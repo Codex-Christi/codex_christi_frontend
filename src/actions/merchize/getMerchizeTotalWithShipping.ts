@@ -173,18 +173,16 @@ const realTimePriceFromMerchize = cache(
         responses.map((res) => res.json())
       );
 
-      const reducedPriceUSD = Math.ceil(
-        data
-          .map((resp, index) => {
-            const variants = resp.data?.variants ?? [];
-            return variants.find(
-              (obj) => obj._id === variantsAndParents[index]['variantId']
-            );
-          })
-          .reduce((accum, variant) => {
-            return accum + (variant?.retail_price ?? 0);
-          }, 0)
-      );
+      const allVariants = data.map((resp, index) => {
+        const variants = resp.data?.variants ?? [];
+        return variants.find(
+          (obj) => obj._id === variantsAndParents[index]['variantId']
+        );
+      });
+
+      const reducedPriceUSD = allVariants.reduce((accum, variant) => {
+        return accum + (variant?.retail_price ?? 0);
+      }, 0);
 
       const dollarMultiplierResult = await getDollarMultiplier(country_iso3);
 
@@ -218,11 +216,12 @@ const realTimePriceFromMerchize = cache(
 
 // Removes or keeps decimal precision based on currency
 // // For currencies without decimal precision (like JPY), it returns an integer.
+
 export const removeOrKeepDecimalPrecision = async (
   curr: string,
   num: number
 ) => {
   return currencyCodesWithoutDecimalPrecision.includes(curr ?? 'USD')
-    ? num.toFixed(0)
+    ? Number(num.toFixed(0))
     : Math.round((num + Number.EPSILON) * 100) / 100;
 };

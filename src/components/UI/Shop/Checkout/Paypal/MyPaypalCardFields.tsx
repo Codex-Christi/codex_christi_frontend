@@ -12,7 +12,6 @@ import {
 import { OnApproveData } from '@paypal/paypal-js';
 import { Input } from '@/components/UI/primitives/input';
 import { Button } from '@/components/UI/primitives/button';
-import { Skeleton } from '@/components/UI/primitives/skeleton';
 import { Loader } from 'lucide-react';
 import { toast } from 'sonner';
 import errorToast from '@/lib/error-toast';
@@ -20,26 +19,6 @@ import loadingToast from '@/lib/loading-toast';
 import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
 import { CheckoutOptions } from '../PaymentSection';
 import { BillingAddressInterface } from '@/actions/shop/paypal/createOrderAction';
-
-{
-  /* Paypal Card Field Providers and Fields */
-}
-
-// Extend global types to avoid 'any' usage
-declare global {
-  interface Window {
-    // @ts-expect-error: Extending 'paypal' on Window conflicts with existing PayPalNamespace definition
-    paypal?: {
-      CardFields?: (options: {
-        createOrder: () => Promise<string>;
-        onApprove: (data: OnApproveData) => Promise<void>;
-        onError?: (err: unknown) => void;
-      }) => {
-        isEligible: () => boolean;
-      };
-    };
-  }
-}
 
 export interface MyPayPalCardFieldInterface {
   mode: CheckoutOptions;
@@ -59,13 +38,13 @@ const billingFields: {
   { placeholder: 'Postal Code', strName: 'postalCode' },
 ];
 
+// Main Component
 const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({
   mode,
   createOrder,
   onApprove,
 }) => {
   const [isPaying, setIsPaying] = useState(false);
-  const [isEligible, setIsEligible] = useState<boolean | null>(null);
 
   const [billingAddress, setBillingAddress] = useState<BillingAddressInterface>(
     {
@@ -85,62 +64,7 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({
     setBillingAddress((prev) => ({ ...prev, [field]: value }));
   };
 
-  useEffect(() => {
-    let isMounted = true;
-    let interval: NodeJS.Timeout;
-
-    const checkEligibility = () => {
-      const cardFieldsFactory = window?.paypal?.CardFields;
-      if (typeof cardFieldsFactory === 'function') {
-        const instance = cardFieldsFactory({
-          createOrder: () => createOrder(true),
-          onApprove,
-          onError: (err: unknown) => {
-            console.error('CardFields error (eligibility check):', err);
-          },
-        });
-        if (isMounted) setIsEligible(instance?.isEligible?.() ?? false);
-      } else {
-        interval = setInterval(() => {
-          const check = window?.paypal?.CardFields;
-          if (typeof check === 'function') {
-            clearInterval(interval);
-            checkEligibility();
-          }
-        }, 200);
-      }
-    };
-
-    if (typeof window !== 'undefined') {
-      checkEligibility();
-    }
-
-    return () => {
-      isMounted = false;
-      if (interval) clearInterval(interval);
-    };
-  }, [createOrder, onApprove]);
-
   if (mode !== 'card') return null;
-
-  if (isEligible === null) {
-    return (
-      <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-        {[...Array(8)].map((_, i) => (
-          <Skeleton key={i} className='h-10 rounded-md w-full' />
-        ))}
-      </div>
-    );
-  }
-
-  if (!isEligible) {
-    return (
-      <div className='text-sm text-red-500 mt-2'>
-        🚫 Credit/debit card payments are not available in your region. Please
-        use another method such as PayPal.
-      </div>
-    );
-  }
 
   return (
     <section
@@ -211,6 +135,7 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({
   );
 };
 
+// Submit Button Compoanent
 function SubmitPaypalCardPaymentButton({
   isPaying,
   setIsPaying,
