@@ -62,9 +62,6 @@ export async function POST(req: Request) {
     const getAdjAmount = (num: number) =>
       payPalSupportsCurrency ? num : num / (multiplier ?? 1);
 
-    console.log('Main Price =>', getAdjAmount(retailPriceTotalNum!));
-    console.log('multiplier', multiplier);
-
     // const adjTotal = getAdjAmount(retailPriceTotalNum!);
     const adjShipping = getAdjAmount(shippingPriceNum!);
 
