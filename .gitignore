@@ -48,3 +48,6 @@ certs
 # Next.js serverlogs 
 serverlogs.txt
 deploy-*.log
+
+# PDF gen files
+/public/uploads/*.pdf
