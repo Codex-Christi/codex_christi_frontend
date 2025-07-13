@@ -9,6 +9,7 @@ const nextConfig = {
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
+  serverExternalPackages: ['pdfkit'],
   images: {
     remotePatterns: [
       {
