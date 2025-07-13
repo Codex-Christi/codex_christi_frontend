@@ -65,12 +65,12 @@ export const processCompletedTxAction = async (encData: string) => {
       if (shipping) {
         const address = shipping.address;
         doc
-          .text('Ship To:', 300, 150)
-          .text(shipping.name?.full_name || '', 300, 165)
-          .text(address?.address_line_1 || '', 300, 180)
+          .text('Ship To:', 400, 150)
+          .text(shipping.name?.full_name || '', 400, 165)
+          .text(address?.address_line_1 || '', 400, 180)
           .text(
             `${address?.admin_area_2 || ''}, ${address?.admin_area_1 || ''} ${address?.postal_code || ''}`,
-            300,
+            400,
             195,
           )
           .moveDown(1);
@@ -85,7 +85,7 @@ export const processCompletedTxAction = async (encData: string) => {
         .fontSize(10)
         .fillColor('#333')
         .text('Description', 50, startY)
-        .text('SKU', 250, startY)
+        .text('SKU', 210, startY)
         .text('Qty', 350, startY, { width: 50, align: 'right' })
         .text('Price', 400, startY, { width: 70, align: 'right' })
         .text('Total', 470, startY, { width: 80, align: 'right' })
@@ -105,13 +105,13 @@ export const processCompletedTxAction = async (encData: string) => {
 
         doc
           .fillColor('#333')
-          .text(item.name || '', 50, y)
-          .text(item.sku || '', 250, y)
+          .text(item.name || '', 50, y, { width: 145, lineBreak: true })
+          .text(item.sku || '', 210, y, { width: 150, lineBreak: true })
           .text(quantity.toString(), 350, y, { width: 50, align: 'right' })
-          .text(`${price.toFixed(2)} ${currency_code}`, 400, y, { width: 70, align: 'right' })
-          .text(`${total.toFixed(2)} ${currency_code}`, 470, y, { width: 80, align: 'right' });
+          .text(`${price} ${currency_code}`, 400, y, { width: 70, align: 'right' })
+          .text(`${total} ${currency_code}`, 470, y, { width: 80, align: 'right' });
 
-        y += 20;
+        y += 30;
       });
 
       // Summary
@@ -142,7 +142,7 @@ export const processCompletedTxAction = async (encData: string) => {
           .stroke()
           .font('Helvetica-Bold')
           .text('Total:', 400, y + 80, { width: 70, align: 'right' })
-          .text(`$${total.toFixed(2)}`, 470, y + 80, { width: 80, align: 'right' })
+          .text(`${total.toFixed(2)} ${currency_code}`, 470, y + 80, { width: 80, align: 'right' })
           .font('Helvetica');
       }
 
