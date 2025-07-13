@@ -103,7 +103,7 @@ export const getShippingPriceMerchizecatalog = cache(
     }, 0);
 
     const shippingNum =
-      shippingPriceServer < 15 ? 15 : Math.ceil(shippingPriceServer);
+      shippingPriceServer < 10 ? 10 : Math.ceil(shippingPriceServer);
 
     const dollarMultiplierResult = await getDollarMultiplier(country_iso3);
 

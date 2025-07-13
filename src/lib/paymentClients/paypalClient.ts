@@ -13,7 +13,7 @@ export const paypalClient = new Client({
   timeout: 0,
   environment: Environment.Sandbox, // Use Environment.Live for production
   logging: {
-    logLevel: LogLevel.Info,
+    logLevel: LogLevel.Debug,
     logRequest: { logBody: true },
     logResponse: { logHeaders: true },
   },

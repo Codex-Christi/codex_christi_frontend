@@ -1,28 +1,28 @@
 // POST /api/paypal/orders/create-order
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 import {
   OrdersController,
   CheckoutPaymentIntent,
   OrderRequest,
   ItemCategory,
   Item,
-} from '@paypal/paypal-server-sdk';
-import { paypalClient } from '@/lib/paymentClients/paypalClient';
-import { CreateOrderActionInterface } from '@/actions/shop/paypal/createOrderAction';
-import { getOrderFinalDetails } from '@/actions/shop/checkout/getOrderFinalDetails';
-import { PAYPAL_CURRENCY_CODES } from '@/datasets/shop_general/paypal_currency_specifics';
-import { removeOrKeepDecimalPrecision } from '@/actions/merchize/getMerchizeTotalWithShipping';
-import { randomUUID } from 'crypto';
-import { format } from 'date-fns';
+} from "@paypal/paypal-server-sdk";
+import { paypalClient } from "@/lib/paymentClients/paypalClient";
+import { CreateOrderActionInterface } from "@/actions/shop/paypal/createOrderAction";
+import { getOrderFinalDetails } from "@/actions/shop/checkout/getOrderFinalDetails";
+import { PAYPAL_CURRENCY_CODES } from "@/datasets/shop_general/paypal_currency_specifics";
+import { removeOrKeepDecimalPrecision } from "@/actions/merchize/getMerchizeTotalWithShipping";
+import { randomUUID } from "crypto";
+import { format } from "date-fns";
 
 // Import the OrdersController from PayPal SDK
 const orders = new OrdersController(paypalClient);
 
 // Define the no shipping preference for PayPal
-const no_Shipping_Prefernce = {
+const shippingPreferenceForPaymentContext = {
   experienceContext: {
-    shippingPreference: 'NO_SHIPPING',
-    brandName: 'Codex Christi',
+    shippingPreference: "SET_PROVIDED_ADDRESS",
+    brandName: "Codex Christi",
   },
 };
 
@@ -31,24 +31,24 @@ export async function POST(req: Request) {
   // const { origin } = new URL(req.url); // ← Edge‑safe way to get your app's origin
 
   const body: CreateOrderActionInterface = await req.json();
-  const { cart, customer, country, country_iso_3, initialCurrency } = body;
+  const { cart, customer, country, country_iso_3, initialCurrency, delivery_address } = body;
   try {
     if (!cart) {
-      throw new Error('Missing cart');
+      throw new Error("Missing cart");
     }
     if (!customer) {
-      throw new Error('Missing customer');
+      throw new Error("Missing customer");
     }
     // To check if paypal supports country's currency
     const payPalSupportsCurrency = PAYPAL_CURRENCY_CODES.includes(
-      initialCurrency as (typeof PAYPAL_CURRENCY_CODES)[number]
+      initialCurrency as (typeof PAYPAL_CURRENCY_CODES)[number],
     );
 
     // 🛡 Validate cart on server (don't trust client prices)
     const orderDetailsFromServer = await getOrderFinalDetails(
       cart,
-      country_iso_3 ? country_iso_3 : 'USA',
-      'merchize'
+      country_iso_3 ? country_iso_3 : "USA",
+      "merchize",
     );
     const { finalPricesWithShippingFee } = orderDetailsFromServer || {};
     const { currency, retailPriceTotalNum, shippingPriceNum, multiplier } =
@@ -56,11 +56,10 @@ export async function POST(req: Request) {
 
     // Extract the currency code, defaulting to 'USD' if not supported
     // or if the currency is not provided
-    const currencyCode = currency && payPalSupportsCurrency ? currency : 'USD';
+    const currencyCode = currency && payPalSupportsCurrency ? currency : "USD";
 
     // Adjust total and shipping prices and item prices based on currency
-    const getAdjAmount = (num: number) =>
-      payPalSupportsCurrency ? num : num / (multiplier ?? 1);
+    const getAdjAmount = (num: number) => (payPalSupportsCurrency ? num : num / (multiplier ?? 1));
 
     // const adjTotal = getAdjAmount(retailPriceTotalNum!);
     const adjShipping = getAdjAmount(shippingPriceNum!);
@@ -75,16 +74,16 @@ export async function POST(req: Request) {
             value: String(
               await removeOrKeepDecimalPrecision(
                 currency!,
-                getAdjAmount(itemDetail.retail_price * (multiplier ?? 1))
-              )
+                getAdjAmount(itemDetail.retail_price * (multiplier ?? 1)),
+              ),
             ),
           },
           quantity: String(quantity),
           description: title,
-          sku: itemDetail.sku,
+          sku: itemDetail.sku_seller,
           url: `https://codexchristi.shop/product/${itemDetail.product}`,
           category: ItemCategory.PhysicalGoods,
-        }) as Item
+        }) as Item,
     );
 
     if (retailPriceTotalNum && shippingPriceNum) {
@@ -92,17 +91,14 @@ export async function POST(req: Request) {
       // const totalAmountWithShipping = Number(adjTotal) + Number(adjShipping); // TODO: calculate securely from SKU/DB
 
       // Resolve all cart items to ensure they are ready for the order payload
-      const resolvedCartItems = await Promise.all(
-        cartItemsForPaypalBodyContext
-      );
+      const resolvedCartItems = await Promise.all(cartItemsForPaypalBodyContext);
 
       const itemsContextTotal = await removeOrKeepDecimalPrecision(
         currencyCode,
         resolvedCartItems.reduce(
-          (accum, itm) =>
-            accum + Number(itm.unitAmount.value) * Number(itm.quantity),
-          0
-        )
+          (accum, itm) => accum + Number(itm.unitAmount.value) * Number(itm.quantity),
+          0,
+        ),
       );
 
       // Create the order payload
@@ -110,17 +106,17 @@ export async function POST(req: Request) {
       // and `value` is the total amount for the order.
       const payload = {
         body: {
-          intent: 'AUTHORIZE' as CheckoutPaymentIntent,
+          intent: "AUTHORIZE" as CheckoutPaymentIntent,
           purchaseUnits: [
             {
-              description: `Codex Christi Shop Order for ${customer.name} on ${format(new Date(Date.now()), "EEEE d 'of' MMMM yyyy hh:mm a")}`,
+              description: `Codex Christi Shop Order for ${customer.name} on ${format(
+                new Date(Date.now()),
+                "EEEE d 'of' MMMM yyyy hh:mm a",
+              )}`,
               amount: {
                 currencyCode,
                 value: String(
-                  await removeOrKeepDecimalPrecision(
-                    currencyCode,
-                    itemsContextTotal + adjShipping
-                  )
+                  await removeOrKeepDecimalPrecision(currencyCode, itemsContextTotal + adjShipping),
                 ),
                 breakdown: {
                   itemTotal: {
@@ -129,12 +125,7 @@ export async function POST(req: Request) {
                   },
                   shipping: {
                     currencyCode,
-                    value: String(
-                      await removeOrKeepDecimalPrecision(
-                        currencyCode,
-                        adjShipping
-                      )
-                    ),
+                    value: String(await removeOrKeepDecimalPrecision(currencyCode, adjShipping)),
                   },
                 },
               },
@@ -142,10 +133,21 @@ export async function POST(req: Request) {
                 name: {
                   fullName: customer.name,
                 },
+                address: {
+                  addressLine1: delivery_address.shipping_address_line_1,
+                  addressLine2: delivery_address.shipping_address_line_2,
+                  adminArea1: delivery_address.shipping_state,
+                  adminArea2:
+                    // delivery_address.shipping_city!.length > 2 ?
+                    delivery_address.shipping_city,
+                  // : undefined,
+                  postalCode: delivery_address.zip_code,
+                  countryCode: country,
+                },
 
                 emailAddress: customer.email,
               },
-              customId: randomUUID() ?? customer?.email ?? '',
+              customId: randomUUID() ?? customer?.email ?? "",
               items: payPalSupportsCurrency
                 ? // && !currencyCodesWithoutDecimalPrecision.includes(currencyCode)
                   resolvedCartItems
@@ -155,24 +157,23 @@ export async function POST(req: Request) {
           ],
           payer: {
             name: { givenName: customer.name },
-            // address: billingAddress,
             address: { countryCode: country },
             emailAddress: customer.email,
           },
           paymentSource: {
-            paypal: no_Shipping_Prefernce,
+            paypal: shippingPreferenceForPaymentContext,
             card: {
-              ...no_Shipping_Prefernce,
+              experienceContext: shippingPreferenceForPaymentContext.experienceContext,
               attributes: {
                 verification: {
-                  method: 'SCA_WHEN_REQUIRED',
+                  method: "SCA_WHEN_REQUIRED",
                 },
               },
             },
-            venmo: no_Shipping_Prefernce,
+            venmo: shippingPreferenceForPaymentContext,
           },
         } as OrderRequest,
-        prefer: 'return=representation',
+        prefer: "return=representation",
       };
 
       // Order Creation time...
@@ -180,10 +181,10 @@ export async function POST(req: Request) {
 
       return NextResponse.json(resBody);
     } else {
-      throw new Error('Invalid Price!! Aborting...');
+      throw new Error("Invalid Price!! Aborting...");
     }
   } catch (err: unknown) {
-    console.error('Create Order Error', err);
+    console.error("Create Order Error", err);
 
     return NextResponse.json(err);
   }

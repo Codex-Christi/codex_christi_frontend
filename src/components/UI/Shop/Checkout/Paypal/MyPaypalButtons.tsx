@@ -2,6 +2,7 @@ import errorToast from '@/lib/error-toast';
 import { PayPalButtons } from '@paypal/react-paypal-js';
 import { MyPayPalCardFieldInterface } from './MyPaypalCardFields';
 import { FC } from 'react';
+import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 
 const MyPaypalButtons: FC<
   Omit<
@@ -12,7 +13,12 @@ const MyPaypalButtons: FC<
   // Props
   const { mode, createOrder, onApprove } = props;
 
-  if (mode !== 'paypal_buttons') return null;
+  // Hooks
+  const country = useShopCheckoutStore(
+    (state) => state.delivery_address.shipping_country
+  );
+
+  if (mode !== 'paypal_buttons' && !country) return null;
 
   // Main JSX
   return (

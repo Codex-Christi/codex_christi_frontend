@@ -22,7 +22,7 @@ export const DeliveryAddressInputFields = ({
       {(
         [
           { placeholder: 'Address Line 1', strName: 'addressLine1' },
-          { placeholder: 'Address Line 2', strName: 'addressLine2' },
+          { placeholder: 'Apt. Number (Address Line 2) ', strName: 'addressLine2' },
           { placeholder: 'State / Province', strName: 'adminArea1' },
           { placeholder: 'City / Town', strName: 'adminArea2' },
           { placeholder: 'Postal Code', strName: 'postalCode' },
