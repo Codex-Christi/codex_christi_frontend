@@ -70,15 +70,13 @@ export const processCompletedTxAction = async (encData: string) => {
           .text(address?.address_line_1 || '', 400, 180)
           .text(
             `${address?.admin_area_2 || ''}, ${address?.admin_area_1 || ''} ${address?.postal_code || ''}`,
-            400,
-            195,
           )
           .moveDown(1);
       }
 
       // Line items table
       const items = authData.purchase_units?.[0]?.items || [];
-      const startY = 225;
+      const startY = 270;
 
       // Table header
       doc
@@ -159,7 +157,7 @@ export const processCompletedTxAction = async (encData: string) => {
     const uploadDir = path.join(process.cwd(), 'public', 'uploads');
     await fs.mkdir(uploadDir, { recursive: true });
 
-    const fileName = `invoice-${authData.id}.pdf`;
+    const fileName = `invoice-${authData.id}-${authData.payer?.email_address}.pdf`;
     const filePath = path.join(uploadDir, fileName);
     await fs.writeFile(filePath, pdfBuffer);
 
