@@ -31,12 +31,11 @@ interface SignupHookInterface {
   userData: UserDataReturnType | null;
 }
 
-interface SignUpResponse {
-  data: UserDataReturnType; // Assuming response includes a user object
-
-  message?: string; // Optional message for success/error
-  success: boolean; // Indicates success or failure
-}
+// interface SignUpResponse {
+//   data: UserDataReturnType; // Assuming response includes a user object
+//   message?: string; // Optional message for success/error
+//   success: boolean; // Indicates success or failure
+// }
 
 const defaultSignUpProcessState: SignupHookInterface = {
   isLoading: false,
@@ -67,7 +66,7 @@ export const useRegularSignUp = () => {
           `/account/user-registration`,
           {
             ...userDetails,
-          }
+          },
         );
 
         toast.dismiss(loadingToastID);
@@ -85,9 +84,7 @@ export const useRegularSignUp = () => {
             userData: signUpRes.data,
           });
 
-          router.replace(
-            `/auth/verify-otp?email=${signUpRes?.data?.data?.email}`
-          );
+          router.replace(`/auth/verify-otp?email=${signUpRes?.data?.data?.email}`);
 
           return signUpRes.data;
         }
@@ -110,7 +107,7 @@ export const useRegularSignUp = () => {
         return String(err);
       }
     },
-    [router]
+    [router],
   );
 
   return { ...signupProcessState, signUp };

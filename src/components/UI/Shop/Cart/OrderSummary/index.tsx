@@ -1,7 +1,6 @@
 'use client';
 
 import { getCatalogItems } from '@/actions/merchize/getItemCatalogInfo';
-import { Button } from '@/components/UI/primitives/button';
 import { CatalogItem } from '@/lib/datasetSearchers/merchize/catalog';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import Link from 'next/link';
@@ -12,10 +11,7 @@ import CustomShopLink from '../../HelperComponents/CustomShopLink';
 /**
  * Gets the max and min shipping fee for an order (cart instance)
  */
-const getMaxandMinShippingPrice = (
-  catalogData: CatalogItem[],
-  findValue: 'max' | 'min'
-) => {
+const getMaxandMinShippingPrice = (catalogData: CatalogItem[], findValue: 'max' | 'min') => {
   const comparator = findValue === 'max' ? Math.max : Math.min;
   let sku = '';
 
@@ -49,9 +45,7 @@ const getMaxandMinShippingPrice = (
 
     return (
       comparator(
-        ...Object.values(passInObj).filter(
-          (v): v is number => typeof v === 'number' && v > 0
-        )
+        ...Object.values(passInObj).filter((v): v is number => typeof v === 'number' && v > 0),
       ) + accum
     );
   }, 0);
@@ -66,7 +60,7 @@ const OrderSummary: FC = () => {
       cartItems.reduce((acc, { itemDetail: { retail_price }, quantity }) => {
         return acc + retail_price * quantity;
       }, 0),
-    [cartItems]
+    [cartItems],
   );
   const [shippingEstimates, setShippingEstimates] = useState<{
     min: number;
@@ -80,9 +74,7 @@ const OrderSummary: FC = () => {
     });
     if (filt) {
       const skuCatalogData = await getCatalogItems(
-        filt
-          ? filt.filter((sku): sku is string => typeof sku === 'string')
-          : ['']
+        filt ? filt.filter((sku): sku is string => typeof sku === 'string') : [''],
       );
 
       const minShippingFee = getMaxandMinShippingPrice(skuCatalogData, 'min');
@@ -135,8 +127,8 @@ const OrderSummary: FC = () => {
           </h3>
 
           <p className='font-semibold pt-8'>
-            <span className='font-extrabold'>**</span> &nbsp; Shipping fee
-            varies by location. <br />
+            <span className='font-extrabold'>**</span> &nbsp; Shipping fee varies by location.{' '}
+            <br />
             <Link
               className='font-normal text-blue-200 underline underline-offset-2'
               href='/shop/help/shipping-rates-and-supported-countries'
