@@ -17,6 +17,7 @@ export const uploadPaymentReceiptToR2 = async ({
         Key: `paypal/${filename}`,
         Body: fileBody,
         ContentType: 'application/pdf',
+        CacheControl: 'public, max-age=31536000',
       }),
     );
 

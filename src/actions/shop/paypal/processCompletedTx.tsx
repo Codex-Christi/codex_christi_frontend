@@ -28,6 +28,9 @@ export const processCompletedTxAction = async (encData: string) => {
       filename: `invoice-${authData.id}-${authData.payer?.email_address}.pdf`,
     });
 
+    const clientSideResp = { success: true, pdfLink: accessLink };
+    return clientSideResp;
+
     // Catch errors
   } catch (error: unknown) {
     // Save error details
