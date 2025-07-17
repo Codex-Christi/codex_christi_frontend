@@ -1,4 +1,3 @@
-import chalk from 'chalk';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { r2 } from '@/lib/cloudflare/r2';
 
@@ -12,13 +11,12 @@ export const uploadPaymentReceiptToR2 = async ({
   fileBody: Buffer<ArrayBufferLike>;
 }) => {
   try {
-    console.log(chalk.yellow(`Generating an upload URL!`));
-
     await r2.send(
       new PutObjectCommand({
         Bucket: process.env.R2_PAYMENT_DOCS_BUCKET_NAME,
         Key: `paypal/${filename}`,
         Body: fileBody,
+        ContentType: 'application/pdf',
       }),
     );
 
