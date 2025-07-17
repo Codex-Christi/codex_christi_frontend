@@ -8,6 +8,7 @@ import PDFDocument from 'pdfkit';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
+import { uploadPaymentReceiptToR2 } from '../checkout/transactions/uploadPaymentReceipt';
 
 export interface CompletedTxInterface {
   authData: OrderResponseBody;
@@ -36,7 +37,7 @@ export const processCompletedTxAction = async (encData: string) => {
         .image('public/media/img/general/logo-glow-tiny.jpg', 50, 45, { width: 100 })
         .fillColor('#333')
         .fontSize(20)
-        .text('INVOICE', { align: 'right' })
+        .text('PAYMENT RECEIPT', { align: 'right' })
         .moveDown(0.5);
 
       // Invoice details
@@ -153,20 +154,26 @@ export const processCompletedTxAction = async (encData: string) => {
       doc.end();
     });
 
+    // Upload to r2
+    await uploadPaymentReceiptToR2({
+      fileBody: pdfBuffer,
+      filename: `invoice-${authData.id}-${authData.payer?.email_address}.pdf`,
+    });
+
     // Save to file system
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-    await fs.mkdir(uploadDir, { recursive: true });
+    // const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+    // await fs.mkdir(uploadDir, { recursive: true });
 
-    const fileName = `invoice-${authData.id}-${authData.payer?.email_address}.pdf`;
-    const filePath = path.join(uploadDir, fileName);
-    await fs.writeFile(filePath, pdfBuffer);
+    // const fileName = `invoice-${authData.id}-${authData.payer?.email_address}.pdf`;
+    // const filePath = path.join(uploadDir, fileName);
+    // await fs.writeFile(filePath, pdfBuffer);
 
-    return {
-      success: true,
-      message: 'PDF saved successfully.',
-      downloadUrl: `/uploads/${fileName}`,
-      mainDecodedData: decryptedData,
-    };
+    // return {
+    //   success: true,
+    //   message: 'PDF saved successfully.',
+    //   downloadUrl: `/uploads/${fileName}`,
+    //   mainDecodedData: decryptedData,
+    // };
   } catch (error: unknown) {
     // Save error details
     const errorDir = path.join(process.cwd(), 'transaction-errors');
@@ -178,6 +185,7 @@ export const processCompletedTxAction = async (encData: string) => {
       errorMessage = error.message;
       errorStack = error.stack;
     }
+    console.log('TX Upload Err: ', error);
 
     const errorPath = path.join(errorDir, `error-${Date.now()}.json`);
     await fs.writeFile(
