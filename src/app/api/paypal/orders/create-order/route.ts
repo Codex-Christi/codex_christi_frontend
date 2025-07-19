@@ -1,19 +1,19 @@
 // POST /api/paypal/orders/create-order
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
 import {
   OrdersController,
   CheckoutPaymentIntent,
   OrderRequest,
   ItemCategory,
   Item,
-} from "@paypal/paypal-server-sdk";
-import { paypalClient } from "@/lib/paymentClients/paypalClient";
-import { CreateOrderActionInterface } from "@/actions/shop/paypal/createOrderAction";
-import { getOrderFinalDetails } from "@/actions/shop/checkout/getOrderFinalDetails";
-import { PAYPAL_CURRENCY_CODES } from "@/datasets/shop_general/paypal_currency_specifics";
-import { removeOrKeepDecimalPrecision } from "@/actions/merchize/getMerchizeTotalWithShipping";
-import { randomUUID } from "crypto";
-import { format } from "date-fns";
+} from '@paypal/paypal-server-sdk';
+import { paypalClient } from '@/lib/paymentClients/paypalClient';
+import { CreateOrderActionInterface } from '@/actions/shop/paypal/createOrderAction';
+import { getOrderFinalDetails } from '@/actions/shop/checkout/getOrderFinalDetails';
+import { PAYPAL_CURRENCY_CODES } from '@/datasets/shop_general/paypal_currency_specifics';
+import { removeOrKeepDecimalPrecision } from '@/actions/merchize/getMerchizeTotalWithShipping';
+import { randomUUID } from 'crypto';
+import { format } from 'date-fns';
 
 // Import the OrdersController from PayPal SDK
 const orders = new OrdersController(paypalClient);
@@ -21,8 +21,8 @@ const orders = new OrdersController(paypalClient);
 // Define the no shipping preference for PayPal
 const shippingPreferenceForPaymentContext = {
   experienceContext: {
-    shippingPreference: "SET_PROVIDED_ADDRESS",
-    brandName: "Codex Christi",
+    shippingPreference: 'SET_PROVIDED_ADDRESS',
+    brandName: 'Codex Christi',
   },
 };
 
@@ -34,10 +34,10 @@ export async function POST(req: Request) {
   const { cart, customer, country, country_iso_3, initialCurrency, delivery_address } = body;
   try {
     if (!cart) {
-      throw new Error("Missing cart");
+      throw new Error('Missing cart');
     }
     if (!customer) {
-      throw new Error("Missing customer");
+      throw new Error('Missing customer');
     }
     // To check if paypal supports country's currency
     const payPalSupportsCurrency = PAYPAL_CURRENCY_CODES.includes(
@@ -47,8 +47,8 @@ export async function POST(req: Request) {
     // 🛡 Validate cart on server (don't trust client prices)
     const orderDetailsFromServer = await getOrderFinalDetails(
       cart,
-      country_iso_3 ? country_iso_3 : "USA",
-      "merchize",
+      country_iso_3 ? country_iso_3 : 'USA',
+      'merchize',
     );
     const { finalPricesWithShippingFee } = orderDetailsFromServer || {};
     const { currency, retailPriceTotalNum, shippingPriceNum, multiplier } =
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
 
     // Extract the currency code, defaulting to 'USD' if not supported
     // or if the currency is not provided
-    const currencyCode = currency && payPalSupportsCurrency ? currency : "USD";
+    const currencyCode = currency && payPalSupportsCurrency ? currency : 'USD';
 
     // Adjust total and shipping prices and item prices based on currency
     const getAdjAmount = (num: number) => (payPalSupportsCurrency ? num : num / (multiplier ?? 1));
@@ -106,7 +106,7 @@ export async function POST(req: Request) {
       // and `value` is the total amount for the order.
       const payload = {
         body: {
-          intent: "AUTHORIZE" as CheckoutPaymentIntent,
+          intent: 'AUTHORIZE' as CheckoutPaymentIntent,
           purchaseUnits: [
             {
               description: `Codex Christi Shop Order for ${customer.name} on ${format(
@@ -147,7 +147,7 @@ export async function POST(req: Request) {
 
                 emailAddress: customer.email,
               },
-              customId: randomUUID() ?? customer?.email ?? "",
+              customId: randomUUID() ?? customer?.email ?? '',
               items: payPalSupportsCurrency
                 ? // && !currencyCodesWithoutDecimalPrecision.includes(currencyCode)
                   resolvedCartItems
@@ -157,7 +157,6 @@ export async function POST(req: Request) {
           ],
           payer: {
             name: { givenName: customer.name },
-            address: { countryCode: country },
             emailAddress: customer.email,
           },
           paymentSource: {
@@ -166,14 +165,14 @@ export async function POST(req: Request) {
               experienceContext: shippingPreferenceForPaymentContext.experienceContext,
               attributes: {
                 verification: {
-                  method: "SCA_WHEN_REQUIRED",
+                  method: 'SCA_WHEN_REQUIRED',
                 },
               },
             },
             venmo: shippingPreferenceForPaymentContext,
           },
         } as OrderRequest,
-        prefer: "return=representation",
+        prefer: 'return=representation',
       };
 
       // Order Creation time...
@@ -181,10 +180,10 @@ export async function POST(req: Request) {
 
       return NextResponse.json(resBody);
     } else {
-      throw new Error("Invalid Price!! Aborting...");
+      throw new Error('Invalid Price!! Aborting...');
     }
   } catch (err: unknown) {
-    console.error("Create Order Error", err);
+    console.error('Create Order Error', err);
 
     return NextResponse.json(err);
   }

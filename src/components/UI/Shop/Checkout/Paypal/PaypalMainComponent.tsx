@@ -164,17 +164,26 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
     const capturedOrder = JSON.parse(await capRes.json()) as OrdersCapture;
 
     if (capturedOrder?.status === 'COMPLETED') {
-      successToast({
-        message: `Transaction complete: ${capturedOrder.id},`,
-        header: 'Payment Successfull!',
-      });
-
       // Server action that'll process
       const res = await processCompletedTxAction(
-        encrypt(JSON.stringify({ capturedOrder, authData })),
+        encrypt(JSON.stringify({ capturedOrder, authData, cart })),
       );
 
       console.log(res);
+
+      //If everything goes well in submitting the processed order's details to the backend
+      if (res.success === true) {
+        successToast({
+          message: `Transaction complete: ${capturedOrder.id},`,
+          header: 'Payment Successfull!',
+        });
+      }
+      // Else if the uploading fails
+      else {
+        errorToast({ header: `Payment details upload failed`, message: res.message });
+      }
+
+      // If payment capture fails for some reason
     } else {
       errorToast({ message: `Capture failed` });
     }
