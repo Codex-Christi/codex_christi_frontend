@@ -7,7 +7,8 @@ const nextConfig = {
   /* config options here */
   // output: 'standalone',
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
+    // Uncomment if you want to remove logs from production server
+    // removeConsole: process.env.NODE_ENV === 'production',
   },
   serverExternalPackages: ['pdfkit'],
   images: {
