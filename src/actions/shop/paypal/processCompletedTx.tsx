@@ -21,7 +21,7 @@ export interface CompletedTxInterface {
 }
 
 // Define explicit return types
-type SuccessResponse = {
+export type SuccessResponse = {
   success: true;
   pdfLink: string;
   authData?: OrderResponseBody;

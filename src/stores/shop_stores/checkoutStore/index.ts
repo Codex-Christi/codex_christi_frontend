@@ -4,10 +4,7 @@ import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { create } from 'zustand';
 import { persist, PersistStorage, StorageValue } from 'zustand/middleware';
 
-type CheckoutPickType = Pick<
-  UserProfileDataInterface,
-  'first_name' | 'last_name' | 'email'
->;
+type CheckoutPickType = Pick<UserProfileDataInterface, 'first_name' | 'last_name' | 'email'>;
 export interface ShopCheckoutStoreInterface extends CheckoutPickType {
   payment_method: {
     payment_method: 'credit_card' | '';
@@ -28,47 +25,46 @@ export interface ShopCheckoutStoreInterface extends CheckoutPickType {
   };
 }
 
-interface ShopCheckoutState extends ShopCheckoutStoreInterface {
+export interface ShopCheckoutState extends ShopCheckoutStoreInterface {
   setFirstName: (first_name: ShopCheckoutStoreInterface['first_name']) => void;
   setLastName: (last_name: ShopCheckoutStoreInterface['last_name']) => void;
   setEmail: (email: ShopCheckoutStoreInterface['email']) => void;
-  setPaymentMehod: (
-    payment_method: ShopCheckoutStoreInterface['payment_method']
-  ) => void;
-  setDeliveryAddress: (
-    delivery_address: ShopCheckoutStoreInterface['delivery_address']
-  ) => void;
+  setPaymentMehod: (payment_method: ShopCheckoutStoreInterface['payment_method']) => void;
+  setDeliveryAddress: (delivery_address: ShopCheckoutStoreInterface['delivery_address']) => void;
 }
 
-const encryptedStorage: PersistStorage<{
-  shopCheckoutData: ShopCheckoutStoreInterface;
-}> = {
-  getItem: (name: string) => {
+interface EncryptedStorageOptions {
+  encrypt: (data: string) => string;
+  decrypt: (data: string) => string;
+}
+
+export const createEncryptedStorage = <S>({
+  encrypt,
+  decrypt,
+}: EncryptedStorageOptions): PersistStorage<S> => ({
+  getItem: (name) => {
     try {
       const encrypted = localStorage.getItem(name);
       if (!encrypted) return null;
       const decrypted = decrypt(encrypted);
-      return JSON.parse(decrypted);
+      return JSON.parse(decrypted) as StorageValue<S>;
     } catch {
       return null;
     }
   },
-  setItem: (
-    name: string,
-    value: StorageValue<{
-      shopCheckoutData: ShopCheckoutStoreInterface;
-    }>
-  ) => {
+  setItem: (name, value) => {
     try {
       const stringified = JSON.stringify(value);
       const encrypted = encrypt(stringified);
       localStorage.setItem(name, encrypted);
     } catch {
-      // Handle error, maybe fail silently
+      // Handle error appropriately
     }
   },
-  removeItem: (name: string) => localStorage.removeItem(name),
-};
+  removeItem: (name) => {
+    localStorage.removeItem(name);
+  },
+});
 
 const initialObj = {
   first_name: '',
@@ -92,8 +88,7 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
   persist(
     (set) => ({
       ...initialObj,
-      first_name:
-        useUserMainProfileStore.getState().userMainProfile?.first_name,
+      first_name: useUserMainProfileStore.getState().userMainProfile?.first_name,
       last_name: useUserMainProfileStore.getState().userMainProfile?.last_name,
       email: useUserMainProfileStore.getState().userMainProfile?.email,
       payment_method: null,
@@ -105,10 +100,8 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
       clearCheckout: () => {
         set({
           ...initialObj,
-          first_name:
-            useUserMainProfileStore.getState().userMainProfile?.first_name,
-          last_name:
-            useUserMainProfileStore.getState().userMainProfile?.last_name,
+          first_name: useUserMainProfileStore.getState().userMainProfile?.first_name,
+          last_name: useUserMainProfileStore.getState().userMainProfile?.last_name,
           email: useUserMainProfileStore.getState().userMainProfile?.email,
           payment_method: null,
         });
@@ -117,16 +110,7 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
     }),
     {
       name: 'checkout-storage',
-      storage: encryptedStorage,
-      partialize: (state) => ({
-        shopCheckoutData: {
-          email: state.email,
-          first_name: state.first_name,
-          last_name: state.last_name,
-          payment_method: state.payment_method,
-          delivery_address: state.delivery_address,
-        },
-      }),
-    }
-  )
+      storage: createEncryptedStorage<ShopCheckoutState>({ encrypt, decrypt }),
+    },
+  ),
 );

@@ -34,8 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
     // dynamically get the host from the Next headers
     metadataBase: new URL(`https://${(await headers()).get('host')}`),
     title: 'Codex Christi',
-    description:
-      'A Hub for Christian Creatives to connect, share, and glorify God.',
+    description: 'A Hub for Christian Creatives to connect, share, and glorify God.',
   };
 }
 
@@ -60,7 +59,7 @@ export default function RootLayout({
           nicoMoji.variable,
           OCR_ext.variable,
           InterFont.variable,
-          TradeWinds.variable
+          TradeWinds.variable,
         )}
       >
         <FaviconUpdater />

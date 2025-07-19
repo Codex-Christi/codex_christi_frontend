@@ -19,7 +19,10 @@ import { OrdersCapture } from '@paypal/paypal-server-sdk';
 import { processCompletedTxAction } from '@/actions/shop/paypal/processCompletedTx';
 import { encrypt } from '@/stores/shop_stores/cartStore';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
+import { usePaymentConfirmationStore } from '@/app/shop/checkout/order-confirmation/[id]/store';
+import { useRouter } from 'next/navigation';
 
+// Dynamic components
 const MyPayPalCardFields = dynamic(() =>
   import('./MyPaypalCardFields').then((comp) => comp.default),
 );
@@ -47,6 +50,10 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   const [, dispatch] = usePayPalScriptReducer();
   const userId = useUserMainProfileStore((state) => state.userMainProfile?.id);
   const { first_name, last_name, email, delivery_address } = useShopCheckoutStore((state) => state);
+  const setPaymentConfirmationData = usePaymentConfirmationStore(
+    (state) => state.setPaymentConfirmation,
+  );
+  const router = useRouter();
 
   // Destructuring
   const { countrySupport } = serverOrderDetails || {};
@@ -187,10 +194,13 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
 
       //If everything goes well in submitting the processed order's details to the backend
       if (res.success === true) {
+        setPaymentConfirmationData(res);
         successToast({
           message: `Transaction complete: ${capturedOrder.id},`,
           header: 'Payment Successfull!',
         });
+
+        router.push(`/shop/checkout/order-confirmation/${capturedOrder.id}`);
       }
       // Else if the uploading fails
       else {
