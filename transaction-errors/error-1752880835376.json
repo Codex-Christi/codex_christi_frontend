@@ -1,0 +1,5 @@
+{
+  "error": "Missing required parameters: cart, customer, delivery_address",
+  "stack": "Error: Missing required parameters: cart, customer, delivery_address\n    at Timeout._onTimeout (/Users/devsantorz/Desktop/devProjects/codex_christi/.next/server/chunks/ssr/[root-of-the-server]__77c27212._.js:1265:24)\n    at listOnTimeout (node:internal/timers:614:17)\n    at process.processTimers (node:internal/timers:549:7)",
+  "timestamp": "2025-07-18T23:20:35.376Z"
+}
