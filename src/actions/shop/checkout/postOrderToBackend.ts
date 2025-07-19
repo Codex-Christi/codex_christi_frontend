@@ -22,7 +22,7 @@ type ResponseData = {
 
 export interface BackendResponse {
   status: number;
-  data: ResponseData;
+  serverData: ResponseData;
 }
 
 export const postOrderTOBackend = cache(
@@ -63,6 +63,7 @@ export const postOrderTOBackend = cache(
           message: 'Data successfully processed!',
           timestamp: new Date().toISOString(),
           capturedOrderPaypalID,
+          paymentAuthID: authData.id,
           custom_id: custom_id!,
           amountReceived: amount ? `${value} ${currency_code}` : null,
           payer: payer
@@ -81,7 +82,7 @@ export const postOrderTOBackend = cache(
 
         resolve({
           status: 200,
-          data: responseData,
+          serverData: responseData,
         });
       }, 500);
     });

@@ -51,3 +51,6 @@ deploy-*.log
 
 # PDF gen files
 /public/uploads/*.pdf
+
+# TX error logs
+transaction-errors

@@ -18,6 +18,7 @@ import { PAYPAL_CURRENCY_CODES } from '@/datasets/shop_general/paypal_currency_s
 import { OrdersCapture } from '@paypal/paypal-server-sdk';
 import { processCompletedTxAction } from '@/actions/shop/paypal/processCompletedTx';
 import { encrypt } from '@/stores/shop_stores/cartStore';
+import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 
 const MyPayPalCardFields = dynamic(() =>
   import('./MyPaypalCardFields').then((comp) => comp.default),
@@ -44,6 +45,7 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   const cart = useCartStore((store) => store.variants);
   const serverOrderDetails = useContext(ServerOrderDetailsContext);
   const [, dispatch] = usePayPalScriptReducer();
+  const userId = useUserMainProfileStore((state) => state.userMainProfile?.id);
   const { first_name, last_name, email, delivery_address } = useShopCheckoutStore((state) => state);
 
   // Destructuring
@@ -166,7 +168,19 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
     if (capturedOrder?.status === 'COMPLETED') {
       // Server action that'll process
       const res = await processCompletedTxAction(
-        encrypt(JSON.stringify({ capturedOrder, authData, cart })),
+        encrypt(
+          JSON.stringify({
+            capturedOrder,
+            authData,
+            cart,
+            customer: {
+              name: `${first_name} ${last_name}`,
+              email: email ?? 'john@example.com',
+            },
+            delivery_address,
+            userId: userId ?? null,
+          }),
+        ),
       );
 
       console.log(res);

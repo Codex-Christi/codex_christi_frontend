@@ -24,8 +24,8 @@ export interface CompletedTxInterface {
 type SuccessResponse = {
   success: true;
   pdfLink: string;
-  authData: OrderResponseBody;
-  capturedOrder: OrdersCapture;
+  authData?: OrderResponseBody;
+  capturedOrder?: OrdersCapture;
 } & BackendResponse;
 
 type ErrorResponse = {
@@ -40,14 +40,15 @@ export const processCompletedTxAction = async (
   try {
     // Decrypt and parse data
     const decryptedData: CompletedTxInterface = JSON.parse(decrypt(encData));
-    const { authData, capturedOrder } = decryptedData;
+    const { authData, customer } = decryptedData;
+    const { email: customerEmail, name: customerName } = customer || {};
 
     const pdfBuffer = await createPaypalShopInvoicePDF(authData);
 
     // Upload to r2
     const { accessLink } = await uploadPaymentReceiptToR2({
       fileBody: pdfBuffer,
-      filename: `invoice-${authData.id}-${authData.payer?.email_address}.pdf`,
+      filename: `invoice-${authData.id}-${customerName}-${customerEmail}.pdf`,
     });
 
     const backendResp = await postOrderTOBackend(decryptedData);
@@ -55,8 +56,6 @@ export const processCompletedTxAction = async (
     const clientSideResp: SuccessResponse = {
       success: true,
       pdfLink: accessLink,
-      authData,
-      capturedOrder,
       ...backendResp,
     };
     return clientSideResp;
