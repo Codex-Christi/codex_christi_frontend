@@ -111,6 +111,7 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
     {
       name: 'checkout-storage',
       storage: createEncryptedStorage<ShopCheckoutState>({ encrypt, decrypt }),
+      skipHydration: true,
     },
   ),
 );

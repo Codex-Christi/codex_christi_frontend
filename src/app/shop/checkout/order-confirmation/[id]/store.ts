@@ -4,32 +4,30 @@ import { createEncryptedStorage } from '@/stores/shop_stores/checkoutStore';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-interface PaymentConfirmationStoreInterface
+interface OrderConfirmationStoreInterface
   extends Omit<SuccessResponse, 'success' | 'status' | 'serverData'> {
   setPaymentConfirmation: (data: SuccessResponse) => void;
   serverData: SuccessResponse['serverData'] | undefined;
 }
 
-export const usePaymentConfirmationStore = create<PaymentConfirmationStoreInterface>()(
+export const useOrderConfirmationStore = create<OrderConfirmationStoreInterface>()(
   persist(
     (set) => ({
       pdfLink: '',
       authData: undefined,
       capturedOrder: undefined,
       serverData: undefined,
+      fileName: '',
 
       setPaymentConfirmation: (data) => {
         set({
-          pdfLink: data.pdfLink,
-          authData: data.authData,
-          capturedOrder: data.capturedOrder,
-          serverData: data.serverData,
+          ...data,
         });
       },
     }),
     {
-      name: 'payment-confirmation-store',
-      storage: createEncryptedStorage<PaymentConfirmationStoreInterface>({ encrypt, decrypt }),
+      name: 'order-confirmation-store',
+      storage: createEncryptedStorage<OrderConfirmationStoreInterface>({ encrypt, decrypt }),
     },
   ),
 );

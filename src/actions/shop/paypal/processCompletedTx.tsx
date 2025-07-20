@@ -24,6 +24,7 @@ export interface CompletedTxInterface {
 export type SuccessResponse = {
   success: true;
   pdfLink: string;
+  fileName: string;
   authData?: OrderResponseBody;
   capturedOrder?: OrdersCapture;
 } & BackendResponse;
@@ -56,6 +57,7 @@ export const processCompletedTxAction = async (
     const clientSideResp: SuccessResponse = {
       success: true,
       pdfLink: accessLink,
+      fileName: `invoice-${authData.id}-${customerName}-${customerEmail}`,
       ...backendResp,
     };
     return clientSideResp;

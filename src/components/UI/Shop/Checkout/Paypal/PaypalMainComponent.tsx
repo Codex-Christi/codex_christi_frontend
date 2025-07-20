@@ -19,7 +19,7 @@ import { OrdersCapture } from '@paypal/paypal-server-sdk';
 import { processCompletedTxAction } from '@/actions/shop/paypal/processCompletedTx';
 import { encrypt } from '@/stores/shop_stores/cartStore';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
-import { usePaymentConfirmationStore } from '@/app/shop/checkout/order-confirmation/[id]/store';
+import { useOrderConfirmationStore } from '@/app/shop/checkout/order-confirmation/[id]/store';
 import { useRouter } from 'next/navigation';
 
 // Dynamic components
@@ -50,7 +50,7 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   const [, dispatch] = usePayPalScriptReducer();
   const userId = useUserMainProfileStore((state) => state.userMainProfile?.id);
   const { first_name, last_name, email, delivery_address } = useShopCheckoutStore((state) => state);
-  const setPaymentConfirmationData = usePaymentConfirmationStore(
+  const setPaymentConfirmationData = useOrderConfirmationStore(
     (state) => state.setPaymentConfirmation,
   );
   const router = useRouter();
@@ -224,8 +224,25 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
 };
 
 const PaypalCheckout: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
+  const serverOrderDetails = useContext(ServerOrderDetailsContext);
+  const { countrySupport } = serverOrderDetails || {};
+  const { country_iso2, currency } = countrySupport?.country || {};
+
+  // To check if paypal supports country's currency
+  const payPalSupportsCurrency = useMemo(
+    () => PAYPAL_CURRENCY_CODES.includes(currency as (typeof PAYPAL_CURRENCY_CODES)[number]),
+    [currency],
+  );
+
+  // JSX
   return (
-    <PayPalScriptProvider options={initialOptions}>
+    <PayPalScriptProvider
+      options={{
+        ...initialOptions,
+        currency: payPalSupportsCurrency ? currency : 'USD',
+        'buyer-country': country_iso2 ?? initialOptions['buyer-country'],
+      }}
+    >
       <PayPalCheckoutChildren mode={mode} />
     </PayPalScriptProvider>
   );
