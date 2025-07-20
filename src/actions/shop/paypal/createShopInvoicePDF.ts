@@ -17,7 +17,14 @@ export const createPaypalShopInvoicePDF = async (authData: OrderResponseBody) =>
     doc.on('end', () => resolve(Buffer.concat(buffers)));
     doc.on('error', reject);
 
-    const imagePath = path.resolve('public/media/img/general/logo-glow-tiny.jpg');
+    const imagePath = path.join(
+      process.cwd(),
+      'public',
+      'media',
+      'img',
+      'general',
+      'logo-glow-tiny.jpg',
+    );
 
     // Header
     doc

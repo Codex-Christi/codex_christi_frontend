@@ -37,7 +37,7 @@ const OrderConfirmation = ({ params }: PageProps) => {
       >
         <h2 className='text-[1.1rem]'>Thank you for your purchase</h2>
 
-        <h2 className='text-[1.275rem] font-[500] text-center my-8'>
+        <h2 className='text-[1.275rem] font-[500] text-center my-8 px-2'>
           Order #{capturedOrderPaypalID} has been confirmed
         </h2>
 
