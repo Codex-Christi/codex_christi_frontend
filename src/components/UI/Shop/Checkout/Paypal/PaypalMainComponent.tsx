@@ -224,25 +224,9 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
 };
 
 const PaypalCheckout: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
-  const serverOrderDetails = useContext(ServerOrderDetailsContext);
-  const { countrySupport } = serverOrderDetails || {};
-  const { country_iso2, currency } = countrySupport?.country || {};
-
-  // To check if paypal supports country's currency
-  const payPalSupportsCurrency = useMemo(
-    () => PAYPAL_CURRENCY_CODES.includes(currency as (typeof PAYPAL_CURRENCY_CODES)[number]),
-    [currency],
-  );
-
   // JSX
   return (
-    <PayPalScriptProvider
-      options={{
-        ...initialOptions,
-        currency: payPalSupportsCurrency ? currency : 'USD',
-        'buyer-country': country_iso2 ?? initialOptions['buyer-country'],
-      }}
-    >
+    <PayPalScriptProvider options={initialOptions}>
       <PayPalCheckoutChildren mode={mode} />
     </PayPalScriptProvider>
   );

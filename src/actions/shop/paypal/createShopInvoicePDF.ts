@@ -17,9 +17,11 @@ export const createPaypalShopInvoicePDF = async (authData: OrderResponseBody) =>
     doc.on('end', () => resolve(Buffer.concat(buffers)));
     doc.on('error', reject);
 
+    const imagePath = path.resolve('public/media/img/general/logo-glow-tiny.jpg');
+
     // Header
     doc
-      .image('public/media/img/general/logo-glow-tiny.jpg', 50, 45, { width: 100 })
+      .image(imagePath, 50, 45, { width: 100 })
       .fillColor('#333')
       .fontSize(20)
       .text('PAYMENT RECEIPT', { align: 'right' })

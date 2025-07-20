@@ -61,7 +61,7 @@ const OrderConfirmation = ({ params }: PageProps) => {
         </svg>
 
         <CustomShopLink
-          href={pdfLink}
+          href={`/shop/order-details/${capturedOrderPaypalID}`}
           className='py-3 border border-[#2576CE] rounded-2xl w-full max-w-[400px] font-[500] text-[1.1rem] mx-auto 
           text-center mt-8 bg-[#2576CE] text-[#F3F3F3] transition'
         >
@@ -69,8 +69,8 @@ const OrderConfirmation = ({ params }: PageProps) => {
         </CustomShopLink>
 
         <Link
-          href={pdfLink}
           download={fileName}
+          href={pdfLink}
           target='_blank'
           rel='noopener noreferrer'
           className='py-3 border rounded-2xl w-full max-w-[400px] font-[500] text-[1.1rem] mx-auto text-center mt-3
