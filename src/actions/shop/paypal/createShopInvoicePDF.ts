@@ -98,7 +98,7 @@ export const createPaypalShopInvoicePDF = async (authData: OrderResponseBody) =>
         .text(item.sku || '', 210, y, { width: 150, lineBreak: true })
         .text(quantity.toString(), 350, y, { width: 50, align: 'right' })
         .text(`${price} ${currency_code}`, 400, y, { width: 70, align: 'right' })
-        .text(`${total} ${currency_code}`, 470, y, { width: 80, align: 'right' });
+        .text(`${total.toFixed(2)} ${currency_code}`, 470, y, { width: 80, align: 'right' });
 
       y += 30;
     });

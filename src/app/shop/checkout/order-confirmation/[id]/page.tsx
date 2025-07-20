@@ -1,10 +1,11 @@
 'use client';
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
-import { use } from 'react';
+import { use, useCallback, useState } from 'react';
 import { useOrderConfirmationStore } from './store';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 import { FaArrowLeft } from 'react-icons/fa6';
+import { Button } from '@/components/UI/primitives/button';
+import errorToast from '@/lib/error-toast';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -17,10 +18,39 @@ const OrderConfirmation = ({ params }: PageProps) => {
   const { pdfLink, serverData, fileName } = useOrderConfirmationStore((state) => state);
   const { capturedOrderPaypalID } = serverData || {};
 
+  // States
+  const [downloading, setDownloading] = useState(false);
+
+  // Handlers
+  const handleDownLoad = useCallback(async () => {
+    try {
+      const response = await fetch(pdfLink);
+      const blob = await response.blob(); // Convert the response to a Blob
+
+      const downloadUrl = URL.createObjectURL(blob); // Create a temporary URL for the Blob
+
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${fileName}.pdf`; // Set the desired filename for the download
+
+      document.body.appendChild(link);
+      link.click(); // Programmatically click the link to trigger the download
+      document.body.removeChild(link); // Remove the link from the document
+
+      URL.revokeObjectURL(downloadUrl); // Revoke the temporary URL to release memory
+    } catch (error) {
+      console.error('Error during download:', error);
+      errorToast({ message: `Error during download:, ${error}` });
+    } finally {
+      setDownloading(false);
+    }
+  }, [fileName, pdfLink]);
+
   if (capturedOrderID !== capturedOrderPaypalID) {
     return notFound();
   }
 
+  // Main JSX
   return (
     <div className='!text-white flex flex-col py-5 !font-inter !select-none'>
       <CustomShopLink
@@ -68,16 +98,15 @@ const OrderConfirmation = ({ params }: PageProps) => {
           View Order Details
         </CustomShopLink>
 
-        <Link
-          download={fileName}
-          href={pdfLink}
-          target='_blank'
-          rel='noopener noreferrer'
-          className='py-3 border rounded-2xl w-full max-w-[400px] font-[500] text-[1.1rem] mx-auto text-center mt-3
-          hover:bg-white hover:text-black transition'
+        <Button
+          name='Download Receipt'
+          onClick={handleDownLoad}
+          className='!py-3 border rounded-2xl w-full max-w-[400px] font-[500] text-[1.1rem] mx-auto text-center mt-3
+          hover:bg-white bg-transparent h-auto hover:text-black transition'
+          disabled={downloading}
         >
-          Generate receipt
-        </Link>
+          {downloading ? 'Downloading...' : 'Generate receipt'}
+        </Button>
       </section>
     </div>
   );
