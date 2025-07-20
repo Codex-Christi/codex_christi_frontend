@@ -38,9 +38,12 @@ const OrderConfirmation = ({ params }: PageProps) => {
       document.body.removeChild(link); // Remove the link from the document
 
       URL.revokeObjectURL(downloadUrl); // Revoke the temporary URL to release memory
-    } catch (error) {
-      console.error('Error during download:', error);
-      errorToast({ message: `Error during download:, ${error}` });
+    } catch (err) {
+      console.error('Error during download:', err);
+      errorToast({
+        header: `Error during download:`,
+        message: `${typeof err === 'string' ? err : err instanceof Error ? err.message : JSON.stringify(err)}`,
+      });
     } finally {
       setDownloading(false);
     }

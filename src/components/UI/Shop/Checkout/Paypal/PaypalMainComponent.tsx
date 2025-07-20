@@ -20,7 +20,7 @@ import { processCompletedTxAction } from '@/actions/shop/paypal/processCompleted
 import { encrypt } from '@/stores/shop_stores/cartStore';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { useOrderConfirmationStore } from '@/app/shop/checkout/order-confirmation/[id]/store';
-import { useRouter } from 'next/navigation';
+import { useShopRouter } from '@/lib/hooks/useShopRouter';
 
 // Dynamic components
 const MyPayPalCardFields = dynamic(() =>
@@ -53,7 +53,7 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   const setPaymentConfirmationData = useOrderConfirmationStore(
     (state) => state.setPaymentConfirmation,
   );
-  const router = useRouter();
+  const router = useShopRouter();
 
   // Destructuring
   const { countrySupport } = serverOrderDetails || {};
