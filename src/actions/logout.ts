@@ -26,15 +26,15 @@ export const logoutUser = async () => {
       ? (decryptRefreshToken.mainRefreshToken as string)
       : ('' as string);
 
-    const res = await axiosClient.post(
-      '/auth/user-logout',
-      { refresh: mainRefreshToken }
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_BASE_URL}/auth/user-logout`,
+      { body: JSON.stringify({ refreshToken: mainRefreshToken }) },
       // {
       //   headers: {
       //     Authorization: `Bearer ${mainAccessToken}`,
       //   },
       // }
-    );
+    ).then((response) => response.json().then((data) => data));
 
     if (res?.data?.success) {
       await deleteSession();
