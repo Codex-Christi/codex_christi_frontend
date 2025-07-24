@@ -4,8 +4,9 @@ import { ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import ShopNav from '@/components/UI/Shop/Nav/Navbar';
 import Footer from '@/components/UI/Shop/Footer';
-const CometsContainer = dynamic(
-  () => import('@/components/UI/general/CometsContainer')
+const CometsContainer = dynamic(() => import('@/components/UI/general/CometsContainer'));
+const UserMainProfileStoreInitializer = dynamic(
+  () => import('@/stores/user-main-profile-store-initializer'),
 );
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -22,6 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default function ShopRootLayout({ children }: { children: ReactNode }) {
   return (
     <CometsContainer>
+      <UserMainProfileStoreInitializer />
       <ShopNav />
       {children}
       <Footer />

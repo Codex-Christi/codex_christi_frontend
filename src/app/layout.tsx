@@ -7,6 +7,11 @@ import { headers } from 'next/headers';
 import { Toaster } from 'sonner';
 import ResponsiveMediaProvider from '@/components/UI/Providers/ResponsiveMediaQueryProvider';
 import LoggedinProvider from '@/components/UI/Providers/LoggedinProvider';
+import dynamic from 'next/dynamic';
+
+const UserMainProfileStoreInitializer = dynamic(
+  () => import('@/stores/user-main-profile-store-initializer'),
+);
 
 // Components Import
 import FaviconUpdater from '@/components/UI/general/Helpers/FaviconUpdater';
@@ -65,6 +70,7 @@ export default function RootLayout({
         <FaviconUpdater />
         <Toaster richColors />
         <ResponsiveMediaProvider>
+          <UserMainProfileStoreInitializer />
           <LoggedinProvider>{children}</LoggedinProvider>
         </ResponsiveMediaProvider>
       </body>

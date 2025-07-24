@@ -2,9 +2,9 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
 import CryptoJS from 'crypto-js';
+import { PersistedStorageWithRehydration } from '@/lib/types/general_store_interfaces';
 
-const ENCRYPTION_KEY =
-  process.env.NEXT_PUBLIC_USER_PROFILE_DATA_ENCRYPTION_KEY!;
+const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_USER_PROFILE_DATA_ENCRYPTION_KEY!;
 
 // === 🔐 Encryption ===
 const encryptData = (data: UserProfileDataInterface | null): string => {
@@ -14,21 +14,17 @@ const encryptData = (data: UserProfileDataInterface | null): string => {
 };
 
 // === 🔓 Decryption ===
-const decryptData = (
-  encryptedData: string
-): UserProfileDataInterface | null => {
+const decryptData = (encryptedData: string): UserProfileDataInterface | null => {
   if (!encryptedData) return null;
   const bytes = CryptoJS.AES.decrypt(encryptedData, ENCRYPTION_KEY);
   const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
   return JSON.parse(decryptedData);
 };
 
-type UserMainProfileStore = {
+interface UserMainProfileStore extends PersistedStorageWithRehydration {
   userMainProfile: UserProfileDataInterface | null;
-  setUserMainProfile: (
-    userMainProfile: UserProfileDataInterface | null
-  ) => void;
-};
+  setUserMainProfile: (userMainProfile: UserProfileDataInterface | null) => void;
+}
 
 // Persisted store for user main profile
 // This store will persist the user profile data in session storage
@@ -40,6 +36,8 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
       setUserMainProfile: (userMainProfile: UserProfileDataInterface | null) =>
         set((state) => ({ ...state, userMainProfile })),
       clearProfile: () => set({ userMainProfile: null }),
+      _hydrated: false,
+      hydrate: () => set({ _hydrated: true }),
     }),
     {
       name: 'user-main-profile-storage',
@@ -64,8 +62,10 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
           return value;
         },
       }),
-    }
-  )
+      skipHydration: true, // Skip initial hydration to avoid  loading encrypted data  on server-side
+      onRehydrateStorage: () => (state) => state?.hydrate(),
+    },
+  ),
 );
 export const clearUserMainProfileStore = () => {
   useUserMainProfileStore.setState({ userMainProfile: null });
@@ -77,7 +77,5 @@ function isUserProfileData(value: {
   id?: string;
   email?: string;
 }): value is UserProfileDataInterface {
-  return (
-    value && typeof value.id === 'string' && typeof value.email === 'string'
-  );
+  return value && typeof value.id === 'string' && typeof value.email === 'string';
 }
