@@ -6,6 +6,9 @@ import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink
 import { FaArrowLeft } from 'react-icons/fa6';
 import { Button } from '@/components/UI/primitives/button';
 import errorToast from '@/lib/error-toast';
+import { useRouteChangeAware } from '@/lib/hooks/useRouteChangeAware';
+import { useCartStore } from '@/stores/shop_stores/cartStore';
+import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -17,6 +20,12 @@ const OrderConfirmation = ({ params }: PageProps) => {
   // Hooks
   const { pdfLink, serverData, fileName } = useOrderConfirmationStore((state) => state);
   const { capturedOrderPaypalID } = serverData || {};
+  const clearCart = useCartStore((store) => store.clearCart);
+  const clearCheckoutStore = useShopCheckoutStore((store) => store.clearCheckout);
+  useRouteChangeAware(() => {
+    clearCart();
+    clearCheckoutStore();
+  });
 
   // States
   const [downloading, setDownloading] = useState(false);
@@ -49,6 +58,9 @@ const OrderConfirmation = ({ params }: PageProps) => {
     }
   }, [fileName, pdfLink]);
 
+  // UseEffect for pathname change
+
+  // Returned not-found page if the current zustand state doesn't hold the TX
   if (capturedOrderID !== capturedOrderPaypalID) {
     return notFound();
   }

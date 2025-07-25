@@ -31,6 +31,7 @@ export interface ShopCheckoutState extends ShopCheckoutStoreInterface {
   setEmail: (email: ShopCheckoutStoreInterface['email']) => void;
   setPaymentMehod: (payment_method: ShopCheckoutStoreInterface['payment_method']) => void;
   setDeliveryAddress: (delivery_address: ShopCheckoutStoreInterface['delivery_address']) => void;
+  clearCheckout: () => void;
 }
 
 interface EncryptedStorageOptions {
