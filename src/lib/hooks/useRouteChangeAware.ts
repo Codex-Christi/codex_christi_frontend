@@ -1,42 +1,33 @@
+// hooks/useRouteChangeEffect.ts
 'use client';
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
+import { patchHistory, addHistoryHandler } from '@/lib/patches/history-patch';
 
 export function useRouteChangeAware(effect: () => void) {
   const pathname = usePathname();
-  const routeChangeRef = useRef(false);
-  const originalMethodsRef = useRef({
-    pushState: history.pushState,
-    replaceState: history.replaceState,
+  const isRouteChangingRef = useRef(false);
+  const effectRef = useRef(effect);
+
+  // Update effect reference on each render
+  useEffect(() => {
+    effectRef.current = effect;
   });
 
-  // Stable effect reference
-  const stableEffect = useCallback(effect, [effect]);
-
   useEffect(() => {
-    const { pushState, replaceState } = originalMethodsRef.current;
+    // Ensure history is patched (client-side only)
+    patchHistory();
 
-    // Patch history methods
-    history.pushState = function (...args) {
-      routeChangeRef.current = true;
-      return pushState.apply(this, args);
-    };
-
-    history.replaceState = function (...args) {
-      routeChangeRef.current = true;
-      return replaceState.apply(this, args);
-    };
+    const unregister = addHistoryHandler(() => {
+      isRouteChangingRef.current = true;
+    });
 
     return () => {
-      // Restore original methods first
-      history.pushState = pushState;
-      history.replaceState = replaceState;
-
-      // Execute effect if route changed
-      if (routeChangeRef.current) {
-        stableEffect();
-        routeChangeRef.current = false;
+      unregister();
+      if (isRouteChangingRef.current) {
+        effectRef.current();
+        isRouteChangingRef.current = false;
       }
     };
-  }, [pathname, stableEffect]);
+  }, [pathname]);
 }
