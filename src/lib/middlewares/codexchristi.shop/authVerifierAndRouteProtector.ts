@@ -12,16 +12,16 @@ export const authVerifierAndRouteProtector = async (req: NextRequest) => {
       // Check if the referrer and URL are the same
       // and if the session is valid for GET requests
       if (url || referrer) {
-        checkAndRedirect(req);
+        return checkAndRedirect(req);
       } else {
-        redirectToReferrer(req);
+        return redirectToReferrer(req);
       }
     } catch (error) {
       console.error('Error verifying session:', error);
     }
   } else {
     // return redirectToReferrer(req);
-    checkAndRedirect(req);
+    return checkAndRedirect(req);
   }
 };
 
