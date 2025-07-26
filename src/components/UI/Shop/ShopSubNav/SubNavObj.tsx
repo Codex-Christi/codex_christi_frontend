@@ -128,29 +128,13 @@ export const categories = [
           </g>
           <g transform='translate(13.511 18.245)'>
             <path d='M0 0h2.982v1.531H0z'></path>
-            <path
-              fill='#FFF'
-              fillRule='evenodd'
-              d='M0 .361.149 0l2.833 1.17-.148.361z'
-            ></path>
-            <path
-              fill='#FFF'
-              fillRule='evenodd'
-              d='M.149 0 0 .361l2.834 1.17.148-.361z'
-            ></path>
+            <path fill='#FFF' fillRule='evenodd' d='M0 .361.149 0l2.833 1.17-.148.361z'></path>
+            <path fill='#FFF' fillRule='evenodd' d='M.149 0 0 .361l2.834 1.17.148-.361z'></path>
           </g>
           <g transform='translate(5.588 18.246)'>
             <path d='M0 0h2.982v1.53H0z'></path>
-            <path
-              fill='#FFF'
-              fillRule='evenodd'
-              d='M0 1.169 2.834 0l.148.361L.15 1.53z'
-            ></path>
-            <path
-              fill='#FFF'
-              fillRule='evenodd'
-              d='M2.834 0 0 1.169l.149.36L2.982.362z'
-            ></path>
+            <path fill='#FFF' fillRule='evenodd' d='M0 1.169 2.834 0l.148.361L.15 1.53z'></path>
+            <path fill='#FFF' fillRule='evenodd' d='M2.834 0 0 1.169l.149.36L2.982.362z'></path>
           </g>
           <g transform='translate(12.19 8.434)'>
             <path d='M0 0h1v1H0z'></path>

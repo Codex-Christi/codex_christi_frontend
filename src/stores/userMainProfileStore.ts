@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
 import CryptoJS from 'crypto-js';
 import { PersistedStorageWithRehydration } from '@/lib/types/general_store_interfaces';
+import { getUser } from '@/lib/funcs/userProfileFetchers/getUser';
 
 const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_USER_PROFILE_DATA_ENCRYPTION_KEY!;
 
@@ -24,6 +25,7 @@ const decryptData = (encryptedData: string): UserProfileDataInterface | null => 
 interface UserMainProfileStore extends PersistedStorageWithRehydration {
   userMainProfile: UserProfileDataInterface | null;
   setUserMainProfile: (userMainProfile: UserProfileDataInterface | null) => void;
+  setUserProfileFromServer: (userProfile: UserProfileDataInterface) => void;
 }
 
 // Persisted store for user main profile
@@ -32,12 +34,17 @@ interface UserMainProfileStore extends PersistedStorageWithRehydration {
 export const useUserMainProfileStore = create<UserMainProfileStore>()(
   persist(
     (set) => ({
-      userMainProfile: null,
+      userMainProfile: null, // Fetch user profile data on initialization
       setUserMainProfile: (userMainProfile: UserProfileDataInterface | null) =>
         set((state) => ({ ...state, userMainProfile })),
       clearProfile: () => set({ userMainProfile: null }),
       _hydrated: false,
       hydrate: () => set({ _hydrated: true }),
+      setUserProfileFromServer: (userProfile: UserProfileDataInterface) =>
+        set((state) => ({
+          ...state,
+          userMainProfile: userProfile,
+        })),
     }),
     {
       name: 'user-main-profile-storage',
@@ -45,6 +52,8 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
         replacer: (key, value) => {
           // Serialize and Encrypt before saving
           if (key === 'userMainProfile' && value) {
+            console.log('Saving userMainProfile:', value);
+
             // Type guard to ensure value is of type UserProfileData
             if (isUserProfileData(value)) {
               return encryptData(value);
@@ -63,7 +72,12 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
         },
       }),
       skipHydration: true, // Skip initial hydration to avoid  loading encrypted data  on server-side
-      onRehydrateStorage: () => (state) => state?.hydrate(),
+      onRehydrateStorage: () => (state) => {
+        state?.hydrate();
+        if (!state?.userMainProfile) {
+          state?.setUserProfileFromServer((getUser() as UserProfileDataInterface) ?? null);
+        }
+      },
     },
   ),
 );
