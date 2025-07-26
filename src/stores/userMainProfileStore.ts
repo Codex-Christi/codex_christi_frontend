@@ -72,10 +72,10 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
         },
       }),
       skipHydration: true, // Skip initial hydration to avoid  loading encrypted data  on server-side
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => async (state) => {
         state?.hydrate();
         if (!state?.userMainProfile) {
-          state?.setUserProfileFromServer((getUser() as UserProfileDataInterface) ?? null);
+          state?.setUserProfileFromServer(((await getUser()) as UserProfileDataInterface) ?? null);
         }
       },
     },
