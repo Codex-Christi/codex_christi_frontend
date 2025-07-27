@@ -10,7 +10,7 @@ import LoggedinProvider from '@/components/UI/Providers/LoggedinProvider';
 import dynamic from 'next/dynamic';
 
 const UserMainProfileStoreInitializer = dynamic(
-  () => import('@/stores/user-main-profile-store-initializer'),
+  () => import('@/components/UI/Providers/UserMainProfileStoreInitializer'),
 );
 
 // Components Import

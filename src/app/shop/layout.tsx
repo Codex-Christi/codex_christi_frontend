@@ -6,7 +6,7 @@ import ShopNav from '@/components/UI/Shop/Nav/Navbar';
 import Footer from '@/components/UI/Shop/Footer';
 const CometsContainer = dynamic(() => import('@/components/UI/general/CometsContainer'));
 const UserMainProfileStoreInitializer = dynamic(
-  () => import('@/stores/user-main-profile-store-initializer'),
+  () => import('@/components/UI/Providers/UserMainProfileStoreInitializer'),
 );
 
 export async function generateMetadata(): Promise<Metadata> {

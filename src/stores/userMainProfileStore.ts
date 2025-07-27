@@ -25,7 +25,7 @@ const decryptData = (encryptedData: string): UserProfileDataInterface | null => 
 interface UserMainProfileStore extends PersistedStorageWithRehydration {
   userMainProfile: UserProfileDataInterface | null;
   setUserMainProfile: (userMainProfile: UserProfileDataInterface | null) => void;
-  setUserProfileFromServer: (userProfile: UserProfileDataInterface) => void;
+  clearProfile: () => void;
 }
 
 // Persisted store for user main profile
@@ -40,11 +40,6 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
       clearProfile: () => set({ userMainProfile: null }),
       _hydrated: false,
       hydrate: () => set({ _hydrated: true }),
-      setUserProfileFromServer: (userProfile: UserProfileDataInterface) =>
-        set((state) => ({
-          ...state,
-          userMainProfile: userProfile,
-        })),
     }),
     {
       name: 'user-main-profile-storage',
@@ -52,8 +47,6 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
         replacer: (key, value) => {
           // Serialize and Encrypt before saving
           if (key === 'userMainProfile' && value) {
-            console.log('Saving userMainProfile:', value);
-
             // Type guard to ensure value is of type UserProfileData
             if (isUserProfileData(value)) {
               return encryptData(value);
@@ -71,16 +64,18 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
           return value;
         },
       }),
-      skipHydration: true, // Skip initial hydration to avoid  loading encrypted data  on server-side
+      skipHydration: true,
+      // Skip initial hydration to avoid  loading encrypted data  on server-side
       onRehydrateStorage: () => async (state) => {
         state?.hydrate();
         if (!state?.userMainProfile) {
-          state?.setUserProfileFromServer(((await getUser()) as UserProfileDataInterface) ?? null);
+          state?.setUserMainProfile(((await getUser()) as UserProfileDataInterface) ?? null);
         }
       },
     },
   ),
 );
+
 export const clearUserMainProfileStore = () => {
   useUserMainProfileStore.setState({ userMainProfile: null });
   useUserMainProfileStore.persist.clearStorage();
