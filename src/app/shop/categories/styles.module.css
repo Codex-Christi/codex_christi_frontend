@@ -1,0 +1,20 @@
+/* or a CSS module */
+.category-grid-item {
+  border-style: solid;
+  border-color: #f3f3f3;
+}
+
+/* // Target the last element of every "column" (3rd, 6th, 9th, etc.)s */
+.category-grid-item:nth-of-type(3n) {
+  border-right: none;
+}
+
+/* Target the middle element of every "column" (2nd, 5th, 8th, etc.) */
+.category-grid-item:nth-of-type(3n-1) {
+  border-right-width: 1px !important;
+}
+
+/* Target the first element of every "column" (1st, 4th, 7th, etc.) */
+.category-grid-item:nth-of-type(3n-2) {
+  border-right-width: 1px !important;
+}
