@@ -9,7 +9,7 @@ interface ActiveInactiveProps {
   children?: ReactNode;
 }
 
-interface CustomShopLinkProps extends LinkProps {
+export interface CustomShopLinkProps extends LinkProps {
   redirectToParentSite?: boolean;
   children?: ReactNode;
   className?: string;
