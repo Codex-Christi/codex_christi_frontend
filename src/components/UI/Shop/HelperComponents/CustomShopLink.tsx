@@ -1,7 +1,7 @@
 'use client';
 
 import Link, { LinkProps } from 'next/link';
-import { FC, ReactNode, useEffect, useState } from 'react';
+import { CSSProperties, FC, ReactNode, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
 interface ActiveInactiveProps {
@@ -17,6 +17,7 @@ interface CustomShopLinkProps extends LinkProps {
   inactiveProps?: ActiveInactiveProps;
   ariaLabel?: string;
   id?: string;
+  style?: CSSProperties;
 }
 
 const CustomShopLink: FC<CustomShopLinkProps> = ({
@@ -33,8 +34,7 @@ const CustomShopLink: FC<CustomShopLinkProps> = ({
   const pathname = usePathname();
   const [domain, setDomain] = useState<string | null>(null);
   const [isDev, setIsDev] = useState<boolean>(false);
-  const [isOnShopRouteParentSite, setIsOnShopRouteParentSite] =
-    useState<boolean>(false);
+  const [isOnShopRouteParentSite, setIsOnShopRouteParentSite] = useState<boolean>(false);
   const [isActive, setIsActive] = useState<boolean>(false);
 
   // Parent & shop domains
@@ -49,8 +49,7 @@ const CustomShopLink: FC<CustomShopLinkProps> = ({
       setDomain(currentDomain);
       setIsDev(currentDomain === 'localhost');
       setIsOnShopRouteParentSite(
-        window.location.pathname.startsWith('/shop') &&
-          currentDomain === parentSiteProdHostName
+        window.location.pathname.startsWith('/shop') && currentDomain === parentSiteProdHostName,
       );
     }
   }, []);
