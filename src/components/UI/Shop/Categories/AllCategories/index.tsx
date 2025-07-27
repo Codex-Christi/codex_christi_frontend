@@ -1,5 +1,5 @@
 'use client';
-import { FC, Key, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { categories as subNavCategoriesWithIcons } from '@/components/UI/Shop/ShopSubNav/SubNavObj';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 import styles from '@/app/shop/categories/styles.module.css';
@@ -57,7 +57,7 @@ const AllCategoriesClientComponent = () => {
 
       return () => clearTimeout(clearer);
     }
-  }, []);
+  }, [setNumofGridChildren]);
 
   //   Main JSX
   return (
@@ -73,8 +73,7 @@ const AllCategoriesClientComponent = () => {
 
       {/* Categories Grid */}
       <section
-        className='grid grid-cols-3 border rounded-2xl border-[#f3f3f3]'
-        id='categoriesGrid'
+        className={`grid grid-cols-3 border rounded-2xl border-[#f3f3f3]`}
         ref={categoriesGridRef}
       >
         {/* Lauch Merch */}
@@ -110,7 +109,6 @@ interface ShopLinkWithIconInterface {
     | ((props: React.SVGProps<SVGSVGElement>) => JSX.Element)
     | ((props: React.SVGProps<SVGSVGElement>) => JSX.Element)
     | IconType;
-  key?: Key | null | undefined;
   href: string;
   numofGridChildren?: number | null;
 }
@@ -119,18 +117,30 @@ const ShopLinkWithIcon: FC<ShopLinkWithIconInterface> = ({
   textValue,
   href,
   SvgElem,
-  key,
   numofGridChildren,
 }) => {
+  // Main JSX
   return (
     <CustomShopLink
       className={`${styles['category-grid-item']} flex flex-col gap-2 items-center justify-center mx-auto 
-             p-10 md:p-14 category-grid-item w-full ${numofGridChildren! > 3 ? 'border-b-[1px]' : ''} `}
+             p-10 md:p-14 category-grid-item w-full ${numofGridChildren! > 3 ? 'border-b-[1px]' : ''} 
+             group hover:bg-black/50 hover:backdrop-blur-sm`}
       href={`/shop/category${href}`}
-      key={key}
+      tabIndex={0}
     >
-      <h4 className='text-nowrap'>{textValue}</h4>
-      <SvgElem width={30} height={30} />
+      <h4
+        className={`text-nowrap group-hover:scale-125 group-hover:font-semibold group-hover:font-ocr
+          group-focus-visible:underline
+           transition-transform duration-300 ease-in-out`}
+      >
+        {textValue}
+      </h4>
+      <SvgElem
+        className='group-hover:scale-150 transition-transform duration-300 ease-in-out'
+        width={30}
+        height={30}
+        size={30}
+      />
     </CustomShopLink>
   );
 };

@@ -18,6 +18,7 @@ export interface CustomShopLinkProps extends LinkProps {
   ariaLabel?: string;
   id?: string;
   style?: CSSProperties;
+  tabIndex?: number;
 }
 
 const CustomShopLink: FC<CustomShopLinkProps> = ({

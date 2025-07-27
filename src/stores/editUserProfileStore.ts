@@ -17,32 +17,26 @@ type UserEditProfileStoreType = {
 };
 
 // Store for user edit profile data
-export const useEditUserMainProfileStore = create<UserEditProfileStoreType>(
-  (set) => ({
-    userEditData: null,
-    fieldErrors: null,
-    // Set the user edit data
-    setUserEditData: (userEditProfileState: UserProfileDataInterface | null) =>
-      set((state) => ({
-        ...state,
-        userEditData: userEditProfileState,
-        fieldErrors: null,
-      })),
-    setFieldErrors: (fieldErrors: Record<string, string> | null) => fieldErrors,
+export const useEditUserMainProfileStore = create<UserEditProfileStoreType>((set) => ({
+  userEditData: null,
+  fieldErrors: null,
+  // Set the user edit data
+  setUserEditData: (userEditProfileState: UserProfileDataInterface | null) =>
+    set((state) => ({
+      ...state,
+      userEditData: userEditProfileState,
+      fieldErrors: null,
+    })),
+  setFieldErrors: (fieldErrors: Record<string, string> | null) => fieldErrors,
 
-    // Clear the user edit data
-    clearEditData: () => set({ userEditData: null, fieldErrors: null }),
-  })
-);
+  // Clear the user edit data
+  clearEditData: () => set({ userEditData: null, fieldErrors: null }),
+}));
 
 export const useValidateUserEditData = () => {
   // Hooks
-  const currentEditData = useEditUserMainProfileStore(
-    (state) => state.userEditData
-  );
-  const { setFieldErrors, fieldErrors: errors } = useEditUserMainProfileStore(
-    (state) => state
-  );
+  const currentEditData = useEditUserMainProfileStore((state) => state.userEditData);
+  const { setFieldErrors, fieldErrors: errors } = useEditUserMainProfileStore((state) => state);
 
   const validate = useCallback(() => {
     const result = PatchUserProfileSchema.safeParse(currentEditData);
@@ -74,18 +68,14 @@ export const useValidateUserEditData = () => {
 
 // Hook to submit the user edit data
 export const useSubmitEditData = () => {
-  const userEditData = useEditUserMainProfileStore(
-    (state) => state.userEditData
-  );
-  const userMainProfile = useUserMainProfileStore(
-    (state) => state.userMainProfile
-  );
+  const userEditData = useEditUserMainProfileStore((state) => state.userEditData);
+  const userMainProfile = useUserMainProfileStore((state) => state.userMainProfile);
 
   const diffData = useMemo(() => {
-    return userMainProfile && userEditData
-      ? getUpdatedKeys(userMainProfile, userEditData)
-      : null;
+    return userMainProfile && userEditData ? getUpdatedKeys(userMainProfile, userEditData) : null;
   }, [userEditData, userMainProfile]);
+
+  useUserMainProfileStore().setUserMainProfile({ ...userMainProfile, ...diffData });
 
   return {
     diffData,

@@ -4,6 +4,7 @@ import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-pro
 import CryptoJS from 'crypto-js';
 import { PersistedStorageWithRehydration } from '@/lib/types/general_store_interfaces';
 import { getUser } from '@/lib/funcs/userProfileFetchers/getUser';
+import { getUpdatedKeys } from '@/lib/utils/getUpdatedObjKeys';
 
 const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_USER_PROFILE_DATA_ENCRYPTION_KEY!;
 
@@ -37,8 +38,23 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
     (set, get) => ({
       userMainProfile: null, // Fetch user profile data on initialization
       setProfileFromServer: async () => {
+        const serverData = await getUser();
+        const storeData = get().userMainProfile;
+
+        // Check if the data has changed before updating the store
+        const isDataDifferent = Object.values(getUpdatedKeys(serverData!, storeData!)).length > 0;
+        if (isDataDifferent) {
+          // console.log('User profile data has changed, updating store...');
+          return set({ userMainProfile: serverData! });
+        } else {
+          // console.log('No changes in user profile data, not updating store.');
+        }
+
+        // If no data is present in the store, fetch from server
+        // This is to ensure that the store is initialized with the latest data
         if (get().userMainProfile === null || !get().userMainProfile) {
           const userData = (await getUser()) as UserProfileDataInterface;
+
           return set({ userMainProfile: userData });
         }
       },
@@ -75,9 +91,7 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
       // Skip initial hydration to avoid  loading encrypted data  on server-side
       onRehydrateStorage: () => async (state) => {
         state?.hydrate();
-        if (state?.userMainProfile !== null) {
-          state?.setProfileFromServer();
-        }
+        state?.setProfileFromServer();
       },
     },
   ),
