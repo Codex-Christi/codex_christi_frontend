@@ -8,6 +8,7 @@ import { createLoginSession } from '@/actions/login';
 import { verifySession } from '@/lib/session/session-validate';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import useAuthStore from '@/stores/authStore';
 
 const tokenClient = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
@@ -36,13 +37,15 @@ const defaultSignUpProcessState: SignInHookInterface = {
 
 export const useLogin = () => {
   const router = useRouter();
+  const autoUpDateSession = useAuthStore((state) => state.autoUpDateSession);
 
   // State values
   const [isClient, setIsClient] = useState(false);
   const [referer, setReferer] = useState<string | null>(null);
   // State for login process
-  const [loginProcessState, setLoginProcessState] =
-    useState<SignInHookInterface>(useMemo(() => defaultSignUpProcessState, []));
+  const [loginProcessState, setLoginProcessState] = useState<SignInHookInterface>(
+    useMemo(() => defaultSignUpProcessState, []),
+  );
   const isCodexChristiShop = isClient
     ? window.location.hostname.includes('codexchristi.shop')
     : false;
@@ -51,11 +54,7 @@ export const useLogin = () => {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsClient(true);
-      setReferer(
-        document.referrer
-          ? document.referrer.split(window.location.hostname)[1]
-          : null
-      );
+      setReferer(document.referrer ? document.referrer.split(window.location.hostname)[1] : null);
     }
   }, [referer]);
 
@@ -71,19 +70,17 @@ export const useLogin = () => {
       });
 
       try {
-        const loginRes: AxiosResponse<LoginDataReturnType> =
-          await tokenClient.post(`/auth/user-login`, {
+        const loginRes: AxiosResponse<LoginDataReturnType> = await tokenClient.post(
+          `/auth/user-login`,
+          {
             ...userDetails,
-          });
+          },
+        );
 
         if (loginRes?.data?.success) {
-          const { refresh: refreshToken, access: accessToken } =
-            loginRes.data.data;
+          const { refresh: refreshToken, access: accessToken } = loginRes.data.data;
 
-          const sessionStatus = await createLoginSession(
-            accessToken,
-            refreshToken
-          );
+          const sessionStatus = await createLoginSession(accessToken, refreshToken);
 
           if (sessionStatus.success === true) {
             setLoginProcessState({
@@ -96,6 +93,8 @@ export const useLogin = () => {
             const isSessionActive = await verifySession();
 
             if (isSessionActive === true) {
+              // Update the auth store
+              autoUpDateSession();
               toast.dismiss(loadingToastID);
 
               successToast({
@@ -155,7 +154,7 @@ export const useLogin = () => {
         return String(err);
       }
     },
-    [isCodexChristiShop, referer, router]
+    [autoUpDateSession, isCodexChristiShop, referer, router],
   );
 
   return { ...loginProcessState, login };

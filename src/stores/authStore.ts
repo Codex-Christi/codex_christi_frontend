@@ -33,11 +33,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     } as UserSessionInfoType;
     const isAuthenticated = (await verifySession()) === true ? true : false;
 
-    set(() => {
-      return {
-        userSessionInfo,
-        isAuthenticated,
-      };
+    return set({
+      userSessionInfo,
+      isAuthenticated,
     });
   },
 }));

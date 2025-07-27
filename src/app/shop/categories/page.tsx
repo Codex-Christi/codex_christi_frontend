@@ -12,8 +12,8 @@ const AllCategoriesPage = () => {
   );
 
   return (
-    <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] pt-10 !px-2 rounded-[10px] w-[80vw] mx-auto max-w-[1200px]'>
-      <h1 className='text-3xl'>Categories</h1>
+    <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] py-10 my-10 rounded-[10px] w-[80vw] mx-auto max-w-[1200px]'>
+      <h1 className='text-3xl font-semibold font-inter'>Categories</h1>
       {JSON.stringify(existingCategoriesWithIconsandHrefs)}
     </div>
   );

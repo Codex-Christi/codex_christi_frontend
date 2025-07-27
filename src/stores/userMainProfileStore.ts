@@ -26,6 +26,7 @@ interface UserMainProfileStore extends PersistedStorageWithRehydration {
   userMainProfile: UserProfileDataInterface | null;
   setUserMainProfile: (userMainProfile: UserProfileDataInterface | null) => void;
   clearProfile: () => void;
+  setProfileFromServer: () => Promise<void>;
 }
 
 // Persisted store for user main profile
@@ -33,8 +34,14 @@ interface UserMainProfileStore extends PersistedStorageWithRehydration {
 // and encrypt it for security.
 export const useUserMainProfileStore = create<UserMainProfileStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       userMainProfile: null, // Fetch user profile data on initialization
+      setProfileFromServer: async () => {
+        if (get().userMainProfile === null || !get().userMainProfile) {
+          const userData = (await getUser()) as UserProfileDataInterface;
+          return set({ userMainProfile: userData });
+        }
+      },
       setUserMainProfile: (userMainProfile: UserProfileDataInterface | null) =>
         set((state) => ({ ...state, userMainProfile })),
       clearProfile: () => set({ userMainProfile: null }),
@@ -68,8 +75,8 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
       // Skip initial hydration to avoid  loading encrypted data  on server-side
       onRehydrateStorage: () => async (state) => {
         state?.hydrate();
-        if (!state?.userMainProfile) {
-          state?.setUserMainProfile(((await getUser()) as UserProfileDataInterface) ?? null);
+        if (state?.userMainProfile !== null) {
+          state?.setProfileFromServer();
         }
       },
     },
@@ -77,7 +84,7 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
 );
 
 export const clearUserMainProfileStore = () => {
-  useUserMainProfileStore.setState({ userMainProfile: null });
+  useUserMainProfileStore.getState().clearProfile();
   useUserMainProfileStore.persist.clearStorage();
 };
 
