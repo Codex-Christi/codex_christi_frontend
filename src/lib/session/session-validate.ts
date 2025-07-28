@@ -24,7 +24,7 @@ export async function verifySession() {
         // Log out user
       } else if (hoursToSessionExpiry <= 24) {
         // Refresh Session
-        console.log('Refreshing session');
+        console.log('You have to refresh session');
       } else {
         // Session is valid, return true object
         return true;
