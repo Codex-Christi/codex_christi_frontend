@@ -23,7 +23,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       openGraph: {
         title: title,
         description: description,
-        images: cover ? [{ url: cover.url }] : undefined,
+        // ✅ Correct conditional: Omit images property entirely when no cover
+        ...(cover ? { images: [{ url: cover.url }] } : {}),
         type: 'website',
         url: `https://codexchristi.shop/category/${categoryName}`,
         locale: 'en_US',
@@ -33,7 +34,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         card: 'summary_large_image',
         title: title,
         description: description,
-        images: cover ? cover?.url : undefined,
+        // ✅ Correct conditional: Omit images property entirely when no cover
+        ...(cover ? { images: cover.url } : {}),
       },
     };
   } catch {
@@ -52,9 +54,9 @@ export default async function EachCategoryPage({ params }: PageProps) {
 
     const { cover, name, description } = categoryMetaData;
     return (
-      <header>
-        <h1>{name}</h1>
-        <h2>{description}</h2>
+      <header className='px-8 py-10'>
+        <h1 className='font-ocr text-3xl'>{name}</h1>
+        <h2 className='text-lg'>{description}</h2>
         {cover && <Image src={cover.url} alt={`${name} category cover image`} />}
       </header>
     );

@@ -47,19 +47,17 @@ export const getCategoryMetadataFromMerchize = cache(async (categoryName: string
 // Fetch from Merchize with Next.js Cache
 // This function is used to fetch data from Merchize API with caching enabled
 const fetchFromMerchizeWithNextCache = cache(
-  async ({
-    url,
-    method,
-    body,
-    daysToCache,
-    isFormBody,
-  }: {
+  async (params: {
     url: string;
     body?: BodyInit | null | undefined;
     method?: string | undefined;
     daysToCache: number;
     isFormBody?: boolean;
   }) => {
+    // DEstrcuting params
+    const { url, method, body, daysToCache, isFormBody } = params;
+
+    // Main fetch from here
     return await fetch(`${url}`, {
       method: method ?? 'GET',
       headers: {
