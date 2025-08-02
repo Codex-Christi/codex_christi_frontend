@@ -60,7 +60,9 @@ export default async function EachCategoryPage({ params }: PageProps) {
         {cover && <Image src={cover.url} alt={`${name} category cover image`} />}
       </header>
     );
-  } catch {
+  } catch (err) {
+    console.log(err);
+
     return notFound();
   }
 }
