@@ -4,10 +4,10 @@ import { cache } from 'react';
 // --- Env Config ---
 // const merchizeToken = process.env.MERCHIZE_TOKEN!;
 const baseURL = process.env.NEXT_PUBLIC_BASE_URL!;
-const merchizeBaseURL = process.env.MERCHIZE_BASE_URL!;
-const merchizeAPIKey = process.env.MERRCHIZE_API_KEY!;
+export const merchizeBaseURL = process.env.MERCHIZE_BASE_URL!;
+export const merchizeAPIKey = process.env.MERRCHIZE_API_KEY!;
 
-const cacheForDays = (days: number): number => 60 * 60 * 24 * days;
+export const cacheForDays = (days: number): number => 60 * 60 * 24 * days;
 
 // --- In-Memory Memoization Maps ---
 const externalProductIDMemo = new Map<

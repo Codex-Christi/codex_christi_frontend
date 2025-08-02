@@ -2,10 +2,7 @@
 // import Calendar from '@/assets/img/calendar.png';
 import ProductDetailsClientComponent from '@/components/UI/Shop/ProductDetails';
 import { Metadata } from 'next';
-import {
-  getProductDetailsSSR,
-  getProductMetaDataOnly,
-} from './productDetailsSSR';
+import { getProductDetailsSSR, getProductMetaDataOnly } from './productDetailsSSR';
 import { notFound } from 'next/navigation';
 // import { useProductDetailsStore } from './detailsStore';
 
@@ -15,17 +12,13 @@ type PageProps = {
 
 // Once we started consuming the API this would be replaced wuth `generateMetadata`
 // ✅ 1. Generate metadata dynamically
-export async function generateMetadata({
-  params,
-}: PageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   try {
     const { id } = await params;
     const productMetaData = await getProductMetaDataOnly(id);
 
     const title = `${productMetaData.title} | Codex Christi Shop`;
-    const description = productMetaData.description
-      .split('.')[0]
-      .replace(/<[^>]*>/g, '');
+    const description = productMetaData.description.split('.')[0].replace(/<[^>]*>/g, '');
 
     return {
       title: title,
