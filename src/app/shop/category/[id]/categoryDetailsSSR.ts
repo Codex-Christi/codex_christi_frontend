@@ -3,8 +3,42 @@ import {
   merchizeBaseURL,
   merchizeAPIKey,
   cacheForDays,
+  BasicProductInterface,
 } from '../../product/[id]/productDetailsSSR';
 import { cache } from 'react';
+
+interface CategoryProductDetail extends Omit<BasicProductInterface['data'], '_id'> {
+  external_product_id: string;
+}
+
+export type CategoryProductsResponse =
+  | {
+      success: boolean;
+      data: {
+        count: number;
+        total_pages: number;
+        current_page: number | number;
+        next: null | string;
+        previous: null | string;
+        results: CategoryProductDetail[];
+      };
+    }
+  | {
+      errors: {
+        type: string;
+        code: string;
+        message: string;
+        field_name: null | string;
+      }[];
+    };
+
+type PaginationParams = {
+  page: number;
+  page_size: number;
+  category: string;
+};
+
+const baseURL = process.env.NEXT_PUBLIC_BASE_URL!;
 
 export const getCategoryMetadataFromMerchize = cache(async (categoryName: string) => {
   try {
@@ -75,3 +109,64 @@ const fetchFromMerchizeWithNextCache = cache(
     });
   },
 );
+
+// Fetch products with caching and pagination
+export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
+  const { page, page_size, category } = params;
+  // const skip = (page - 1) * limit;
+  try {
+    const categoryProductsResponse = await fetch(
+      `${baseURL}/products/filter-by-collection?category=${category}&page=${page}&page_size=${page_size}`,
+      { next: { tags: [`products-${category}`], revalidate: cacheForDays(1) } },
+    ).then(async (resp) => {
+      if (!resp.ok) {
+        throw new Error(`HTTP error! Status: ${resp.status}, Status Text: ${resp.statusText}`);
+      }
+      return resp.json().then((data: CategoryProductsResponse) => data);
+    });
+    if ('data' in categoryProductsResponse && categoryProductsResponse.success) {
+      const { results, count, total_pages } = categoryProductsResponse.data;
+      return {
+        products: results,
+        totalPages: total_pages,
+        count,
+      };
+    } else {
+      // Handle error case
+      throw new Error(
+        Array.isArray(
+          (
+            categoryProductsResponse as {
+              errors: { type: string; code: string; message: string; field_name: null | string }[];
+            }
+          ).errors,
+        )
+          ? (
+              categoryProductsResponse as {
+                errors: {
+                  type: string;
+                  code: string;
+                  message: string;
+                  field_name: null | string;
+                }[];
+              }
+            ).errors
+              .map((e) => e.message)
+              .join(', ')
+          : 'Unknown error fetching category products',
+      );
+    }
+  } catch (err) {
+    console.error(err);
+    throw err;
+  }
+});
+
+// Server action for revalidation
+export async function revalidateProducts(category: string) {
+  // This would normally be an API call to your revalidation endpoint
+  console.log(`Revalidating products-${category}`);
+
+  // In production:
+  // await fetch(`/api/revalidate?tag=products-${category}`);
+}

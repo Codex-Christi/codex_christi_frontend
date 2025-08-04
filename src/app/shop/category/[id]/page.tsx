@@ -1,7 +1,6 @@
 import { Metadata } from 'next';
 import { getCategoryMetadataFromMerchize } from './categoryDetailsSSR';
 import { notFound } from 'next/navigation';
-import Image from 'next/image';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -52,13 +51,14 @@ export default async function EachCategoryPage({ params }: PageProps) {
 
     const categoryMetaData = await getCategoryMetadataFromMerchize(categoryName);
 
-    const { cover, name, description } = categoryMetaData;
+    const { name, description } = categoryMetaData;
     return (
-      <header className='px-8 py-10'>
-        <h1 className='font-ocr text-3xl'>{name}</h1>
-        <h2 className='text-lg'>{description}</h2>
-        {cover && <Image src={cover.url} alt={`${name} category cover image`} />}
-      </header>
+      <div className='min-h-[60vh]'>
+        <header className='px-8 py-10'>
+          <h1 className='font-ocr text-3xl'>{name}</h1>
+          <h2 className='text-lg'>{description}</h2>
+        </header>
+      </div>
     );
   } catch (err) {
     console.log(err);
