@@ -3,7 +3,7 @@ import { fetchCategoryProducts, getCategoryMetadataFromMerchize } from './catego
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { Suspense } from 'react';
-import Skeleton from './Skeleton';
+import SkeletonContainer from './Skeleton';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -75,7 +75,7 @@ export default async function EachCategoryPage({ params, searchParams }: PagePro
           <h2 className='text-lg'>{description}</h2>
         </header>
 
-        <Skeleton count={productLimit} />
+        <SkeletonContainer count={productLimit} />
 
         {/* <Suspense fallback={<Skeleton count={productLimit} />}>
           <main className='px-8'>
