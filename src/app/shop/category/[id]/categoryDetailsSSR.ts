@@ -116,7 +116,7 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
   // const skip = (page - 1) * limit;
   try {
     const categoryProductsResponse = await fetch(
-      `${baseURL}/products/filter-by-collection?category=${category}&page=${page}&page_size=${page_size}`,
+      `${baseURL}/product/filter-by-collection?collection=${category}&page=${page}&page_size=${page_size}`,
       { next: { tags: [`products-${category}`], revalidate: cacheForDays(1) } },
     ).then(async (resp) => {
       if (!resp.ok) {
@@ -125,8 +125,12 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
       return resp.json().then((data: CategoryProductsResponse) => data);
     });
     if ('data' in categoryProductsResponse && categoryProductsResponse.success) {
-      const { results, count, total_pages } = categoryProductsResponse.data;
+      const { results, count, total_pages, current_page, next, previous } =
+        categoryProductsResponse.data;
       return {
+        next,
+        previous,
+        current_page,
         products: results,
         totalPages: total_pages,
         count,

@@ -1,9 +1,11 @@
 import { Metadata } from 'next';
-import { getCategoryMetadataFromMerchize } from './categoryDetailsSSR';
+import { fetchCategoryProducts, getCategoryMetadataFromMerchize } from './categoryDetailsSSR';
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 
 type PageProps = {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 // ✅ 1. Generate metadata dynamically
@@ -45,18 +47,30 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default async function EachCategoryPage({ params }: PageProps) {
-  try {
-    const { id: categoryName } = await params;
+export default async function EachCategoryPage({ params, searchParams }: PageProps) {
+  const { id: categoryName } = await params;
+  const searchParamsObj = await searchParams;
+  const page = parseInt((searchParamsObj?.page as string) ?? '1');
 
-    const categoryMetaData = await getCategoryMetadataFromMerchize(categoryName);
+  // Device Type SSR
+  const userAgent = (await headers()).get('user-agent') || '';
+  const deviceType = /mobile|android|iphone|ipad|ipod/i.test(userAgent) ? 'mobile' : 'desktop';
+  const productLimit = deviceType === 'mobile' ? 10 : 20;
+
+  try {
+    const [categoryMetaData, initialProducts] = await Promise.all([
+      getCategoryMetadataFromMerchize(categoryName),
+      fetchCategoryProducts({ category: categoryName, page, page_size: productLimit }),
+    ]);
 
     const { name, description } = categoryMetaData;
+
     return (
       <div className='min-h-[60vh]'>
         <header className='px-8 py-10'>
           <h1 className='font-ocr text-3xl'>{name}</h1>
           <h2 className='text-lg'>{description}</h2>
+          <h3>{deviceType}</h3>
         </header>
       </div>
     );
