@@ -2,6 +2,8 @@ import { Metadata } from 'next';
 import { fetchCategoryProducts, getCategoryMetadataFromMerchize } from './categoryDetailsSSR';
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
+import { Suspense } from 'react';
+import Skeleton from './Skeleton';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -58,20 +60,28 @@ export default async function EachCategoryPage({ params, searchParams }: PagePro
   const productLimit = deviceType === 'mobile' ? 10 : 20;
 
   try {
-    const [categoryMetaData, initialProducts] = await Promise.all([
+    const [categoryMetaData, initialProductFetchResp] = await Promise.all([
       getCategoryMetadataFromMerchize(categoryName),
       fetchCategoryProducts({ category: categoryName, page, page_size: productLimit }),
     ]);
 
     const { name, description } = categoryMetaData;
+    const { next, products } = initialProductFetchResp;
 
     return (
       <div className='min-h-[60vh]'>
-        <header className='px-8 py-10'>
+        <header className='px-8 pt-10'>
           <h1 className='font-ocr text-3xl'>{name}</h1>
           <h2 className='text-lg'>{description}</h2>
-          <h3>{deviceType}</h3>
         </header>
+
+        <Skeleton count={productLimit} />
+
+        {/* <Suspense fallback={<Skeleton count={productLimit} />}>
+          <main className='px-8'>
+            <h4>Products Loaded: {JSON.stringify(initialProductFetchResp)}</h4>
+          </main>
+        </Suspense> */}
       </div>
     );
   } catch (err) {
