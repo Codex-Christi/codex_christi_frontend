@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { Suspense } from 'react';
 import SkeletonContainer from './Skeleton';
+import ProductList from './ProductList';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -11,43 +12,43 @@ type PageProps = {
 };
 
 // ✅ 1. Generate metadata dynamically
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  try {
-    const { id: categoryName } = await params;
-    const categoryMetaData = await getCategoryMetadataFromMerchize(categoryName);
+// export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+//   try {
+//     const { id: categoryName } = await params;
+//     const categoryMetaData = await getCategoryMetadataFromMerchize(categoryName);
 
-    const { cover, description, name } = categoryMetaData;
+//     const { cover, description, name } = categoryMetaData;
 
-    const title = `${name} | Codex Christi Shop`;
+//     const title = `${name} | Codex Christi Shop`;
 
-    return {
-      title: title,
-      description: description,
-      openGraph: {
-        title: title,
-        description: description,
-        // ✅ Correct conditional: Omit images property entirely when no cover
-        ...(cover ? { images: [{ url: cover.url }] } : {}),
-        type: 'website',
-        url: `https://codexchristi.shop/category/${categoryName}`,
-        locale: 'en_US',
-        siteName: 'Codex Christi Shop',
-      },
-      twitter: {
-        card: 'summary_large_image',
-        title: title,
-        description: description,
-        // ✅ Correct conditional: Omit images property entirely when no cover
-        ...(cover ? { images: cover.url } : {}),
-      },
-    };
-  } catch {
-    // fallback metadata or suppress entirely
-    return {
-      title: 'Product not found',
-    };
-  }
-}
+//     return {
+//       title: title,
+//       description: description,
+//       openGraph: {
+//         title: title,
+//         description: description,
+//         // ✅ Correct conditional: Omit images property entirely when no cover
+//         ...(cover ? { images: [{ url: cover.url }] } : {}),
+//         type: 'website',
+//         url: `https://codexchristi.shop/category/${categoryName}`,
+//         locale: 'en_US',
+//         siteName: 'Codex Christi Shop',
+//       },
+//       twitter: {
+//         card: 'summary_large_image',
+//         title: title,
+//         description: description,
+//         // ✅ Correct conditional: Omit images property entirely when no cover
+//         ...(cover ? { images: cover.url } : {}),
+//       },
+//     };
+//   } catch {
+//     // fallback metadata or suppress entirely
+//     return {
+//       title: 'Product not found',
+//     };
+//   }
+// }
 
 export default async function EachCategoryPage({ params, searchParams }: PageProps) {
   const { id: categoryName } = await params;
@@ -75,13 +76,21 @@ export default async function EachCategoryPage({ params, searchParams }: PagePro
           <h2 className='text-lg'>{description}</h2>
         </header>
 
-        <SkeletonContainer count={productLimit} />
+        {/* <SkeletonContainer count={productLimit} /> */}
 
-        {/* <Suspense fallback={<Skeleton count={productLimit} />}>
+        {/* <Suspense fallback={<SkeletonContainer count={productLimit} />}>
           <main className='px-8'>
             <h4>Products Loaded: {JSON.stringify(initialProductFetchResp)}</h4>
           </main>
         </Suspense> */}
+        <main className='px-8 pt-7 flex flex-col gap-16 mb-10'>
+          <ProductList
+            category={categoryName}
+            count={productLimit}
+            initialData={products}
+            initialPage={page}
+          />
+        </main>
       </div>
     );
   } catch (err) {

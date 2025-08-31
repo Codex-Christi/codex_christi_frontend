@@ -1,4 +1,5 @@
-import 'server-only';
+'use server';
+
 import {
   merchizeBaseURL,
   merchizeAPIKey,
@@ -7,7 +8,7 @@ import {
 } from '../../product/[id]/productDetailsSSR';
 import { cache } from 'react';
 
-interface CategoryProductDetail extends Omit<BasicProductInterface['data'], '_id'> {
+export interface CategoryProductDetail extends Omit<BasicProductInterface['data'], '_id'> {
   external_product_id: string;
 }
 
@@ -45,12 +46,12 @@ export const getCategoryMetadataFromMerchize = cache(async (categoryName: string
     const res = await fetchFromMerchizeWithNextCache({
       url: `${merchizeBaseURL}/product/v2/collections/search`,
       method: 'POST',
-      body: new URLSearchParams({ name: `'${categoryName}'` }).toString(),
+      body: new URLSearchParams({ name: `'${categoryName}'` }).toString().toLowerCase(),
       isFormBody: true,
       daysToCache: 1,
     });
 
-    const categoryID = res.data.collections[0]._id as string;
+    const categoryID = res!.data!.collections[0]._id as string;
 
     // Make second request to extract all metadata
     const { data: metaDataObj } = (await fetchFromMerchizeWithNextCache({
@@ -73,7 +74,6 @@ export const getCategoryMetadataFromMerchize = cache(async (categoryName: string
 
     //  Catch errors
   } catch (err) {
-    console.log(err);
     throw err;
   }
 });
@@ -92,21 +92,33 @@ const fetchFromMerchizeWithNextCache = cache(
     const { url, method, body, daysToCache, isFormBody } = params;
 
     // Main fetch from here
-    return await fetch(`${url}`, {
-      method: method ?? 'GET',
-      headers: {
-        'X-API-KEY': `${merchizeAPIKey}`,
-        'Content-Type': isFormBody ? 'application/x-www-form-urlencoded' : 'application/json',
-      },
-      next: { revalidate: cacheForDays(daysToCache) },
+    try {
+      return await fetch(`${url}`, {
+        method: method ?? 'GET',
+        headers: {
+          'X-API-KEY': `${merchizeAPIKey}`,
+          'Content-Type': isFormBody ? 'application/x-www-form-urlencoded' : 'application/json',
+        },
+        next: { revalidate: cacheForDays(daysToCache) },
 
-      body: body,
-    }).then(async (resp) => {
-      if (!resp.ok) throw new Error('Network error');
+        body: body,
+      })
+        .then(async (resp) => {
+          if (!resp.ok) {
+            throw new Error('Network error');
+          }
 
-      const data = await resp.json();
-      return data;
-    });
+          const data = await resp.json();
+          return data;
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+    } catch (err) {
+      console.log(err);
+
+      throw err;
+    }
   },
 );
 
@@ -114,15 +126,20 @@ const fetchFromMerchizeWithNextCache = cache(
 export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
   const { page, page_size, category } = params;
   // const skip = (page - 1) * limit;
+
   try {
     const categoryProductsResponse = await fetch(
       `${baseURL}/product/filter-by-collection?collection=${category}&page=${page}&page_size=${page_size}`,
+
       { next: { tags: [`products-${category}`], revalidate: cacheForDays(1) } },
     ).then(async (resp) => {
       if (!resp.ok) {
         throw new Error(`HTTP error! Status: ${resp.status}, Status Text: ${resp.statusText}`);
+      } else {
+        // console.log(Object.keys(await resp.json()));
+
+        return resp.json().then((data: CategoryProductsResponse) => data);
       }
-      return resp.json().then((data: CategoryProductsResponse) => data);
     });
     if ('data' in categoryProductsResponse && categoryProductsResponse.success) {
       const { results, count, total_pages, current_page, next, previous } =
@@ -162,6 +179,7 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
     }
   } catch (err) {
     console.error(err);
+
     throw err;
   }
 });
