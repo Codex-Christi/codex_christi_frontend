@@ -45,7 +45,8 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
         const isDataDifferent = Object.values(getUpdatedKeys(serverData!, storeData!)).length > 0;
         if (isDataDifferent) {
           // console.log('User profile data has changed, updating store...');
-          return set({ userMainProfile: serverData! });
+          set({ userMainProfile: serverData! });
+          return;
         } else {
           // console.log('No changes in user profile data, not updating store.');
         }
@@ -55,7 +56,8 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
         if (get().userMainProfile === null || !get().userMainProfile) {
           const userData = (await getUser()) as UserProfileDataInterface;
 
-          return set({ userMainProfile: userData });
+          set({ userMainProfile: userData });
+          return;
         }
       },
       setUserMainProfile: (userMainProfile: UserProfileDataInterface | null) =>
