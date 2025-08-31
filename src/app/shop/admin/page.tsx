@@ -16,7 +16,7 @@ export default function AdminShopActionsPage() {
           ? (decryptedSessionCookie.mainAccessToken as string)
           : ('' as string);
         fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/admin/populate-products`, {
-          headers: { 'X-API-KEY': mainAccessToken },
+          headers: { Authorization: `Bearer ${mainAccessToken}` },
         }).then((resp) => resp.json().then((data) => console.log(data)));
       }}
     >
