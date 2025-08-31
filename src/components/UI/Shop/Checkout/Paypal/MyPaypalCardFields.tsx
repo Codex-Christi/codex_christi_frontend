@@ -39,41 +39,30 @@ const billingFields: {
 ];
 
 // Main Component
-const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({
-  mode,
-  createOrder,
-  onApprove,
-}) => {
+const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({ mode, createOrder, onApprove }) => {
   const [isPaying, setIsPaying] = useState(false);
 
-  const [billingAddress, setBillingAddress] = useState<BillingAddressInterface>(
-    {
-      addressLine1: '',
-      addressLine2: '',
-      adminArea1: '',
-      adminArea2: '',
-      countryCode: '',
-      postalCode: '',
-    }
-  );
+  const [billingAddress, setBillingAddress] = useState<BillingAddressInterface>({
+    addressLine1: '',
+    addressLine2: '',
+    adminArea1: '',
+    adminArea2: '',
+    countryCode: '',
+    postalCode: '',
+  });
 
-  const handleBillingAddressChange = (
-    field: keyof typeof billingAddress,
-    value: string
-  ) => {
+  const handleBillingAddressChange = (field: keyof typeof billingAddress, value: string) => {
     setBillingAddress((prev) => ({ ...prev, [field]: value }));
   };
 
   if (mode !== 'card') return null;
 
   return (
-    <section
-      className={`${mode === 'card' ? 'block' : 'hidden'} w-full !mx-auto`}
-    >
+    <section className={`${mode === 'card' ? 'block' : 'hidden'} w-full !mx-auto`}>
       <PayPalCardFieldsProvider
         createOrder={() => createOrder(true)}
         onApprove={onApprove}
-        onError={(err) => {
+        onError={(err: unknown) => {
           console.error('PayPal Card Fields Error:', err);
           errorToast({
             message: 'An error occurred during payment. Please try again.',
@@ -110,19 +99,27 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({
           <PayPalExpiryField />
           <PayPalCVVField />
 
-          {billingFields.map(({ strName, placeholder }) => (
-            <Input
-              className='bg-transparent placeholder:text-[#ccc] !py-[1rem] !px-[2rem] text-[14px]
+          {billingFields.map(
+            ({
+              strName,
+              placeholder,
+            }: {
+              strName: keyof BillingAddressInterface;
+              placeholder: string;
+            }) => (
+              <Input
+                className='bg-transparent placeholder:text-[#ccc] !py-[1rem] !px-[2rem] text-[14px]
         h-[unset] rounded-[10px] w-full'
-              key={strName}
-              name={placeholder}
-              placeholder={placeholder}
-              value={billingAddress[strName]}
-              onChange={(e) => {
-                handleBillingAddressChange(strName, e.target.value);
-              }}
-            />
-          ))}
+                key={strName}
+                name={placeholder}
+                placeholder={placeholder}
+                value={billingAddress[strName]}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  handleBillingAddressChange(strName, e.target.value);
+                }}
+              />
+            ),
+          )}
         </div>
 
         <SubmitPaypalCardPaymentButton
@@ -160,12 +157,10 @@ function SubmitPaypalCardPaymentButton({
   }, [isPaying]);
 
   const handleClick = async () => {
-    if (!cardFieldsForm)
-      return errorToast({ message: 'Payment form unavailable' });
+    if (!cardFieldsForm) return errorToast({ message: 'Payment form unavailable' });
 
     const formState = await cardFieldsForm.getState();
-    if (!formState.isFormValid)
-      return errorToast({ message: 'Payment details are invalid' });
+    if (!formState.isFormValid) return errorToast({ message: 'Payment details are invalid' });
 
     setIsPaying(true);
     try {
