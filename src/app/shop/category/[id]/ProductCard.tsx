@@ -10,9 +10,8 @@ export default function ProductCard({ product }: { product: CategoryProductDetai
     <CustomShopLink
       href={`/shop/product/${slug}`}
       className='relative bg-white/10 backdrop-blur-md rounded-xl py-8 pt-0 
-        border border-white/10 shadow-lg shadow-white/5
-        overflow-hidden hover:shadow-lg transition-shadow mx-auto w-full max-w-[310px]
-        lg:max-w-[350px]'
+        border-[2px] border-white/50 overflow-hidden mx-auto w-full max-w-[310px]
+        lg:max-w-[350px] animate-glow-border hover:scale-[1.03]'
     >
       <div className='relative h-auto'>
         <Image
@@ -27,10 +26,12 @@ export default function ProductCard({ product }: { product: CategoryProductDetai
       </div>
       <div className='pt-4 px-4 flex flex-col gap-2'>
         <h3 className='font-semibold text-lg mb-1'>{product.title}</h3>
-        <p className='text-gray-600 text-sm mb-2 line-clamp-2'>{product.description}</p>
         <div className='flex justify-between items-center'>
           <span className='font-bold'>${Number(product.retail_price).toFixed(2)}</span>
           <Button
+            onClick={(e) => {
+              e.preventDefault();
+            }}
             name={`Add ${title} to cart`}
             className='px-3 py-1 bg-[#0085FF] font-ocr text-[0.95rem] font-[900] rounded-md
              hover:bg-gray-500 transition-colors hover:scale-110'

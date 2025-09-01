@@ -8,30 +8,23 @@ import {
 } from '../../product/[id]/productDetailsSSR';
 import { cache } from 'react';
 
-export interface CategoryProductDetail extends Omit<BasicProductInterface['data'], '_id'> {
-  external_product_id: string;
-}
+type BasicProductData = BasicProductInterface['data'];
+
+export type CategoryProductDetail = BasicProductData;
 
 export type CategoryProductsResponse =
   | {
       success: boolean;
       data: {
-        count: number;
-        total_pages: number;
-        current_page: number | number;
+        total: number;
+        pages: number;
+        page: number;
         next: null | string;
         previous: null | string;
-        results: CategoryProductDetail[];
+        products: CategoryProductDetail[];
       };
     }
-  | {
-      errors: {
-        type: string;
-        code: string;
-        message: string;
-        field_name: null | string;
-      }[];
-    };
+  | { success: false; message: string };
 
 type PaginationParams = {
   page: number;
@@ -41,17 +34,30 @@ type PaginationParams = {
 
 const baseURL = process.env.NEXT_PUBLIC_BASE_URL!;
 
-export const getCategoryMetadataFromMerchize = cache(async (categoryName: string) => {
+// Get category's ID from Merchize
+const getCategoryIDFromMerchize = async (categoryName: string) => {
   try {
     const res = await fetchFromMerchizeWithNextCache({
       url: `${merchizeBaseURL}/product/v2/collections/search`,
       method: 'POST',
       body: new URLSearchParams({ name: `'${categoryName}'` }).toString().toLowerCase(),
       isFormBody: true,
-      daysToCache: 1,
+      daysToCache: 3,
     });
 
     const categoryID = res!.data!.collections[0]._id as string;
+
+    return categoryID;
+  } catch (err) {
+    console.log(`Error while getting category ID from Merchize`, err);
+    throw err;
+  }
+};
+
+// Get tCategory's Metadata from Merchize
+export const getCategoryMetadataFromMerchize = cache(async (categoryName: string) => {
+  try {
+    const categoryID = await getCategoryIDFromMerchize(categoryName);
 
     // Make second request to extract all metadata
     const { data: metaDataObj } = (await fetchFromMerchizeWithNextCache({
@@ -74,6 +80,7 @@ export const getCategoryMetadataFromMerchize = cache(async (categoryName: string
 
     //  Catch errors
   } catch (err) {
+    console.log(err);
     throw err;
   }
 });
@@ -99,7 +106,7 @@ const fetchFromMerchizeWithNextCache = cache(
           'X-API-KEY': `${merchizeAPIKey}`,
           'Content-Type': isFormBody ? 'application/x-www-form-urlencoded' : 'application/json',
         },
-        next: { revalidate: cacheForDays(daysToCache) },
+        next: { revalidate: cacheForDays(daysToCache) || undefined },
 
         body: body,
       })
@@ -127,53 +134,40 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
   const { page, page_size, category } = params;
   // const skip = (page - 1) * limit;
 
+  // Get ID first
+  const catID = await getCategoryIDFromMerchize(category);
+
   try {
-    const categoryProductsResponse = await fetch(
-      `${baseURL}/product/filter-by-collection?collection=${category}&page=${page}&page_size=${page_size}`,
+    const categoryProductsResponse: CategoryProductsResponse = await fetchFromMerchizeWithNextCache(
+      // `${baseURL}/product/filter-by-collection?collection=${category}&page=${page}&page_size=${page_size}`,
 
-      { next: { tags: [`products-${category}`], revalidate: cacheForDays(1) } },
-    ).then(async (resp) => {
-      if (!resp.ok) {
-        throw new Error(`HTTP error! Status: ${resp.status}, Status Text: ${resp.statusText}`);
-      } else {
-        // console.log(Object.keys(await resp.json()));
+      {
+        url: `${merchizeBaseURL}/product/products?limit=${page_size}&page=${page}&title=&collectionId[]=${catID}&minPrice=&maxPrice=`,
+        daysToCache: 0.3,
+      },
+    );
 
-        return resp.json().then((data: CategoryProductsResponse) => data);
-      }
-    });
     if ('data' in categoryProductsResponse && categoryProductsResponse.success) {
-      const { results, count, total_pages, current_page, next, previous } =
-        categoryProductsResponse.data;
+      const { products, total, pages, page } = categoryProductsResponse.data;
       return {
-        next,
-        previous,
-        current_page,
-        products: results,
-        totalPages: total_pages,
-        count,
+        next:
+          pages > page
+            ? `${merchizeBaseURL}/product/products?limit=${page_size}&page=${page + 1}&title=&collectionId[]=${catID}&minPrice=&maxPrice=`
+            : null,
+        previous:
+          page > 1 && page <= pages
+            ? `${merchizeBaseURL}/product/products?limit=${page_size}&page=${page - 1}&title=&collectionId[]=${catID}&minPrice=&maxPrice=`
+            : null,
+        current_page: page,
+        products,
+        totalPages: pages,
+        count: total,
       };
     } else {
       // Handle error case
       throw new Error(
-        Array.isArray(
-          (
-            categoryProductsResponse as {
-              errors: { type: string; code: string; message: string; field_name: null | string }[];
-            }
-          ).errors,
-        )
-          ? (
-              categoryProductsResponse as {
-                errors: {
-                  type: string;
-                  code: string;
-                  message: string;
-                  field_name: null | string;
-                }[];
-              }
-            ).errors
-              .map((e) => e.message)
-              .join(', ')
+        'message' in categoryProductsResponse && categoryProductsResponse.success === false
+          ? categoryProductsResponse.message
           : 'Unknown error fetching category products',
       );
     }

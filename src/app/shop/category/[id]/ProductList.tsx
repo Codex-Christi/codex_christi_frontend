@@ -81,7 +81,7 @@ export default function ProductList({
         ) : (
           <>
             {data.map((product) => (
-              <ProductCard key={product.external_product_id} product={product} />
+              <ProductCard key={product._id} product={product} />
             ))}
           </>
         )}

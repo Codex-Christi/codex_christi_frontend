@@ -92,6 +92,11 @@ const config = {
           '20%,50%': {
             opacity: '0',
           },
+
+          'glow-border': {
+            '0%, 100%': 'box-shadow: 0 0 100px #ff00ff;', // Start and end glow
+            '50%': 'box-shadow: 0 0 200px #ff00ff;', // Peak glow intensity
+          },
         },
       },
       animation: {
@@ -99,6 +104,7 @@ const config = {
         'accordion-up': 'accordion-up 0.2s ease-out',
         'ltr-linear-infinite': 'ltr-linear-infinite forwards 500s infinite',
         'caret-blink': 'caret-blink 1.25s ease-out infinite',
+        'glow-border': 'glow-border 1.5s infinite', // Define an animation named 'glow'
       },
       fontFamily: {
         nico: ['var(--font-nico)', ...fontFamily.sans],
@@ -123,7 +129,7 @@ const config = {
             textShadow: value,
           }),
         },
-        { values: theme('textShadow') }
+        { values: theme('textShadow') },
       );
     }),
   ],
