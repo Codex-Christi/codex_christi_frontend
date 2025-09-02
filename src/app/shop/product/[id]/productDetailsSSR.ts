@@ -142,8 +142,8 @@ export const fetchExternalProductID = cache((productIDorSlug: string) => {
 });
 
 // --- Fetch Base Product Info ---
-export const fetchBaseProduct = cache((externalProductID: string, image: string, slug: string) => {
-  const key = `${externalProductID}|${image}`;
+export const fetchBaseProduct = cache((externalProductID: string) => {
+  const key = `${externalProductID}`;
   if (baseProductMemo.has(key)) {
     return baseProductMemo.get(key)!;
   }
@@ -152,6 +152,7 @@ export const fetchBaseProduct = cache((externalProductID: string, image: string,
     const res = await fetch(`${merchizeBaseURL}/product/products/${externalProductID}`, {
       headers: {
         'X-API-KEY': `${merchizeAPIKey}`,
+        'Cache-Control': 'no-cache',
         // Authorization: `Bearer ${merchizeToken}`,
       },
       next: { revalidate: cacheForDays(7) },
@@ -164,7 +165,8 @@ export const fetchBaseProduct = cache((externalProductID: string, image: string,
     }
 
     const json: BasicProductInterface = await res.json();
-    return { ...json.data, image, slug };
+
+    return { ...json.data };
   })();
 
   baseProductMemo.set(key, promise);
@@ -179,7 +181,7 @@ export const fetchProductVariants = cache((productIDorSlug: string) => {
 
   const promise = (async () => {
     const res = await fetch(`${merchizeBaseURL}/product/products/${productIDorSlug}/all-variants`, {
-      headers: { 'X-API-KEY': `${merchizeAPIKey}` },
+      headers: { 'X-API-KEY': `${merchizeAPIKey}`, 'Cache-Control': 'no-cache' },
       next: { revalidate: cacheForDays(7) },
     });
 
@@ -229,9 +231,10 @@ export const fetchProductVariants = cache((productIDorSlug: string) => {
 // --- Combined Full Fetch ---
 export const getProductDetailsSSR = cache(
   async (productIDorSlug: string): Promise<ProductResult> => {
-    const { external_product_id, image, slug } = await fetchExternalProductID(productIDorSlug);
-    const productMetaData = await fetchBaseProduct(external_product_id, image, slug);
-    const productVariants = await fetchProductVariants(productMetaData._id);
+    const [productMetaData, productVariants] = await Promise.all([
+      fetchBaseProduct(productIDorSlug),
+      fetchProductVariants(productIDorSlug),
+    ]);
 
     return { productMetaData, productVariants };
   },
@@ -240,7 +243,7 @@ export const getProductDetailsSSR = cache(
 // --- Metadata-Only Fetch ---
 export const getProductMetaDataOnly = cache(
   async (productIDorSlug: string): Promise<BasicProductInterface['data']> => {
-    const { external_product_id, image, slug } = await fetchExternalProductID(productIDorSlug);
-    return fetchBaseProduct(external_product_id, image, slug);
+    // const { external_product_id, image, slug } = await fetchExternalProductID(productIDorSlug);
+    return fetchBaseProduct(productIDorSlug);
   },
 );

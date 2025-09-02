@@ -13,18 +13,19 @@ export const ProductImageGallery: FC = () => {
   const [currentItem, setCurrentItem] = useState(0);
 
   const productDetailsContext = useProductDetailsContext();
-  const { matchingVariant, setMatchingVariant } = useCurrentVariant(
-    (state) => state
-  );
+  const { matchingVariant, setMatchingVariant } = useCurrentVariant((state) => state);
 
   const metadata = productDetailsContext.productMetaData;
   // Compute image URLs for gallery
   const images = useMemo(() => {
     const image_uris = matchingVariant?.image_uris ?? [];
+    const firstImage = productDetailsContext.productVariants[0].image_uris[0];
+    const firstImageUrl = `https://d2dytk4tvgwhb4.cloudfront.net/${firstImage}`;
+
     return image_uris && image_uris.length > 0
       ? image_uris.map((uri) => `https://d2dytk4tvgwhb4.cloudfront.net/${uri}`)
-      : [metadata.image];
-  }, [matchingVariant?.image_uris, metadata.image]);
+      : [firstImageUrl];
+  }, [matchingVariant?.image_uris, productDetailsContext.productVariants]);
 
   const isAuthenticated = useAuthStore((store) => store.isAuthenticated);
 
@@ -98,14 +99,8 @@ export const ProductImageGallery: FC = () => {
           {/* Gallery navigation */}
           {images.length > 1 && (
             <>
-              <GalleryPrevButton
-                setCurrentItem={setCurrentItem}
-                imagesArr={images}
-              />
-              <GalleryNextButton
-                setCurrentItem={setCurrentItem}
-                imagesArr={images}
-              />
+              <GalleryPrevButton setCurrentItem={setCurrentItem} imagesArr={images} />
+              <GalleryNextButton setCurrentItem={setCurrentItem} imagesArr={images} />
             </>
           )}
         </div>
@@ -179,11 +174,7 @@ export const ProductImageGallery: FC = () => {
                 stroke='white'
                 strokeWidth='2'
               />
-              <path
-                d='M9.80273 15.4656L15.5117 20.2808'
-                stroke='white'
-                strokeWidth='2'
-              />
+              <path d='M9.80273 15.4656L15.5117 20.2808' stroke='white' strokeWidth='2' />
             </svg>
           </Link>
         </div>

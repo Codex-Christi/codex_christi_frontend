@@ -2,7 +2,7 @@
 // import Calendar from '@/assets/img/calendar.png';
 import ProductDetailsClientComponent from '@/components/UI/Shop/ProductDetails';
 import { Metadata } from 'next';
-import { getProductDetailsSSR, getProductMetaDataOnly } from './productDetailsSSR';
+import { getProductDetailsSSR } from './productDetailsSSR';
 import { notFound } from 'next/navigation';
 // import { useProductDetailsStore } from './detailsStore';
 
@@ -15,7 +15,9 @@ type PageProps = {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   try {
     const { id } = await params;
-    const productMetaData = await getProductMetaDataOnly(id);
+    const { productMetaData, productVariants } = await getProductDetailsSSR(id);
+    const firstImage = productVariants[0].image_uris[0];
+    const firstImageUrl = `https://d2dytk4tvgwhb4.cloudfront.net/${firstImage}`;
 
     const title = `${productMetaData.title} | Codex Christi Shop`;
     const description = productMetaData.description.split('.')[0].replace(/<[^>]*>/g, '');
@@ -26,7 +28,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       openGraph: {
         title: title,
         description: description,
-        images: [{ url: productMetaData.image }],
+        images: [{ url: firstImageUrl }],
         type: 'website',
         url: `https://codexchristi.shop/product/${id}`,
         locale: 'en_US',
@@ -36,7 +38,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         card: 'summary_large_image',
         title: title,
         description: description,
-        images: productMetaData.image,
+        images: firstImageUrl,
       },
     };
   } catch {

@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   fetchCategoryProducts,
-  type CategoryProductsResponse,
+  // type CategoryProductsResponse,
   type CategoryProductDetail,
 } from './categoryDetailsSSR';
 import ProductCard from './ProductCard';

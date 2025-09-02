@@ -5,10 +5,10 @@ import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink
 import { Button } from '@/components/UI/primitives/button';
 
 export default function ProductCard({ product }: { product: CategoryProductDetail }) {
-  const { slug, title } = product;
+  const { title, _id } = product;
   return (
     <CustomShopLink
-      href={`/shop/product/${slug}`}
+      href={`/shop/product/${_id}`}
       className='relative bg-white/10 backdrop-blur-md rounded-xl py-8 pt-0 
         border-[2px] border-white/50 overflow-hidden mx-auto w-full max-w-[310px]
         lg:max-w-[350px] animate-glow-border hover:scale-[1.03]'
