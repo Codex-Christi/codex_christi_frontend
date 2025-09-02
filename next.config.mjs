@@ -39,6 +39,7 @@ const nextConfig = {
         search: '',
       },
     ],
+    qualities: [25, 50, 75, 100],
   },
   async rewrites() {
     return [

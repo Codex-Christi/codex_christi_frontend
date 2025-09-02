@@ -1,12 +1,8 @@
 // app/category/[id]/ProductList.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import {
-  fetchCategoryProducts,
-  // type CategoryProductsResponse,
-  type CategoryProductDetail,
-} from './categoryDetailsSSR';
+import { useState, useEffect, useCallback, startTransition } from 'react';
+import { fetchCategoryProducts, type CategoryProductDetail } from './categoryDetailsSSR';
 import ProductCard from './ProductCard';
 import Skeleton from './Skeleton';
 import errorToast from '@/lib/error-toast';
@@ -23,7 +19,7 @@ export default function ProductList({
   count: number;
   initialData: CategoryProductDetail[];
 }) {
-  const [page, ,] = useState(initialPage);
+  const [page, setPage] = useState(initialPage);
   const [data, setData] = useState(initialData);
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
@@ -35,16 +31,22 @@ export default function ProductList({
       setIsLoading(true);
       setIsError(false);
       setErrorObj(null);
+
       try {
         const newData = await fetchCategoryProducts({
           category,
           page: targetPage,
           page_size: count,
         });
+
         setData(newData.products);
+        setPage(targetPage);
       } catch (error) {
         setIsError(true);
         setErrorObj(error);
+        errorToast({
+          message: `An error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
       } finally {
         setIsLoading(false);
       }
@@ -52,26 +54,40 @@ export default function ProductList({
     [category, count, page],
   );
 
-  // Re-fetch when page changes
+  // Listen for URL changes (for pagination)
   useEffect(() => {
-    if (page !== initialPage) {
-      fetchProducts(page);
-    }
-  }, [page, category, count, initialPage, fetchProducts]);
+    const handleUrlChange = () => {
+      const params = new URLSearchParams(window.location.search);
+      const newPage = parseInt(params.get('page') || '1');
 
-  // Error-Catching toast
-  useEffect(() => {
-    if (isError && errorObj) {
-      errorToast({
-        message: `An error occurred: ${
-          errorObj instanceof Error ? errorObj.message : 'Unknown error'
-        }`,
+      if (newPage !== page) {
+        startTransition(() => {
+          fetchProducts(newPage);
+        });
+      }
+    };
+
+    // Add event listener for custom URL change events
+    window.addEventListener('urlchange', handleUrlChange);
+
+    // Also check URL on initial load
+    const params = new URLSearchParams(window.location.search);
+    const urlPage = parseInt(params.get('page') || '1');
+    if (urlPage !== page) {
+      startTransition(() => {
+        fetchProducts(urlPage);
       });
     }
-  }, [isError, errorObj]);
+
+    return () => {
+      window.removeEventListener('urlchange', handleUrlChange);
+    };
+  }, [page, fetchProducts]);
 
   // Refresh function
-  const refreshProducts = () => fetchProducts(page);
+  const refreshProducts = useCallback(async () => {
+    await fetchProducts(page);
+  }, [fetchProducts, page]);
 
   return (
     <>

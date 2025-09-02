@@ -149,6 +149,7 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
 
     if ('data' in categoryProductsResponse && categoryProductsResponse.success) {
       const { products, total, pages, page } = categoryProductsResponse.data;
+
       return {
         next:
           pages > page

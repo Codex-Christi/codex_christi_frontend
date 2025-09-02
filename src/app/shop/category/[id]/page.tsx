@@ -2,10 +2,12 @@ import { Metadata } from 'next';
 import { fetchCategoryProducts, getCategoryMetadataFromMerchize } from './categoryDetailsSSR';
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
-import { Suspense } from 'react';
-import SkeletonContainer from './Skeleton';
 import errorToast from '@/lib/error-toast';
-import ProductList from './ProductList';
+import dynamic from 'next/dynamic';
+
+// Dynamic Components
+const ProductList = dynamic(() => import('./ProductList'));
+const PaginationControls = dynamic(() => import('./PaginationControls'));
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -61,7 +63,7 @@ export default async function EachCategoryPage({ params, searchParams }: PagePro
   // Device Type SSR
   const userAgent = (await headers()).get('user-agent') || '';
   const deviceType = /mobile|android|iphone|ipad|ipod/i.test(userAgent) ? 'mobile' : 'desktop';
-  const productLimit = deviceType === 'mobile' ? 10 : 20;
+  const productLimit = deviceType === 'mobile' ? 10 : 2;
 
   try {
     const [categoryMetaData, initialProductFetchResp] = await Promise.all([
@@ -70,7 +72,7 @@ export default async function EachCategoryPage({ params, searchParams }: PagePro
     ]);
 
     const { name, description } = categoryMetaData;
-    const { next, products } = initialProductFetchResp;
+    const { products, totalPages } = initialProductFetchResp;
 
     return (
       <div className='min-h-[60vh]'>
@@ -92,6 +94,13 @@ export default async function EachCategoryPage({ params, searchParams }: PagePro
             count={productLimit}
             initialData={products}
             initialPage={page}
+          />
+
+          <PaginationControls
+            currentPage={page}
+            category={categoryName}
+            limit={productLimit}
+            totalPages={totalPages}
           />
         </main>
       </div>
