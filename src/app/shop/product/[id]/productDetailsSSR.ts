@@ -152,7 +152,6 @@ export const fetchBaseProduct = cache((externalProductID: string) => {
     const res = await fetch(`${merchizeBaseURL}/product/products/${externalProductID}`, {
       headers: {
         'X-API-KEY': `${merchizeAPIKey}`,
-        'Cache-Control': 'no-cache',
         // Authorization: `Bearer ${merchizeToken}`,
       },
       next: { revalidate: cacheForDays(7) },
@@ -181,7 +180,7 @@ export const fetchProductVariants = cache((productIDorSlug: string) => {
 
   const promise = (async () => {
     const res = await fetch(`${merchizeBaseURL}/product/products/${productIDorSlug}/all-variants`, {
-      headers: { 'X-API-KEY': `${merchizeAPIKey}`, 'Cache-Control': 'no-cache' },
+      headers: { 'X-API-KEY': `${merchizeAPIKey}` },
       next: { revalidate: cacheForDays(7) },
     });
 
