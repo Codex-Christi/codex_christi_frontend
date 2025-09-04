@@ -1,7 +1,7 @@
 'use client';
 
 import { getCatalogItems } from '@/actions/merchize/getItemCatalogInfo';
-import { CatalogItem } from '@/lib/datasetSearchers/merchize/catalog';
+import { CatalogItem } from '@/lib/datasetSearchers/merchize/shipping.types';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import Link from 'next/link';
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';

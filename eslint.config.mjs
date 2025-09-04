@@ -13,21 +13,20 @@ const compat = new FlatCompat({
   allConfig: js.configs.all,
 });
 
-export default [
-  ...compat.extends(
-    'next/core-web-vitals',
-    'plugin:@typescript-eslint/recommended'
-  ),
-  {
-    languageOptions: {
-      parser: tsParser,
-    },
-
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-expressions': 'warn',
-      '@typescript-eslint/no-unused-vars': 'warn',
-      '@typescript-eslint/no-empty-object-type': 'warn',
-    },
+export default [{
+  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts"]
+}, ...compat.extends(
+  'next/core-web-vitals',
+  'plugin:@typescript-eslint/recommended'
+), {
+  languageOptions: {
+    parser: tsParser,
   },
-];
+
+  rules: {
+    '@typescript-eslint/no-explicit-any': 'warn',
+    '@typescript-eslint/no-unused-expressions': 'warn',
+    '@typescript-eslint/no-unused-vars': 'warn',
+    '@typescript-eslint/no-empty-object-type': 'warn',
+  },
+}];
