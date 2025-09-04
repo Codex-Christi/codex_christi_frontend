@@ -63,7 +63,7 @@ export default async function EachCategoryPage({ params, searchParams }: PagePro
   // Device Type SSR
   const userAgent = (await headers()).get('user-agent') || '';
   const deviceType = /mobile|android|iphone|ipad|ipod/i.test(userAgent) ? 'mobile' : 'desktop';
-  const productLimit = deviceType === 'mobile' ? 10 : 2;
+  const productLimit = deviceType === 'mobile' ? 10 : 15;
 
   try {
     const [categoryMetaData, initialProductFetchResp] = await Promise.all([

@@ -14,9 +14,9 @@ const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
         // .slice()
         // .toReversed()
         .map((cartItem) => {
-          const { itemDetail: variant, title, slug, quantity } = cartItem;
+          const { itemDetail: variant, title, quantity } = cartItem;
           const productTitle = title;
-          const { image, retail_price, _id, options } = variant;
+          const { image, retail_price, _id, options, product: parentID } = variant;
 
           return (
             <div
@@ -28,7 +28,7 @@ const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
 
               {/* Item Image */}
               {image && (
-                <CustomShopLink href={`/shop/product/${slug}`}>
+                <CustomShopLink href={`/shop/product/${parentID}`}>
                   <Image
                     src={image}
                     className='rounded-xl hover:cursor-pointer'
@@ -44,7 +44,7 @@ const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
                 className='text-left h-full flex flex-col justify-around col-span-1 
           md:col-span-2 xl:col-span-3 hover:cursor-pointer'
               >
-                <CustomShopLink href={`/shop/product/${slug}`}>
+                <CustomShopLink href={`/shop/product/${parentID}`}>
                   <h3 className='text-lg font-semibold hover:underline underline-offset-8 '>
                     {productTitle}
                   </h3>
@@ -59,22 +59,13 @@ const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
             gap-2'
               >
                 {/*  Size & Color*/}
-                <SizeAndColorElem
-                  options={options as ProductVariantOptions}
-                  className=''
-                />
+                <SizeAndColorElem options={options as ProductVariantOptions} className='' />
                 {/* Quantity */}
-                <ItemQuantityComponent
-                  className='hidden md:flex'
-                  cartItem={cartItem}
-                />
+                <ItemQuantityComponent className='hidden md:flex' cartItem={cartItem} />
               </section>
 
               {/* Quantity on small screens only */}
-              <ItemQuantityComponent
-                className='flex md:hidden'
-                cartItem={cartItem}
-              />
+              <ItemQuantityComponent className='flex md:hidden' cartItem={cartItem} />
               {/* Delete Item */}
               {/* <Button></Button> */}
 

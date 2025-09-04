@@ -1,4 +1,3 @@
-// app/category/[id]/ProductList.tsx
 'use client';
 
 import { useState, useEffect, useCallback, startTransition } from 'react';
@@ -23,9 +22,8 @@ export default function ProductList({
   const [data, setData] = useState(initialData);
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
-  const [errorObj, setErrorObj] = useState<unknown | Error>(null);
+  const [errorObj, setErrorObj] = useState<Error | null>(null);
 
-  // Unified fetch handler
   const fetchProducts = useCallback(
     async (targetPage = page) => {
       setIsLoading(true);
@@ -38,15 +36,13 @@ export default function ProductList({
           page: targetPage,
           page_size: count,
         });
-
         setData(newData.products);
         setPage(targetPage);
       } catch (error) {
+        const err = error instanceof Error ? error : new Error('Unknown error');
         setIsError(true);
-        setErrorObj(error);
-        errorToast({
-          message: `An error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        });
+        setErrorObj(err);
+        errorToast({ message: `An error occurred: ${err.message}` });
       } finally {
         setIsLoading(false);
       }
@@ -54,29 +50,21 @@ export default function ProductList({
     [category, count, page],
   );
 
-  // Listen for URL changes (for pagination)
   useEffect(() => {
     const handleUrlChange = () => {
       const params = new URLSearchParams(window.location.search);
-      const newPage = parseInt(params.get('page') || '1');
-
+      const newPage = parseInt(params.get('page') || '1', 10);
       if (newPage !== page) {
-        startTransition(() => {
-          fetchProducts(newPage);
-        });
+        startTransition(() => fetchProducts(newPage));
       }
     };
 
-    // Add event listener for custom URL change events
     window.addEventListener('urlchange', handleUrlChange);
 
-    // Also check URL on initial load
     const params = new URLSearchParams(window.location.search);
-    const urlPage = parseInt(params.get('page') || '1');
+    const urlPage = parseInt(params.get('page') || '1', 10);
     if (urlPage !== page) {
-      startTransition(() => {
-        fetchProducts(urlPage);
-      });
+      startTransition(() => fetchProducts(urlPage));
     }
 
     return () => {
@@ -84,34 +72,45 @@ export default function ProductList({
     };
   }, [page, fetchProducts]);
 
-  // Refresh function
-  const refreshProducts = useCallback(async () => {
-    await fetchProducts(page);
-  }, [fetchProducts, page]);
+  const refreshProducts = useCallback(() => fetchProducts(page), [fetchProducts, page]);
 
   return (
     <>
-      <div className='mt-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 min-[900px]:grid-cols-3  xl:!grid-cols-4 gap-6'>
-        {isLoading ? (
+      <div className='mt-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 min-[900px]:grid-cols-3 xl:!grid-cols-4 gap-6'>
+        {isLoading && !data.length ? (
           <Skeleton count={count} />
         ) : (
-          <>
-            {data.map((product) => (
-              <ProductCard key={product._id} product={product} />
-            ))}
-          </>
+          data.map((product) => <ProductCard key={product._id} product={product} />)
         )}
       </div>
 
-      {/* Refresh Button */}
-      <Button
-        name='Refresh Products Button'
-        onClick={refreshProducts}
-        disabled={isLoading}
-        className='px-4 py-2 bg-blue-500 text-white mx-auto rounded hover:bg-blue-600 disabled:opacity-50'
-      >
-        {isLoading ? 'Refreshing...' : 'Refresh Products'}
-      </Button>
+      {isError && (
+        <div className='flex flex-col items-center justify-center mt-8'>
+          <div className='animate-pulse text-red-500 text-center mb-4'>
+            <p className='text-lg font-semibold'>Oops! Something went wrong.</p>
+            <p className='text-sm'>{errorObj?.message || 'Unknown error occurred.'}</p>
+          </div>
+          <Button
+            name='Retry Button'
+            onClick={refreshProducts}
+            disabled={isLoading}
+            className='px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50'
+          >
+            {isLoading ? 'Retrying...' : 'Retry'}
+          </Button>
+        </div>
+      )}
+
+      {!isError && (
+        <Button
+          name='Refresh Products Button'
+          onClick={refreshProducts}
+          disabled={isLoading}
+          className='px-4 py-2 bg-blue-500 text-white mx-auto rounded hover:bg-blue-600 disabled:opacity-50'
+        >
+          {isLoading ? 'Refreshing...' : 'Refresh Products'}
+        </Button>
+      )}
     </>
   );
 }

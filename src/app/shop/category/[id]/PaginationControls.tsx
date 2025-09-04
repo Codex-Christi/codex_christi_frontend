@@ -8,7 +8,6 @@ import { Button } from '@/components/UI/primitives/button';
 export default function PaginationControls({
   currentPage,
   totalPages,
-  category,
   limit,
 }: {
   currentPage: number;

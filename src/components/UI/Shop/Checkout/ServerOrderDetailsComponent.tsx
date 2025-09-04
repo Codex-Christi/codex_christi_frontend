@@ -22,6 +22,7 @@ export const ServerOrderDetailsComponent: FC<{ children?: ReactNode }> = ({ chil
       country ? country : 'USA',
       'merchize',
     );
+
     setServerOrderDetails(orderDetailsFromServer);
   }, [cart, country]);
 

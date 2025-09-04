@@ -21,6 +21,9 @@ export default function ProductCard({ product }: { product: CategoryProductDetai
           height={300}
           width={150}
           className='object-cover object-top aspect-[16/18] md:aspect-[16/13] !w-full'
+          style={{
+            filter: isDayOrNight() === 'night' ? 'brightness(.8) contrast(.9)' : 'none',
+          }}
           // sizes='(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'
         />
       </div>
@@ -42,4 +45,14 @@ export default function ProductCard({ product }: { product: CategoryProductDetai
       </div>
     </CustomShopLink>
   );
+}
+
+function isDayOrNight() {
+  const currentHour = new Date().getHours(); // Get the current hour (0-23)
+  // Define a range for "day" hours. For instance, 6 AM to 8 PM.
+  if (currentHour >= 6 && currentHour < 20) {
+    return 'day';
+  } else {
+    return 'night';
+  }
 }
