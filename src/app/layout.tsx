@@ -5,16 +5,18 @@ import { Inter, Trade_Winds } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import { headers } from 'next/headers';
 import { Toaster } from 'sonner';
-import ResponsiveMediaProvider from '@/components/UI/Providers/ResponsiveMediaQueryProvider';
 import LoggedinProvider from '@/components/UI/Providers/LoggedinProvider';
 import dynamic from 'next/dynamic';
 
+// Dynamic Components
 const UserMainProfileStoreInitializer = dynamic(
   () => import('@/components/UI/Providers/UserMainProfileStoreInitializer'),
 );
-
-// Components Import
-import FaviconUpdater from '@/components/UI/general/Helpers/FaviconUpdater';
+const NextProgressProvider = dynamic(() => import('@/components/UI/Providers/ProgressProvider'));
+const ResponsiveMediaProvider = dynamic(
+  () => import('@/components/UI/Providers/ResponsiveMediaQueryProvider'),
+);
+const FaviconUpdater = dynamic(() => import('@/components/UI/general/Helpers/FaviconUpdater'));
 
 const nicoMoji = localFont({
   src: '../res/fonts/Nico-Moji.woff',
@@ -69,10 +71,12 @@ export default function RootLayout({
       >
         <FaviconUpdater />
         <Toaster richColors />
-        <ResponsiveMediaProvider>
-          <UserMainProfileStoreInitializer />
-          <LoggedinProvider>{children}</LoggedinProvider>
-        </ResponsiveMediaProvider>
+        <NextProgressProvider>
+          <ResponsiveMediaProvider>
+            <UserMainProfileStoreInitializer />
+            <LoggedinProvider>{children}</LoggedinProvider>
+          </ResponsiveMediaProvider>
+        </NextProgressProvider>
       </body>
     </html>
   );

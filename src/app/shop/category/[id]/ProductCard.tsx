@@ -22,7 +22,7 @@ export default function ProductCard({ product }: { product: CategoryProductDetai
           width={150}
           className='object-cover object-top aspect-[16/18] md:aspect-[16/13] !w-full'
           style={{
-            filter: isDayOrNight() === 'night' ? 'brightness(.8) contrast(.9)' : 'none',
+            filter: isDayOrNight() === 'night' ? 'brightness(.8)' : 'none',
           }}
           // sizes='(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'
         />
@@ -34,6 +34,7 @@ export default function ProductCard({ product }: { product: CategoryProductDetai
           <Button
             onClick={(e) => {
               e.preventDefault();
+              e.stopPropagation();
             }}
             name={`Add ${title} to cart`}
             className='px-3 py-1 bg-[#0085FF] font-ocr text-[0.95rem] font-[900] rounded-md

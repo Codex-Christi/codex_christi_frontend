@@ -36,16 +36,12 @@ const patchUser = async (formData: FormData) => {
   });
 
   try {
-    const response = await client.patch<UserPatchResponse>(
-      '/account/my-profile-update',
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${mainAccessToken}`,
-        },
-      }
-    );
+    const response = await client.patch<UserPatchResponse>('/account/my-profile-update', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Authorization: `Bearer ${mainAccessToken}`,
+      },
+    });
     return response.data;
   } catch (error: unknown) {
     throw error;
@@ -84,9 +80,7 @@ const EditProfileSubmitButton = () => {
       for (const key in submissionData.data) {
         formData.set(
           key,
-          submissionData.data[key as keyof typeof submissionData.data] as
-            | string
-            | Blob
+          submissionData.data[key as keyof typeof submissionData.data] as string | Blob,
         );
       }
       // Set the loading state
@@ -110,6 +104,7 @@ const EditProfileSubmitButton = () => {
 
             if (response && response.data) {
               setUserMainProfile(response.data);
+
               clearEditData();
             }
           })

@@ -189,8 +189,6 @@ export const getShippingPriceMerchizecatalog = cache(
       sum += cost;
     }
 
-    console.log('\nSum;', sum);
-
     const shippingNum = sum < 10 ? 10 : Math.ceil(sum);
     const fx = asFX(await getDollarMultiplier(country_iso3));
     const currency = fx.currency ?? 'USD';

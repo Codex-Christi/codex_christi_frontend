@@ -55,7 +55,7 @@ export default function PaginationControls({
         onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
         name='Go to Previous Page'
         className={`p-2 rounded ${
-          currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-100'
+          currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-900'
         }`}
         disabled={currentPage === 1}
         aria-disabled={currentPage === 1}
@@ -74,7 +74,7 @@ export default function PaginationControls({
             name={`Go to Page ${pageNum}`}
             key={pageNum}
             className={`px-3 py-1 rounded ${
-              currentPage === pageNum ? 'bg-black text-white' : 'hover:bg-gray-100'
+              currentPage === pageNum ? 'bg-black text-white' : 'hover:bg-gray-600'
             }`}
           >
             {pageNum}

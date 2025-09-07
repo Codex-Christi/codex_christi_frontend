@@ -55,17 +55,14 @@ export default function ProductList({
       const params = new URLSearchParams(window.location.search);
       const newPage = parseInt(params.get('page') || '1', 10);
       if (newPage !== page) {
+        setPage(newPage);
         startTransition(() => fetchProducts(newPage));
       }
     };
 
-    window.addEventListener('urlchange', handleUrlChange);
+    handleUrlChange();
 
-    const params = new URLSearchParams(window.location.search);
-    const urlPage = parseInt(params.get('page') || '1', 10);
-    if (urlPage !== page) {
-      startTransition(() => fetchProducts(urlPage));
-    }
+    window.addEventListener('urlchange', handleUrlChange);
 
     return () => {
       window.removeEventListener('urlchange', handleUrlChange);
@@ -106,7 +103,7 @@ export default function ProductList({
           name='Refresh Products Button'
           onClick={refreshProducts}
           disabled={isLoading}
-          className='px-4 py-2 bg-blue-500 text-white mx-auto rounded hover:bg-blue-600 disabled:opacity-50'
+          className='px-4 py-2 bg-[#0085FF] text-white mx-auto rounded hover:bg-blue-600 disabled:opacity-50'
         >
           {isLoading ? 'Refreshing...' : 'Refresh Products'}
         </Button>
