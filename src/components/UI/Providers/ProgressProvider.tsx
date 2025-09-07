@@ -7,7 +7,7 @@ const ProgressProvider = dynamic(
   { ssr: false },
 );
 
-const NextProgressProvider = ({ children }: { children: React.ReactNode }) => {
+const NextProgressProvider = ({ children }: { children?: React.ReactNode }) => {
   return (
     <ProgressProvider
       height='6px'
