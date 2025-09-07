@@ -4,19 +4,11 @@ import './globals.css';
 import { Inter, Trade_Winds } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import { headers } from 'next/headers';
-import { Toaster } from 'sonner';
-import LoggedinProvider from '@/components/UI/Providers/LoggedinProvider';
 import dynamic from 'next/dynamic';
 
 // Dynamic Components
-const UserMainProfileStoreInitializer = dynamic(
-  () => import('@/components/UI/Providers/UserMainProfileStoreInitializer'),
-);
-const NextProgressProvider = dynamic(() => import('@/components/UI/Providers/ProgressProvider'));
-const ResponsiveMediaProvider = dynamic(
-  () => import('@/components/UI/Providers/ResponsiveMediaQueryProvider'),
-);
-const FaviconUpdater = dynamic(() => import('@/components/UI/general/Helpers/FaviconUpdater'));
+
+const AllRootProviders = dynamic(() => import('@/components/UI/Providers/AllRootProviders'));
 
 const nicoMoji = localFont({
   src: '../res/fonts/Nico-Moji.woff',
@@ -69,14 +61,7 @@ export default function RootLayout({
           TradeWinds.variable,
         )}
       >
-        <FaviconUpdater />
-        <Toaster richColors />
-        <NextProgressProvider>
-          <ResponsiveMediaProvider>
-            <UserMainProfileStoreInitializer />
-            <LoggedinProvider>{children}</LoggedinProvider>
-          </ResponsiveMediaProvider>
-        </NextProgressProvider>
+        <AllRootProviders>{children}</AllRootProviders>
       </body>
     </html>
   );

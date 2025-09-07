@@ -1,27 +1,21 @@
-import React, { FC, SetStateAction } from 'react';
+import React, { FC } from 'react';
 import { Button } from '../../primitives/button';
 import { FaAngleRight } from 'react-icons/fa6';
 
 export const GalleryNextButton: FC<{
-  setCurrentItem: (value: SetStateAction<number>) => void;
-  imagesArr: string[];
-}> = ({ setCurrentItem, imagesArr }) => {
+  onClick?: () => void | undefined;
+  className?: string;
+}> = ({ onClick, className }) => {
   return (
     <Button
       name='gallery-next-button'
-      className='absolute top-[40%] right-2 text-black hover:scale-125 bg-transparent
-      hover:shadow-lg hover:shadow-gray-100 rounded-[50%] !py-6  px-1 hover:bg-gray-50'
+      className={`absolute top-[45%] right-2 !text-black hover:scale-125 bg-transparent
+      hover:shadow-lg hover:shadow-gray-100 rounded-[50%] !py-4 px-1 !bg-gray-50 hover:bg-white ${className ?? ''}`}
       type='button'
-      onClick={() => {
-        setCurrentItem((prevIndex) => {
-          if (prevIndex + 1 === imagesArr.length) return 0;
-
-          return prevIndex + 1;
-        });
-      }}
+      onClick={onClick}
       aria-label='Go to next image'
     >
-      <FaAngleRight className='size-10' />
+      <FaAngleRight className='size-8' />
     </Button>
   );
 };
