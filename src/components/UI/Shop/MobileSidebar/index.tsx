@@ -11,6 +11,7 @@ import {
 } from '@/components/UI/primitives/drawer';
 import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 import SubNav from '../ShopSubNav';
+import { useRouteChangeAware } from '@/lib/hooks/useRouteChangeAware';
 
 // Interfaces
 interface SideDrawerInterface {
@@ -19,22 +20,18 @@ interface SideDrawerInterface {
   openCloseController: Dispatch<SetStateAction<boolean>>;
 }
 
-const ShopMobileSideBar: FC<SideDrawerInterface> = ({
-  openState,
-  openCloseController,
-}) => {
+const ShopMobileSideBar: FC<SideDrawerInterface> = ({ openState, openCloseController }) => {
   // Hooks
   const { isDesktopOnly } = useResponsiveSSRValue();
+  useRouteChangeAware(() => {
+    openCloseController(false);
+  });
 
   // Main JSX
   return (
     <>
       {!isDesktopOnly && (
-        <Drawer
-          direction='left'
-          open={openState}
-          onOpenChange={openCloseController}
-        >
+        <Drawer direction='left' open={openState} onOpenChange={openCloseController}>
           <DrawerOverlay className={` bg-black/[0.01] !backdrop-blur-[2px]`}>
             <DrawerContent
               className={` !rounded-none h-full bg-[#131313] bg-opacity-95  !border-none
