@@ -8,12 +8,12 @@ import {
 } from '@/app/shop/product/[id]/productDetailsSSR';
 import dynamic from 'next/dynamic';
 const RadioButtonGroup = dynamic(() =>
-  import('./RadioButtonGroupWithText').then((mod) => mod.default)
+  import('./RadioButtonGroupWithText').then((mod) => mod.default),
 );
 import { useCurrentVariant } from './currentVariantStore';
 
 function isColorAttribute(
-  option: SizeAttribute | ColorAttribute | ProductAttribute | undefined
+  option: SizeAttribute | ColorAttribute | ProductAttribute | undefined,
 ): option is ColorAttribute {
   const attr = option?.attribute;
   return (
@@ -45,11 +45,8 @@ const ColorsSelector = () => {
       const uniqueColors = [
         ...new Map(
           arrayOfColors
-            .filter(
-              (obj): obj is { label: string; value: string; key: string } =>
-                obj !== null
-            )
-            .map((obj) => [`${obj.label}:${obj.value}`, obj])
+            .filter((obj): obj is { label: string; value: string; key: string } => obj !== null)
+            .map((obj) => [`${obj.label}:${obj.value}`, obj]),
         ).values(),
       ];
 
@@ -62,22 +59,17 @@ const ColorsSelector = () => {
   const onChangeColor = useCallback(
     (value: string | { name: string; value: string }) => {
       const colorValue = typeof value === 'string' ? value : value.value;
-      const matched = productVariants.find(
-        (variant) => variant.options[2]?.value === colorValue
-      );
+      const matched = productVariants.find((variant) => variant.options[2]?.value === colorValue);
 
       const colorOption = matched?.options[2];
 
       if (isColorAttribute(colorOption)) {
         setColor(colorOption);
       } else {
-        console.warn(
-          '[onChangeSize] colorOption not valid ColorAttribute:',
-          colorOption
-        );
+        console.warn('[onChangeSize] colorOption not valid ColorAttribute:', colorOption);
       }
     },
-    [productVariants, setColor]
+    [productVariants, setColor],
   );
 
   return (
@@ -87,10 +79,7 @@ const ColorsSelector = () => {
         <div className='space-y-1'>
           <h4 className='text-xl'>Colors:</h4>
 
-          <RadioButtonGroup
-            props={uniqueColorOptions}
-            onChange={onChangeColor}
-          />
+          <RadioButtonGroup props={uniqueColorOptions} onChange={onChangeColor} />
         </div>
       )}
     </>

@@ -295,7 +295,11 @@ export const ProductImageGallery: React.FC = () => {
   );
 
   return (
-    <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-2 lg:p-8 flex flex-col gap-8 items-start sm:gap-12 sm:flex-row lg:flex-col-reverse xl:flex-row'>
+    <div
+      className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-2 lg:p-8 flex flex-col gap-8 items-start
+     sm:gap-12 sm:flex-row lg:flex-col-reverse xl:flex-row'
+      id='mainGallery'
+    >
       {/* Thumbnails */}
       <ThumbsPanel
         images={images}
