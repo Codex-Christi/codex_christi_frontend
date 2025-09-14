@@ -6,14 +6,12 @@ import dynamic from 'next/dynamic';
 import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 
 const ProductImageGallery = dynamic(() =>
-  import('./ProductImageGallery').then((mod) => mod.ProductImageGallery)
+  import('./ProductImageGallery/index').then((mod) => mod.ProductImageGallery),
 );
 const ProductDescription = dynamic(() =>
-  import('./ProductDescription').then((mod) => mod.ProductDescription)
+  import('./ProductDescription').then((mod) => mod.ProductDescription),
 );
-const ProductTitleAndSizesEtc = dynamic(
-  () => import('./ProductTitleAndSizesEtc')
-);
+const ProductTitleAndSizesEtc = dynamic(() => import('./ProductTitleAndSizesEtc'));
 
 // Component
 const ProductSummary = () => {
@@ -74,8 +72,7 @@ const ProductSummary = () => {
             </svg>
 
             <p>
-              “Very comfortable, fits perfectly and I think it’s affordable for
-              the above price.”
+              “Very comfortable, fits perfectly and I think it’s affordable for the above price.”
             </p>
           </div>
 
@@ -104,9 +101,8 @@ const ProductSummary = () => {
             </svg>
 
             <p>
-              “This hoodie is stylish and comfy! I wear it almost every day. The
-              design is simple but trendy, and it goes well with everything.
-              Highly recommend!”
+              “This hoodie is stylish and comfy! I wear it almost every day. The design is simple
+              but trendy, and it goes well with everything. Highly recommend!”
             </p>
           </div>
 
@@ -135,9 +131,8 @@ const ProductSummary = () => {
             </svg>
 
             <p>
-              “I really like the quality of the hoodie, but it runs a bit small.
-              I would suggest ordering one size up if you prefer a looser fit.
-              Other than that, it’s great!”
+              “I really like the quality of the hoodie, but it runs a bit small. I would suggest
+              ordering one size up if you prefer a looser fit. Other than that, it’s great!”
             </p>
           </div>
         </div>

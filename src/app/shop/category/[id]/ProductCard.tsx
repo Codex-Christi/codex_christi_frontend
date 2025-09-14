@@ -11,7 +11,7 @@ export default function ProductCard({ product }: { product: CategoryProductDetai
       href={`/shop/product/${_id}`}
       className='relative bg-white/10 backdrop-blur-md rounded-xl py-8 pt-0 
         border-[2px] border-white/50 overflow-hidden mx-auto w-full max-w-[310px]
-        lg:max-w-[350px] hover:scale-[1.03]'
+        lg:max-w-[350px] hover:scale-[1.03] !select-none'
     >
       <div className='relative h-auto'>
         <Image

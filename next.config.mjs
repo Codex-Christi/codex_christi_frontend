@@ -13,31 +13,10 @@ const nextConfig = {
   serverExternalPackages: ['pdfkit'],
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'avatar.iran.liara.run',
-        port: '',
-        pathname: '/public/**',
-        search: '',
-      },
-      {
-        protocol: 'https',
-        hostname: 'purecatamphetamine.github.io',
-        pathname: '/country-flag-icons/3x2/**',
-        search: '',
-      },
-      {
-        protocol: 'https',
-        hostname: 'mainmedia.codexchristi.org',
-        pathname: '/**',
-        search: '',
-      },
-      {
-        protocol: 'https',
-        hostname: 'd2dytk4tvgwhb4.cloudfront.net',
-        pathname: '/**',
-        search: '',
-      },
+      new URL('https://avatar.iran.liara.run/public/**'),
+      new URL('https://d2dytk4tvgwhb4.cloudfront.net/**'),
+      new URL('https://mainmedia.codexchristi.org/**'),
+      new URL('https://purecatamphetamine.github.io/country-flag-icons/3x2/**'),
     ],
     qualities: [25, 50, 75, 100],
   },
