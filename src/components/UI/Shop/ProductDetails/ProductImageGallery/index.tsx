@@ -1,38 +1,33 @@
 'use client';
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import 'yet-another-react-lightbox/styles.css'; // REQUIRED for fullscreen overlay & z-index
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useProductDetailsContext } from '..';
 import { useCurrentVariant } from '../currentVariantStore';
-
-// shadcn/ui carousel (Embla)
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  type CarouselApi,
-} from '@/components/UI/primitives/carousel';
+import ThumbsPanel from './ThumbsPanel';
+import ActionButtons from './ActionButtons';
+import MainStage from './MainStage';
+import { type CarouselApi } from '@/components/UI/primitives/carousel';
 import { GalleryPrevButton } from '../GalleryPrevButton';
 import { GalleryNextButton } from '../GalleryNextButton';
 import { ControllerRef, Plugin } from 'yet-another-react-lightbox';
 import Zoom from 'yet-another-react-lightbox/plugins/zoom';
+import { useLightboxHistory } from './useLightBoxHistory';
+
+export type ImageListLoaderReturnType = ReturnType<typeof useImageListLoader>;
 
 // Dynamically import Lightbox to avoid SSR hydration issues
 const Lightbox = dynamic(() => import('yet-another-react-lightbox'), { ssr: false });
-const ActionButtons = dynamic(() => import('./ActionButtons').then((mod) => mod.default), {
-  ssr: false,
-});
 
 // ---- Helpers ----
-const prevent = {
+export const prevent = {
   onContextMenu: (e: React.SyntheticEvent) => e.preventDefault(),
   onDragStart: (e: React.SyntheticEvent) => e.preventDefault(),
 };
 
-// ===== Small modular pieces (kept local to this file) =====
-function LoadingOverlay({ show, onRetry }: { show: boolean; onRetry?: () => void }) {
+// Loading Overlay
+export function LoadingOverlay({ show, onRetry }: { show: boolean; onRetry?: () => void }) {
   if (!show) return null;
   return (
     <div className='absolute inset-0 z-10 grid place-items-center bg-black/30 backdrop-blur-sm'>
@@ -91,112 +86,6 @@ function useImageListLoader(urls: string[]) {
   } as const;
 }
 
-function ThumbsPanel({
-  images,
-  currentIndex,
-  onSelect,
-  metaTitle,
-  loader,
-}: {
-  images: string[];
-  currentIndex: number;
-  onSelect: (i: number) => void;
-  metaTitle?: string;
-  loader: ReturnType<typeof useImageListLoader>;
-}) {
-  return (
-    <div className='grid gap-4 grid-cols-5 order-2 sm:grid-cols-1 sm:order-1 lg:grid-cols-5 xl:grid-cols-1 xl:order-1'>
-      {images.map((image, index) => (
-        <button
-          key={index}
-          onClick={() => onSelect(index)}
-          className={`rounded-[15px] sm:rounded-[20px] size-14 sm:size-20 border-2 cursor-pointer ${index === currentIndex ? 'border-white' : 'border-transparent'}`}
-          aria-label={`Go to image ${index + 1}`}
-        >
-          <div className='relative h-full w-full'>
-            <Image
-              {...prevent}
-              alt={metaTitle || 'Product image'}
-              className='rounded-[20px] transition-all object-cover'
-              src={loader.srcWithRetry(image, index)}
-              width={80}
-              height={80}
-              quality={100}
-              onLoad={() => loader.markLoaded(index, image)}
-              onError={() => loader.markFailed(index)}
-            />
-            <LoadingOverlay
-              show={!loader.loaded[index] || loader.failed[index]}
-              onRetry={loader.failed[index] ? () => loader.retryOne(index) : undefined}
-            />
-          </div>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function MainStage({
-  images,
-  metaTitle,
-  setOpen,
-  api,
-  setApi,
-  loader,
-}: {
-  images: string[];
-  metaTitle?: string;
-  setOpen: (v: boolean) => void;
-  api: CarouselApi | null;
-  setApi: (api: CarouselApi) => void;
-  loader: ReturnType<typeof useImageListLoader>;
-}) {
-  return (
-    <div className='rounded-[20px] w-[95%] h-full relative'>
-      <Carousel
-        className='w-full'
-        opts={{ align: 'start', watchDrag: true, loop: true }}
-        setApi={setApi}
-      >
-        <CarouselContent>
-          {images.map((src, i) => (
-            <CarouselItem key={i} className='basis-full'>
-              <div
-                className='relative size-full aspect-[16/18] md:aspect-[16/13] rounded-[20px] overflow-hidden cursor-zoom-in'
-                onClick={() => setOpen(true)}
-              >
-                <Image
-                  {...prevent}
-                  priority={i === 0}
-                  className='size-full object-cover object-top'
-                  fill
-                  src={loader.srcWithRetry(src, i)}
-                  alt={metaTitle || 'Product image'}
-                  sizes='(max-width: 640px) 100vw, (max-width: 1280px) 70vw, 800px'
-                  quality={100}
-                  onLoad={() => loader.markLoaded(i, src)}
-                  onError={() => loader.markFailed(i)}
-                />
-                <LoadingOverlay
-                  show={!loader.loaded[i] || loader.failed[i]}
-                  onRetry={loader.failed[i] ? () => loader.retryOne(i) : undefined}
-                />
-              </div>
-            </CarouselItem>
-          ))}
-        </CarouselContent>
-        {images.length > 1 && (
-          <>
-            {/* Your custom Embla buttons */}
-            <GalleryPrevButton onClick={() => api?.scrollPrev()} />
-            <GalleryNextButton onClick={() => api?.scrollNext()} />
-          </>
-        )}
-      </Carousel>
-    </div>
-  );
-}
-
 // Build a responsive srcSet for each slide using your CloudFront URLs.
 // Assumes your CDN honors a `?w=` query to resize; adjust if your transformer differs.
 const RESPONSIVE_WIDTHS = [320, 640, 960, 1200, 1600, 2048, 2560, 3840] as const;
@@ -209,11 +98,15 @@ function buildSrcSet(src: string, naturalW?: number, naturalH?: number) {
   }));
 }
 
+// Main Product Image Gallery Component
 export const ProductImageGallery: React.FC = () => {
   const [currentItem, setCurrentItem] = useState(0);
   const [open, setOpen] = useState(false);
   const [api, setApi] = useState<CarouselApi | null>(null);
   const controllerRef = useRef<ControllerRef>(null);
+
+  // Custom History Hook for lightbox fullscrenn back navigation
+  useLightboxHistory(open, () => setOpen(false));
 
   const { matchingVariant, setMatchingVariant } = useCurrentVariant((s) => s);
   const productDetailsContext = useProductDetailsContext();
