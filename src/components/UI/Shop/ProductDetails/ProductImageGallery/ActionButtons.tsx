@@ -1,14 +1,62 @@
 'use client';
 
+import { Button } from '@/components/UI/primitives/button';
 import useAuthStore from '@/stores/authStore';
 import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useProductDetailsContext } from '..';
+import successToast from '@/lib/success-toast';
+import errorToast from '@/lib/error-toast';
 
 export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) => void }) {
   // Hooks
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const productDetailsContext = useProductDetailsContext();
+  const metadata = productDetailsContext.productMetaData;
+
+  // States
+  const [currentUrl, setCurrentUrl] = useState('');
+
+  // Vars
+  const shareData = useMemo(() => {
+    return {
+      title: `${metadata.title} | Codex CHristi Shop`,
+      text: `Check out this amazing merch from Codex Christi`,
+      url: currentUrl,
+    };
+  }, [currentUrl, metadata.title]);
+
+  // Funcs
+  const shareContent = useCallback(async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        successToast({ message: 'Content shared successfully!' });
+      } catch (error) {
+        console.error('Error sharing content:', error);
+        errorToast({ message: `Error sharing content: ${error}` });
+      }
+    } else {
+      errorToast({ message: 'Web Share API not supported in this browser.' });
+      // Provide a fallback, e.g., copy to clipboard
+      if (currentUrl && !(currentUrl.includes('localhost') || currentUrl.includes('192.168'))) {
+        await navigator.clipboard.writeText(shareData.url);
+        successToast({ message: 'URL copied to clipboard!' });
+      }
+    }
+  }, [currentUrl, shareData]);
+
+  // Effects
+  useEffect(() => {
+    // Access window.location only after the component mounts on the client-side
+    if (typeof window !== 'undefined') {
+      setCurrentUrl(window.location.href);
+    }
+  }, []);
 
   /* Action buttons (share / wishlist / inspect) */
   return (
+    // Fullscreen button
     <div className='grid gap-8'>
       <button aria-label='Open fullscreen' onClick={() => setOpen(true)}>
         <svg width='26' height='26' viewBox='0 0 26 26' fill='none'>
@@ -25,6 +73,7 @@ export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) =>
         </svg>
       </button>
 
+      {/* Favorite Button */}
       {isAuthenticated && (
         <Link href=''>
           <svg width='30' height='26' viewBox='0 0 30 26' fill='none'>
@@ -39,7 +88,13 @@ export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) =>
         </Link>
       )}
 
-      <Link href=''>
+      {/* Share button */}
+      <Button
+        onClick={shareContent}
+        name='Share Product button'
+        aria-label='Share this product'
+        className='p-0 bg-transparent'
+      >
         <svg width='22' height='26' viewBox='0 0 22 26' fill='none'>
           <path
             fillRule='evenodd'
@@ -78,7 +133,7 @@ export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) =>
           />
           <path d='M9.80273 15.4656L15.5117 20.2808' stroke='white' strokeWidth='2' />
         </svg>
-      </Link>
+      </Button>
     </div>
   );
 }
