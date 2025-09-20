@@ -1,3 +1,5 @@
+version: '3.9'
+
 services:
   app:
     build:
@@ -8,34 +10,38 @@ services:
     env_file:
       - .env.production
     volumes:
-      - 'app_build:/app/.next'
+      - app_build:/app/.next
     command: ['yarn', 'start']
     ports:
-      - 3000:3000
+      - '3000:3000'
     restart: always
     networks:
       - webserver-network
     depends_on:
       app_build:
-        condition: service_completed_successfully
+        condition: service_healthy
 
-  # The one-off container that builds the application
   app_build:
     build:
       context: .
       dockerfile: Dockerfile
-      target: production
+      target: builder
     container_name: codex-con-app-build
     env_file:
       - .env.production
     volumes:
-      - 'app_build:/app/.next'
+      - app_build:/app/.next
     command: ['yarn', 'build']
+    restart: 'no'
+    healthcheck:
+      test: ['CMD', 'sh', '-c', 'test -d /app/.next && test -f /app/.next/BUILD_ID']
+      interval: 5s
+      timeout: 2s
+      retries: 12
 
 volumes:
-  # The volume that is going to store the .next directory where the built
-  # application is located
   app_build: {}
+
 networks:
   webserver-network:
     external: true
