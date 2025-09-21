@@ -22,11 +22,11 @@ function getLastXElements<T>(arr: T[], x: number): T[] {
 // Main Component
 const AllCategoriesClientComponent = () => {
   const existingCategories = useMemo(
-    () => ['launch-merch', 't-shirts', 'hoodies', 'headwears'],
+    () => ['launch-merch', 't-shirts', 'hoodies', 'headwears', 'jackets'],
     [],
   );
   const categoriesGridRef = useRef<HTMLElement>(null);
-  const [numofGridChildren, setNumofGridChildren] = useState<number | null>(null);
+  const [numOfGridChildren, setNumOfGridChildren] = useState<number | null>(null);
 
   const existingCategoriesWithIconsandHrefs = subNavCategoriesWithIcons.filter((cat) =>
     existingCategories.includes(cat.textValue.toLowerCase()),
@@ -37,7 +37,7 @@ const AllCategoriesClientComponent = () => {
       categoriesGridRef!.current!.children ?? [],
     ) as HTMLAnchorElement[];
     const numofChildren = categoriesGridChildren?.length;
-    setNumofGridChildren(numofChildren);
+    setNumOfGridChildren(numofChildren);
 
     if (numofChildren && categoriesGridChildren && numofChildren > 3) {
       const remainder = numofChildren % 3;
@@ -57,7 +57,7 @@ const AllCategoriesClientComponent = () => {
 
       return () => clearTimeout(clearer);
     }
-  }, [setNumofGridChildren]);
+  }, [setNumOfGridChildren]);
 
   //   Main JSX
   return (
@@ -81,14 +81,14 @@ const AllCategoriesClientComponent = () => {
           SvgElem={BsRocket}
           textValue='Launch-merch'
           href='/launch-merch'
-          numofGridChildren={numofGridChildren}
+          numOfGridChildren={numOfGridChildren}
         />
 
         {/* Other Categories from NavObj */}
         {existingCategoriesWithIconsandHrefs.map(({ SvgElem, textValue, href }, index) => {
           return (
             <ShopLinkWithIcon
-              numofGridChildren={numofGridChildren}
+              numOfGridChildren={numOfGridChildren}
               key={textValue + index}
               SvgElem={SvgElem}
               href={href}
@@ -110,20 +110,20 @@ interface ShopLinkWithIconInterface {
     | ((props: React.SVGProps<SVGSVGElement>) => JSX.Element)
     | IconType;
   href: string;
-  numofGridChildren?: number | null;
+  numOfGridChildren?: number | null;
 }
 
 const ShopLinkWithIcon: FC<ShopLinkWithIconInterface> = ({
   textValue,
   href,
   SvgElem,
-  numofGridChildren,
+  numOfGridChildren,
 }) => {
   // Main JSX
   return (
     <CustomShopLink
       className={`${styles['category-grid-item']} flex flex-col gap-2 items-center justify-center mx-auto 
-             p-10 md:p-14 category-grid-item w-full ${numofGridChildren! > 3 ? 'border-b-[1px]' : ''} 
+             p-10 md:p-14 category-grid-item w-full ${numOfGridChildren! > 3 ? 'border-b-[1px]' : ''} 
              group hover:bg-black/50 hover:backdrop-blur-sm`}
       href={`/shop/category${href}`}
       tabIndex={0}

@@ -234,6 +234,12 @@ export const ProductImageGallery: React.FC = () => {
               style: { maxWidth: '100vw', maxHeight: '100vh', width: '100vw', height: 'auto' },
             },
           }}
+          styles={{
+            container: {
+              backgroundColor: 'rgba(0, 0, 0, 0.4)',
+              backdropFilter: 'blur(30px) contrast(0.95)',
+            },
+          }}
           // Keep your custom prev/next; Zoom buttons come from plugin CSS
           render={{
             buttonPrev: () => <GalleryPrevButton onClick={() => controllerRef?.current?.prev()} />,
