@@ -42,7 +42,6 @@ const getCategoryIDFromMerchize = async (categoryName: string) => {
       method: 'POST',
       body: new URLSearchParams({ name: `'${categoryName}'` }).toString().toLowerCase(),
       isFormBody: true,
-      daysToCache: 3,
     });
 
     const categoryID = res!.data!.collections[0]._id as string;
@@ -92,7 +91,7 @@ const fetchFromMerchizeWithNextCache = cache(
     url: string;
     body?: BodyInit | null | undefined;
     method?: string | undefined;
-    daysToCache: number;
+    daysToCache?: number;
     isFormBody?: boolean;
   }) => {
     // DEstrcuting params
@@ -106,7 +105,7 @@ const fetchFromMerchizeWithNextCache = cache(
           'X-API-KEY': `${merchizeAPIKey}`,
           'Content-Type': isFormBody ? 'application/x-www-form-urlencoded' : 'application/json',
         },
-        next: { revalidate: cacheForDays(daysToCache) || undefined },
+        next: { revalidate: daysToCache ? cacheForDays(daysToCache) : undefined },
 
         body: body,
       })
