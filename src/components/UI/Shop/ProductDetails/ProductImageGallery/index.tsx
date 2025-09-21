@@ -1,3 +1,4 @@
+// ProductImageGallery.tsx
 'use client';
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
@@ -41,6 +42,11 @@ export function LoadingOverlay({ show, onRetry }: { show: boolean; onRetry?: () 
       </div>
     </div>
   );
+}
+
+/** Lightweight CloudFront detector — exported so child components can decide to bypass Next optimizer */
+export function isCloudfrontUrl(u?: string) {
+  return !!u && u.includes('d2dytk4tvgwhb4.cloudfront.net');
 }
 
 function useImageListLoader(urls: string[]) {
@@ -138,7 +144,11 @@ export const ProductImageGallery: React.FC = () => {
       const img = new window.Image();
       img.onload = () =>
         setDims((d) => (d[i] ? d : { ...d, [i]: { w: img.naturalWidth, h: img.naturalHeight } }));
-      img.src = src;
+      // probe a reasonably large size so we get accurate natural dims without asking full 8k images
+      const probe = isCloudfrontUrl(src)
+        ? `${src}${src.includes('?') ? '&' : '?'}w=1600&q=80`
+        : src;
+      img.src = probe;
     });
   }, [images]);
 
@@ -250,3 +260,5 @@ export const ProductImageGallery: React.FC = () => {
     </div>
   );
 };
+
+export default ProductImageGallery;
