@@ -9,8 +9,6 @@ services:
     container_name: codex-con-app-start
     env_file:
       - .env.production
-    volumes:
-      - app_build:/app/.next
     command: ['yarn', 'start']
     ports:
       - '3000:3000'
@@ -21,26 +19,7 @@ services:
       app_build:
         condition: service_healthy
 
-  app_build:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: builder
-    container_name: codex-con-app-build
-    env_file:
-      - .env.production
-    volumes:
-      - app_build:/app/.next
-    command: ['yarn', 'build']
-    restart: 'no'
-    healthcheck:
-      test: ['CMD', 'sh', '-c', 'test -d /app/.next && test -f /app/.next/BUILD_ID']
-      interval: 5s
-      timeout: 2s
-      retries: 12
-
-volumes:
-  app_build: {}
+volumes: {}
 
 networks:
   webserver-network:
