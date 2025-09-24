@@ -42,6 +42,7 @@ const getCategoryIDFromMerchize = async (categoryName: string) => {
       method: 'POST',
       body: new URLSearchParams({ name: `'${categoryName}'` }).toString().toLowerCase(),
       isFormBody: true,
+      daysToCache: 0.3,
     });
 
     const categoryID = res!.data!.collections[0]._id as string;

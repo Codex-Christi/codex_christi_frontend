@@ -1,28 +1,27 @@
 import { cache } from 'react';
 import { CompletedTxInterface } from '../paypal/processCompletedTx';
+import { OrderResponseBody } from '@paypal/paypal-js';
 
 // Derive types from CompletedTxInterface to keep DRY (DeepSeek's improvement)
-type ResponseData = {
+interface ResponseData extends Omit<OrderResponseBody, 'payer'> {
   message: string;
   timestamp: string;
   capturedOrderPaypalID: CompletedTxInterface['capturedOrder']['id'];
   custom_id: string;
   amountReceived: string | null;
-  payer: {
-    payerEmail: string | undefined;
-    payerName: string;
-  } | null;
+
   orderReceipient: {
     name: string | undefined;
     recepientEmail: string | null;
   };
-  delivery_address: CompletedTxInterface['delivery_address'];
+  paypal_profile_delivery_address: CompletedTxInterface['delivery_address'] | null | undefined;
   userId: CompletedTxInterface['userId'] | null;
-};
+  paypalAuthorizationData: CompletedTxInterface['authData'];
+}
 
 export interface BackendResponse {
   status: number;
-  serverData: ResponseData;
+  paymentJSONData: ResponseData;
 }
 
 export const postOrderTOBackend = cache(
@@ -76,13 +75,14 @@ export const postOrderTOBackend = cache(
             name: recepientName?.full_name,
             recepientEmail: recepientEmail!,
           },
-          delivery_address,
+          paypal_profile_delivery_address: delivery_address,
           userId: userId ?? null,
+          paypalAuthorizationData: authData,
         };
 
         resolve({
           status: 200,
-          serverData: responseData,
+          paymentJSONData: responseData,
         });
       }, 500);
     });

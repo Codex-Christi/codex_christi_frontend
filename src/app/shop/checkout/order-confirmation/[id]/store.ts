@@ -5,9 +5,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 interface OrderConfirmationStoreInterface
-  extends Omit<SuccessResponse, 'success' | 'status' | 'serverData'> {
+  extends Omit<SuccessResponse, 'success' | 'status' | 'paymentJSONData'> {
   setPaymentConfirmation: (data: SuccessResponse) => void;
-  serverData: SuccessResponse['serverData'] | undefined;
+  paymentJSONData: SuccessResponse['paymentJSONData'] | undefined;
 }
 
 export const useOrderConfirmationStore = create<OrderConfirmationStoreInterface>()(
@@ -16,7 +16,7 @@ export const useOrderConfirmationStore = create<OrderConfirmationStoreInterface>
       pdfLink: '',
       authData: undefined,
       capturedOrder: undefined,
-      serverData: undefined,
+      paymentJSONData: undefined,
       fileName: '',
 
       setPaymentConfirmation: (data) => {
