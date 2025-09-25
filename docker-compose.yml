@@ -10,7 +10,7 @@ services:
     env_file:
       - .env.production
     volumes:
-      - 'app_build:/app/.next'
+      - 'app_build:/app/.next' # app consumes the volume at /app/.next
     command: ['yarn', 'start']
     ports:
       - '3000:3000'
@@ -21,20 +21,28 @@ services:
       app_build:
         condition: service_healthy
 
+  # Build stage container that copies the already-built .next from the image
+  # into the named volume. No second "yarn build" anymore.
   app_build:
     build:
       context: .
       dockerfile: Dockerfile
-      target: builder # ✅ ensures build tools exist
+      target: builder # <-- use the builder stage (has /app/.next baked in)
     container_name: codex-con-app-build
     env_file:
       - .env.production
     volumes:
-      - 'app_build:/app/.next'
-    command: ['yarn', 'build']
+      - 'app_build:/cache' # mount the volume at /cache so we don't hide /app/.next
+    # copy prebuilt .next from the image to the volume, then exit
+    command:
+      [
+        'sh',
+        '-c',
+        'set -eu; rm -rf /cache/*; cp -a /app/.next/. /cache/; test -f /cache/BUILD_ID && echo "Copied .next to volume"',
+      ]
     restart: 'no'
     healthcheck:
-      test: ['CMD', 'sh', '-c', 'test -d /app/.next && test -f /app/.next/BUILD_ID']
+      test: ['CMD', 'sh', '-c', 'test -f /cache/BUILD_ID']
       interval: 5s
       timeout: 2s
       retries: 12
