@@ -3,39 +3,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: production
-    container_name: codex-con-app-start
+      target: runner # Use the 'runner' stage from the optimized Dockerfile
+    container_name: codex-con-app
     env_file:
       - .env.production
-    volumes:
-      - 'app_build:/app/.next'
-    command: ['yarn', 'start']
+    # No need for the app_build volume anymore
+    command: ['node', 'server.js'] # Run the standalone server.js
     ports:
       - 3000:3000
     restart: always
     networks:
       - webserver-network
-    depends_on:
-      app_build:
-        condition: service_completed_successfully
 
-  # The one-off container that builds the application
-  app_build:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
-    container_name: codex-con-app-build
-    env_file:
-      - .env.production
-    volumes:
-      - 'app_build:/app/.next'
-    command: ['yarn', 'build']
-
-volumes:
-  # The volume that is going to store the .next directory where the built
-  # application is located
-  app_build: {}
 networks:
   webserver-network:
     external: true
