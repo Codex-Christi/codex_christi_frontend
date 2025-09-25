@@ -1,69 +1,45 @@
-# Stage 1: Dependency installation
-# Use a slimmed-down base image for dependencies
-FROM node:lts-bookworm-slim AS deps
+# syntax=docker/dockerfile:1.4
+###############################################################################
+# Multi-stage Dockerfile (base -> deps -> builder -> production)
+###############################################################################
 
-# Enable Corepack for Yarn
+FROM node:lts-bookworm-slim AS base
+WORKDIR /app
 RUN corepack enable
 
-# Set the working directory
+# Install deps once
+FROM base AS deps
 WORKDIR /app
-
-# Copy only the necessary package files to leverage Docker's layer caching
 COPY package.json yarn.lock .yarnrc.yml ./
+RUN --mount=type=cache,target=/root/.cache/yarn \
+    yarn install --immutable --inline-builds
 
-# Run the installation, leveraging caching and combining commands for a single layer
-RUN yarn install --immutable --inline-builds --cache-folder=/tmp/yarn-cache && \
-    rm -rf /tmp/yarn-cache
-
-# Stage 2: Build the application
-# Use the same base image
-FROM node:lts-bookworm-slim AS builder
-
-# Enable Corepack for Yarn
-RUN corepack enable
-
-# Set the working directory
+# Build application
+FROM deps AS builder
 WORKDIR /app
-
-# Copy package files from the deps stage
-COPY --from=deps /app/package.json /app/yarn.lock /app/.yarnrc.yml ./
-
-# Copy installed node_modules from the deps stage
-COPY --from=deps /app/node_modules ./node_modules/
-
-# Copy the rest of the application files
 COPY . .
+# use cache here too for faster repeated builds
+RUN --mount=type=cache,target=/root/.cache/yarn \
+    yarn build
 
-# Run the Next.js build
-# Ensure your next.config.js has `output: 'standalone'`
-RUN yarn build
-
-# Stage 3: Production runtime
-# Use a minimal base image, since standalone mode includes a minimal Node.js server
-FROM node:lts-bookworm-slim AS runner
-
-# Create a group and non-root user
-RUN groupadd --gid 1001 "nodejs"
-RUN useradd --uid 1001 --create-home --shell /bin/bash --groups "nodejs" "nextjs"
-
-# Set the working directory to the standalone output folder
+# Final production image
+FROM node:lts-bookworm-slim AS production
 WORKDIR /app
 
-# Copy necessary files from the builder stage
-# This includes the standalone server and static assets
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+RUN groupadd --gid 1001 nodejs \
+ && useradd --uid 1001 --create-home --shell /bin/bash --gid 1001 nextjs
 
-# Set environment variables for production
+# copy runtime files only
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules /app/node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/.next /app/.next
+COPY --from=builder --chown=nextjs:nodejs /app/public /app/public
+COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/yarn.lock ./
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 
 EXPOSE 3000
-
-# Change to the non-root user
 USER nextjs:nodejs
 
-# Start the application using the standalone server
-CMD ["node", "server.js"]
+CMD ["yarn", "start"]
