@@ -18,8 +18,8 @@ const OrderConfirmation = ({ params }: PageProps) => {
   const { id: capturedOrderID } = use(params);
 
   // Hooks
-  const { pdfLink, serverData, fileName } = useOrderConfirmationStore((state) => state);
-  const { capturedOrderPaypalID } = serverData || {};
+  const { pdfLink, paymentJSONData, fileName } = useOrderConfirmationStore((state) => state);
+  const { capturedOrderPaypalID } = paymentJSONData || {};
   const clearCart = useCartStore((store) => store.clearCart);
   const clearCheckoutStore = useShopCheckoutStore((store) => store.clearCheckout);
   useRouteChangeAware(() => {
