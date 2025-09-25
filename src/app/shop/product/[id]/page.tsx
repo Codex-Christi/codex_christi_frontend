@@ -4,7 +4,7 @@ import ProductDetailsClientComponent from '@/components/UI/Shop/ProductDetails';
 import { Metadata } from 'next';
 import { getProductDetailsSSR } from './productDetailsSSR';
 import { notFound } from 'next/navigation';
-// import { useProductDetailsStore } from './detailsStore';
+import serialize from 'serialize-javascript';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -29,7 +29,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         title: title,
         description: description,
         images: [{ url: firstImageUrl }],
-        type: 'website',
         url: `https://codexchristi.shop/product/${id}`,
         locale: 'en_US',
         siteName: 'Codex Christi Shop',
@@ -39,6 +38,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         title: title,
         description: description,
         images: firstImageUrl,
+      },
+      other: {
+        'og:type': 'product', // Manually add the custom og:type
+        'og:product:price:amount': productMetaData.retail_price.toString(),
+        'og:product:price:currency': 'USD',
+        // Add other product-specific tags as needed
       },
     };
   } catch {
@@ -61,8 +66,32 @@ const ProductDetails = async ({ params }: PageProps) => {
       return notFound(); // or handle the error as needed
     });
 
+  const {
+    productMetaData: { description, title },
+    productVariants,
+  } = productData;
+  const LDImageURL = productVariants[0].image_uris[0];
+  const trimmedDescription = description.split('.')[0].replace(/<[^>]*>/g, '');
+
+  const JSON_LD_Data = serialize({
+    '@context': 'https://schema.org/',
+    '@type': 'Product',
+    name: title,
+    image: LDImageURL,
+    description: trimmedDescription,
+    brand: {
+      '@type': 'Brand',
+      name: 'Codex Christi',
+    },
+  });
+
   // Main JSX
-  return <ProductDetailsClientComponent fetchedProductData={productData} />;
+  return (
+    <>
+      <ProductDetailsClientComponent fetchedProductData={productData} />;
+      <script type='application/ld+json'>{JSON_LD_Data}</script>
+    </>
+  );
 };
 
 export default ProductDetails;
