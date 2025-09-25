@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="/home/deploy/apps/codexchristi"   # change if path differs
+APP_DIR="/root/apps/codexchristi"   # change if path differs
 COMPOSE_FILE="$APP_DIR/docker-compose.yml"
 BUILDER_NAME="codex-builder-codexchristi"
 CACHE_DIR="/var/lib/buildx-cache/codexchristi"
