@@ -6,7 +6,6 @@ import { Button } from '@/components/UI/primitives/button';
 
 export default function ProductCard({ product }: { product: CategoryProductDetail }) {
   const { title, _id } = product;
-  console.log(product.image);
 
   return (
     <CustomShopLink

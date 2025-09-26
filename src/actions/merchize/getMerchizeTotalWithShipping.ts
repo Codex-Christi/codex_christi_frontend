@@ -73,10 +73,11 @@ export const getMerchizeTotalWIthShipping = cache(
 
     const shippingPriceObj = await getShippingPriceMerchizecatalog(catalogRows, country_iso3, opts);
 
-    const variantsAndParents = cart.map(({ itemDetail, variantId }) => ({
-      variantId,
-      parentProductID: itemDetail?.product,
-    }));
+    const variantsAndParents = cart.flatMap(({ itemDetail, variantId, quantity }) =>
+      Array.from({ length: quantity }, () => {
+        return { variantId, parentProductID: itemDetail?.product };
+      }),
+    );
 
     const realTimePriceTotal = await realTimePriceFromMerchize(variantsAndParents, country_iso3);
 
@@ -131,9 +132,12 @@ export const getShippingPriceMerchizecatalog = cache(
     const normalized = await loadNormalizedRows();
     const extrasBySku = new Map(normalized.map((r) => [r.sku, r.extras ?? {}]));
 
+    const sumOfSKUS = Array.from(counts.entries()).reduce((acc, [, qty]) => acc + qty, 0);
+
     let sum = 0;
     for (const [sku, qty] of counts) {
       const row = bySku.get(sku);
+
       if (!row) {
         throw new Error(
           `Shipping bands missing for resolved SKU "${sku}". This indicates a mapping error.`,
@@ -189,7 +193,7 @@ export const getShippingPriceMerchizecatalog = cache(
       sum += cost;
     }
 
-    const shippingNum = sum < 10 ? 10 : Math.ceil(sum);
+    const shippingNum = sum < 10 ? 5 * sumOfSKUS : Math.ceil(sum);
     const fx = asFX(await getDollarMultiplier(country_iso3));
     const currency = fx.currency ?? 'USD';
     const currency_symbol = fx.currency_symbol ?? symbolFromCurrency(currency);
