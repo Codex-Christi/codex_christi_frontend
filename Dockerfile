@@ -13,8 +13,8 @@ RUN --mount=type=cache,target=/root/.cache/yarn \
 FROM deps AS builder
 WORKDIR /app
 COPY . .
-# give Next build some heap; remove or raise if you upgraded RAM
-ENV NODE_OPTIONS="--max-old-space-size=2048"
+# More heap for Next build (3 GB) to prevent OOM on small VPS
+ENV NODE_OPTIONS="--max-old-space-size=3072"
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN --mount=type=cache,target=/root/.cache/yarn \
     yarn build

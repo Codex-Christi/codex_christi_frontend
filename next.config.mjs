@@ -6,6 +6,7 @@
 const nextConfig = {
   /* config options here */
   // output: 'standalone',
+  productionBrowserSourceMaps: false,
   compiler: {
     // Uncomment if you want to remove logs from production server
     // removeConsole: process.env.NODE_ENV === 'production',
