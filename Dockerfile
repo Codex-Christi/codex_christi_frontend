@@ -12,6 +12,8 @@ RUN --mount=type=cache,target=/root/.cache/yarn \
 
 FROM deps AS builder
 WORKDIR /app
+# ⬇️ Make sure the env file is available to `next build`
+COPY .env.production ./
 COPY . .
 # More heap for Next build (3 GB) to prevent OOM on small VPS
 ENV NODE_OPTIONS="--max-old-space-size=3072"
