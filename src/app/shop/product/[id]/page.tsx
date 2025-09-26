@@ -67,7 +67,7 @@ const ProductDetails = async ({ params }: PageProps) => {
     });
 
   const {
-    productMetaData: { description, title },
+    productMetaData: { description, title, retail_price },
     productVariants,
   } = productData;
   const LDImageURL = productVariants[0].image_uris[0];
@@ -82,6 +82,15 @@ const ProductDetails = async ({ params }: PageProps) => {
     brand: {
       '@type': 'Brand',
       name: 'Codex Christi',
+    },
+    offers: {
+      '@type': 'Offer',
+      price: retail_price,
+      priceCurrency: 'USD',
+      availability: 'https://schema.org/InStock',
+      itemCondition: 'https://schema.org/NewCondition',
+      // Optional but nice-to-have:
+      // priceValidUntil: '2026-12-31',
     },
   });
 

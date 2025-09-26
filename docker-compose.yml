@@ -31,7 +31,11 @@ services:
     volumes:
       - app_build:/cache # mount the volume at /cache so we don't shadow /app/.next
     command:
-      ['sh', '-c', 'set -eu; rm -rf /cache/*; cp -a /app/.next/. /cache/; test -f /cache/BUILD_ID']
+      [
+        'sh',
+        '-c',
+        'set -eu; rm -rf /cache/*; cp -a /app/.next/. /cache/; chown -R 1001:1001 /cache; test -f /cache/BUILD_ID',
+      ]
     restart: 'no'
     # healthcheck removed; we rely on exit code for depends_on: service_completed_successfully
 
