@@ -31,7 +31,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next /app/.next
 COPY --from=builder --chown=nextjs:nodejs /app/public /app/public
 COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/yarn.lock ./
 # 3) CRITICAL: copy next.config.* so image config applies at runtime
-COPY --from=builder /app/next.config.* ./    
+COPY --from=builder /app/next.config.* ./
+# Runtime-read datasets / resources
+COPY --from=builder --chown=nextjs:nodejs /app/src/datasets /app/src/datasets
+# If you read files from src/res at runtime (templates/locales/etc.), include it too:
+# COPY --from=builder --chown=nextjs:nodejs /app/src/res /app/src/res    
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

@@ -59,6 +59,7 @@ echo "Starting services…"
 docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
 
 # Light cleanup of dangling images older than 24h
-docker image prune --force --filter "until=24h" >/dev/null 2>&1 || true
+# docker image prune --force --filter "until=24h" >/dev/null 2>&1 || true
+docker system prune --force
 
 echo "== deploy finished $(date -u +%FT%TZ) =="
