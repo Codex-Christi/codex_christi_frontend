@@ -35,8 +35,8 @@ yarn-debug.log*
 yarn-error.log*
 
 # Env files (all excluded for safety)
-.env*
-!.env.example
+# .env*
+# !.env.example
 
 # Vercel
 .vercel
