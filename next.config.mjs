@@ -19,7 +19,7 @@ const nextConfig = {
       new URL('https://mainmedia.codexchristi.org/**'),
       new URL('https://purecatamphetamine.github.io/country-flag-icons/3x2/**'),
     ],
-    qualities: [25, 50, 75, 100],
+    qualities: [25, 50, 75, 80, 90, 100],
   },
   async rewrites() {
     return [

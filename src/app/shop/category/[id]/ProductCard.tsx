@@ -6,6 +6,8 @@ import { Button } from '@/components/UI/primitives/button';
 
 export default function ProductCard({ product }: { product: CategoryProductDetail }) {
   const { title, _id } = product;
+  console.log(product.image);
+
   return (
     <CustomShopLink
       href={`/shop/product/${_id}`}
@@ -22,7 +24,7 @@ export default function ProductCard({ product }: { product: CategoryProductDetai
           width={150}
           className='object-cover object-top aspect-[16/18] md:aspect-[16/13] !w-full'
           style={{
-            filter: isDayOrNight() === 'night' ? 'brightness(.8)' : 'none',
+            filter: isDayOrNight() === 'night' ? 'brightness(.9)' : 'none',
           }}
           // sizes='(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'
         />

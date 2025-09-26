@@ -30,6 +30,8 @@ COPY --from=deps --chown=nextjs:nodejs /app/node_modules /app/node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/.next /app/.next
 COPY --from=builder --chown=nextjs:nodejs /app/public /app/public
 COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/yarn.lock ./
+# 3) CRITICAL: copy next.config.* so image config applies at runtime
+COPY --from=builder /app/next.config.* ./    
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
