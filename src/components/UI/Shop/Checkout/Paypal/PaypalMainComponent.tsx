@@ -87,10 +87,6 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
     // prevCountry.current = country_iso2;
   }, [country_iso2, currency, dispatch, payPalSupportsCurrency]);
 
-  useEffect(() => {
-    console.log(`clientId:`, process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!);
-  }, []);
-
   // Create order async function
   const createOrder = useCallback(async (): Promise<string> => {
     try {

@@ -9,20 +9,9 @@ import {
 import { FC, useCallback, useMemo } from 'react';
 import { useCurrentVariant } from './currentVariantStore';
 
-const sizeFormatArr = [
-  'xs',
-  's',
-  'm',
-  'l',
-  'xl',
-  '2xl',
-  '3xl',
-  '4xl',
-  '5xl',
-  '6xl',
-];
+const sizeFormatArr = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl'];
 function isSizeAttribute(
-  option: SizeAttribute | ColorAttribute | ProductAttribute | undefined
+  option: SizeAttribute | ColorAttribute | ProductAttribute | undefined,
 ): option is SizeAttribute {
   const attr = option?.attribute;
 
@@ -47,15 +36,12 @@ const SizeSelector: FC = () => {
   // Handler for size change
   const onChangeSize = useCallback(
     (value: string | { name: string; value: string }) => {
-      const sizeValue =
-        typeof value === 'string'
-          ? value.toLowerCase()
-          : value.value.toLowerCase();
+      const sizeValue = typeof value === 'string' ? value.toLowerCase() : value.value.toLowerCase();
 
       const index = productHasColorAndSize ? 1 : 0;
 
       const matched = productVariants.find(
-        (variant) => variant.options[index]?.value.toLowerCase() === sizeValue
+        (variant) => variant.options[index]?.value.toLowerCase() === sizeValue,
       );
 
       const sizeOption = matched?.options[index];
@@ -63,20 +49,15 @@ const SizeSelector: FC = () => {
       if (isSizeAttribute(sizeOption)) {
         setSize(sizeOption, matched!);
       } else {
-        console.warn(
-          '[onChangeSize] sizeOption not valid SizeAttribute:',
-          sizeOption
-        );
+        console.warn('[onChangeSize] sizeOption not valid SizeAttribute:', sizeOption);
       }
     },
-    [productHasColorAndSize, productVariants, setSize]
+    [productHasColorAndSize, productVariants, setSize],
   );
 
   // Variables
   const sizesArr = productVariants.map((variant) => {
-    const sizeOption = productHasColorAndSize
-      ? variant.options[1]
-      : variant.options[0];
+    const sizeOption = productHasColorAndSize ? variant.options[1] : variant.options[0];
 
     return sizeOption?.value.toUpperCase();
   });
@@ -89,16 +70,16 @@ const SizeSelector: FC = () => {
             ? sizesArr.sort(
                 (a, b) =>
                   sizeFormatArr.indexOf((a ?? '').toLowerCase()) -
-                  sizeFormatArr.indexOf((b ?? '').toLocaleLowerCase())
+                  sizeFormatArr.indexOf((b ?? '').toLocaleLowerCase()),
               )
-            : sizesArr
-        )
+            : sizesArr,
+        ),
       ).map((size) => ({
         value: size,
         label: size,
         key: `size-${(size ?? '').toLowerCase()}`,
       })),
-    [productHasColorAndSize, sizesArr]
+    [productHasColorAndSize, sizesArr],
   );
 
   // JSX

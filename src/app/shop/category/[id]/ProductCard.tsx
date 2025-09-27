@@ -1,60 +1,64 @@
 // app/category/[id]/ProductCard.tsx
+'use client';
+
 import Image from 'next/image';
-import { CategoryProductDetail } from './categoryDetailsSSR';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
-import { Button } from '@/components/UI/primitives/button';
+import SizeAndColorSelectorPopover from '@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/SizeAndColorSelectorPopover';
+import type { CategoryProductDetail } from './categoryDetailsSSR';
 
 export default function ProductCard({ product }: { product: CategoryProductDetail }) {
   const { title, _id } = product;
 
   return (
-    <CustomShopLink
-      href={`/shop/product/${_id}`}
+    <div
       className='relative bg-white/10 backdrop-blur-md rounded-xl py-8 pt-0 
-        border-[2px] border-white/50 overflow-hidden mx-auto w-full max-w-[310px]
-        lg:max-w-[350px] hover:scale-[1.03] !select-none'
+                 border-[2px] border-white/50 overflow-hidden mx-auto w-full max-w-[310px]
+                 lg:max-w-[350px] hover:scale-[1.03] !select-none'
     >
-      <div className='relative h-auto'>
-        <Image
-          src={product.image}
-          alt={product.title}
-          // fill
-          height={300}
-          width={150}
-          className='object-cover object-top aspect-[16/18] md:aspect-[16/13] !w-full'
-          style={{
-            filter: isDayOrNight() === 'night' ? 'brightness(.9)' : 'none',
-          }}
-          // sizes='(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw'
-        />
-      </div>
-      <div className='pt-4 px-4 flex flex-col gap-2'>
-        <h3 className='font-semibold text-lg mb-1'>{product.title}</h3>
-        <div className='flex justify-between items-center'>
-          <span className='font-bold'>${Number(product.retail_price).toFixed(2)}</span>
-          <Button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            name={`Add ${title} to cart`}
-            className='px-3 py-1 bg-[#0085FF] font-ocr text-[0.95rem] font-[900] rounded-md
-             hover:bg-gray-500 transition-colors hover:scale-110'
-          >
-            Add to Cart
-          </Button>
+      {/* 1) The stretched link overlay that makes the WHOLE card clickable */}
+      <CustomShopLink
+        href={`/shop/product/${_id}`}
+        aria-label={`${title} details`}
+        className='absolute inset-0 z-10'
+      />
+
+      {/* 2) Card content (sits visually above background but *under* the link overlay by default) */}
+      <div className='relative'>
+        <div className='relative h-auto'>
+          <Image
+            src={product.image}
+            alt={product.title}
+            height={300}
+            width={150}
+            className='object-cover object-top aspect-[16/18] md:aspect-[16/13] !w-full'
+            style={{ filter: isDayOrNight() === 'night' ? 'brightness(.9)' : 'none' }}
+          />
+        </div>
+
+        <div className='pt-4 px-4 flex flex-col gap-2'>
+          <h3 className='font-semibold text-lg mb-1'>{product.title}</h3>
+          <div className='flex justify-between items-center'>
+            <span className='font-bold'>${Number(product.retail_price).toFixed(2)}</span>
+
+            {/* 3) Raise the Popover trigger ABOVE the stretched link (so it’s clickable) */}
+            <div className='relative z-20'>
+              <SizeAndColorSelectorPopover
+                buttonProps={{
+                  type: 'button',
+                  name: `Add ${product.title} to cart`,
+                  className: `px-3 py-1 bg-[#0085FF] font-ocr text-[0.95rem] font-[900] rounded-md hover:bg-gray-500 
+                    transition-colors hover:scale-110`,
+                }}
+              />
+            </div>
+          </div>
         </div>
       </div>
-    </CustomShopLink>
+    </div>
   );
 }
 
 function isDayOrNight() {
-  const currentHour = new Date().getHours(); // Get the current hour (0-23)
-  // Define a range for "day" hours. For instance, 6 AM to 8 PM.
-  if (currentHour >= 6 && currentHour < 20) {
-    return 'day';
-  } else {
-    return 'night';
-  }
+  const h = new Date().getHours();
+  return h >= 6 && h < 20 ? 'day' : 'night';
 }
