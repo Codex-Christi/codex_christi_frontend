@@ -126,8 +126,6 @@ function hex_is_light(color: string) {
 
 const scrollToSection = (id: string) => {
   const element = document.getElementById(id);
-  console.log(element);
-
   if (element && typeof window !== 'undefined') {
     element.scrollIntoView({ behavior: 'smooth' }); // 'smooth' for animated scroll
   }

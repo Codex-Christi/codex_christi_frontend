@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo } from 'react';
-import { useProductDetailsContext } from '.';
+import React, { FC, useCallback, useMemo, use } from 'react';
+import { OptionalProductVariantProps, ProductDetailsContext } from '.';
 import {
   ColorAttribute,
   hasColorAndSize,
@@ -25,17 +25,25 @@ function isColorAttribute(
 }
 
 // Main Component for Colors Selector
-const ColorsSelector = () => {
+const ColorsSelector: FC<OptionalProductVariantProps> = ({ variants }) => {
   // Hooks
-  const { productVariants } = useProductDetailsContext();
-  const productHasColorAndSize = hasColorAndSize(productVariants[0].options);
   const { setColor } = useCurrentVariant();
 
   //   Variables
+  let productDetailsContext;
+
+  if (!variants) {
+    productDetailsContext = use(ProductDetailsContext);
+  }
+
+  const productVariants = variants ?? productDetailsContext!.productVariants;
+
+  const productHasColorAndSize = hasColorAndSize(productVariants[0]!.options);
+
   const uniqueColorOptions = useMemo(() => {
     if (productHasColorAndSize) {
       const arrayOfColors = productVariants.map((variant) => {
-        const attr = variant.options[2];
+        const attr = variant!.options[2];
         if (attr) {
           return { label: attr.name, value: attr.value, key: attr.slug };
         }
@@ -59,7 +67,7 @@ const ColorsSelector = () => {
   const onChangeColor = useCallback(
     (value: string | { name: string; value: string }) => {
       const colorValue = typeof value === 'string' ? value : value.value;
-      const matched = productVariants.find((variant) => variant.options[2]?.value === colorValue);
+      const matched = productVariants.find((variant) => variant!.options[2]!.value === colorValue);
 
       const colorOption = matched?.options[2];
 

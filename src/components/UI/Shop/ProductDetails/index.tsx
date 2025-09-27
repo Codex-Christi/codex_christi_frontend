@@ -4,17 +4,21 @@ import dynamic from 'next/dynamic';
 const ProductSummary = dynamic(() => import('./ProductSummary'));
 const ProductTitleAndSizesEtc = dynamic(() => import('./ProductTitleAndSizesEtc'));
 import Link from 'next/link';
-import { createContext, useContext, FC, useMemo, useEffect } from 'react';
-import { setupVariantAutoMatching } from './currentVariantStore';
+import { createContext, useContext, FC, useMemo } from 'react';
 import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 
-interface ProductDetailsProps {
+export interface ProductDetailsProps {
   // Define any props if needed
   fetchedProductData: ProductResult;
 }
 
+export interface OptionalProductVariantProps {
+  variants: Partial<ProductDetailsProps['fetchedProductData']['productVariants']>;
+  productMetaData?: { title: string; slug: string };
+}
+
 // Use ProductResult directly as the context type
-const ProductDetailsContext = createContext<ProductResult | undefined>(undefined);
+export const ProductDetailsContext = createContext<ProductResult | undefined>(undefined);
 
 export const useProductDetailsContext = () => {
   const context = useContext(ProductDetailsContext);
@@ -27,12 +31,6 @@ export const useProductDetailsContext = () => {
 const ProductDetails: FC<ProductDetailsProps> = ({ fetchedProductData }) => {
   // Hooks
   const { isDesktopOnly } = useResponsiveSSRValue();
-
-  // useEffects
-  useEffect(() => {
-    const unsubscribe = setupVariantAutoMatching(fetchedProductData.productVariants);
-    return unsubscribe;
-  }, [fetchedProductData.productVariants]);
 
   //   JSX
   return (

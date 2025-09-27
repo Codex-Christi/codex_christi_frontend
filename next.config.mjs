@@ -15,7 +15,7 @@ const nextConfig = {
   images: {
     remotePatterns: [
       new URL('https://avatar.iran.liara.run/public/**'),
-      new URL('https://d2dytk4tvgwhb4.cloudfront.net/**'),
+      new URL('https://d2dytk4tvgwhb4.cloudfront.net/v2/**'),
       new URL('https://mainmedia.codexchristi.org/**'),
       new URL('https://purecatamphetamine.github.io/country-flag-icons/3x2/**'),
     ],

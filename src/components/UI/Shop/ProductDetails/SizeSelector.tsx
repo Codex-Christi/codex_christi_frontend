@@ -1,94 +1,102 @@
+'use client';
+
 import RadioButtonGroup from './RadioButtonGroupWithText';
-import { useProductDetailsContext } from '.';
+import { OptionalProductVariantProps, ProductDetailsContext } from '.';
 import {
   ColorAttribute,
   hasColorAndSize,
   ProductAttribute,
   SizeAttribute,
 } from '@/app/shop/product/[id]/productDetailsSSR';
-import { FC, useCallback, useMemo } from 'react';
+import { FC, use, useCallback, useEffect, useMemo } from 'react';
 import { useCurrentVariant } from './currentVariantStore';
 
+// Keep this outside the component
 const sizeFormatArr = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl'];
+
 function isSizeAttribute(
   option: SizeAttribute | ColorAttribute | ProductAttribute | undefined,
 ): option is SizeAttribute {
-  const attr = option?.attribute;
-
-  return (
-    (typeof attr === 'object' &&
-      attr !== null &&
-      'name' in attr &&
-      (attr as { name: string }).name === 'size') ||
-    (attr as { name: string }).name === 'Size'
-  );
+  const name = option?.attribute?.name;
+  return typeof name === 'string' && name.toLowerCase() === 'size';
 }
 
-// Main component for size selector
-const SizeSelector: FC = () => {
-  // Hooks
-  const { productVariants } = useProductDetailsContext();
-  const productHasColorAndSize = hasColorAndSize(productVariants[0].options);
+const SizeSelector: FC<OptionalProductVariantProps> = ({ variants }) => {
+  // -------------------- ALWAYS TOP-LEVEL HOOK CALLS --------------------
+  // 1) Context read (safe even without a Provider; value may be undefined)
+  const ctx = use(ProductDetailsContext);
 
-  const { setSize } = useCurrentVariant();
+  // 2) Zustand hook — **MUST NOT** be conditional
+  const setSize = useCurrentVariant((s) => s.setSize);
+  const resetVariantOptions = useCurrentVariant((s) => s.resetVariantOptions);
+  // ---------------------------------------------------------------------
 
-  // Handlers
-  // Handler for size change
+  // Prefer props, fall back to context value. This branching is on **values**, not on hooks.
+  const productVariants = useMemo(
+    () => variants ?? ctx?.productVariants ?? [],
+    [ctx?.productVariants, variants],
+  );
+
+  const productHasColorAndSize = hasColorAndSize(productVariants[0]!.options);
+
   const onChangeSize = useCallback(
     (value: string | { name: string; value: string }) => {
-      const sizeValue = typeof value === 'string' ? value.toLowerCase() : value.value.toLowerCase();
+      const sizeValue = (typeof value === 'string' ? value : value?.value)?.toLowerCase();
+
+      if (!sizeValue) return;
 
       const index = productHasColorAndSize ? 1 : 0;
-
       const matched = productVariants.find(
-        (variant) => variant.options[index]?.value.toLowerCase() === sizeValue,
+        (variant) => variant?.options?.[index]?.value?.toLowerCase() === sizeValue,
       );
 
-      const sizeOption = matched?.options[index];
+      const sizeOption = matched?.options?.[index];
 
-      if (isSizeAttribute(sizeOption)) {
-        setSize(sizeOption, matched!);
+      if (isSizeAttribute(sizeOption) && matched) {
+        setSize(sizeOption, matched);
       } else {
-        console.warn('[onChangeSize] sizeOption not valid SizeAttribute:', sizeOption);
+        console.warn('[SizeSelector:onChangeSize] Not a valid SizeAttribute:', sizeOption);
       }
     },
     [productHasColorAndSize, productVariants, setSize],
   );
 
-  // Variables
-  const sizesArr = productVariants.map((variant) => {
-    const sizeOption = productHasColorAndSize ? variant.options[1] : variant.options[0];
+  const uniqueSizesOptions = useMemo(() => {
+    const sizesRaw = productVariants
+      .map((variant) => {
+        const idx = productHasColorAndSize ? 1 : 0;
+        const v = variant?.options?.[idx]?.value;
+        return v ? v.toString().toUpperCase() : undefined;
+      })
+      .filter(Boolean) as string[];
 
-    return sizeOption?.value.toUpperCase();
-  });
-  // Unique sizes from the varinats, sortedif product has color and size
-  const uniqueSizesOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          productHasColorAndSize
-            ? sizesArr.sort(
-                (a, b) =>
-                  sizeFormatArr.indexOf((a ?? '').toLowerCase()) -
-                  sizeFormatArr.indexOf((b ?? '').toLocaleLowerCase()),
-              )
-            : sizesArr,
-        ),
-      ).map((size) => ({
-        value: size,
-        label: size,
-        key: `size-${(size ?? '').toLowerCase()}`,
-      })),
-    [productHasColorAndSize, sizesArr],
-  );
+    const deduped = Array.from(new Set(sizesRaw));
+    const sorted = productHasColorAndSize
+      ? [...deduped].sort(
+          (a, b) => sizeFormatArr.indexOf(a.toLowerCase()) - sizeFormatArr.indexOf(b.toLowerCase()),
+        )
+      : deduped;
 
-  // JSX
+    return sorted.map((size) => ({
+      value: size,
+      label: size,
+      key: `size-${size.toLowerCase()}`,
+    }));
+  }, [productHasColorAndSize, productVariants]);
+
+  // Use Effects
+  // Reset Current variants on mount
+  useEffect(() => {
+    resetVariantOptions();
+  }, [resetVariantOptions]);
+
+  if (uniqueSizesOptions.length === 0) return null;
+
+  // Main JSX
   return (
     <section className='!space-y-6 pb-6'>
-      {/* Sizes */}
       <div className='space-y-1'>
         <h4 className='text-xl'>Sizes:</h4>
-
         <RadioButtonGroup props={uniqueSizesOptions} onChange={onChangeSize} />
       </div>
     </section>

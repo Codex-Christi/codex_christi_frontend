@@ -3,11 +3,19 @@
 
 import Image from 'next/image';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
-import SizeAndColorSelectorPopover from '@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/SizeAndColorSelectorPopover';
 import type { CategoryProductDetail } from './categoryDetailsSSR';
+import dynamic from 'next/dynamic';
+
+const SizeAndColorSelectorPopover = dynamic(
+  () =>
+    import(
+      '@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/SizeAndColorSelectorPopover'
+    ).then((mod) => mod.default),
+  { ssr: false },
+);
 
 export default function ProductCard({ product }: { product: CategoryProductDetail }) {
-  const { title, _id } = product;
+  const { title, _id, slug } = product;
 
   return (
     <div
@@ -43,6 +51,9 @@ export default function ProductCard({ product }: { product: CategoryProductDetai
             {/* 3) Raise the Popover trigger ABOVE the stretched link (so it’s clickable) */}
             <div className='relative z-20'>
               <SizeAndColorSelectorPopover
+                productId={_id}
+                productTitle={title}
+                productSlug={slug}
                 buttonProps={{
                   type: 'button',
                   name: `Add ${product.title} to cart`,

@@ -6,32 +6,46 @@ import {
 } from '@/app/shop/product/[id]/productDetailsSSR';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { shallow } from 'zustand/shallow';
 
 // 🧠 Types
+type Variant = ProductVariantsInterface['data'][0];
+type Variants = ProductVariantsInterface['data'];
+
 interface CurrentVariantStore {
-  matchingVariant: ProductVariantsInterface['data'][0] | null;
-  setMatchingVariant: (
-    variant: ProductVariantsInterface['data'][0] | null
-  ) => void;
+  matchingVariant: Variant | null;
+  setMatchingVariant: (variant: Variant | null) => void;
+
+  // Tuple: [ProductAttribute (unused), Size, Color]
   currentVariantOptions: [null, SizeAttribute | null, ColorAttribute | null];
   setColor: (color: ColorAttribute) => void;
-  setSize: (
-    size: SizeAttribute,
-    variant: ProductVariantsInterface['data'][0]
-  ) => void;
+  setSize: (size: SizeAttribute, variant: Variant) => void;
   resetVariantOptions: () => void;
-  findMatchingVariant: (
-    variants: ProductVariantsInterface['data']
-  ) => ProductVariantsInterface['data'][0] | undefined;
+
+  findMatchingVariant: (variants: Variants) => Variant | undefined;
 }
 
-// 🏪 Zustand store
+// Helper: find indices by attribute name (case-insensitive)
+function getOptionIndices(options: Variant['options']) {
+  let sizeIdx: number | null = null;
+  let colorIdx: number | null = null;
+
+  options?.forEach((opt, idx) => {
+    const n = opt?.attribute?.name?.toLowerCase();
+    if (n === 'size') sizeIdx = idx;
+    if (n === 'color') colorIdx = idx;
+  });
+
+  return { sizeIdx, colorIdx };
+}
+
 export const useCurrentVariant = create<CurrentVariantStore>()(
   subscribeWithSelector<CurrentVariantStore>((set, get) => ({
     matchingVariant: null,
     currentVariantOptions: [null, null, null],
 
-    setMatchingVariant: (variant) => set({ matchingVariant: variant }),
+    setMatchingVariant: (variant) =>
+      set((s) => (s.matchingVariant === variant ? s : { matchingVariant: variant })),
 
     setColor: (color) =>
       set((state) => ({
@@ -39,84 +53,67 @@ export const useCurrentVariant = create<CurrentVariantStore>()(
       })),
 
     setSize: (size, variant) => {
-      const hasSizeOnly = !hasColorAndSize(variant.options);
-
+      const hasBoth = hasColorAndSize(variant.options);
       return set((state) => ({
-        currentVariantOptions: [
-          null,
-          size,
-          hasSizeOnly ? null : state.currentVariantOptions[2],
-        ],
+        currentVariantOptions: [null, size, hasBoth ? state.currentVariantOptions[2] : null],
       }));
     },
 
     resetVariantOptions: () =>
-      set({ currentVariantOptions: [null, null, null] }),
+      set({ currentVariantOptions: [null, null, null], matchingVariant: null }),
 
     findMatchingVariant: (variants) => {
-      // Add null/undefined check for variants
-      if (!variants || !Array.isArray(variants)) {
+      if (!Array.isArray(variants) || variants.length === 0) {
         console.error('Invalid variants passed to findMatchingVariant');
+        get().setMatchingVariant(null);
         return undefined;
       }
 
-      const [, size, color] = get().currentVariantOptions;
+      const [, selSize, selColor] = get().currentVariantOptions;
 
-      const matchedProductVariant = variants.find((variant) => {
-        const [, variantSize, variantColor] =
-          variant.options.length > 2 // Check if options have size and color
-            ? variant.options
-            : [null, variant.options[0], null]; // Fallback for size only
+      // Determine indices from the first variant’s option schema
+      const { sizeIdx, colorIdx } = getOptionIndices(variants[0]?.options ?? []);
 
-        // Case 1: Both size and color selected
-        if (size && color) {
-          return (
-            variantSize?.value === size.value &&
-            variantColor?.value === color.value
-          );
-        }
+      const eq = (a?: string, b?: string) => (a ?? '').toLowerCase() === (b ?? '').toLowerCase();
 
-        // Case 2: Only size selected
-        if (size && !color) {
-          return variantSize?.value.toLowerCase() === size.value.toLowerCase();
-        }
+      const matched = variants.find((variant) => {
+        const sizeVal = sizeIdx != null ? variant?.options?.[sizeIdx]?.value : undefined;
+        const colorVal = colorIdx != null ? variant?.options?.[colorIdx]?.value : undefined;
 
-        // Case 3: Only color selected
-        if (color) {
-          return variantColor?.value === color.value;
-        }
-
-        // Default: No selection - return first variant
-        return variant === variants[0];
+        if (selSize && selColor) return eq(sizeVal, selSize.value) && eq(colorVal, selColor.value);
+        if (selSize) return eq(sizeVal, selSize.value);
+        if (selColor) return eq(colorVal, selColor.value);
+        return false; // nothing selected → no match (don’t force first variant)
       });
 
-      get().setMatchingVariant(matchedProductVariant ?? null);
-
-      return matchedProductVariant;
+      get().setMatchingVariant(matched ?? null);
+      return matched;
     },
-  }))
+  })),
 );
 
-// 🔄 Subscription to auto-trigger matching when options change
-export function setupVariantAutoMatching(
-  variants: ProductVariantsInterface['data']
-) {
-  // Validate variants before setting up subscription
-  if (!variants || !Array.isArray(variants)) {
+// 🔄 Auto-match when options change (with shallow equality to prevent noisy triggers)
+export function setupVariantAutoMatching(variants: Variants) {
+  if (!Array.isArray(variants) || variants.length === 0) {
     console.error('Invalid variants passed to setupVariantAutoMatching');
-    return () => {}; // Return empty unsubscribe function
+    return () => {};
   }
 
   return useCurrentVariant.subscribe(
-    (state) => state.currentVariantOptions,
+    (s) => s.currentVariantOptions,
     () => {
       useCurrentVariant.getState().findMatchingVariant(variants);
-    }
+    },
+    { equalityFn: shallow }, // <— only fire when tuple actually changes top-level
   );
 }
 
-// 🔍 Subscription to log matching variant changes
-useCurrentVariant.subscribe(
-  (state) => state.matchingVariant,
-  () => {}
-);
+// Optional: keep a dev log when the matched variant changes (fireImmediately true if you want)
+// useCurrentVariant.subscribe(
+//   (s) => s.matchingVariant,
+//   (mv) => {
+//     // no-op now; useful for debugging:
+//     // console.debug('[matchingVariant]', mv?._id);
+//   },
+//   // { fireImmediately: true }
+// );
