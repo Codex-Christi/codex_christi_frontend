@@ -16,8 +16,15 @@ const nextConfig = {
     remotePatterns: [
       new URL('https://avatar.iran.liara.run/public/**'),
       new URL('https://d2dytk4tvgwhb4.cloudfront.net/v2/**'),
+      new URL('https://d2dytk4tvgwhb4.cloudfront.net/**'),
       new URL('https://mainmedia.codexchristi.org/**'),
       new URL('https://purecatamphetamine.github.io/country-flag-icons/3x2/**'),
+      {
+        protocol: 'https',
+        hostname: 'd2dytk4tvgwhb4.cloudfront.net', // Replace with your actual CloudFront domain
+        port: '', // Leave empty unless a specific port is used
+        pathname: '/**', // This wildcard allows any path and implicitly any query parameters
+      },
     ],
     qualities: [25, 50, 75, 80, 90, 100],
   },

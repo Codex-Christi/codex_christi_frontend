@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, ComponentProps, useState, useMemo } from 'react';
+import { FC, ComponentProps, useState, useMemo, WheelEventHandler, TouchEventHandler } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/UI/primitives/popover';
 import { Button } from '@/components/UI/primitives/button';
 import { Skeleton } from '@/components/UI/primitives/skeleton'; // Import shadcn/ui Skeleton
@@ -17,25 +17,25 @@ interface SizeAndColorSelectorPopoverProps {
   productSlug: string;
 }
 
-const SizeAndColorSelectorPopover: FC<SizeAndColorSelectorPopoverProps> = ({
-  buttonProps,
-  productId,
-  productTitle,
-  productSlug,
-}) => {
+const SizeAndColorSelectorPopover: FC<SizeAndColorSelectorPopoverProps> = (props) => {
+  const { buttonProps, productId, productTitle, productSlug } = props;
   const [isOpen, setIsOpen] = useState(false);
   const { data, error, isLoading } = useProductVariants(productId, isOpen);
+
+  const stopPropagation = (e: Event) => e.stopPropagation();
 
   // Memoize the popover content to prevent unnecessary re-renders
   const popoverContent = useMemo(
     () => (
       <PopoverContent
+        onWheel={stopPropagation as unknown as WheelEventHandler}
+        onTouchMove={stopPropagation as unknown as TouchEventHandler}
         align='start'
         side='top'
         sideOffset={8}
-        className={`bg-black/55 backdrop-blur-xl backdrop-saturate-150 ring-1 ring-white/10 rounded-2xl p-4 shadow-2xl
-             shadow-black/40 z-[60] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 
-             text-white select-none cursor-pointer lg:min-w-[375px] max-h-[500px] overflow-y-visible lg:scale-90`}
+        className={`bg-black/65 backdrop-blur-xl backdrop-saturate-150 ring-1 ring-white/10 rounded-2xl p-4 shadow-2xl
+             shadow-white/60 z-[60] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 
+             text-white select-none cursor-pointer lg:min-w-[375px] lg:scale-90`}
       >
         {/* Ambient aura (radial glow) */}
         <div
@@ -48,40 +48,42 @@ const SizeAndColorSelectorPopover: FC<SizeAndColorSelectorPopoverProps> = ({
           }}
         />
 
-        {/* --- Conditional Content Rendering based on SWR state --- */}
-        {/* Loading state with Skeleton */}
-        {isLoading && (
-          <div className='space-y-4'>
-            <Skeleton className='h-6 w-full' />
-            <Skeleton className='h-10 w-full' />
-            <Skeleton className='h-10 w-full' />
-          </div>
-        )}
-
-        {/* Error state */}
-        {error && (
-          <div className='text-red-400'>
-            <p className='font-semibold'>Error: {error.message}</p>
-          </div>
-        )}
-
-        {/* Fetched data display */}
-        {data && (
-          <>
-            {/* Size and Color Selectors */}
-            <SizeSelector variants={data.data} />
-            <ColorsSelector variants={data.data} />
-
-            {/* Add to Cart and Buy Now buttons */}
+        <div className='max-h-[500px] overflow-y-auto scrollbar px-4'>
+          {/* --- Conditional Content Rendering based on SWR state --- */}
+          {/* Loading state with Skeleton */}
+          {isLoading && (
             <div className='space-y-4'>
-              <AddToCart
-                variants={data.data}
-                productMetaData={{ title: productTitle, slug: productSlug }}
-              />
-              <BuyNow />
+              <Skeleton className='h-6 w-full' />
+              <Skeleton className='h-10 w-full' />
+              <Skeleton className='h-10 w-full' />
             </div>
-          </>
-        )}
+          )}
+
+          {/* Error state */}
+          {error && (
+            <div className='text-red-400'>
+              <p className='font-semibold'>Error: {error.message}</p>
+            </div>
+          )}
+
+          {/* Fetched data display */}
+          {data && (
+            <>
+              {/* Size and Color Selectors */}
+              <SizeSelector variants={data.data} />
+              <ColorsSelector variants={data.data} />
+
+              {/* Add to Cart and Buy Now buttons */}
+              <div className='space-y-4'>
+                <AddToCart
+                  variants={data.data}
+                  productMetaData={{ title: productTitle, slug: productSlug }}
+                />
+                <BuyNow />
+              </div>
+            </>
+          )}
+        </div>
       </PopoverContent>
     ),
     [data, error, isLoading, productSlug, productTitle],

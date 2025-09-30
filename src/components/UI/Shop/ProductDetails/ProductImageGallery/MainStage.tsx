@@ -1,13 +1,11 @@
-// MainStage.tsx
-'use client';
 import {
   Carousel,
+  CarouselApi,
   CarouselContent,
   CarouselItem,
-  type CarouselApi,
 } from '@/components/UI/primitives/carousel';
+import { LoadingOverlay, type ImageListLoaderReturnType, prevent } from '.';
 import Image from 'next/image';
-import { LoadingOverlay, isCloudfrontUrl, prevent, type ImageListLoaderReturnType } from '.';
 import { GalleryPrevButton } from '../GalleryPrevButton';
 import { GalleryNextButton } from '../GalleryNextButton';
 
@@ -34,45 +32,35 @@ function MainStage({
         setApi={setApi}
       >
         <CarouselContent>
-          {images.map((src, i) => {
-            const isCF = isCloudfrontUrl(src);
-            const mainWidth = 1200; // choose appropriate main width
-            const direct = isCF
-              ? `${loader.srcWithRetry(src, i)}${src.includes('?') ? '&' : '?'}w=${mainWidth}&q=90`
-              : loader.srcWithRetry(src, i);
-
-            return (
-              <CarouselItem key={i} className='basis-full'>
-                <div
-                  className='relative size-full aspect-[16/18] md:aspect-[16/13] rounded-[20px] overflow-hidden cursor-zoom-in'
-                  onClick={() => setOpen(true)}
-                >
-                  <Image
-                    {...prevent}
-                    priority={i === 0}
-                    className='size-full object-cover object-top'
-                    fill
-                    src={direct}
-                    alt={metaTitle || 'Product image'}
-                    sizes='(max-width: 640px) 100vw, (max-width: 1280px) 70vw, 800px'
-                    quality={90}
-                    onLoad={() => loader.markLoaded(i, src)}
-                    onError={() => loader.markFailed(i)}
-                    unoptimized={isCF} // bypass Next optimizer for CloudFront images
-                  />
-                  <LoadingOverlay
-                    show={!loader.loaded[i] || loader.failed[i]}
-                    onRetry={loader.failed[i] ? () => loader.retryOne(i) : undefined}
-                  />
-                </div>
-              </CarouselItem>
-            );
-          })}
+          {images.map((src, i) => (
+            <CarouselItem key={i} className='basis-full'>
+              <div
+                className='relative size-full aspect-[16/18] md:aspect-[16/13] rounded-[20px] overflow-hidden cursor-zoom-in'
+                onClick={() => setOpen(true)}
+              >
+                <Image
+                  {...prevent}
+                  priority={i === 0}
+                  className='size-full object-cover object-top'
+                  fill
+                  src={loader.srcWithRetry(src, i)}
+                  alt={metaTitle || 'Product image'}
+                  sizes='(max-width: 640px) 100vw, (max-width: 1280px) 70vw, 800px'
+                  quality={100}
+                  onLoad={() => loader.markLoaded(i, src)}
+                  onError={() => loader.markFailed(i)}
+                />
+                <LoadingOverlay
+                  show={!loader.loaded[i] || loader.failed[i]}
+                  onRetry={loader.failed[i] ? () => loader.retryOne(i) : undefined}
+                />
+              </div>
+            </CarouselItem>
+          ))}
         </CarouselContent>
 
         {images.length > 1 && (
           <>
-            {/* Your custom Embla buttons */}
             <GalleryPrevButton onClick={() => api?.scrollPrev()} />
             <GalleryNextButton onClick={() => api?.scrollNext()} />
           </>

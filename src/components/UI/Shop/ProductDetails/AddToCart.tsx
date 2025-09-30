@@ -92,7 +92,8 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
     } finally {
       // IMPORTANT: do not clear the timeout or flip isBusy here,
       // or you remove the debounce. Let the timeout re-enable the button.
-      // clearTimeout(unblock); setIsBusy(false); // <- leave commented
+      clearTimeout(unblock);
+      setIsBusy(false); // <- leave commented
     }
   }, [
     addToCart,
