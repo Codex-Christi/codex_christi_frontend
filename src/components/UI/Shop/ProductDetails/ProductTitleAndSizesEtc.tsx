@@ -4,20 +4,12 @@ import { useCurrentVariant } from './currentVariantStore';
 import { useMemo } from 'react';
 
 const DeliveryandPaymentsBanner = dynamic(() =>
-  import('./DeliveryandPaymentsBanner').then(
-    (mod) => mod.DeliveryandPaymentsBanner
-  )
+  import('./DeliveryandPaymentsBanner').then((mod) => mod.DeliveryandPaymentsBanner),
 );
-const AddToCart = dynamic(() =>
-  import('./AddToCart').then((mod) => mod.AddToCart)
-);
+const AddToCart = dynamic(() => import('./AddToCart').then((mod) => mod.AddToCart));
 const BuyNow = dynamic(() => import('./BuyNow').then((mod) => mod.BuyNow));
-const SizeSelector = dynamic(() =>
-  import('./SizeSelector').then((mod) => mod.default)
-);
-const ColorsSelector = dynamic(() =>
-  import('./ColorsSelector').then((mod) => mod.default)
-);
+const SizeSelector = dynamic(() => import('./SizeSelector').then((mod) => mod.default));
+const ColorsSelector = dynamic(() => import('./ColorsSelector').then((mod) => mod.default));
 
 // Main Component
 const ProductTitleAndSizesEtc = () => {
@@ -81,12 +73,12 @@ const ProductTitleAndSizesEtc = () => {
         </div>
 
         {/* Size and Color Selectors */}
-        <SizeSelector />
-        <ColorsSelector />
+        <SizeSelector variants={productDetailsContext.productVariants} />
+        <ColorsSelector variants={productDetailsContext.productVariants} />
 
         {/* Add to Cart and Buy Now buttons */}
         <div className='space-y-4'>
-          <AddToCart />
+          <AddToCart variants={productDetailsContext.productVariants} />
 
           <BuyNow />
         </div>
