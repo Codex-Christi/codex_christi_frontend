@@ -2,7 +2,6 @@
 
 import { Button } from '@/components/UI/primitives/button';
 import useAuthStore from '@/stores/authStore';
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useProductDetailsContext } from '..';
 import successToast from '@/lib/success-toast';
@@ -75,7 +74,7 @@ export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) =>
 
       {/* Favorite Button */}
       {isAuthenticated && (
-        <Link href=''>
+        <Button name='Add to favorites'>
           <svg width='30' height='26' viewBox='0 0 30 26' fill='none'>
             <path
               d='M15.8468 24.41C15.4671 24.7464 14.8958 24.7453 14.5175 24.4075L13.2477 23.2736C6.38099 17.1657 1.84766 13.1373 1.84766 8.19346C1.84766 4.16512 5.07432 1 9.18099 1C11.1006 1 12.9564 1.72531 14.363 2.92401C14.8259 3.31848 15.5361 3.31848 15.999 2.92402C17.4056 1.72531 19.2614 1 21.181 1C25.2877 1 28.5143 4.16512 28.5143 8.19346C28.5143 13.1373 23.981 17.1657 17.1143 23.2866L15.8468 24.41Z'
@@ -85,7 +84,7 @@ export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) =>
               strokeLinejoin='round'
             />
           </svg>
-        </Link>
+        </Button>
       )}
 
       {/* Share button */}

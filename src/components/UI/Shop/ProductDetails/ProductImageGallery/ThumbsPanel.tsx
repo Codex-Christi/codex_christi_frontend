@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { ImageListLoaderReturnType, LoadingOverlay, prevent } from '.';
+import { useThumbBoxWidth } from './useThumbBoxWidth';
 
 function ThumbsPanel({
   images,
@@ -14,8 +15,13 @@ function ThumbsPanel({
   metaTitle?: string;
   loader: ImageListLoaderReturnType;
 }) {
+  const { ref, width } = useThumbBoxWidth(80);
+
   return (
-    <div className='grid gap-4 grid-cols-5 order-2 sm:grid-cols-1 sm:order-1 lg:grid-cols-5 xl:grid-cols-1 xl:order-1'>
+    <div
+      ref={ref}
+      className='grid gap-4 grid-cols-5 order-2 sm:grid-cols-1 sm:order-1 lg:grid-cols-5 xl:grid-cols-1 xl:order-1'
+    >
       {images.map((image, index) => (
         <button
           key={index}
@@ -32,13 +38,15 @@ function ThumbsPanel({
               alt={metaTitle || 'Product image'}
               className='rounded-[20px] transition-all object-cover'
               src={loader.srcWithRetry(image, index)}
-              width={80}
-              height={80}
-              quality={100}
+              width={width}
+              height={width}
+              sizes={`${width}px`}
+              quality={80}
+              loading='lazy'
+              fetchPriority='low'
               onLoad={() => loader.markLoaded(index, image)}
               onError={() => loader.markFailed(index)}
             />
-            {/* Overlay uses <span role="button"> so it’s not a nested <button> */}
             <LoadingOverlay
               show={!loader.loaded[index] || loader.failed[index]}
               onRetry={loader.failed[index] ? () => loader.retryOne(index) : undefined}

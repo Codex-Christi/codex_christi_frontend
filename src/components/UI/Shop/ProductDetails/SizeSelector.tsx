@@ -96,7 +96,7 @@ const SizeSelector: FC<OptionalProductVariantProps> = ({ variants }) => {
   return (
     <section className='!space-y-6 pb-6'>
       <div className='space-y-1'>
-        <h4 className='text-xl'>Sizes:</h4>
+        <h3 className='text-xl'>Sizes:</h3>
         <RadioButtonGroup props={uniqueSizesOptions} onChange={onChangeSize} />
       </div>
     </section>

@@ -26,6 +26,10 @@ const nextConfig = {
         pathname: '/**', // This wildcard allows any path and implicitly any query parameters
       },
     ],
+    // cover viewport widths your app uses
+    deviceSizes: [320, 375, 425, 768, 1024, 1280, 1440, 1920, 2048],
+    // small sizes for thumbnails, icons, small images
+    imageSizes: [24, 48, 80, 120, 160, 240, 320],
     qualities: [25, 50, 75, 80, 90, 100],
   },
   async rewrites() {
