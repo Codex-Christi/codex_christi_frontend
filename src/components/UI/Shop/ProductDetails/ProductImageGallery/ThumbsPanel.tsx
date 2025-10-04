@@ -18,6 +18,10 @@ function ThumbsPanel({
 }) {
   const { ref, width } = useThumbBoxWidth(80);
 
+  // clamp maximum thumbnail width considered for `sizes`
+  const MAX_THUMB = 160; // choose a cap, e.g. 160px — browser won't pick variants larger than this
+  const thumbSizeHint = `${Math.min(width, MAX_THUMB)}px`;
+
   return (
     <div
       ref={ref}
@@ -28,21 +32,21 @@ function ThumbsPanel({
           key={index}
           type='button'
           onClick={() => onSelect(index)}
-          className={`rounded-[15px] sm:rounded-[20px] size-14 sm:size-20 border-2 cursor-pointer ${
-            index === currentIndex ? 'border-white' : 'border-transparent'
-          }`}
+          className={`rounded-[18px] sm:rounded-[20px] size-16 sm:size-20 border-[2.5px] cursor-pointer ${
+            index === currentIndex ? 'border-white shadow-md shadow-gray-300' : 'border-transparent'
+          } `}
           aria-label={`Go to image ${index + 1}`}
         >
           <div className='relative h-full w-full'>
             <Image
               {...prevent}
               alt={metaTitle || 'Product image'}
-              className='rounded-[20px] transition-all object-cover'
+              className='rounded-[20px] transition-all !object-cover w-full object-top bg-top'
               src={loader.srcWithRetry(image, index)}
               width={width}
               height={width}
-              // The sizes prop ensures the browser picks the correct variant
-              sizes={`${width}px`}
+              // Use the clamped thumbSizeHint here
+              sizes={thumbSizeHint}
               quality={75}
               loading='lazy'
               onLoad={() => loader.markLoaded(index, image)}

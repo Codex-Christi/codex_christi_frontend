@@ -42,13 +42,13 @@ function MainStage({
                 <Image
                   {...prevent}
                   priority={i === 0}
-                  fetchPriority={i === 0 ? 'high' : undefined}
+                  fetchPriority={i === 0 ? 'high' : 'low'}
                   className='size-full object-cover object-top'
                   fill
                   src={loader.srcWithRetry(src, i)}
                   alt={metaTitle || 'Product image'}
-                  // Here, refine the sizes string to reflect expected rendering widths
-                  sizes='(max-width: 640px) 100vw, (max-width: 1280px) 70vw, 80vw'
+                  // Patched sizes: cap max width to 640px
+                  sizes='(max-width: 640px) 100vw, (max-width: 1280px) 70vw, 640px'
                   quality={80}
                   onLoad={() => loader.markLoaded(i, src)}
                   onError={() => loader.markFailed(i)}
