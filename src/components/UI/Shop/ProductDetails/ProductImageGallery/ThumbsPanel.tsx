@@ -16,7 +16,7 @@ function ThumbsPanel({
   metaTitle?: string;
   loader: ImageListLoaderReturnType;
 }) {
-  const { ref, width } = useThumbBoxWidth(100);
+  const { ref, width } = useThumbBoxWidth(80);
 
   return (
     <div
@@ -28,19 +28,20 @@ function ThumbsPanel({
           key={index}
           type='button'
           onClick={() => onSelect(index)}
-          className={`rounded-[15px] sm:rounded-[20px] size-12 sm:size-20 border-[2.5px] cursor-pointer ${
-            index === currentIndex ? 'border-white shadow-md shadow-gray-300' : 'border-transparent'
-          } `}
+          className={`rounded-[15px] sm:rounded-[20px] size-14 sm:size-20 border-2 cursor-pointer ${
+            index === currentIndex ? 'border-white' : 'border-transparent'
+          }`}
           aria-label={`Go to image ${index + 1}`}
         >
           <div className='relative h-full w-full'>
             <Image
               {...prevent}
               alt={metaTitle || 'Product image'}
-              className='rounded-[20px] transition-all !object-cover w-full !object-top'
+              className='rounded-[20px] transition-all object-cover'
               src={loader.srcWithRetry(image, index)}
               width={width}
               height={width}
+              // The sizes prop ensures the browser picks the correct variant
               sizes={`${width}px`}
               quality={75}
               loading='lazy'
