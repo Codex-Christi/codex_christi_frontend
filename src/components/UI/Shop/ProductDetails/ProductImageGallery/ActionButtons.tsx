@@ -57,7 +57,12 @@ export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) =>
   return (
     // Fullscreen button
     <div className='grid gap-8'>
-      <button aria-label='Open fullscreen' onClick={() => setOpen(true)}>
+      <Button
+        name='Fullsreen button'
+        aria-label='Open fullscreen'
+        onClick={() => setOpen(true)}
+        className='p-0 bg-transparent'
+      >
         <svg width='26' height='26' viewBox='0 0 26 26' fill='none'>
           <path
             d='M24.5801 1.03334C24.5272 1.01147 24.4711 1 24.4147 1H15.513C15.2736 1 15.0798 1.19375 15.0798 1.43318C15.0798 1.67261 15.2736 1.86636 15.513 1.86636H23.369L14.8378 10.3975C14.6686 10.5667 14.6686 10.8408 14.8378 11.0101C14.9225 11.0947 15.0333 11.137 15.1441 11.137C15.2549 11.137 15.3658 11.0947 15.4504 11.0101L23.9815 2.4789V10.1649C23.9815 10.4043 24.1753 10.598 24.4147 10.598C24.6542 10.598 24.8479 10.4043 24.8479 10.1649V1.43318C24.8479 1.37684 24.8364 1.32068 24.8146 1.2678C24.7707 1.16165 24.6863 1.07723 24.5801 1.03334Z'
@@ -70,11 +75,11 @@ export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) =>
             stroke='white'
           />
         </svg>
-      </button>
+      </Button>
 
       {/* Favorite Button */}
       {isAuthenticated && (
-        <Button name='Add to favorites'>
+        <Button name='Add to favorites' className='p-0 bg-transparent'>
           <svg width='30' height='26' viewBox='0 0 30 26' fill='none'>
             <path
               d='M15.8468 24.41C15.4671 24.7464 14.8958 24.7453 14.5175 24.4075L13.2477 23.2736C6.38099 17.1657 1.84766 13.1373 1.84766 8.19346C1.84766 4.16512 5.07432 1 9.18099 1C11.1006 1 12.9564 1.72531 14.363 2.92401C14.8259 3.31848 15.5361 3.31848 15.999 2.92402C17.4056 1.72531 19.2614 1 21.181 1C25.2877 1 28.5143 4.16512 28.5143 8.19346C28.5143 13.1373 23.981 17.1657 17.1143 23.2866L15.8468 24.41Z'

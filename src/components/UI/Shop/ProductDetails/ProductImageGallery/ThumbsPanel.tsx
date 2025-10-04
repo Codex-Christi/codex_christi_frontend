@@ -1,6 +1,32 @@
 import Image from 'next/image';
 import { ImageListLoaderReturnType, LoadingOverlay, prevent } from '.';
-import { useThumbBoxWidth } from './useThumbBoxWidth';
+import { useEffect, useRef, useState } from 'react';
+
+function useThumbBoxWidth(initial = 80) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState<number>(initial);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const el = ref.current;
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      const w = entry.contentRect.width;
+      const next = Math.max(24, Math.round(w));
+      setWidth(next);
+    });
+    ro.observe(el);
+
+    const rect = el.getBoundingClientRect();
+    if (rect.width) {
+      setWidth(Math.max(24, Math.round(rect.width)));
+    }
+
+    return () => ro.disconnect();
+  }, []);
+
+  return { ref, width };
+}
 
 function ThumbsPanel({
   images,
@@ -41,9 +67,8 @@ function ThumbsPanel({
               width={width}
               height={width}
               sizes={`${width}px`}
-              quality={80}
+              quality={75}
               loading='lazy'
-              fetchPriority='low'
               onLoad={() => loader.markLoaded(index, image)}
               onError={() => loader.markFailed(index)}
             />

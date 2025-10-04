@@ -58,7 +58,6 @@ export const getMerchizeTotalWIthShipping = cache(
       };
     }
 
-    // Substring-prefix resolution (throws if any cannot be matched)
     let catalogRows;
     try {
       catalogRows = await getCatalogItems(skus, country_iso3);
@@ -126,26 +125,22 @@ export const getShippingPriceMerchizecatalog = cache(
     const dest = iso3ToDest(country_iso3);
     const fallback = opts?.fallbackToROW ?? true;
 
-    // O(1) by full SKU — because getCatalogItems set SKU_variant = YOUR full SKU
     const bySku = new Map(catalogArr.map((r) => [r.SKU_variant, r]));
-
     const normalized = await loadNormalizedRows();
     const extrasBySku = new Map(normalized.map((r) => [r.sku, r.extras ?? {}]));
 
-    const sumOfSKUS = Array.from(counts.entries()).reduce((acc, [, qty]) => acc + qty, 0);
+    const numOfSKUs = Array.from(counts.entries()).reduce((acc, [, qty]) => acc + qty, 0);
 
     let sum = 0;
     for (const [sku, qty] of counts) {
       const row = bySku.get(sku);
-
       if (!row) {
-        throw new Error(
-          `Shipping bands missing for resolved SKU "${sku}". This indicates a mapping error.`,
-        );
+        console.error(`[AUDIT] Missing catalog row for SKU ${sku}`);
+        throw new Error(`Shipping bands missing for resolved SKU "${sku}"`);
       }
 
-      let first: number | null = null,
-        addl: number | null = null;
+      let first: number | null = null;
+      let addl: number | null = null;
       switch (dest) {
         case 'US':
           first = row.US_shipping_fee;
@@ -172,11 +167,19 @@ export const getShippingPriceMerchizecatalog = cache(
           addl = row.ROW_additional_shipping_fee;
           break;
       }
+
+      console.debug(`[AUDIT] SKU ${sku}, dest=${dest}, raw band = first:${first}, addl:${addl}`);
       if ((first == null || Number.isNaN(first)) && fallback) {
+        console.warn(
+          `[AUDIT] SKU ${sku}, dest=${dest}: fallback to ROW band first:${row.ROW_shipping_fee}, addl:${row.ROW_additional_shipping_fee}`,
+        );
         first = row.ROW_shipping_fee;
         addl = row.ROW_additional_shipping_fee;
       }
-      if (first == null || Number.isNaN(first)) continue;
+      if (first == null || Number.isNaN(first)) {
+        console.error(`[AUDIT] SKU ${sku}, dest=${dest}: no valid first band after fallback`);
+        continue;
+      }
 
       const f = Number(first) || 0;
       const a = Number(addl ?? 0);
@@ -188,26 +191,59 @@ export const getShippingPriceMerchizecatalog = cache(
           typeof extra?.['us_post_service_added_fee'] === 'number'
             ? (extra['us_post_service_added_fee'] as number)
             : null;
-        if (typeof surcharge === 'number') cost += surcharge;
+        if (surcharge !== null) {
+          console.debug(`[AUDIT] SKU ${sku}: US surcharge ${surcharge}`);
+          cost += surcharge;
+        }
       }
+
+      console.debug(`[AUDIT] SKU ${sku} cost contribution = ${cost}`);
       sum += cost;
     }
 
-    const shippingNum = sum < 10 ? 5 * sumOfSKUS : Math.ceil(sum);
-    const fx = asFX(await getDollarMultiplier(country_iso3));
+    console.debug(`[AUDIT] total sum (USD base) = ${sum}`);
+
+    // Apply fallback rule in USD first
+    let baseUsdShipping: number;
+    if (sum < 10) {
+      baseUsdShipping = 5 * numOfSKUs;
+      console.warn(
+        `[AUDIT] sum < 10 fallback: baseUsdShipping = 5 × ${numOfSKUs} = ${baseUsdShipping}`,
+      );
+    } else {
+      baseUsdShipping = Math.ceil(sum);
+    }
+
+    const fxRaw = await getDollarMultiplier(country_iso3);
+    console.debug(`[AUDIT] fxRaw =`, fxRaw);
+    const fx = asFX(fxRaw);
+    const multiplier = typeof fx.multiplier === 'number' ? fx.multiplier : 1;
     const currency = fx.currency ?? 'USD';
     const currency_symbol = fx.currency_symbol ?? symbolFromCurrency(currency);
-    const multiplier = typeof fx.multiplier === 'number' ? fx.multiplier : null;
-    const priced = (multiplier ?? 1) * shippingNum;
+
+    console.debug(`[AUDIT] multiplier = ${multiplier}, currency = ${currency}`);
+
+    const pricedForeign = baseUsdShipping * multiplier;
+    console.debug(`[AUDIT] pricedForeign = ${pricedForeign}`);
+
+    const shippingPriceNum = Math.ceil(pricedForeign * 100) / 100;
+    console.debug(`[AUDIT] shippingPriceNum (foreign) = ${shippingPriceNum}`);
+
+    const usdBack = multiplier > 0 ? shippingPriceNum / multiplier : shippingPriceNum;
+    console.debug(
+      `[AUDIT] back-converted USD = ${usdBack} vs baseUsdShipping = ${baseUsdShipping}`,
+    );
 
     return {
       multiplier,
-      shippingPriceNum: Math.ceil(priced * 100) / 100,
+      shippingPriceNum,
       currency,
       currency_symbol,
     };
   },
 );
+
+// (realTimePriceFromMerchize unchanged)
 
 // Retail total (unchanged, typed FX)
 const merchizeAPIKey = process.env.MERRCHIZE_API_KEY!;

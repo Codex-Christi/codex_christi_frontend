@@ -40,14 +40,13 @@ function MainStage({
               >
                 <Image
                   {...prevent}
-                  fetchPriority='high'
                   priority={i === 0}
                   className='size-full object-cover object-top'
                   fill
                   src={loader.srcWithRetry(src, i)}
                   alt={metaTitle || 'Product image'}
-                  sizes='(max-width: 640px) 100vw, (max-width: 1280px) 70vw, 1200px'
-                  quality={90}
+                  sizes='(max-width: 640px) 100vw, (max-width: 1280px) 70vw, 800px'
+                  quality={80}
                   onLoad={() => loader.markLoaded(i, src)}
                   onError={() => loader.markFailed(i)}
                 />
