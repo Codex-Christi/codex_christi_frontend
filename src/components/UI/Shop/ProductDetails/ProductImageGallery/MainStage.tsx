@@ -48,7 +48,7 @@ function MainStage({
                   src={loader.srcWithRetry(src, i)}
                   alt={metaTitle || 'Product image'}
                   // Patched sizes: cap max width to 640px
-                  sizes='(max-width: 412px) 400px, (max-width: 640px) 550px, (min-resolution: 2dppx) 60vw, 800px'
+                  sizes='(max-width: 412px) 360px, (max-width: 640px) 480px, (min-resolution: 2dppx) 55vw, 800px'
                   quality={80}
                   onLoad={() => loader.markLoaded(i, src)}
                   onError={() => loader.markFailed(i)}
