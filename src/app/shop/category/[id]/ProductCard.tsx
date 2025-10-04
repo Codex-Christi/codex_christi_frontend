@@ -38,6 +38,7 @@ export default function ProductCard({ product }: { product: CategoryProductDetai
             alt={product.title}
             height={300}
             width={150}
+            fetchPriority='high'
             className='object-cover object-top aspect-[16/18] md:aspect-[16/13] !w-full'
             style={{ filter: isDayOrNight() === 'night' ? 'brightness(.9)' : 'none' }}
           />
