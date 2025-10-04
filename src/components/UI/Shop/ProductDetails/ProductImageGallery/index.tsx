@@ -1,3 +1,4 @@
+// ProductImageGallery/index.tsx
 'use client';
 
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
@@ -14,9 +15,7 @@ import { GalleryPrevButton } from '../GalleryPrevButton';
 import { GalleryNextButton } from '../GalleryNextButton';
 import { ControllerRef, Plugin } from 'yet-another-react-lightbox';
 import Zoom from 'yet-another-react-lightbox/plugins/zoom';
-import type { ZoomRef } from 'yet-another-react-lightbox';
 import { useLightboxHistory } from './useLightBoxHistory';
-import { FaSearchMinus, FaSearchPlus } from 'react-icons/fa';
 
 const Lightbox = dynamic(() => import('yet-another-react-lightbox'), { ssr: false });
 
@@ -94,8 +93,8 @@ export const ProductImageGallery: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [api, setApi] = useState<CarouselApi | null>(null);
   const controllerRef = useRef<ControllerRef>(null);
-  const zoomRef = useRef<ZoomRef | null>(null);
 
+  // Back button support while fullscreen
   useLightboxHistory(open, () => setOpen(false));
 
   const { matchingVariant, setMatchingVariant } = useCurrentVariant((s) => s);
@@ -105,6 +104,7 @@ export const ProductImageGallery: React.FC = () => {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Build image URLs (unchanged from your template)
   const images = useMemo(() => {
     const image_uris = matchingVariant?.image_uris ?? [];
     const initialImagesURIArr = productDetailsContext.productVariants[0].image_uris;
@@ -118,6 +118,7 @@ export const ProductImageGallery: React.FC = () => {
 
   const loader = useImageListLoader(images);
 
+  // Pre-measure natural sizes for Lightbox zoom (safe, client-only)
   const [dims, setDims] = useState<Record<number, { w: number; h: number }>>({});
   useEffect(() => {
     setDims({});
@@ -129,15 +130,18 @@ export const ProductImageGallery: React.FC = () => {
     });
   }, [images]);
 
+  // URL-driven reset (unchanged)
   useEffect(() => {
     setCurrentItem(0);
     setMatchingVariant(null);
   }, [pathname, searchParams, setMatchingVariant]);
 
+  // Single-image guard
   useEffect(() => {
     if (images.length === 1) setCurrentItem(0);
   }, [images.length]);
 
+  // Embla -> React state
   useEffect(() => {
     if (!api) return;
     const onSelect = () => setCurrentItem(api.selectedScrollSnap());
@@ -156,6 +160,7 @@ export const ProductImageGallery: React.FC = () => {
     [api],
   );
 
+  // Build slides with known width/height when available
   const slides = useMemo(
     () =>
       images.map((src, i) => (dims[i] ? { src, width: dims[i].w, height: dims[i].h } : { src })),
@@ -167,6 +172,7 @@ export const ProductImageGallery: React.FC = () => {
       className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-2 lg:p-8 flex flex-col gap-8 items-start sm:gap-12 sm:flex-row lg:flex-col-reverse xl:flex-row'
       id='mainGallery'
     >
+      {/* Thumbnails */}
       <ThumbsPanel
         images={images}
         currentIndex={currentItem}
@@ -175,6 +181,7 @@ export const ProductImageGallery: React.FC = () => {
         loader={loader}
       />
 
+      {/* Main image + side actions */}
       <div className='flex items-start w-full h-full gap-4 sm:gap-8 sm:order-2'>
         <MainStage
           images={images}
@@ -187,6 +194,7 @@ export const ProductImageGallery: React.FC = () => {
         <ActionButtons setOpen={setOpen} />
       </div>
 
+      {/* Fullscreen Lightbox (no custom zoom UI) */}
       {open && (
         <Lightbox
           open={open}
@@ -195,7 +203,6 @@ export const ProductImageGallery: React.FC = () => {
           slides={slides}
           plugins={[Zoom as Plugin]}
           controller={{ ref: controllerRef }}
-          zoom={{ ref: zoomRef }}
           carousel={{
             imageFit: 'contain',
             imageProps: {
@@ -215,28 +222,9 @@ export const ProductImageGallery: React.FC = () => {
             slide: { display: 'grid', placeItems: 'center' },
           }}
           render={{
+            // keep your custom prev/next only
             buttonPrev: () => <GalleryPrevButton onClick={() => controllerRef.current?.prev()} />,
             buttonNext: () => <GalleryNextButton onClick={() => controllerRef.current?.next()} />,
-            buttonZoom: () => (
-              <div className='flex items-center gap-3 px-2'>
-                <button
-                  type='button'
-                  className='yarl__button'
-                  onClick={() => zoomRef.current?.zoomOut?.()}
-                  aria-label='Zoom out'
-                >
-                  <FaSearchMinus size={24} /> {/* icon for zoom out */}
-                </button>
-                <button
-                  type='button'
-                  className='yarl__button'
-                  onClick={() => zoomRef.current?.zoomIn?.()}
-                  aria-label='Zoom in'
-                >
-                  <FaSearchPlus size={24} /> {/* icon for zoom in */}
-                </button>
-              </div>
-            ),
           }}
         />
       )}

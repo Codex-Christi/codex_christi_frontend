@@ -1,3 +1,4 @@
+// MainStage.tsx
 import {
   Carousel,
   CarouselApi,

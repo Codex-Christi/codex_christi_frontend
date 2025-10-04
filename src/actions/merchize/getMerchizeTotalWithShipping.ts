@@ -201,17 +201,20 @@ export const getShippingPriceMerchizecatalog = cache(
       sum += cost;
     }
 
-    console.debug(`[AUDIT] total sum (USD base) = ${sum}`);
+    console.debug(`[AUDIT] total sum (USD base raw) = ${sum}`);
 
-    // Apply fallback rule in USD first
+    const computedUsd = Math.ceil(sum);
+    const fallbackThreshold = 5 * numOfSKUs;
     let baseUsdShipping: number;
-    if (sum < 10) {
-      baseUsdShipping = 5 * numOfSKUs;
+
+    if (computedUsd < fallbackThreshold) {
+      baseUsdShipping = fallbackThreshold;
       console.warn(
-        `[AUDIT] sum < 10 fallback: baseUsdShipping = 5 × ${numOfSKUs} = ${baseUsdShipping}`,
+        `[AUDIT] fallback rule applied: computedUsd (${computedUsd}) < fallbackThreshold (${fallbackThreshold}), baseUsdShipping = ${baseUsdShipping}`,
       );
     } else {
-      baseUsdShipping = Math.ceil(sum);
+      baseUsdShipping = computedUsd;
+      console.debug(`[AUDIT] no fallback: baseUsdShipping = computedUsd = ${computedUsd}`);
     }
 
     const fxRaw = await getDollarMultiplier(country_iso3);
@@ -245,7 +248,6 @@ export const getShippingPriceMerchizecatalog = cache(
 
 // (realTimePriceFromMerchize unchanged)
 
-// Retail total (unchanged, typed FX)
 const merchizeAPIKey = process.env.MERRCHIZE_API_KEY!;
 const merchizeBaseURL = process.env.MERCHIZE_BASE_URL;
 type MerchizeVariant = { _id: string; retail_price?: number };
