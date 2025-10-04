@@ -41,6 +41,7 @@ function MainStage({
                 <Image
                   {...prevent}
                   priority={i === 0}
+                  fetchPriority={i === 0 ? 'high' : undefined}
                   className='size-full object-cover object-top'
                   fill
                   src={loader.srcWithRetry(src, i)}
