@@ -47,7 +47,7 @@ function ThumbsPanel({
               width={width}
               height={width}
               // Use the clamped thumbSizeHint here
-              sizes={`(min-resolution: 2dppx) ${thumbSizeHintHighDPI}px, ${thumbSizeHint}`}
+              sizes={`(max-width: 375px) ${thumbSizeHint}px, (min-resolution: 2dppx) ${thumbSizeHintHighDPI}px, ${thumbSizeHint}px`}
               quality={75}
               loading='lazy'
               onLoad={() => loader.markLoaded(index, image)}
