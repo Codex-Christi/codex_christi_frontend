@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import HeroImage from '../../../../public/media/img/general/logo-main.svg';
 
 const Hero = () => {
   return (
@@ -25,7 +26,7 @@ const Hero = () => {
         fetchPriority='high'
         style={{ objectFit: 'cover' }}
         alt='Hero Logo Image'
-        src='/media/img/general/logo-main.svg'
+        src={HeroImage}
         className={`!w-[12rem] md:!w-[18rem] lg:!w-[22rem] !left-[unset] !r-0`}
       />
     </div>
