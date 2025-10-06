@@ -13,19 +13,26 @@ const AllRootProviders = dynamic(() => import('@/components/UI/Providers/AllRoot
 const nicoMoji = localFont({
   src: '../res/fonts/Nico-Moji.woff',
   variable: '--font-nico',
+  preload: true,
 });
+
 const OCR_ext = localFont({
   src: '../res/fonts/OCR-ext.ttf',
   variable: '--font-ocr',
+  preload: false,
 });
+
 const InterFont = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
+  preload: true,
 });
+
 const TradeWinds = Trade_Winds({
   subsets: ['latin'],
   variable: '--font-trade-winds',
   weight: ['400'],
+  preload: false,
 });
 
 export async function generateMetadata(): Promise<Metadata> {
