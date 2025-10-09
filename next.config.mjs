@@ -27,7 +27,7 @@ const nextConfig = {
       },
     ],
     // cover viewport widths your app uses
-    deviceSizes: [320, 375, 425, 512, 640, 768, 900, 1024, 1280, 1440, 1920], // added mid widths, removed 2048
+    deviceSizes: [320, 375, 425, 512, 640, 768, 900, 1024, 1280], // remove very large variants for gallery
 
     // small sizes for thumbnails, icons, small images
     imageSizes: [24, 48, 80, 120, 160, 240, 320, 400, 480], // added 400 and 480 for better intermediate thumbnails
