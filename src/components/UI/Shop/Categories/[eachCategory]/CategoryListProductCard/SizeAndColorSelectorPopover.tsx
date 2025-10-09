@@ -35,7 +35,7 @@ const SizeAndColorSelectorPopover: FC<SizeAndColorSelectorPopoverProps> = (props
         sideOffset={8}
         className={`bg-black/65 backdrop-blur-xl backdrop-saturate-150 ring-1 ring-white/10 rounded-2xl p-4 shadow-2xl
              shadow-white/60 z-[60] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 
-             text-white select-none cursor-pointer lg:min-w-[375px] lg:scale-90`}
+             text-white select-none cursor-pointer lg:min-w-[375px] lg:scale-90 !min-h-[300px] transition-[all_.5s]`}
       >
         {/* Ambient aura (radial glow) */}
         <div
@@ -48,13 +48,14 @@ const SizeAndColorSelectorPopover: FC<SizeAndColorSelectorPopoverProps> = (props
           }}
         />
 
-        <div className='max-h-[500px] overflow-y-auto scrollbar px-4'>
+        <div className='max-h-[500px] overflow-y-auto scrollbar px-4 py-5'>
           {/* --- Conditional Content Rendering based on SWR state --- */}
           {/* Loading state with Skeleton */}
           {isLoading && (
-            <div className='space-y-4'>
-              <Skeleton className='h-6 w-full' />
-              <Skeleton className='h-10 w-full' />
+            <div className='space-y-6'>
+              <Skeleton className='h-12 w-full' />
+              <Skeleton className='h-12 w-full' />
+              <Skeleton className='h-12 w-full' />
               <Skeleton className='h-10 w-full' />
             </div>
           )}
