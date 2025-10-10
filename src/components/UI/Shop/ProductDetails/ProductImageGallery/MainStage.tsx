@@ -43,6 +43,7 @@ function MainStage({
                   {...prevent}
                   priority={i === 0}
                   fetchPriority={i === 0 ? 'high' : 'low'}
+                  loading={i === 0 ? 'eager' : undefined}
                   className='size-full object-cover object-top'
                   fill
                   src={loader.srcWithRetry(src, i)}

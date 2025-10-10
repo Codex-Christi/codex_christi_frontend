@@ -14,6 +14,7 @@ import { CheckoutAccordionContext } from '../ProductCheckout';
 import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
 import { DeliveryAddressInputFields } from './DeliveryAddressInputFields';
 import errorToast from '@/lib/error-toast';
+import { useVerifyEmailWithOTP } from '@/lib/hooks/shopHooks/checkout/useVerifyEmailWithOTP';
 
 const signupExtSchema = SignUpFormSchema.pick({
   firstname: true,
@@ -45,6 +46,7 @@ export const BasicCheckoutInfo = () => {
   const { handleOpenItem } = useContext(CheckoutAccordionContext);
 
   const { delivery_address, first_name, last_name, email } = useShopCheckoutStore((state) => state);
+  const { isEmailVerified, sendInitialOTPToEmail } = useVerifyEmailWithOTP(email);
 
   const {
     shipping_address_line_1,
@@ -105,7 +107,11 @@ export const BasicCheckoutInfo = () => {
       ...rest,
     }));
     // Move Accordion to Delivery Details
-    handleOpenItem('payment-section');
+    if (isEmailVerified) {
+      handleOpenItem('payment-section');
+    } else {
+      sendInitialOTPToEmail(email);
+    }
   }
 
   // Main JSX
