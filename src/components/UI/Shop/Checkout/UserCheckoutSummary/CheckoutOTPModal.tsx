@@ -1,21 +1,22 @@
 'use client';
 
+import * as React from 'react';
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/UI/primitives/dialog';
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerClose,
+  DrawerOverlay,
+} from '@/components/UI/primitives/drawer';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/UI/primitives/input-otp';
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
+import { IoMdClose } from 'react-icons/io';
+import errorToast from '@/lib/error-toast';
 
-// Public imperative API (kept the same name for compatibility)
-export type CheckoutOTPModalHandles = {
-  open: () => void;
-  close: () => void;
-};
+// Public imperative API (names kept the same for compatibility)
+export type CheckoutOTPModalHandles = { open: () => void; close: () => void };
 
-// Kept prop names the same to avoid downstream changes
+// Prop names kept the same
 export type CheckoutOTPModalProps = {
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -26,13 +27,11 @@ export type CheckoutOTPModalProps = {
   defaultValue?: string;
 };
 
-// Main component
-export const CheckoutOTPModal = forwardRef<CheckoutOTPModalHandles, CheckoutOTPModalProps>(
+export const CheckoutOTPModal = React.forwardRef<CheckoutOTPModalHandles, CheckoutOTPModalProps>(
   (
     {
       isOpen,
       onOpenChange,
-      className,
       title = 'Enter verification code',
       length = 6,
       onComplete,
@@ -40,15 +39,15 @@ export const CheckoutOTPModal = forwardRef<CheckoutOTPModalHandles, CheckoutOTPM
     },
     ref,
   ) => {
-    const [value, setValue] = useState<string>(defaultValue ?? '');
+    const [value, setValue] = React.useState<string>(defaultValue ?? '');
 
-    // Call onComplete exactly when filled
-    useEffect(() => {
+    // Fire onComplete only when fully entered
+    React.useEffect(() => {
       if (value.length === length && onComplete) onComplete(value);
     }, [value, length, onComplete]);
 
-    // Clear value before closing to avoid stale OTP on re-open
-    const handleOpenChange = useCallback(
+    // Clear OTP before closing
+    const handleOpenChange = React.useCallback(
       (open: boolean) => {
         if (!open) setValue('');
         onOpenChange?.(open);
@@ -56,89 +55,73 @@ export const CheckoutOTPModal = forwardRef<CheckoutOTPModalHandles, CheckoutOTPM
       [onOpenChange],
     );
 
-    // Imperative API forwards to the controlled setter
-    useImperativeHandle(
+    // Imperative control forwards to parent-controlled handler
+    React.useImperativeHandle(
       ref,
-      () => ({
-        open: () => handleOpenChange(true),
-        close: () => handleOpenChange(false),
-      }),
+      () => ({ open: () => handleOpenChange(true), close: () => handleOpenChange(false) }),
       [handleOpenChange],
     );
 
-    // Glassy, dark panel base (overlay styling comes from your primitives/dialog overlay)
-    const base =
-      'relative overflow-hidden rounded-2xl bg-black/45 border border-white/20 text-white backdrop-blur-xl shadow-2xl';
-
     return (
-      <Dialog open={!!isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent
-          onOpenAutoFocus={(e) => e.preventDefault()}
-          onCloseAutoFocus={(e) => e.preventDefault()}
-          className='border-0 bg-transparent p-0 shadow-none'
-        >
-          <div
-            className={`${base} ${className ?? ''} z-[60] w-[92vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl mx-auto`}
-            role='dialog'
-            aria-modal='true'
+      <Drawer open={!!isOpen} onOpenChange={handleOpenChange}>
+        <DrawerOverlay className={`!bg-black/[0.7] !backdrop-blur-[5px]`}>
+          <DrawerContent
+            onOpenAutoFocus={(e) => e.preventDefault()}
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            className='!rounded-none h-full -mt-6 bg-black/[0.4] !border-none !fixed !bottom-0 flex items-center justify-center !right-0 !z-[500] w-full'
           >
-            {/* glossy glare */}
-            <div className='pointer-events-none absolute -top-8 left-1/2 h-32 w-[220%] -translate-x-1/2 rotate-[14deg] bg-gradient-to-b from-transparent via-white/12 to-transparent' />
-
-            <div className='relative z-10 p-6 w-full'>
-              <div className='flex items-start justify-between mb-4'>
-                <DialogTitle className='text-lg font-semibold tracking-tight'>{title}</DialogTitle>
-                <button
-                  type='button'
-                  onClick={() => handleOpenChange(false)}
-                  className='rounded-lg px-2 py-1 text-white/80 hover:text-white hover:bg-white/10'
-                  aria-label='Close'
-                >
-                  ✕
-                </button>
+            <div className='mx-auto w-full sm:w-[92vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl p-6 sm:rounded-2xl text-white supports-[backdrop-filter]:backdrop-blur-lg backdrop-blur-lg border border-white/20 shadow-2xl relative'>
+              <div className='flex items-center justify-between mb-4 py-2'>
+                <DrawerTitle className='text-lg font-semibold tracking-tight'>{title}</DrawerTitle>
+                <DrawerClose className='text-white/70 hover:text-white text-4xl' aria-label='Close'>
+                  <IoMdClose />
+                </DrawerClose>
               </div>
 
-              {/* Screen-reader description to satisfy a11y */}
-              <DialogDescription className='sr-only'>
+              {/* a11y description for screen readers */}
+              <DrawerDescription className='sr-only'>
                 Enter the one-time verification code sent to your email.
-              </DialogDescription>
+              </DrawerDescription>
 
-              {/* Paste from clipboard */}
-              <div className='mb-4 text-right'>
-                <button
-                  type='button'
-                  className='text-sm text-white/70 hover:text-white underline'
-                  onClick={async () => {
-                    try {
-                      const text = await navigator.clipboard.readText();
-                      if (text) {
-                        const digits = text.replace(/\D/g, '').slice(0, length);
-                        setValue(digits);
+              <section className='flex flex-col lg:flex-row justify-center items-center lg:justify-between px-4 pt-6 lg:pt-8'>
+                {/* OTP */}
+                <InputOTP maxLength={length} value={value} onChange={setValue} className='font-otp'>
+                  <InputOTPGroup className='gap-4 '>
+                    {Array.from({ length }).map((_, i) => (
+                      <InputOTPSlot
+                        key={i}
+                        index={i}
+                        className='w-12 h-14 rounded-xl bg-white/5 border border-white/55 text-white text-2xl text-center tracking-widest outline-none ring-offset-transparent focus:ring-2 focus:ring-white/40 focus:bg-white/10 transition'
+                      />
+                    ))}
+                  </InputOTPGroup>
+                </InputOTP>
+
+                {/* Paste from clipboard */}
+                <div className='mt-10 lg:mt-0'>
+                  <button
+                    type='button'
+                    className='text-md text-white/70 hover:text-white border p-3 rounded-lg'
+                    onClick={async () => {
+                      try {
+                        const text = await navigator.clipboard.readText();
+                        if (text) {
+                          const digits = text.replace(/\D/g, '').slice(0, length);
+                          setValue(digits);
+                        }
+                      } catch (e) {
+                        errorToast({ message: `Clipboard read failed:' ${e}` });
                       }
-                    } catch (e) {
-                      console.error('Clipboard read failed:', e);
-                    }
-                  }}
-                >
-                  Paste from clipboard
-                </button>
-              </div>
+                    }}
+                  >
+                    Paste from clipboard
+                  </button>
+                </div>
+              </section>
 
-              {/* OTP */}
-              <InputOTP maxLength={length} value={value} onChange={setValue} className='font-otp'>
-                <InputOTPGroup className='gap-2'>
-                  {Array.from({ length }).map((_, i) => (
-                    <InputOTPSlot
-                      key={i}
-                      index={i}
-                      className='w-12 h-14 rounded-xl bg-white/5 border border-white/25 text-white text-2xl text-center tracking-widest outline-none ring-offset-transparent focus:ring-2 focus:ring-white/40 focus:bg-white/10 transition'
-                    />
-                  ))}
-                </InputOTPGroup>
-              </InputOTP>
-
-              <div className='mt-4 flex gap-2'>
+              <div className='mt-14 flex gap-10 justify-between'>
                 <button
+                  name='Clear OTP Input'
                   type='button'
                   onClick={() => setValue('')}
                   className='px-3 py-2 rounded-lg bg-white/10 border border-white/20 hover:bg-white/15'
@@ -146,39 +129,40 @@ export const CheckoutOTPModal = forwardRef<CheckoutOTPModalHandles, CheckoutOTPM
                   Clear
                 </button>
                 <button
+                  name='Proceed to Payment Button'
                   type='button'
                   onClick={() => handleOpenChange(false)}
-                  className='px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white'
+                  className='px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white'
                 >
-                  Done
+                  Proceed to Payment
                 </button>
               </div>
             </div>
-          </div>
-        </DialogContent>
 
-        {/* Keep autofill neutralizer inline and global */}
-        <style jsx global>{`
-          input:-webkit-autofill,
-          input:-webkit-autofill:hover,
-          input:-webkit-autofill:focus,
-          input:-webkit-autofill:active {
-            -webkit-text-fill-color: #ffffff !important;
-            caret-color: #ffffff !important;
-            transition: background-color 9999s ease-in-out 0s !important;
-            -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
-            background-clip: content-box !important;
-          }
-          input::-webkit-contacts-auto-fill-button,
-          input::-webkit-credentials-auto-fill-button {
-            visibility: hidden !important;
-            display: none !important;
-            pointer-events: none !important;
-            position: absolute !important;
-            right: 0 !important;
-          }
-        `}</style>
-      </Dialog>
+            {/* Keep autofill neutralizer inline and global */}
+            <style jsx global>{`
+              input:-webkit-autofill,
+              input:-webkit-autofill:hover,
+              input:-webkit-autofill:focus,
+              input:-webkit-autofill:active {
+                -webkit-text-fill-color: #ffffff !important;
+                caret-color: #ffffff !important;
+                transition: background-color 9999s ease-in-out 0s !important;
+                -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
+                background-clip: content-box !important;
+              }
+              input::-webkit-contacts-auto-fill-button,
+              input::-webkit-credentials-auto-fill-button {
+                visibility: hidden !important;
+                display: none !important;
+                pointer-events: none !important;
+                position: absolute !important;
+                right: 0 !important;
+              }
+            `}</style>
+          </DrawerContent>
+        </DrawerOverlay>
+      </Drawer>
     );
   },
 );

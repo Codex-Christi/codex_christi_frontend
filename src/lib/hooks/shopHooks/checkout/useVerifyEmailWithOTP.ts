@@ -54,7 +54,11 @@ export const useVerifyEmailWithOTP = (email: string | undefined, openOTPModal: (
         const otpStatus = resp?.data?.otp_status;
 
         if (otpStatus === 'pending') {
-          successToast({ header: 'OTP Sent', message: 'Check your email.' });
+          successToast({
+            header: 'OTP Sent - Check your email',
+            message: resp.message ?? 'OTP Sent - Check your email',
+            duration: 10000,
+          });
         } else {
           // Fallback toast when API shape differs or status not pending
           successToast({

@@ -19,8 +19,8 @@ import { CheckoutOTPModalHandles } from './CheckoutOTPModal';
 
 //Dynamic component import
 import dynamic from 'next/dynamic';
-const CheckoutOTPModal = dynamic(
-  () => import('./CheckoutOTPModal').then((mod) => mod.CheckoutOTPModal),
+const CheckoutOTPMainWrapper = dynamic(
+  () => import('./CheckoutOTPMainWrapper').then((mod) => mod.CheckoutOTPMainWrapper),
   { ssr: false },
 );
 
@@ -200,16 +200,13 @@ export const BasicCheckoutInfo = () => {
       </Form>
 
       {/* OTP Modal Popover */}
-      <CheckoutOTPModal
+      <CheckoutOTPMainWrapper
         isOpen={isOtpOpen}
         onOpenChange={setIsOtpOpen}
         ref={popoverRef}
         title='Verify your email before proceeding'
         length={6}
-        onComplete={(otp) => {
-          console.log('OTP entered:', otp);
-          // setIsOtpOpen(false);
-        }}
+        proceedToPaymentTrigger={handleOpenItem}
       />
     </>
   );
