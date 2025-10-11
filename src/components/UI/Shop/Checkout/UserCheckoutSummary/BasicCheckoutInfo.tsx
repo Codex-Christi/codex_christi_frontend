@@ -9,12 +9,20 @@ import { SignUpFormSchema } from '@/lib/formSchemas/signUpFormSchema';
 import { EmailInput, NameInput } from '@/components/UI/Auth/FormFields';
 import { FaAngleDoubleDown } from 'react-icons/fa';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
-import { useContext } from 'react';
+import { useContext, useRef, useState } from 'react';
 import { CheckoutAccordionContext } from '../ProductCheckout';
 import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
 import { DeliveryAddressInputFields } from './DeliveryAddressInputFields';
 import errorToast from '@/lib/error-toast';
 import { useVerifyEmailWithOTP } from '@/lib/hooks/shopHooks/checkout/useVerifyEmailWithOTP';
+import { CheckoutOTPModalHandles } from './CheckoutOTPModal';
+
+//Dynamic component import
+import dynamic from 'next/dynamic';
+const CheckoutOTPModal = dynamic(
+  () => import('./CheckoutOTPModal').then((mod) => mod.CheckoutOTPModal),
+  { ssr: false },
+);
 
 const signupExtSchema = SignUpFormSchema.pick({
   firstname: true,
@@ -42,11 +50,16 @@ export type BasicCheckoutInfoFormSchema = z.infer<typeof BasicCheckoutInfoFormSc
 
 // Main Form Component Starts Here
 export const BasicCheckoutInfo = () => {
+  // Ref for OTP Popover
+  const popoverRef = useRef<CheckoutOTPModalHandles>(null);
+  const [isOtpOpen, setIsOtpOpen] = useState(false);
+
   // Hooks
   const { handleOpenItem } = useContext(CheckoutAccordionContext);
-
   const { delivery_address, first_name, last_name, email } = useShopCheckoutStore((state) => state);
-  const { isEmailVerified, sendInitialOTPToEmail } = useVerifyEmailWithOTP(email);
+  const { isEmailVerified, sendInitialOTPToEmail } = useVerifyEmailWithOTP(email, () =>
+    setIsOtpOpen(true),
+  );
 
   const {
     shipping_address_line_1,
@@ -78,7 +91,7 @@ export const BasicCheckoutInfo = () => {
   });
 
   // Handlers
-  function onSubmit(data: z.infer<typeof BasicCheckoutInfoFormSchema>) {
+  async function onSubmit(data: z.infer<typeof BasicCheckoutInfoFormSchema>) {
     // Only spread the rest of the data except country
     const {
       country,
@@ -110,7 +123,7 @@ export const BasicCheckoutInfo = () => {
     if (isEmailVerified) {
       handleOpenItem('payment-section');
     } else {
-      sendInitialOTPToEmail(email);
+      await sendInitialOTPToEmail(email);
     }
   }
 
@@ -185,6 +198,19 @@ export const BasicCheckoutInfo = () => {
           </Button>
         </form>
       </Form>
+
+      {/* OTP Modal Popover */}
+      <CheckoutOTPModal
+        isOpen={isOtpOpen}
+        onOpenChange={setIsOtpOpen}
+        ref={popoverRef}
+        title='Verify your email before proceeding'
+        length={6}
+        onComplete={(otp) => {
+          console.log('OTP entered:', otp);
+          // setIsOtpOpen(false);
+        }}
+      />
     </>
   );
 };

@@ -6,8 +6,14 @@ import { useCallback, useEffect, useState } from 'react';
 import errorToast from '@/lib/error-toast';
 import { useSendFirstCheckoutEmailOTPMutation } from './customMutationHooks';
 
-export const useVerifyEmailWithOTP = (email: string | undefined) => {
-  const { trigger, data, error, isMutating, reset } = useSendFirstCheckoutEmailOTPMutation();
+export const useVerifyEmailWithOTP = (email: string | undefined, openOTPModal: () => void) => {
+  const {
+    trigger,
+    data,
+    error: mutationError,
+    isMutating,
+    reset,
+  } = useSendFirstCheckoutEmailOTPMutation();
 
   const getEmailStatus = useVerifiedEmailsStore((s) => s.getEmailStatus);
   // Derive verified status from store
@@ -22,38 +28,49 @@ export const useVerifyEmailWithOTP = (email: string | undefined) => {
 
   //
   const sendInitialOTPToEmail = useCallback(
-    (email: string | undefined, extraHeaders?: HeadersInit) => {
+    async (email: string | undefined, extraHeaders?: HeadersInit) => {
       if (!email) {
         errorToast({ message: 'No email provided' });
         return;
-      } else {
-        if (!isEmailVerified) {
-          setIsEmailVerified(false);
+      }
 
-          trigger({ email, headers: extraHeaders })
-            .then((resp) => {
-              const {
-                data: { id, otp_status },
-              } = resp;
-              console.log(id);
+      // Avoid duplicate requests while a send is in flight
+      if (isMutating) {
+        return;
+      }
 
-              if (otp_status === 'pending') {
-                successToast({ header: 'OTP Sent', message: 'Check your email.' });
-              }
-            })
-            .catch((err: typeof error) => {
-              errorToast({
-                header: 'Email verification failed',
-                message: err ? err.message : error ? error.message : 'Error occured',
-              });
-            });
+      if (isEmailVerified) {
+        successToast({ header: 'Good news!', message: 'Email already verified...' });
+        setIsEmailVerified(true);
+        return;
+      }
+
+      // Open the popover first so the user sees the OTP UI immediately
+      try {
+        setIsEmailVerified(false);
+        openOTPModal();
+
+        const resp = await trigger({ email, headers: extraHeaders });
+        const otpStatus = resp?.data?.otp_status;
+
+        if (otpStatus === 'pending') {
+          successToast({ header: 'OTP Sent', message: 'Check your email.' });
         } else {
-          successToast({ header: 'Good news!', message: 'Email already verified...' });
-          setIsEmailVerified(true);
+          // Fallback toast when API shape differs or status not pending
+          successToast({
+            header: 'Request Sent',
+            message: 'If this email is valid, an OTP will arrive shortly.',
+          });
         }
+      } catch (err: unknown) {
+        const message =
+          (err as Error)?.message ??
+          mutationError?.message ??
+          'An error occurred while sending the OTP';
+        errorToast({ header: 'Email verification failed', message });
       }
     },
-    [error, isEmailVerified, trigger],
+    [isEmailVerified, isMutating, mutationError, openOTPModal, trigger],
   );
 
   return {
@@ -61,7 +78,7 @@ export const useVerifyEmailWithOTP = (email: string | undefined) => {
     sendInitialOTPToEmail,
     resetVerificationState: reset,
     data,
-    error,
+    error: mutationError,
     isMutating,
   };
 };
