@@ -9,10 +9,10 @@ import { useSendFirstCheckoutEmailOTPMutation } from './customMutationHooks';
 export const useVerifyEmailWithOTP = (email: string | undefined, openOTPModal: () => void) => {
   const {
     trigger,
-    data,
+    data: initialOTPSendResp,
     error: mutationError,
     isMutating,
-    reset,
+    reset: resetInitialOTPMutation,
   } = useSendFirstCheckoutEmailOTPMutation();
 
   const getEmailStatus = useVerifiedEmailsStore((s) => s.getEmailStatus);
@@ -57,7 +57,12 @@ export const useVerifyEmailWithOTP = (email: string | undefined, openOTPModal: (
           successToast({
             header: 'OTP Sent - Check your email',
             message: resp.message ?? 'OTP Sent - Check your email',
-            duration: 10000,
+            duration: 15000,
+          });
+        } else if (otpStatus === 'verified') {
+          successToast({
+            header: 'Email verified',
+            message: 'Email already verified. Proceeding to payment...',
           });
         } else {
           // Fallback toast when API shape differs or status not pending
@@ -80,9 +85,9 @@ export const useVerifyEmailWithOTP = (email: string | undefined, openOTPModal: (
   return {
     isEmailVerified,
     sendInitialOTPToEmail,
-    resetVerificationState: reset,
-    data,
-    error: mutationError,
-    isMutating,
+    resetInitialOTPMutation,
+    initialOTPSendResp,
+    initialOTPSendError: mutationError,
+    isInitialSendLoading: isMutating,
   };
 };

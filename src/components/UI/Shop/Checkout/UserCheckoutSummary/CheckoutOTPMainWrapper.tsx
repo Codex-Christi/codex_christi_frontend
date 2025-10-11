@@ -1,25 +1,33 @@
+import { useVerifyEmailWithOTP } from '@/lib/hooks/shopHooks/checkout/useVerifyEmailWithOTP';
 import {
   CheckoutOTPModal,
   CheckoutOTPModalProps,
   CheckoutOTPModalHandles,
 } from './CheckoutOTPModal';
-import { RefObject } from 'react';
+import { forwardRef } from 'react';
 
 type CheckoutOTPMainWrapperProps = Omit<CheckoutOTPModalProps, 'onComplete'> & {
-  ref: RefObject<CheckoutOTPModalHandles>;
   proceedToPaymentTrigger: (itemValue: 'basic-checkout-info' | 'payment-section') => void;
+  otpSendHookProps: ReturnType<typeof useVerifyEmailWithOTP>;
 };
 
-export const CheckoutOTPMainWrapper: React.FC<CheckoutOTPMainWrapperProps> = (props) => {
-  // Main JSX
+export const CheckoutOTPMainWrapper = forwardRef<
+  CheckoutOTPModalHandles,
+  CheckoutOTPMainWrapperProps
+>((props, ref) => {
+  const { otpSendHookProps, ...rest } = props;
+  const { initialOTPSendResp } = otpSendHookProps;
+
   return (
-    <>
-      <CheckoutOTPModal
-        {...props}
-        onComplete={(otp) => {
-          console.log('OTP entered:', otp);
-        }}
-      />
-    </>
+    <CheckoutOTPModal
+      ref={ref}
+      {...rest}
+      onComplete={(otp) => {
+        console.log('OTP entered:', otp);
+        console.log(initialOTPSendResp);
+      }}
+    />
   );
-};
+});
+
+CheckoutOTPMainWrapper.displayName = 'CheckoutOTPMainWrapper';

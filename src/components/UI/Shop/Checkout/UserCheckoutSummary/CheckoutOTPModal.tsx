@@ -70,7 +70,7 @@ export const CheckoutOTPModal = React.forwardRef<CheckoutOTPModalHandles, Checko
             onCloseAutoFocus={(e) => e.preventDefault()}
             className='!rounded-none h-full -mt-6 bg-black/[0.4] !border-none !fixed !bottom-0 flex items-center justify-center !right-0 !z-[500] w-full'
           >
-            <div className='mx-auto w-full sm:w-[92vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl p-6 sm:rounded-2xl text-white supports-[backdrop-filter]:backdrop-blur-lg backdrop-blur-lg border border-white/20 shadow-2xl relative'>
+            <div className='mx-auto w-full sm:w-[92vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl p-6 sm:rounded-2xl text-white supports-[backdrop-filter]:backdrop-blur-lg !backdrop-blur-[5px] border border-white/20 shadow-2xl relative'>
               <div className='flex items-center justify-between mb-4 py-2'>
                 <DrawerTitle className='text-lg font-semibold tracking-tight'>{title}</DrawerTitle>
                 <DrawerClose className='text-white/70 hover:text-white text-4xl' aria-label='Close'>
@@ -83,7 +83,7 @@ export const CheckoutOTPModal = React.forwardRef<CheckoutOTPModalHandles, Checko
                 Enter the one-time verification code sent to your email.
               </DrawerDescription>
 
-              <section className='flex flex-col lg:flex-row justify-center items-center lg:justify-between px-4 pt-6 lg:pt-8'>
+              <section className='flex flex-col lg:flex-row justify-center items-center lg:justify-between pt-6 lg:pt-8'>
                 {/* OTP */}
                 <InputOTP maxLength={length} value={value} onChange={setValue} className='font-otp'>
                   <InputOTPGroup className='gap-4 '>
@@ -110,7 +110,7 @@ export const CheckoutOTPModal = React.forwardRef<CheckoutOTPModalHandles, Checko
                           setValue(digits);
                         }
                       } catch (e) {
-                        errorToast({ message: `Clipboard read failed:' ${e}` });
+                        errorToast({ message: `Clipboard read failed: ${e}` });
                       }
                     }}
                   >

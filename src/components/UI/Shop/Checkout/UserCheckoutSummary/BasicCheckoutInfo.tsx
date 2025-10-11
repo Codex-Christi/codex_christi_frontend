@@ -51,15 +51,14 @@ export type BasicCheckoutInfoFormSchema = z.infer<typeof BasicCheckoutInfoFormSc
 // Main Form Component Starts Here
 export const BasicCheckoutInfo = () => {
   // Ref for OTP Popover
-  const popoverRef = useRef<CheckoutOTPModalHandles>(null);
+  const OTPModalRef = useRef<CheckoutOTPModalHandles>(null);
   const [isOtpOpen, setIsOtpOpen] = useState(false);
 
   // Hooks
   const { handleOpenItem } = useContext(CheckoutAccordionContext);
   const { delivery_address, first_name, last_name, email } = useShopCheckoutStore((state) => state);
-  const { isEmailVerified, sendInitialOTPToEmail } = useVerifyEmailWithOTP(email, () =>
-    setIsOtpOpen(true),
-  );
+  const otpSendHookProps = useVerifyEmailWithOTP(email, () => setIsOtpOpen(true));
+  const { isEmailVerified, sendInitialOTPToEmail } = otpSendHookProps;
 
   const {
     shipping_address_line_1,
@@ -109,7 +108,6 @@ export const BasicCheckoutInfo = () => {
       first_name: firstname,
       last_name: lastname,
       delivery_address: {
-        ...state.delivery_address,
         shipping_country: country,
         shipping_address_line_1: addressLine1,
         shipping_address_line_2: addressLine2 ?? '',
@@ -203,10 +201,11 @@ export const BasicCheckoutInfo = () => {
       <CheckoutOTPMainWrapper
         isOpen={isOtpOpen}
         onOpenChange={setIsOtpOpen}
-        ref={popoverRef}
+        ref={OTPModalRef}
         title='Verify your email before proceeding'
         length={6}
         proceedToPaymentTrigger={handleOpenItem}
+        otpSendHookProps={otpSendHookProps}
       />
     </>
   );
