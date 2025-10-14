@@ -4,7 +4,9 @@ import {
   CheckoutOTPModalProps,
   CheckoutOTPModalHandles,
 } from './CheckoutOTPModal';
-import { forwardRef } from 'react';
+import { forwardRef, useCallback, useEffect } from 'react';
+import loadingToast from '@/lib/loading-toast';
+import { toast } from 'sonner';
 
 type CheckoutOTPMainWrapperProps = Omit<CheckoutOTPModalProps, 'onComplete'> & {
   proceedToPaymentTrigger: (itemValue: 'basic-checkout-info' | 'payment-section') => void;
@@ -15,17 +17,48 @@ export const CheckoutOTPMainWrapper = forwardRef<
   CheckoutOTPModalHandles,
   CheckoutOTPMainWrapperProps
 >((props, ref) => {
-  const { otpSendHookProps, ...rest } = props;
-  const { initialOTPSendResp } = otpSendHookProps;
+  const { otpSendHookProps, proceedToPaymentTrigger, ...rest } = props;
+  const { initialOTPSendResp, triggerVerifySentOTP, isVerifying, isInitialSendLoading } =
+    otpSendHookProps;
+  const { email, order_id } = initialOTPSendResp?.data || {};
 
+  useEffect(() => {
+    let toastID: number;
+    if (isVerifying || isInitialSendLoading) {
+      toast.dismiss();
+      toastID = loadingToast({
+        message: isInitialSendLoading ? 'Sending OTP...' : 'Verifying OTP...',
+        duration: 5000,
+      });
+
+      return () => {
+        toast.dismiss(toastID);
+      };
+    }
+  }, [isVerifying, isInitialSendLoading]);
+
+  // Main JSX
   return (
     <CheckoutOTPModal
       ref={ref}
       {...rest}
-      onComplete={(otp) => {
-        console.log('OTP entered:', otp);
-        console.log(initialOTPSendResp);
-      }}
+      onComplete={useCallback(
+        async (otp: string) => {
+          // Handle OTP completion
+
+          if (email && order_id) {
+            const resp = await triggerVerifySentOTP({ email, order_id, otp });
+            console.log(resp);
+            setTimeout(() => {
+              rest.onOpenChange?.(false);
+              if (resp?.data.otp_status === 'verified') {
+                proceedToPaymentTrigger('payment-section');
+              }
+            }, 2500);
+          }
+        },
+        [email, order_id, proceedToPaymentTrigger, rest, triggerVerifySentOTP],
+      )}
     />
   );
 });

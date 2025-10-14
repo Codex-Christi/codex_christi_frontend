@@ -12,12 +12,14 @@ import {
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/UI/primitives/input-otp';
 import { IoMdClose } from 'react-icons/io';
 import errorToast from '@/lib/error-toast';
+import { FiClipboard } from 'react-icons/fi';
 
 // Public imperative API (names kept the same for compatibility)
 export type CheckoutOTPModalHandles = { open: () => void; close: () => void };
 
 // Prop names kept the same
 export type CheckoutOTPModalProps = {
+  email?: string;
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   className?: string;
@@ -28,23 +30,30 @@ export type CheckoutOTPModalProps = {
 };
 
 export const CheckoutOTPModal = React.forwardRef<CheckoutOTPModalHandles, CheckoutOTPModalProps>(
-  (
-    {
+  (props, ref) => {
+    // Destructure props with defaults
+    const {
       isOpen,
       onOpenChange,
       title = 'Enter verification code',
       length = 6,
       onComplete,
       defaultValue,
-    },
-    ref,
-  ) => {
+      email,
+    } = props;
+
     const [value, setValue] = React.useState<string>(defaultValue ?? '');
+    const [isComplete, setIsComplete] = React.useState(false);
 
     // Fire onComplete only when fully entered
     React.useEffect(() => {
-      if (value.length === length && onComplete) onComplete(value);
-    }, [value, length, onComplete]);
+      if (value.length === length && onComplete && !isComplete) {
+        setIsComplete(true);
+        onComplete(value);
+      } else if (value.length !== length && isComplete) {
+        setIsComplete(false);
+      }
+    }, [value, length, onComplete, isComplete]);
 
     // Clear OTP before closing
     const handleOpenChange = React.useCallback(
@@ -83,15 +92,17 @@ export const CheckoutOTPModal = React.forwardRef<CheckoutOTPModalHandles, Checko
                 Enter the one-time verification code sent to your email.
               </DrawerDescription>
 
+              <h6>Enter the OTP sent to your email: {email}</h6>
+
               <section className='flex flex-col lg:flex-row justify-center items-center lg:justify-between pt-6 lg:pt-8'>
                 {/* OTP */}
                 <InputOTP maxLength={length} value={value} onChange={setValue} className='font-otp'>
-                  <InputOTPGroup className='gap-4 '>
+                  <InputOTPGroup className='gap-4'>
                     {Array.from({ length }).map((_, i) => (
                       <InputOTPSlot
                         key={i}
                         index={i}
-                        className='w-12 h-14 rounded-xl bg-white/5 border border-white/55 text-white text-2xl text-center tracking-widest outline-none ring-offset-transparent focus:ring-2 focus:ring-white/40 focus:bg-white/10 transition'
+                        className='w-12 h-14 rounded-xl bg-white/5 border border-white/55 text-white text-2xl text-center tracking-widest outline-none ring-offset-transparent focus:ring-2 focus:ring-white/40 focus:bg-white/10 transition-all hover:scale-105 duration-200'
                       />
                     ))}
                   </InputOTPGroup>
@@ -101,7 +112,7 @@ export const CheckoutOTPModal = React.forwardRef<CheckoutOTPModalHandles, Checko
                 <div className='mt-10 lg:mt-0'>
                   <button
                     type='button'
-                    className='text-md text-white/70 hover:text-white border p-3 rounded-lg'
+                    className='group flex items-center gap-2 text-md text-white/70 hover:text-white border p-3 rounded-lg transition-all hover:scale-105 hover:bg-white/10 duration-200'
                     onClick={async () => {
                       try {
                         const text = await navigator.clipboard.readText();
@@ -109,12 +120,13 @@ export const CheckoutOTPModal = React.forwardRef<CheckoutOTPModalHandles, Checko
                           const digits = text.replace(/\D/g, '').slice(0, length);
                           setValue(digits);
                         }
-                      } catch (e) {
-                        errorToast({ message: `Clipboard read failed: ${e}` });
+                      } catch {
+                        errorToast({ message: `Clipboard access denied` });
                       }
                     }}
                   >
-                    Paste from clipboard
+                    <span>Paste OTP</span>
+                    <FiClipboard className='w-5 h-5 group-hover:animate-bounce' />
                   </button>
                 </div>
               </section>
@@ -128,10 +140,11 @@ export const CheckoutOTPModal = React.forwardRef<CheckoutOTPModalHandles, Checko
                 >
                   Clear
                 </button>
+
                 <button
                   name='Proceed to Payment Button'
                   type='button'
-                  onClick={() => handleOpenChange(false)}
+                  onClick={() => onComplete?.(value)}
                   className='px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white'
                 >
                   Proceed to Payment
