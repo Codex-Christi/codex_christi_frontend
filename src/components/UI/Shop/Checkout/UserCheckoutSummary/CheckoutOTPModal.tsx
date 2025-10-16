@@ -13,13 +13,13 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/UI/primitive
 import { IoMdClose } from 'react-icons/io';
 import errorToast from '@/lib/error-toast';
 import { FiClipboard } from 'react-icons/fi';
+import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 
 // Public imperative API (names kept the same for compatibility)
 export type CheckoutOTPModalHandles = { open: () => void; close: () => void };
 
 // Prop names kept the same
 export type CheckoutOTPModalProps = {
-  email?: string;
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   className?: string;
@@ -39,11 +39,11 @@ export const CheckoutOTPModal = React.forwardRef<CheckoutOTPModalHandles, Checko
       length = 6,
       onComplete,
       defaultValue,
-      email,
     } = props;
 
     const [value, setValue] = React.useState<string>(defaultValue ?? '');
     const [isComplete, setIsComplete] = React.useState(false);
+    const email = useShopCheckoutStore((s) => s.email);
 
     // Fire onComplete only when fully entered
     React.useEffect(() => {

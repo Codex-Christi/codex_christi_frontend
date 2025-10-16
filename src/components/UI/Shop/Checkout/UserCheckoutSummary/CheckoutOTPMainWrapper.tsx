@@ -54,7 +54,7 @@ export const CheckoutOTPMainWrapper = forwardRef<
               if (resp?.data.otp_status === 'verified') {
                 proceedToPaymentTrigger('payment-section');
               }
-            }, 2500);
+            }, 500);
           }
         },
         [email, order_id, proceedToPaymentTrigger, rest, triggerVerifySentOTP],

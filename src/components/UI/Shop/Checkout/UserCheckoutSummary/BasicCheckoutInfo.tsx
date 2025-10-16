@@ -251,7 +251,6 @@ export const BasicCheckoutInfo = () => {
         length={6}
         proceedToPaymentTrigger={handleOpenItem}
         otpSendHookProps={otpSendHookProps}
-        email={email}
       />
     </>
   );
