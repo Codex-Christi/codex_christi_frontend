@@ -9,7 +9,8 @@ import { SignUpFormSchema } from '@/lib/formSchemas/signUpFormSchema';
 import { EmailInput, NameInput } from '@/components/UI/Auth/FormFields';
 import { FaAngleDoubleDown } from 'react-icons/fa';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
-import { useContext, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { useContext, useRef, useState, useEffect } from 'react';
 import { CheckoutAccordionContext } from '../ProductCheckout';
 import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
 import { DeliveryAddressInputFields } from './DeliveryAddressInputFields';
@@ -56,7 +57,14 @@ export const BasicCheckoutInfo = () => {
 
   // Hooks
   const { handleOpenItem } = useContext(CheckoutAccordionContext);
-  const { delivery_address, first_name, last_name, email } = useShopCheckoutStore((state) => state);
+  const { delivery_address, first_name, last_name, email } = useShopCheckoutStore(
+    useShallow((s) => ({
+      delivery_address: s.delivery_address,
+      first_name: s.first_name,
+      last_name: s.last_name,
+      email: s.email,
+    })),
+  );
   const otpSendHookProps = useVerifyEmailWithOTP(email, () => setIsOtpOpen(true));
   const { isEmailVerified, sendInitialOTPToEmail } = otpSendHookProps;
 
@@ -69,6 +77,23 @@ export const BasicCheckoutInfo = () => {
     zip_code,
   } = delivery_address || {};
 
+  // Helper to derive form values from current store state (used on hydration/reset)
+  const deriveValuesFromStore = () => {
+    const s = useShopCheckoutStore.getState();
+    const da = s.delivery_address || ({} as typeof delivery_address);
+    return {
+      country: da?.shipping_country ?? '',
+      firstname: s.first_name ?? '',
+      lastname: s.last_name ?? '',
+      email: s.email ?? '',
+      addressLine1: da?.shipping_address_line_1 ?? '',
+      addressLine2: da?.shipping_address_line_2 ?? '',
+      adminArea1: da?.shipping_state ?? '',
+      adminArea2: da?.shipping_city ?? '',
+      postalCode: da?.zip_code ?? '',
+    } as const;
+  };
+
   // Extract Default Values
   const storeValues = {
     country: shipping_country ?? '',
@@ -78,16 +103,37 @@ export const BasicCheckoutInfo = () => {
     // Extract addressLine1 from delivery_address
     addressLine1: shipping_address_line_1 ?? '',
     addressLine2: shipping_address_line_2 ?? '',
-    adminArea1: shipping_city ?? '',
-    adminArea2: shipping_state ?? '',
+    adminArea1: shipping_state ?? '',
+    adminArea2: shipping_city ?? '',
     postalCode: zip_code ?? '',
   };
 
   // useForm Hook Starts Here
   const basicCheckoutInfoForm = useForm<z.infer<typeof BasicCheckoutInfoFormSchema>>({
     resolver: zodResolver(BasicCheckoutInfoFormSchema),
-    values: storeValues,
+    defaultValues: storeValues,
   });
+
+  // Ensure form is populated after Zustand persist hydration (full reload case)
+  useEffect(() => {
+    const apply = () => {
+      const vals = deriveValuesFromStore();
+      basicCheckoutInfoForm.reset(vals);
+    };
+
+    const hasHydrated = useShopCheckoutStore.persist?.hasHydrated?.();
+    if (hasHydrated) {
+      apply();
+    } else {
+      const unsub = useShopCheckoutStore.persist?.onFinishHydration?.(() => {
+        apply();
+      });
+      return () => {
+        if (typeof unsub === 'function') unsub();
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Handlers
   async function onSubmit(data: z.infer<typeof BasicCheckoutInfoFormSchema>) {
@@ -101,7 +147,6 @@ export const BasicCheckoutInfo = () => {
       adminArea1,
       adminArea2,
       postalCode,
-      ...rest
     } = data;
     useShopCheckoutStore.setState((state) => ({
       ...state,
@@ -116,13 +161,12 @@ export const BasicCheckoutInfo = () => {
         shipping_state: adminArea1,
         zip_code: postalCode,
       },
-      ...rest,
     }));
     // Move Accordion to Delivery Details
     if (isEmailVerified) {
       handleOpenItem('payment-section');
     } else {
-      await sendInitialOTPToEmail(email);
+      await sendInitialOTPToEmail(data.email);
     }
   }
 
