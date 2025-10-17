@@ -139,6 +139,7 @@ export const BasicCheckoutInfo = () => {
   async function onSubmit(data: z.infer<typeof BasicCheckoutInfoFormSchema>) {
     // Only spread the rest of the data except country
     const {
+      email,
       country,
       firstname,
       lastname,
@@ -150,6 +151,7 @@ export const BasicCheckoutInfo = () => {
     } = data;
     useShopCheckoutStore.setState((state) => ({
       ...state,
+      email: email,
       first_name: firstname,
       last_name: lastname,
       delivery_address: {
@@ -251,6 +253,7 @@ export const BasicCheckoutInfo = () => {
         length={6}
         proceedToPaymentTrigger={handleOpenItem}
         otpSendHookProps={otpSendHookProps}
+        email={email}
       />
     </>
   );

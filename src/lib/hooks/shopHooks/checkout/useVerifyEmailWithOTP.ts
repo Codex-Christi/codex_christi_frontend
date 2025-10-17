@@ -123,8 +123,21 @@ export const useVerifyEmailWithOTP = (email: string | undefined, openOTPModal: (
         return;
       }
 
+      if (verifyError) {
+        const errorsArr = verifyError.info!.errors as { code: string; message: string }[];
+        if (errorsArr[0]) {
+          const error = errorsArr[0];
+          errorToast({ header: 'OTP Verification failed', message: error.message });
+          return;
+        }
+
+        errorToast({ message: verifyError.message ?? 'An error occurred during verification' });
+        return;
+      }
+
       try {
         const resp = await verifyTrigger({ email, otp, order_id });
+
         const otpStatus = resp?.data?.otp_status;
 
         if (otpStatus === 'verified') {
@@ -149,7 +162,7 @@ export const useVerifyEmailWithOTP = (email: string | undefined, openOTPModal: (
         errorToast({ header: 'Email verification failed', message });
       }
     },
-    [isVerifying, mutationError, verifyTrigger, addEmailToVerifiedList],
+    [isVerifying, verifyTrigger, verifyError, addEmailToVerifiedList, mutationError?.message],
   );
 
   return {
