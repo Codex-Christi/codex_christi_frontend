@@ -7,6 +7,7 @@ import {
 import { forwardRef, useCallback, useEffect } from 'react';
 import loadingToast from '@/lib/loading-toast';
 import { toast } from 'sonner';
+import { useOrderStringStore } from '@/stores/shop_stores/checkoutStore/ORD-stringStore';
 
 type CheckoutOTPMainWrapperProps = Omit<CheckoutOTPModalProps, 'onComplete'> & {
   proceedToPaymentTrigger: (itemValue: 'basic-checkout-info' | 'payment-section') => void;
@@ -20,7 +21,9 @@ export const CheckoutOTPMainWrapper = forwardRef<
   const { otpSendHookProps, proceedToPaymentTrigger, ...rest } = props;
   const { initialOTPSendResp, triggerVerifySentOTP, isVerifying, isInitialSendLoading } =
     otpSendHookProps;
-  const { email, order_id } = initialOTPSendResp?.data || {};
+  const { order_id } = initialOTPSendResp?.data || {};
+  const setOrderString = useOrderStringStore((s) => s.setOrderString);
+  const { email } = rest;
 
   useEffect(() => {
     let toastID: number;
@@ -48,16 +51,16 @@ export const CheckoutOTPMainWrapper = forwardRef<
 
           if (email && order_id) {
             const resp = await triggerVerifySentOTP({ email, order_id, otp });
-            console.log(resp);
             setTimeout(() => {
               rest.onOpenChange?.(false);
-              if (resp?.data.otp_status === 'verified') {
+              if (resp && resp?.data.otp_status === 'verified') {
+                setOrderString(resp.data.order_id);
                 proceedToPaymentTrigger('payment-section');
               }
             }, 500);
           }
         },
-        [email, order_id, proceedToPaymentTrigger, rest, triggerVerifySentOTP],
+        [email, order_id, proceedToPaymentTrigger, rest, setOrderString, triggerVerifySentOTP],
       )}
     />
   );

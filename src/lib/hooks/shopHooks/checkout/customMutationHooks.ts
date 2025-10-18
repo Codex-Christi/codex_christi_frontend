@@ -60,7 +60,7 @@ export const useVerifySentEmailOTPMutation = () => {
   )();
 };
 
-function generateSignatureHeaders() {
+export function generateSignatureHeaders() {
   const API_SECRET_KEY = process.env.NEXT_PUBLIC_SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY; // Same as backend
   if (!API_SECRET_KEY) {
     throw new Error('API_SECRET_KEY is not defined');
