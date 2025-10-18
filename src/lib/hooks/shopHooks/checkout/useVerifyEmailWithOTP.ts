@@ -10,6 +10,7 @@ import {
   useSendFirstCheckoutEmailOTPMutation,
   useVerifySentEmailOTPMutation,
 } from './customMutationHooks';
+import { useOrderStringStore } from '@/stores/shop_stores/checkoutStore/ORD-stringStore';
 
 export const useVerifyEmailWithOTP = (email: string | undefined, openOTPModal: () => void) => {
   const {
@@ -28,15 +29,23 @@ export const useVerifyEmailWithOTP = (email: string | undefined, openOTPModal: (
 
   const getEmailStatus = useVerifiedEmailsStore((s) => s.getEmailStatus);
   const addEmailToVerifiedList = useVerifiedEmailsStore((s) => s.addEmailToVerifiedList);
+  const clearVerfiedEmailStore = useVerifiedEmailsStore((s) => s.clearStore);
   // Derive verified status from store
   const storeVerified = email ? getEmailStatus(email) === true : false;
   // Local state, initially from store
   const [isEmailVerified, setIsEmailVerified] = useState<boolean>(storeVerified);
+  const orderString = useOrderStringStore((s) => s.orderString);
 
   // Sync local state if store changes
   useEffect(() => {
     setIsEmailVerified(storeVerified);
   }, [storeVerified]);
+
+  useEffect(() => {
+    if (orderString === '') {
+      clearVerfiedEmailStore();
+    }
+  }, [clearVerfiedEmailStore, orderString]);
 
   //  first mutation to send OTP to email
   const sendInitialOTPToEmail = useCallback(
