@@ -34,7 +34,7 @@ export const useSendFirstCheckoutEmailOTPMutation = () => {
       key: arg.email,
       fetcherOptions: {
         headers: {
-          ...generateSignatureHeaders(),
+          ...generateSignatureHeadersOnClient(),
           ...(arg.headers ?? {}),
         },
         method: 'POST',
@@ -51,7 +51,7 @@ export const useVerifySentEmailOTPMutation = () => {
       key: arg.email,
       fetcherOptions: {
         headers: {
-          ...generateSignatureHeaders(),
+          ...generateSignatureHeadersOnClient(),
           ...(arg.headers ?? {}),
         },
         method: 'POST',
@@ -60,7 +60,7 @@ export const useVerifySentEmailOTPMutation = () => {
   )();
 };
 
-export function generateSignatureHeaders() {
+function generateSignatureHeadersOnClient() {
   const API_SECRET_KEY = process.env.NEXT_PUBLIC_SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY; // Same as backend
   if (!API_SECRET_KEY) {
     throw new Error('API_SECRET_KEY is not defined');

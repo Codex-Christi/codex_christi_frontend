@@ -6,8 +6,11 @@ import { OrdersCapture } from '@paypal/paypal-server-sdk';
 import { CartVariant, decrypt } from '@/stores/shop_stores/cartStore';
 import { CreateOrderActionInterface } from '../createOrderAction';
 import { savePaymentReceiptToCloud } from './savePaymentReceiptToCloud';
-import { sendMerchizeOrderDetailsToBackend } from '../../checkout/createMerchizeOrder/sendMerchizeOrderDetailsToBackend';
-import { savePaymentDataToBackend } from './savePaymentDataToBackend';
+import {
+  OrderProcessingResponse,
+  sendMerchizeOrderDetailsToBackend,
+} from '../../checkout/createMerchizeOrder/sendMerchizeOrderDetailsToBackend';
+import { PaymentSaveResponse, savePaymentDataToBackend } from './savePaymentDataToBackend';
 
 export interface CompletedTxInterface {
   authData: OrderResponseBody;
@@ -54,32 +57,67 @@ export const processCompletedTxAction = async (encData: string) => {
     // After the success check above, receiptUploadRes is narrowed to the success shape
     const { pdfReceiptLink, receiptFileName } = receiptUploadRes as SuccessResponse;
 
-    const asyncBackendTasks = [
-      savePaymentDataToBackend({
-        pdfReceiptLink,
-        receiptFileName,
-        authData,
-        customer,
-        delivery_address,
-        country_iso2,
-        ORD_string,
-        capturedOrder,
-      }),
-      sendMerchizeOrderDetailsToBackend({
-        country_iso2,
-        ORD_string,
-        orderRecipientInfo: { ...customer, ...delivery_address },
-        orderVariants,
-      }),
-    ];
+    const firstResp = await savePaymentDataToBackend({
+      pdfReceiptLink,
+      receiptFileName,
+      authData,
+      customer,
+      delivery_address,
+      country_iso2,
+      ORD_string,
+      capturedOrder,
+    });
 
-    const settled = await Promise.allSettled(asyncBackendTasks);
+    console.log(firstResp);
 
-    const resultA = settled[0];
-    const resultB = settled[1];
+    // const asyncBackendTasks = [
+    //   savePaymentDataToBackend({
+    //     pdfReceiptLink,
+    //     receiptFileName,
+    //     authData,
+    //     customer,
+    //     delivery_address,
+    //     country_iso2,
+    //     ORD_string,
+    //     capturedOrder,
+    //   }),
+    //   sendMerchizeOrderDetailsToBackend({
+    //     country_iso2,
+    //     ORD_string,
+    //     orderRecipientInfo: { ...customer, ...delivery_address },
+    //     orderVariants,
+    //   }),
+    // ];
 
-    console.log(resultA, resultB);
-    return { resultA, resultB };
+    // const settled = await Promise.allSettled(asyncBackendTasks);
+
+    // const resultA = settled[0];
+    // const resultB = settled[1];
+
+    // const rA =
+    //   resultA.status === 'fulfilled'
+    //     ? resultA.value
+    //     : { ok: false, error: { message: (resultA.reason as Error).message } };
+    // const rB =
+    //   resultB.status === 'fulfilled'
+    //     ? resultB.value
+    //     : { ok: false, error: { message: (resultB.reason as Error).message } };
+
+    // const resultsTuple = [rA, rB] as const;
+    // console.log(resultsTuple);
+    // const allOk = resultsTuple.every((res) => res.ok === true);
+
+    // if (allOk) {
+    //   return {
+    //     ok: true,
+    //     results: resultsTuple as [
+    //       { ok: true; data: PaymentSaveResponse },
+    //       { ok: true; data: OrderProcessingResponse },
+    //     ],
+    //   };
+    // } else {
+    //   return { ok: false, results: resultsTuple };
+    // }
   } catch (error: unknown) {
     console.log(error);
   }

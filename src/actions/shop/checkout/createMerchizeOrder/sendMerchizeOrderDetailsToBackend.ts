@@ -1,11 +1,12 @@
 'use server';
 
 import { FetcherError, FetcherOptions, universalFetcher } from '@/lib/utils/SWRfetcherAdvanced';
-import { generateSignatureHeaders } from '@/lib/hooks/shopHooks/checkout/customMutationHooks';
+import { generateSignatureHeaders } from '@/lib/hooks/shopHooks/checkout/helpers/generateSignatureHeaders';
 import { cache } from 'react';
 import { CartVariant } from '@/stores/shop_stores/cartStore';
 import { CompletedTxInterface } from '../../paypal/processCompletedTx';
-import { baseURL } from '../../paypal/processCompletedTx/savePaymentDataToBackend';
+
+const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
 
 // Remember to convert qunatity to num before sending to API
 type OrderVariants = Pick<CartVariant, 'variantId' | 'quantity'>[];
@@ -17,7 +18,7 @@ interface MerchizeBackendOrderProps {
   country_iso2: string;
 }
 
-interface OrderProcessingResponse {
+export interface OrderProcessingResponse {
   status: number;
   success: boolean;
   message: string;
@@ -73,13 +74,17 @@ export const sendMerchizeOrderDetailsToBackend = cache(
           fetcherOptions: {
             // You can override anything here if needed:
             method: 'POST', // your fetcher auto-POSTs when arg is present—this is optional
-            headers: { ...generateSignatureHeaders() },
+            headers: { ...(await generateSignatureHeaders()) },
             // cache: 'no-store', // if you want to force no caching on server
           } satisfies FetcherOptions,
         },
       );
       return { ok: true as const, data };
-    } catch (err) {
+    } catch (err: FetcherError | unknown) {
+      if (err instanceof FetcherError) {
+        console.log(err.info);
+      }
+
       // Leverage your FetcherError for rich error info
       if (err instanceof FetcherError) {
         return {

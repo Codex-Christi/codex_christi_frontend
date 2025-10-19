@@ -1,12 +1,12 @@
 'use server';
 
 import { FetcherError, FetcherOptions, universalFetcher } from '@/lib/utils/SWRfetcherAdvanced';
-import { generateSignatureHeaders } from '@/lib/hooks/shopHooks/checkout/customMutationHooks';
+import { generateSignatureHeaders } from '@/lib/hooks/shopHooks/checkout/helpers/generateSignatureHeaders';
 import { cache } from 'react';
 import { CompletedTxInterface } from '.';
 import { OrderResponseBody } from '@paypal/paypal-js';
 
-export const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
+const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
 
 export interface PaymentJSONData extends Omit<OrderResponseBody, 'payer'> {
   message: string;
@@ -24,8 +24,14 @@ export interface PaymentJSONData extends Omit<OrderResponseBody, 'payer'> {
   paypal_profile_delivery_address: CompletedTxInterface['delivery_address'] | null | undefined;
   userId: CompletedTxInterface['userId'] | null;
   paypalAuthorizationData: CompletedTxInterface['authData'];
-  pdfReceiptLink: string;
-  receiptFileName: string;
+}
+
+interface ReqBody {
+  paypal_payload: {
+    paymentJSONData: PaymentJSONData;
+    pdfReceiptLink: string;
+    receiptFileName: string;
+  };
 }
 
 export interface PaymentSaveResponse {
@@ -71,45 +77,53 @@ export const savePaymentDataToBackend = cache(async (paymentJSONData: PaymentSav
   const { currency_code, value } = amount || {};
 
   const body = {
-    message: 'Data successfully processed!',
-    timestamp: new Date().toISOString(),
-    capturedOrderPaypalID,
-    paymentAuthID: authData.id,
-    custom_id: custom_id!,
-    amountReceived: amount ? `${value} ${currency_code}` : null,
-    payer: payer
-      ? {
-          payerEmail: payerEmail!,
-          payerName: `${payerName?.given_name} ${payerName?.surname}`,
-        }
-      : null,
-    orderReceipient: {
-      name: recepientName?.full_name,
-      recepientEmail: recepientEmail!,
-      orderID: ORD_string,
+    paypal_payload: {
+      paymentJSONData: {
+        message: 'Data successfully processed!',
+        timestamp: new Date().toISOString(),
+        capturedOrderPaypalID,
+        paymentAuthID: authData.id,
+        custom_id: custom_id!,
+        amountReceived: amount ? `${value} ${currency_code}` : null,
+        payer: payer
+          ? {
+              payerEmail: payerEmail!,
+              payerName: `${payerName?.given_name} ${payerName?.surname}`,
+            }
+          : null,
+        orderReceipient: {
+          name: recepientName?.full_name,
+          recepientEmail: recepientEmail!,
+          orderID: ORD_string,
+        },
+        paypal_profile_delivery_address: delivery_address,
+        userId: userId ?? null,
+        paypalAuthorizationData: authData,
+      },
+      pdfReceiptLink,
+      receiptFileName,
     },
-    paypal_profile_delivery_address: delivery_address,
-    userId: userId ?? null,
-    paypalAuthorizationData: authData,
-    pdfReceiptLink,
-    receiptFileName,
   };
 
   try {
-    const data = await universalFetcher<PaymentSaveResponse, PaymentJSONData>(
+    const data = await universalFetcher<PaymentSaveResponse, ReqBody>(
       `${baseURL}/orders/order-payment`,
       {
-        arg: body satisfies PaymentJSONData, // <- becomes JSON body (POST by default in your fetcher)
+        arg: body satisfies ReqBody, // <- becomes JSON body (POST by default in your fetcher)
         fetcherOptions: {
           // You can override anything here if needed:
           method: 'POST', // your fetcher auto-POSTs when arg is present—this is optional
-          headers: { ...generateSignatureHeaders() },
+          headers: { ...(await generateSignatureHeaders()) },
           // cache: 'no-store', // if you want to force no caching on server
         } satisfies FetcherOptions,
       },
     );
     return { ok: true as const, data };
-  } catch (err) {
+  } catch (err: FetcherError | unknown) {
+    if (err instanceof FetcherError) {
+      console.log(err.info);
+    }
+
     // Leverage your FetcherError for rich error info
     if (err instanceof FetcherError) {
       return {
