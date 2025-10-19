@@ -32,7 +32,7 @@
     "@types/pdfkit": "^0.17.0",
     "@types/serialize-javascript": "^5.0.4",
     "axios": "^1.7.7",
-    "class-variance-authority": "^0.7.0",
+    "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",
     "country-data-list": "^1.4.1",
     "country-flag-icons": "^1.5.18",

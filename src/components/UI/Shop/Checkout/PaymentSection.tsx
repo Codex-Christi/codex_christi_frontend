@@ -12,7 +12,7 @@ import { CheckoutAccordionContext } from './ProductCheckout';
 
 // Dynamic Imports
 const PayPalCheckout = dynamic(() =>
-  import('./Paypal/PaypalMainComponent').then((comp) => comp.default)
+  import('./Paypal/PayPalMainCheckoutComponent').then((comp) => comp.default),
 );
 
 export type CheckoutOptions = 'card' | 'paypal_buttons' | 'google_pay' | '';
@@ -30,9 +30,7 @@ const PaymentSection = () => {
   return (
     <>
       <section className='flex justify-between w-full items-center mb-10'>
-        <h2 className='border-b max-w-fit  border-white text-xl font-bold'>
-          Payment Method
-        </h2>
+        <h2 className='border-b max-w-fit  border-white text-xl font-bold'>Payment Method</h2>
 
         <Button
           variant={'outline'}
@@ -76,11 +74,7 @@ const PaymentSection = () => {
               />
 
               <Label htmlFor='paypal_buttons' className='cursor-pointer'>
-                <Image
-                  className='w-10 h-auto'
-                  src={PayPal}
-                  alt='Pay with Paypal'
-                />
+                <Image className='w-10 h-auto' src={PayPal} alt='Pay with Paypal' />
               </Label>
             </p>
             {/*  */}
@@ -93,11 +87,7 @@ const PaymentSection = () => {
                 onCheckedChange={() => setPayOption('google_pay')}
               />
 
-              <Image
-                className='w-10 h-auto'
-                src={GooglePay}
-                alt='Pay with Google Pay'
-              />
+              <Image className='w-10 h-auto' src={GooglePay} alt='Pay with Google Pay' />
             </p>
             {/*  */}
           </div>
@@ -107,10 +97,7 @@ const PaymentSection = () => {
           Create your account Or{' '}
           <span className='font-medium'>
             Already have an account?{' '}
-            <Link
-              className='underline underline-offset-4 font-semibold'
-              href=''
-            >
+            <Link className='underline underline-offset-4 font-semibold' href=''>
               Sign In
             </Link>
           </span>

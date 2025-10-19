@@ -1,3 +1,5 @@
+'use client';
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { encrypt, decrypt } from '../cartStore';
@@ -17,7 +19,6 @@ export const useOrderStringStore = create<OrderStringState>()(
     {
       name: 'order-string-store',
       storage: createEncryptedStorage<OrderStringState>({ encrypt, decrypt }),
-      skipHydration: true,
     },
   ),
 );
