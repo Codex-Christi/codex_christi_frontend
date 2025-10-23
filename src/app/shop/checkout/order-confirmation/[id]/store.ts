@@ -1,4 +1,4 @@
-import { SuccessResponse } from '@/actions/shop/paypal/processCompletedTx';
+import { SuccessResponse } from '@/actions/shop/paypal/processAndUploadCompletedTx';
 import { decrypt, encrypt } from '@/stores/shop_stores/cartStore';
 import { createEncryptedStorage } from '@/stores/shop_stores/checkoutStore';
 import { create } from 'zustand';

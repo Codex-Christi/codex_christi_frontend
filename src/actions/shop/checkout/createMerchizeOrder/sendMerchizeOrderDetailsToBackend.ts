@@ -4,7 +4,7 @@ import { FetcherError, FetcherOptions, universalFetcher } from '@/lib/utils/SWRf
 import { generateSignatureHeaders } from '@/lib/hooks/shopHooks/checkout/helpers/generateSignatureHeaders';
 import { cache } from 'react';
 import { CartVariant } from '@/stores/shop_stores/cartStore';
-import { CompletedTxInterface } from '../../paypal/processCompletedTx';
+import { CompletedTxInterface } from '../../paypal/processAndUploadCompletedTx';
 
 const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
 

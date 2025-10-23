@@ -110,6 +110,8 @@ export async function universalFetcher<Data, Arg = undefined>(
     });
 
     if (!res.ok) {
+      console.log(res);
+
       let errInfo: Record<string, unknown> | null = null;
       try {
         errInfo = await res.json();
