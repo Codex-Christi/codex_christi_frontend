@@ -31,7 +31,7 @@ export const usePayPalTXApproveCallback = () => {
 
   const {
     result: paymentSaveRes,
-    call: savePaymentDataToBackend,
+    call: savePaymentDataToBackendOnClient,
     isPending: isPaymentSavePending,
   } = useServerActionWithState(savePaymentTXToBackend, null);
 
@@ -111,9 +111,9 @@ export const usePayPalTXApproveCallback = () => {
             }),
           );
 
-          const paymentTXSaveRes = await savePaymentDataToBackend(encPaymentSaveProps);
+          const paymentTXSaveRes = await savePaymentDataToBackendOnClient(encPaymentSaveProps);
 
-          console.dir(paymentTXSaveRes);
+          console.log(paymentTXSaveRes);
 
           //If everything goes well in submitting the processed order's details to the backend
           //     setPaymentConfirmationData(res);
@@ -143,7 +143,7 @@ export const usePayPalTXApproveCallback = () => {
       email,
       first_name,
       last_name,
-      savePaymentDataToBackend,
+      savePaymentDataToBackendOnClient,
       uploadReceipt,
       userId,
     ],

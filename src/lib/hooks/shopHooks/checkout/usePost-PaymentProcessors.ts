@@ -92,8 +92,8 @@ export const usePost_PaymentProcessors = () => {
       checkObjectKeys(paymentSavingActionProps, requiredKeys);
 
       const paymentSaveRes = await savePaymentDataToBackend(encProps);
-
-      if (paymentSaveRes.ok === false) {
+      if (!paymentSaveRes.ok) {
+        return { ok: false as const, error: paymentSaveRes.error };
       }
 
       return paymentSaveRes;

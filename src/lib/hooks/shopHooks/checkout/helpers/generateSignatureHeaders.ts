@@ -12,7 +12,7 @@ export async function generateSignatureHeaders() {
 
   return {
     'Content-Type': 'application/json',
-    'X-API-Signature': `${signature}`,
+    'X-API-Signature': `${signature}3`,
     'X-API-Timestamp': `${timestamp}`,
   };
 }
