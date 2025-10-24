@@ -93,6 +93,9 @@ export const usePost_PaymentProcessors = () => {
 
       const paymentSaveRes = await savePaymentDataToBackend(encProps);
 
+      if (paymentSaveRes.ok === false) {
+      }
+
       return paymentSaveRes;
     } catch (err: unknown) {
       return {
@@ -106,6 +109,8 @@ export const usePost_PaymentProcessors = () => {
       };
     }
   }, []);
+
+  const pushOrderToMerchize = useCallback(async (encProps: string) => {}, []);
 
   return { uploadPaymentReceipt, savePaymentTXToBackend };
 };

@@ -7,6 +7,7 @@ import { CompletedTxInterface } from '@/lib/hooks/shopHooks/checkout/usePost-Pay
 import { OrderResponseBody } from '@paypal/paypal-js';
 import { decrypt } from '@/stores/shop_stores/cartStore';
 import { OrdersCapture } from '@paypal/paypal-server-sdk';
+import { returnReducedBackendError } from '@/lib/hooks/shopHooks/checkout/helpers/returnReducedBackendError';
 
 const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
 
@@ -37,14 +38,16 @@ interface ReqBody {
 }
 
 export interface PaymentSaveResponse {
-  status: number;
-  success: boolean;
-  message: string;
   data: {
-    id: string;
-    custom_id: string;
-    receipient_email: string;
-    user: string | null;
+    status: number;
+    success: boolean;
+    message: string;
+    data: {
+      id: string;
+      custom_id: string;
+      receipient_email: string;
+      user: string | null;
+    };
   };
 }
 
@@ -123,18 +126,13 @@ export const savePaymentDataToBackend = cache(async (encProps: string) => {
         } satisfies FetcherOptions,
       },
     );
-    return { ok: true as const, data };
+    return { ok: true as const, ...data };
   } catch (err: FetcherError | { message: string } | unknown) {
-    console.log(err);
-    if (err instanceof FetcherError) {
-      console.log(err.info);
-    }
-
     // Leverage your FetcherError for rich error info
     if (err instanceof FetcherError) {
       return {
         ok: false as const,
-        error: { message: err.message, status: err.status, info: err.info },
+        error: returnReducedBackendError(err),
       };
     }
     return {

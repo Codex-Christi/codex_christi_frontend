@@ -4,7 +4,8 @@ import { FetcherError, FetcherOptions, universalFetcher } from '@/lib/utils/SWRf
 import { generateSignatureHeaders } from '@/lib/hooks/shopHooks/checkout/helpers/generateSignatureHeaders';
 import { cache } from 'react';
 import { CartVariant } from '@/stores/shop_stores/cartStore';
-import { CompletedTxInterface } from '../../paypal/processAndUploadCompletedTx';
+import { CompletedTxInterface } from '@/lib/hooks/shopHooks/checkout/usePost-PaymentProcessors';
+import { returnReducedBackendError } from '@/lib/hooks/shopHooks/checkout/helpers/returnReducedBackendError';
 
 const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
 
@@ -19,20 +20,22 @@ interface MerchizeBackendOrderProps {
 }
 
 export interface OrderProcessingResponse {
-  status: number;
-  success: boolean;
-  message: string;
   data: {
-    id: string;
-    order_payment_custom_id: string;
-    order_intent_id: string;
-    order_intent_order_id: string;
-    provider_order_id: string;
-    provider_order_code: string;
-    processing_staus: [
-      'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'completed' | 'failed',
-    ];
-    error_message: string | null;
+    status: number;
+    success: boolean;
+    message: string;
+    data: {
+      id: string;
+      order_payment_custom_id: string;
+      order_intent_id: string;
+      order_intent_order_id: string;
+      provider_order_id: string;
+      provider_order_code: string;
+      processing_staus: [
+        'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'completed' | 'failed',
+      ];
+      error_message: string | null;
+    };
   };
 }
 
@@ -79,17 +82,13 @@ export const sendMerchizeOrderDetailsToBackend = cache(
           } satisfies FetcherOptions,
         },
       );
-      return { ok: true as const, data };
+      return { ok: true as const, ...data };
     } catch (err: FetcherError | unknown) {
-      if (err instanceof FetcherError) {
-        console.log(err.info);
-      }
-
       // Leverage your FetcherError for rich error info
       if (err instanceof FetcherError) {
         return {
           ok: false as const,
-          error: { message: err.message, status: err.status, info: err.info },
+          error: returnReducedBackendError(err),
         };
       }
       return { ok: false as const, error: { message: 'Unknown error' } };

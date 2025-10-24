@@ -10,6 +10,7 @@ import { startTransition, useCallback, useContext, useEffect } from 'react';
 import { usePost_PaymentProcessors } from './usePost-PaymentProcessors';
 import { useServerActionWithState } from '../../useServerActionWithState';
 import { FetcherError } from '@/lib/utils/SWRfetcherAdvanced';
+import successToast from '@/lib/success-toast';
 
 // Main Hook
 export const usePayPalTXApproveCallback = () => {
@@ -68,7 +69,7 @@ export const usePayPalTXApproveCallback = () => {
         if (capturedOrder?.status === 'COMPLETED') {
           // Process all post-payment server actions
           // Server action that'll process the receipt upload
-          const rrr = await uploadReceipt(
+          const directReceiptUploadResp = await uploadReceipt(
             encrypt(
               JSON.stringify({
                 authData,
@@ -80,26 +81,43 @@ export const usePayPalTXApproveCallback = () => {
               }),
             ),
           );
-          console.log(capturedOrder);
 
-          console.log(rrr);
+          if (!(directReceiptUploadResp?.ok === true)) {
+            errorToast({
+              header: `Payment details upload failed`,
+              message: directReceiptUploadResp?.error.message ?? 'Error occured',
+            });
+            return;
+          }
 
-          // please encrypt authData, finalCapturedOrder, 'capturedOrderPaypalID', customer, delivery_address, userId, ORD_string, pdfReceiptLink, receiptFileName,
+          successToast({
+            message: `Transaction complete: ${capturedOrder.id},`,
+            header: 'Payment Successfull!',
+          });
+
+          const { pdfReceiptLink, receiptFileName } = directReceiptUploadResp;
+
+          const encPaymentSaveProps = encrypt(
+            JSON.stringify({
+              authData,
+              finalCapturedOrder: capturedOrder,
+              capturedOrderPaypalID: capturedOrder.id,
+              customer: { name: `${first_name} ${last_name}`, email },
+              delivery_address,
+              userId,
+              ORD_string,
+              pdfReceiptLink,
+              receiptFileName,
+            }),
+          );
+
+          const paymentTXSaveRes = await savePaymentDataToBackend(encPaymentSaveProps);
+
+          console.dir(paymentTXSaveRes);
 
           //If everything goes well in submitting the processed order's details to the backend
-          //   if (res.success === true) {
           //     setPaymentConfirmationData(res);
-          //     successToast({
-          //       message: `Transaction complete: ${capturedOrder.id},`,
-          //       header: 'Payment Successfull!',
-          //     });
-
           //     router.push(`/shop/checkout/order-confirmation/${capturedOrder.id}`);
-          //   }
-          //   // Else if the uploading fails
-          //   else {
-          //     errorToast({ header: `Payment details upload failed`, message: res.message });
-          //   }
 
           // If payment capture fails for some reason
         } else {
@@ -119,12 +137,24 @@ export const usePayPalTXApproveCallback = () => {
         throw new Error('Failed to create PayPal order');
       }
     },
-    [ORD_string, email, first_name, last_name, receiptUploadRes, uploadReceipt],
+    [
+      ORD_string,
+      delivery_address,
+      email,
+      first_name,
+      last_name,
+      savePaymentDataToBackend,
+      uploadReceipt,
+      userId,
+    ],
   );
 
   return {
     mainPayPalApproveCallback,
     isReceiptUploadPending,
     isReceiptUploadSuccess: receiptUploadRes?.ok,
+    isPaymentSavePending,
+    isPaymentSaveSuccessfull: paymentSaveRes?.ok,
+    paymentSaveRes,
   };
 };
