@@ -1,28 +1,30 @@
+import { useCallback, useContext } from 'react';
 import { ServerOrderDetailsContext } from '@/components/UI/Shop/Checkout/ServerOrderDetailsComponent';
-import errorToast from '@/lib/error-toast';
-import { encrypt, useCartStore } from '@/stores/shop_stores/cartStore';
+import { useCartStore, encrypt } from '@/stores/shop_stores/cartStore';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { useOrderStringStore } from '@/stores/shop_stores/checkoutStore/ORD-stringStore';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { OnApproveData, OrderResponseBody } from '@paypal/paypal-js';
 import { OrdersCapture } from '@paypal/paypal-server-sdk';
-import { startTransition, useCallback, useContext, useEffect } from 'react';
 import { usePost_PaymentProcessors } from './usePost-PaymentProcessors';
 import { useServerActionWithState } from '../../useServerActionWithState';
 import { FetcherError } from '@/lib/utils/SWRfetcherAdvanced';
 import successToast from '@/lib/success-toast';
+import errorToast from '@/lib/error-toast';
 
-// Main Hook
+// 🧩 Main Hook
 export const usePayPalTXApproveCallback = () => {
-  // Top-level hook initializations
-  const cart = useCartStore((store) => store.variants);
-  const serverOrderDetails = useContext(ServerOrderDetailsContext);
-  const userId = useUserMainProfileStore((state) => state.userMainProfile?.id);
-  const { first_name, last_name, email, delivery_address } = useShopCheckoutStore((state) => state);
+  const cart = useCartStore((s) => s.variants);
+  const { userMainProfile } = useUserMainProfileStore();
+  const userId = userMainProfile?.id;
+  const { first_name, last_name, email, delivery_address } = useShopCheckoutStore();
   const ORD_string = useOrderStringStore((s) => s.orderString);
+  const serverOrderDetails = useContext(ServerOrderDetailsContext);
 
-  const { uploadPaymentReceipt, savePaymentTXToBackend } = usePost_PaymentProcessors();
+  const { uploadPaymentReceipt, savePaymentTXToBackend, pushOrderToMerchize } =
+    usePost_PaymentProcessors();
 
+  // Controlled async server actions
   const {
     result: receiptUploadRes,
     call: uploadReceipt,
@@ -31,122 +33,127 @@ export const usePayPalTXApproveCallback = () => {
 
   const {
     result: paymentSaveRes,
-    call: savePaymentDataToBackendOnClient,
+    call: savePaymentDataToBackend,
     isPending: isPaymentSavePending,
   } = useServerActionWithState(savePaymentTXToBackend, null);
 
-  // Destructuring
-  const { countrySupport } = serverOrderDetails || {};
-  const { country_iso2 } = countrySupport?.country || {};
+  const {
+    result: orderPushRes,
+    call: pushOrderToMerchizeClient,
+    isPending: isOrderPushPending,
+  } = useServerActionWithState(pushOrderToMerchize, null);
 
-  // Main completion callback
+  const country_iso2 = serverOrderDetails?.countrySupport?.country?.country_iso2;
+
+  // 💳 Main PayPal Approve Callback
   const mainPayPalApproveCallback = useCallback(
-    async (data: OnApproveData): Promise<void> => {
+    async (data: OnApproveData) => {
       try {
+        // 1️⃣ Authorize PayPal Order
+
         const authRes = await fetch('/next-api/paypal/orders/authorize', {
           method: 'POST',
           body: JSON.stringify({ orderID: data.orderID }),
         });
+        if (!authRes.ok) throw new Error(`Authorization failed: ${authRes.statusText}`);
 
-        //Object from paypal on authorize
         const authData = JSON.parse(await authRes.json()) as OrderResponseBody;
-
         const authorizationId = authData?.purchase_units?.[0]?.payments?.authorizations?.[0]?.id;
+        if (!authorizationId) throw new Error('Missing authorization ID');
 
-        if (!authorizationId) {
-          errorToast({ message: 'Missing authorization ID' });
-          return;
-        }
+        // 2️⃣ Capture Payment
 
         const capRes = await fetch('/next-api/paypal/orders/capture', {
           method: 'POST',
           body: JSON.stringify({ authorizationId }),
         });
+        if (!capRes.ok) throw new Error(`Capture failed: ${capRes.statusText}`);
 
-        //Final capturedOrder data
         const capturedOrder = JSON.parse(await capRes.json()) as OrdersCapture;
+        if (capturedOrder?.status !== 'COMPLETED')
+          throw new Error(`Payment not completed: ${capturedOrder?.status}`);
 
-        if (capturedOrder?.status === 'COMPLETED') {
-          // Process all post-payment server actions
-          // Server action that'll process the receipt upload
-          const directReceiptUploadResp = await uploadReceipt(
-            encrypt(
-              JSON.stringify({
-                authData,
-                customer: {
-                  name: `${first_name} ${last_name}`,
-                  email: email ?? 'john@example.com',
-                },
-                ORD_string,
-              }),
-            ),
-          );
+        // 3️⃣ Upload Payment Receipt
+        const receiptPayload = encrypt(
+          JSON.stringify({
+            authData,
+            customer: { name: `${first_name} ${last_name}`, email: email ?? 'john@example.com' },
+            ORD_string,
+          }),
+        );
 
-          if (!(directReceiptUploadResp?.ok === true)) {
-            errorToast({
-              header: `Payment details upload failed`,
-              message: directReceiptUploadResp?.error.message ?? 'Error occured',
-            });
-            return;
-          }
-
-          successToast({
-            message: `Transaction complete: ${capturedOrder.id},`,
-            header: 'Payment Successfull!',
+        const receiptResp = await uploadReceipt(receiptPayload);
+        if (!receiptResp?.ok) {
+          errorToast({
+            header: 'Payment details upload failed',
+            message: receiptResp?.error?.message ?? 'Error occurred during receipt upload',
           });
-
-          const { pdfReceiptLink, receiptFileName } = directReceiptUploadResp;
-
-          const encPaymentSaveProps = encrypt(
-            JSON.stringify({
-              authData,
-              finalCapturedOrder: capturedOrder,
-              capturedOrderPaypalID: capturedOrder.id,
-              customer: { name: `${first_name} ${last_name}`, email },
-              delivery_address,
-              userId,
-              ORD_string,
-              pdfReceiptLink,
-              receiptFileName,
-            }),
-          );
-
-          const paymentTXSaveRes = await savePaymentDataToBackendOnClient(encPaymentSaveProps);
-
-          console.log(paymentTXSaveRes);
-
-          //If everything goes well in submitting the processed order's details to the backend
-          //     setPaymentConfirmationData(res);
-          //     router.push(`/shop/checkout/order-confirmation/${capturedOrder.id}`);
-
-          // If payment capture fails for some reason
-        } else {
-          throw new Error(`Capture failed`);
+          return;
         }
-      } catch (err: Error | FetcherError | unknown) {
+
+        successToast({
+          header: 'Payment Successful!',
+          message: `Transaction complete: ${capturedOrder.id}`,
+        });
+
+        // 4️⃣ Save Payment to Backend
+        const { pdfReceiptLink, receiptFileName } = receiptResp;
+        const paymentSavePayload = encrypt(
+          JSON.stringify({
+            authData,
+            finalCapturedOrder: capturedOrder,
+            capturedOrderPaypalID: capturedOrder.id,
+            customer: { name: `${first_name} ${last_name}`, email },
+            delivery_address,
+            userId,
+            ORD_string,
+            pdfReceiptLink,
+            receiptFileName,
+          }),
+        );
+
+        const paymentResp = await savePaymentDataToBackend(paymentSavePayload);
+
+        console.log(paymentResp);
+
+        if (!paymentResp?.ok) {
+          errorToast({
+            header: 'Payment Save Failed',
+            message: paymentResp?.error?.message ?? 'Could not save payment record',
+          });
+          return;
+        }
+
+        // 5️⃣ Push Order to Merchize
+        const orderVariants = cart.map(({ quantity, variantId }) => ({ quantity, variantId }));
+        const orderRecipientInfo = {
+          delivery_address,
+          customer: { name: `${first_name} ${last_name}`, email },
+        };
+        const merchizePayload = encrypt(
+          JSON.stringify({ orderVariants, orderRecipientInfo, ORD_string, country_iso2 }),
+        );
+
+        const pushRes = await pushOrderToMerchizeClient(merchizePayload);
+
+        console.log(pushRes);
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : err instanceof FetcherError
+              ? `info: ${err.info}, cause: ${err.cause}`
+              : String(err);
+
         console.log(err);
 
-        errorToast({
-          message:
-            err instanceof Error
-              ? err.message
-              : err instanceof FetcherError
-                ? `info - ${err.info}, cause - ${err.cause}, message - ${err.message}`
-                : String(err),
-        });
-        throw new Error('Failed to create PayPal order');
+        console.error('PayPal approval error:', err);
+        errorToast({ message });
+        // throw new Error('Failed to complete PayPal order');
       }
     },
-    [
-      ORD_string,
-      delivery_address,
-      email,
-      first_name,
-      last_name,
-      savePaymentDataToBackendOnClient,
-      uploadReceipt,
-      userId,
-    ],
+    //prettier-ignore
+    [ cart, country_iso2, delivery_address, email, first_name, last_name, uploadReceipt, savePaymentDataToBackend, pushOrderToMerchizeClient, ORD_string, userId, ],
   );
 
   return {
@@ -156,5 +163,7 @@ export const usePayPalTXApproveCallback = () => {
     isPaymentSavePending,
     isPaymentSaveSuccessfull: paymentSaveRes?.ok,
     paymentSaveRes,
+    orderPushRes,
+    isOrderPushPending,
   };
 };

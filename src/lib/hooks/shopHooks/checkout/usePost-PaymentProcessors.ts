@@ -1,3 +1,7 @@
+import {
+  MerchizeBackendOrderProps,
+  sendMerchizeOrderDetailsToBackend,
+} from '@/actions/shop/checkout/createMerchizeOrder/sendMerchizeOrderDetailsToBackend';
 import { CreateOrderActionInterface } from '@/actions/shop/paypal/createOrderAction';
 import {
   PaymentSavingActionProps,
@@ -96,7 +100,7 @@ export const usePost_PaymentProcessors = () => {
         return { ok: false as const, error: paymentSaveRes.error };
       }
 
-      return paymentSaveRes;
+      return { ok: true as const, data: paymentSaveRes.data };
     } catch (err: unknown) {
       return {
         ok: false as const,
@@ -110,9 +114,44 @@ export const usePost_PaymentProcessors = () => {
     }
   }, []);
 
-  const pushOrderToMerchize = useCallback(async (encProps: string) => {}, []);
+  /**
+   * Please encrypt
+   *
+   * orderVariants, orderRecipientInfo: {'delivery_address', 'customer'} , ORD_string, country_iso2
+   */
+  const pushOrderToMerchize = useCallback(async (encProps: string) => {
+    try {
+      const merchizeOrderPushProps: MerchizeBackendOrderProps = JSON.parse(decrypt(encProps));
+      const reqKeys = [
+        'orderVariants',
+        'orderRecipientInfo',
+        'ORD_string',
+        'country_iso2',
+      ] as (keyof MerchizeBackendOrderProps)[];
 
-  return { uploadPaymentReceipt, savePaymentTXToBackend };
+      checkObjectKeys(merchizeOrderPushProps, reqKeys);
+
+      const orderPushRes = await sendMerchizeOrderDetailsToBackend(encProps);
+
+      if (!orderPushRes.ok) {
+        return { ok: false as const, error: orderPushRes.error };
+      }
+
+      return { ok: true as const, data: orderPushRes.data.data };
+    } catch (err: unknown) {
+      return {
+        ok: false as const,
+        error: {
+          message:
+            err && typeof err === 'object' && 'message' in err
+              ? (err.message as string)
+              : 'Unknown error',
+        },
+      };
+    }
+  }, []);
+
+  return { uploadPaymentReceipt, savePaymentTXToBackend, pushOrderToMerchize };
 };
 
 export function checkObjectKeys<T extends object>(obj: T, requiredKeys: Array<keyof T>): void {

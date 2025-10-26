@@ -16,7 +16,7 @@ export interface BillingAddressInterface {
 
 export interface CreateOrderActionInterface {
   cart: CartVariant[];
-  customer?: { name: string; email: string };
+  customer: { name: string; email: string };
   country: string;
   country_iso_3: string;
   initialCurrency: string;
