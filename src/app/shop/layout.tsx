@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import ShopNav from '@/components/UI/Shop/Nav/Navbar';
 import Footer from '@/components/UI/Shop/Footer';
 const CometsContainer = dynamic(() => import('@/components/UI/general/CometsContainer'));
+
 const UserMainProfileStoreInitializer = dynamic(
   () => import('@/components/UI/Providers/UserMainProfileStoreInitializer'),
 );

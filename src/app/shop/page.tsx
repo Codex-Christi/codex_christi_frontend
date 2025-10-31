@@ -2,7 +2,7 @@
 
 import Categories from '@/components/UI/Shop/Index/Categories';
 import Deals from '@/components/UI/Shop/Index/Deals';
-import SpecialDeals from '@/components/UI/Shop/Index/SpecialDeals';
+// import SpecialDeals from '@/components/UI/Shop/Index/SpecialDeals';
 import { FC } from 'react';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 
@@ -136,15 +136,14 @@ const Shop: FC = () => {
 
             <p>
               to customize anything. from{' '}
-              <span className='font-medium'>T-shirts, Hoodies, Mugs</span> to
-              just anything.
+              <span className='font-medium'>T-shirts, Hoodies, Mugs</span> to just anything.
             </p>
           </div>
         </div>
 
         <Categories />
 
-        <SpecialDeals />
+        {/* <SpecialDeals /> */}
       </div>
     </>
   );

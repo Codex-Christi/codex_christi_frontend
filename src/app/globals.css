@@ -112,6 +112,25 @@
   }
 }
 
+@layer components {
+  .outlined-text {
+    color: #fbbf24;
+    -webkit-text-stroke: 1px #f59e0b;
+    text-shadow:
+      3px 3px 0 #f59e0b,
+      4px 4px 0 #701a75,
+      6px 6px 0 #701a75,
+      8px 8px 0 #701a75,
+      10px 10px 0 #701a75,
+      12px 12px 0 #701a75,
+      14px 14px 0 #701a75,
+      16px 16px 0 #701a75,
+      18px 18px 20px rgba(0, 0, 0, 0.4);
+    transform: perspective(-5rem);
+    transform-origin: center center;
+  }
+}
+
 html,
 body {
   overflow-x: hidden !important;
