@@ -46,7 +46,7 @@ export const getDollarMultiplier = cache(async (countryCode: string) => {
     return {
       multiplier,
       currency: currencyCode,
-      currency_symbol,
+      currency_symbol
     };
   } catch (error) {
     console.error(`Conversion failed for ${countryCode}:`, error);
