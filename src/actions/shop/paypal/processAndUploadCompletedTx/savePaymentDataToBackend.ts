@@ -38,16 +38,14 @@ interface ReqBody {
 }
 
 export interface PaymentSaveResponse {
+  status: number;
+  success: boolean;
+  message: string;
   data: {
-    status: number;
-    success: boolean;
-    message: string;
-    data: {
-      id: string;
-      custom_id: string;
-      receipient_email: string;
-      user: string | null;
-    };
+    id: string;
+    custom_id: string;
+    receipient_email: string;
+    user: string | null;
   };
 }
 

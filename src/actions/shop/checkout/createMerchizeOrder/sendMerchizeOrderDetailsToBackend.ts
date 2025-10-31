@@ -18,33 +18,31 @@ export interface MerchizeBackendOrderProps {
     delivery_address: CompletedTxInterface['delivery_address'];
     customer: CompletedTxInterface['customer'];
   };
-  ORD_string: string;
   country_iso2: string;
+  order_custom_id: string;
 }
 
 export interface OrderProcessingResponse {
+  status: number;
+  success: boolean;
+  message: string;
   data: {
-    status: number;
-    success: boolean;
-    message: string;
-    data: {
-      id: string;
-      order_payment_custom_id: string;
-      order_intent_id: string;
-      order_intent_order_id: string;
-      provider_order_id: string;
-      provider_order_code: string;
-      processing_staus: [
-        'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'completed' | 'failed',
-      ];
-      error_message: string | null;
-    };
+    id: string;
+    order_payment_custom_id: string;
+    order_intent_id: string;
+    order_intent_order_id: string;
+    provider_order_id: string;
+    provider_order_code: string;
+    processing_staus: [
+      'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'completed' | 'failed',
+    ];
+    error_message: string | null;
   };
 }
 
 // Main Async func
 export const sendMerchizeOrderDetailsToBackend = cache(async (encProps: string) => {
-  const { orderRecipientInfo, orderVariants, ORD_string, country_iso2 } = JSON.parse(
+  const { orderRecipientInfo, orderVariants, country_iso2, order_custom_id } = JSON.parse(
     decrypt(encProps),
   ) as MerchizeBackendOrderProps;
   const {
@@ -75,7 +73,7 @@ export const sendMerchizeOrderDetailsToBackend = cache(async (encProps: string) 
 
   try {
     const data = await universalFetcher<OrderProcessingResponse, typeof reqBody>(
-      `${baseURL}/orders/process/${ORD_string}`,
+      `${baseURL}/orders/process/${order_custom_id}`,
       {
         arg: reqBody, // <- becomes JSON body (POST by default in your fetcher)
         fetcherOptions: {
@@ -86,13 +84,18 @@ export const sendMerchizeOrderDetailsToBackend = cache(async (encProps: string) 
         } satisfies FetcherOptions,
       },
     );
+
+    // console.log(data);
+
     return { ok: true as const, ...data };
   } catch (err: FetcherError | unknown) {
     // Leverage your FetcherError for rich error info
     if (err instanceof FetcherError) {
+      // console.log(err, !!err);
+
       return {
         ok: false as const,
-        error: returnReducedBackendError(err),
+        error: !!err ? returnReducedBackendError(err) : err,
       };
     }
     return { ok: false as const, error: { message: 'Unknown error' } };
