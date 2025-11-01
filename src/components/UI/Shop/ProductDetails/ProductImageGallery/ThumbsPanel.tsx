@@ -1,6 +1,6 @@
 // ThumbsPanel.tsx
 import Image from 'next/image';
-import { ImageListLoaderReturnType, LoadingOverlay, prevent } from '.';
+import { ImageListLoaderReturnType, LoadingOverlay, imagePreventDefaults } from '.';
 import { useThumbBoxWidth } from './useThumbBoxWidth';
 
 function ThumbsPanel({
@@ -40,7 +40,7 @@ function ThumbsPanel({
         >
           <div className='relative h-full w-full'>
             <Image
-              {...prevent}
+              {...imagePreventDefaults}
               alt={metaTitle || 'Product image'}
               className='rounded-[20px] transition-all !object-cover w-full object-top bg-top'
               src={loader.srcWithRetry(image, index)}

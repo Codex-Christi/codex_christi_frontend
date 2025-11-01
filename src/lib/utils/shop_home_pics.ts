@@ -73,7 +73,7 @@ export const categoriesObj = {
         price: 30000,
       },
       {
-        image_name: 'brand-cap_headwear.png',
+        image_name: 'brand-cap_white_headwear.png',
         img_alt: `Patterned White Baseball Cap Black Logo`,
         productId: '68f0a6aa048473068c573574',
         price: 30000,
