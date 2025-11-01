@@ -20,7 +20,7 @@ export default function PriceDisplay({ className }: { className?: string }) {
     setLoading(true);
 
     try {
-      const res = await fetch(`/api/currency/multiplier?code=${code}`, {
+      const res = await fetch(`/next-api/currency/multiplier?code=${code}`, {
         next: { revalidate: 86400 },
       });
 
