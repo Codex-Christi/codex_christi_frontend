@@ -35,7 +35,7 @@ const Deals = () => {
     >
       {/* Launch Merch Text */}
       <CustomShopLink
-        href='/shop/category/lauch-merch'
+        href='/category/lauch-merch'
         className='flex font-ocr justify-between md:gap-4 -ml-10 md:ml-[unset]
          md:col-span-3 md:flex-col place-items-center select-none md:scale-[0.6] lg:scale-100
       '
