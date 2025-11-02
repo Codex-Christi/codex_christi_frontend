@@ -1,76 +1,56 @@
 'use client';
-
 import Image from 'next/image';
 import Link from 'next/link';
 import { lauchMerchProducts } from '@/lib/utils/shop_home_pics';
 import { useRef } from 'react';
-import { imagePreventDefaults } from '../ProductDetails/ProductImageGallery';
 import { GalleryPrevButton as CarouselPrev } from '../ProductDetails/GalleryPrevButton';
 import { GalleryNextButton as CarouselNext } from '../ProductDetails/GalleryNextButton';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
+import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
+import { useAutoScroller } from './useAutoScroller';
 
 // Top-Page Deals Component
 const Deals = () => {
-  const slideContainer = useRef<HTMLDivElement | null>(null);
+  const slideContainerRef = useRef<HTMLDivElement | null>(null);
+  const { isMobileAndTablet, isMobile, isTabletOnly } = useResponsiveSSRValue();
 
-  const scrollByWidth = (direction: 'left' | 'right') => {
-    const container = slideContainer.current;
-    if (!container) return;
+  const { nudgeScroll } = useAutoScroller(
+    slideContainerRef,
+    { isMobileAndTablet, isMobile, isTabletOnly },
+    {
+      // auto is true on mobile/tablet by default; you can force:
+      // auto: true,
+      // respectReducedMotion: true,
+      // snapManage: true,
+      // override nudge defaults if you like:
+      // nudge: { fraction: 0.33, duration: 600, minPx: 60, maxPx: 180 },
+    },
+  );
 
-    const style = getComputedStyle(container);
-    const gap = parseFloat(style.gap || style.columnGap || '0') || 0;
-
-    const visibleWidth = container.clientWidth;
-
-    const firstChild = container.querySelector<HTMLElement>(':scope > *');
-
-    if (firstChild) {
-      const itemRect = firstChild.getBoundingClientRect();
-      const itemWidth = Math.round(itemRect.width);
-      const stepCount = Math.max(1, Math.floor(visibleWidth / (itemWidth + gap)));
-
-      const scrollAmount = (itemWidth + gap) * stepCount;
-
-      const target =
-        direction === 'left'
-          ? Math.max(0, container.scrollLeft - scrollAmount)
-          : container.scrollLeft + scrollAmount;
-
-      container.scrollTo({ left: target, behavior: 'smooth' });
-      return;
-    }
-
-    const fallbackAmount = visibleWidth + gap;
-
-    container.scrollTo({
-      left:
-        direction === 'left'
-          ? container.scrollLeft - fallbackAmount
-          : container.scrollLeft + fallbackAmount,
-      behavior: 'smooth',
-    });
-  };
-
+  // Main JSX
   return (
     <div
-      className='pt-12 pb-8 px-4 bg-[linear-gradient(95.55deg,_#9747FF_3.68%,_#4264FF_53.29%,_#007AFF_100%)] relative md:grid md:grid-cols-12 md:gap-2
+      className='md:pt-12 pb-8 px-4 bg-[linear-gradient(95.55deg,_#9747FF_3.68%,_#4264FF_53.29%,_#007AFF_100%)] relative md:grid md:grid-cols-12 md:gap-2
     items-center'
     >
       {/* Launch Merch Text */}
       <CustomShopLink
         href='/shop/category/lauch-merch'
-        className='hidden font-ocr md:col-span-3 md:flex place-items-center select-none md:scale-[0.6] lg:scale-100
+        className='flex font-ocr justify-between md:gap-4 -ml-10 md:ml-[unset]
+         md:col-span-3 md:flex-col place-items-center select-none md:scale-[0.6] lg:scale-100
       '
       >
-        <div>
-          <div className='-space-y-2'>
-            <p className='outlined-text text-7xl -tracking-widest text-center'>Launch</p>
-            <p className='outlined-text text-7xl -tracking-widest text-center'>Merch</p>
-          </div>
-          <div className='text-center mt-0.5'>
-            <div className='bg-white text-[#007AFF] font-bold rounded-lg py-2 px-4 mx-auto text-center w-auto inline-block'>
-              Special Sales
-            </div>
+        <div className=' -space-y-8 md:-space-y-2 flex flex-col items-center justify-center'>
+          <p className='outlined-text scale-[0.6] md:scale-100 text-7xl -tracking-widest text-center'>
+            Launch
+          </p>
+          <p className='outlined-text scale-[0.6] md:scale-100 text-7xl -tracking-widest text-center'>
+            Merch
+          </p>
+        </div>
+        <div className='text-center mt-0.5'>
+          <div className='bg-white text-[#007AFF] font-bold rounded-lg py-2 px-4 mx-auto text-center w-auto inline-block'>
+            Special Sales
           </div>
         </div>
       </CustomShopLink>
@@ -79,7 +59,7 @@ const Deals = () => {
         className='overflow-x-auto overflow-y-hidden min-w-full flex gap-2 md:gap-8 custom-scrollbar 
         scroll-smooth snap-x snap-mandatory 
         md:grid md:grid-cols-5 md:w-full md:col-span-9'
-        ref={slideContainer}
+        ref={slideContainerRef}
       >
         {lauchMerchProducts.map((merch) => (
           <Link
@@ -93,7 +73,8 @@ const Deals = () => {
               src={`/${merch.image_name}`}
               fill
               alt={merch.img_alt}
-              {...imagePreventDefaults}
+              draggable={false}
+              onDragStart={(e) => e.preventDefault()} // prevent ghost drag only
               priority
               quality={100}
               sizes='(max-width: 412px) 80px, (max-width: 640px) 100px, (max-width: 1024px) 120px, (min-width: 1280px) 150px, 200px'
@@ -102,15 +83,18 @@ const Deals = () => {
         ))}
       </div>
 
+      {/* NOTE: Desktop currently performs no scroll. To enable later:
+          // onClick={() => nudgeScroll('right', { fraction: 0.33, duration: 450 })}
+      */}
       <CarouselPrev
         className='absolute top-[40%] left-0  md:hidden'
-        onClick={() => scrollByWidth('left')}
+        onClick={() => (isMobileAndTablet ? nudgeScroll('left') : undefined)}
         aria-label='Scroll left'
       />
 
       <CarouselNext
         className='absolute top-[40%] right-0 md:hidden'
-        onClick={() => scrollByWidth('right')}
+        onClick={() => (isMobileAndTablet ? nudgeScroll('right') : undefined)}
         aria-label='Scroll right'
       />
     </div>

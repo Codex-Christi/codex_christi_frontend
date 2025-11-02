@@ -94,12 +94,18 @@ export const usePayPalTXApproveCallback = () => {
           receiptFileName,
         }),
       );
+      console.log('ORD:string: ', ORD_string);
+      console.log(`Email at payment save time: ${email}`);
 
       const paymentResp = await savePaymentDataToBackend(paymentSavePayload);
 
-      const order_custom_id = authData.purchase_units
-        ? authData.purchase_units[0].custom_id
-        : paymentResp?.data?.custom_id;
+      console.log(`Payment save resp:`, paymentResp);
+
+      console.log('Custom id from Backend:', paymentResp?.data?.custom_id);
+
+      const order_custom_id = paymentResp?.data?.custom_id;
+
+      console.log(`Custom ID I'm sending for Order Push: ${order_custom_id}`);
 
       if (!paymentResp?.ok) {
         errorToast({
@@ -121,7 +127,7 @@ export const usePayPalTXApproveCallback = () => {
 
       const pushRes = await pushOrderToMerchizeClient(merchizePayload);
 
-      console.log(pushRes);
+      console.log(`Merchize Order Push resp:`, pushRes);
     },
     [
       ORD_string,

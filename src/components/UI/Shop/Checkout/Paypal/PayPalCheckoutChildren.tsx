@@ -18,7 +18,7 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   // Hooks
   const cart = useCartStore((store) => store.variants);
   const serverOrderDetails = useContext(ServerOrderDetailsContext);
-  const { first_name, last_name, email, delivery_address } = useShopCheckoutStore((state) => state);
+  const { first_name, last_name, email, delivery_address } = useShopCheckoutStore();
   const { mainPayPalApproveCallback } = usePayPalTXApproveCallback();
 
   // Destructuring

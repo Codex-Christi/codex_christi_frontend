@@ -104,6 +104,7 @@ export async function POST(req: Request) {
       // Create the order payload
       // Note: `currencyCode` is used for the currency of the order
       // and `value` is the total amount for the order.
+
       const payload = {
         body: {
           intent: 'AUTHORIZE' as CheckoutPaymentIntent,

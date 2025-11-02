@@ -69,6 +69,50 @@ interface UniversalFetchOptions<Arg = unknown> {
   fetcherOptions?: FetcherOptions;
 }
 
+// --- Start of new logging utility ---
+const isDebugging = process.env.NODE_ENV !== 'production';
+
+function logFetchRequest(key: string, fo: FetcherOptions) {
+  if (!isDebugging) {
+    return;
+  }
+
+  // Create a Headers instance to safely check and get header values.
+  const headersInstance = new Headers(fo.headers as HeadersInit);
+
+  // Use the .get() method to safely retrieve the Content-Type header.
+  const contentType = headersInstance.get('Content-Type');
+
+  let bodyContent = fo.body;
+
+  // Conditionally parse the body only if the Content-Type is 'application/json'.
+  // Using .get() is the correct, type-safe way to access headers.
+  try {
+    if (
+      bodyContent &&
+      typeof bodyContent === 'string' &&
+      contentType?.includes('application/json')
+    ) {
+      bodyContent = JSON.parse(bodyContent);
+    }
+  } catch (error) {
+    console.log(error);
+
+    // Gracefully ignore parsing errors if the body isn't a valid JSON string.
+  }
+
+  // Convert the Headers instance back to a plain object for logging.
+  const headersObject = Object.fromEntries(headersInstance.entries());
+
+  console.groupCollapsed(`DEBUG FETCH: ${fo.method} ${key}`);
+  console.log('Request URL:', key);
+  console.log('Method:', fo.method);
+  console.log('Headers:', headersObject);
+  console.log('Body:', bodyContent);
+  console.groupEnd();
+}
+// --- End of new logging utility ---
+
 // Overload when no arg (i.e. typical GET)
 export async function universalFetcher<Data>(
   key: string,
@@ -102,6 +146,10 @@ export async function universalFetcher<Data, Arg = undefined>(
     fo.body = typeof body === 'string' ? body : JSON.stringify(body);
   }
 
+  // --- Start of logging integration ---
+  // logFetchRequest(key, fo);
+  // --- End of logging integration ---
+
   try {
     const res = await fetch(key, {
       method: fo.method,
@@ -126,6 +174,9 @@ export async function universalFetcher<Data, Arg = undefined>(
       const data = (await res.json()) as Data;
       return data;
     } catch (jsonErr) {
+      // You can add log for json parsing error
+      if (isDebugging) console.error('JSON parsing error:', jsonErr);
+
       const norm = normalizeError(jsonErr);
       throw new FetcherError('Invalid JSON response', { cause: norm }, null);
     }
