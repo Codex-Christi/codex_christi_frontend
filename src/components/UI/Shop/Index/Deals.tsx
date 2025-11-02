@@ -30,7 +30,7 @@ const Deals = () => {
   // Main JSX
   return (
     <div
-      className='md:pt-12 pb-8 px-4 bg-[linear-gradient(95.55deg,_#9747FF_3.68%,_#4264FF_53.29%,_#007AFF_100%)] relative md:grid md:grid-cols-12 md:gap-2
+      className='md:pt-12 pb-8 px-4  bg-[linear-gradient(95.55deg,_#9747FF_3.68%,_#4264FF_53.29%,_#007AFF_100%)] relative md:grid md:grid-cols-12 md:gap-2
     items-center'
     >
       {/* Launch Merch Text */}
@@ -57,14 +57,14 @@ const Deals = () => {
 
       <div
         className='overflow-x-auto overflow-y-hidden min-w-full flex gap-2 md:gap-8 custom-scrollbar 
-        scroll-smooth snap-x snap-mandatory 
+        scroll-smooth snap-x snap-mandatory md:justify-items-center  md:content-center
         md:grid md:grid-cols-5 md:w-full md:col-span-9'
         ref={slideContainerRef}
       >
         {lauchMerchProducts.map((merch) => (
           <Link
             className='w-[12rem] h-[12rem] md:h-[150px] relative shrink-0 overflow-hidden'
-            href={`/shop/product/${merch.productId}`}
+            href={`/product/${merch.productId}`}
             key={merch.productId}
           >
             <Image

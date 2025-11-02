@@ -10,7 +10,8 @@ const Categories = () => {
       <div className='grid gap-8 md:grid-cols-2 lg:grid-cols-4'>
         {Object.entries(categoriesObj).map(([categoryName, products]) => (
           <div
-            className='bg-[linear-gradient(161.11deg,_rgba(0,_133,_255,_0.7)_6.84%,_rgba(0,_24,_140,_0.5)_49.48%,_rgba(8,_8,_8,_0.7)_92.13%)] py-8 px-4 rounded-[20px] md:px-8'
+            className='bg-[linear-gradient(161.11deg,_rgba(0,_133,_255,_0.7)_6.84%,_rgba(0,_24,_140,_0.5)_49.48%,_rgba(8,_8,_8,_0.7)_92.13%)] 
+            backdrop-blur-[4px] py-8 px-4 rounded-[20px] md:px-8'
             key={categoryName}
           >
             <section className='grid gap-4'>
