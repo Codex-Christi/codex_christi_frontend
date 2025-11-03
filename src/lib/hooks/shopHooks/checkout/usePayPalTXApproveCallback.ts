@@ -45,6 +45,105 @@ export const usePayPalTXApproveCallback = () => {
 
   const country_iso2 = serverOrderDetails?.countrySupport?.country?.country_iso2;
 
+  // Bg func that runs server-side post-processing
+  const serverPostProcessingFunc = useCallback(
+    async ({
+      authData,
+      capturedOrder,
+    }: {
+      authData: OrderResponseBody;
+      capturedOrder: OrdersCapture;
+    }) => {
+      // 3️⃣ Upload Payment Receipt - Start
+      const receiptPayload = encrypt(
+        JSON.stringify({
+          authData,
+          customer: { name: `${first_name} ${last_name}`, email: email ?? 'john@example.com' },
+          ORD_string,
+        }),
+      );
+
+      const receiptResp = await uploadReceipt(receiptPayload);
+      if (!receiptResp?.ok) {
+        errorToast({
+          header: 'Payment details upload failed',
+          message: receiptResp?.error?.message ?? 'Error occurred during receipt upload',
+        });
+        return;
+      }
+      // End receipt upload
+
+      successToast({
+        header: 'Payment Successful!',
+        message: `Transaction complete: ${capturedOrder.id}`,
+      });
+
+      // 4️⃣ Save Payment to Backend
+      const { pdfReceiptLink, receiptFileName } = receiptResp;
+
+      const paymentSavePayload = encrypt(
+        JSON.stringify({
+          authData,
+          finalCapturedOrder: capturedOrder,
+          capturedOrderPaypalID: capturedOrder.id,
+          customer: { name: `${first_name} ${last_name}`, email },
+          delivery_address,
+          userId,
+          ORD_string,
+          pdfReceiptLink,
+          receiptFileName,
+        }),
+      );
+      console.log('ORD:string: ', ORD_string);
+      console.log(`Email at payment save time: ${email}`);
+
+      const paymentResp = await savePaymentDataToBackend(paymentSavePayload);
+
+      console.log(`Payment save resp:`, paymentResp);
+
+      console.log('Custom id from Backend:', paymentResp?.data?.custom_id);
+
+      const order_custom_id = paymentResp?.data?.custom_id;
+
+      console.log(`Custom ID I'm sending for Order Push: ${order_custom_id}`);
+
+      if (!paymentResp?.ok) {
+        errorToast({
+          header: 'Payment Save Failed',
+          message: paymentResp?.error?.message ?? 'Could not save payment record',
+        });
+        return;
+      }
+
+      // 5️⃣ Push Order to Merchize
+      const orderVariants = cart.map(({ quantity, variantId }) => ({ quantity, variantId }));
+      const orderRecipientInfo = {
+        delivery_address,
+        customer: { name: `${first_name} ${last_name}`, email },
+      };
+      const merchizePayload = encrypt(
+        JSON.stringify({ orderVariants, orderRecipientInfo, country_iso2, order_custom_id }),
+      );
+
+      const pushRes = await pushOrderToMerchizeClient(merchizePayload);
+
+      console.log(`Merchize Order Push resp:`, pushRes);
+    },
+    [
+      ORD_string,
+      cart,
+      country_iso2,
+      delivery_address,
+      email,
+      first_name,
+      last_name,
+      pushOrderToMerchizeClient,
+      savePaymentDataToBackend,
+      uploadReceipt,
+      userId,
+    ],
+  );
+
   // 💳 Main PayPal Approve Callback
   const mainPayPalApproveCallback = useCallback(
     async (data: OnApproveData) => {
@@ -73,70 +172,8 @@ export const usePayPalTXApproveCallback = () => {
         if (capturedOrder?.status !== 'COMPLETED')
           throw new Error(`Payment not completed: ${capturedOrder?.status}`);
 
-        // 3️⃣ Upload Payment Receipt
-        const receiptPayload = encrypt(
-          JSON.stringify({
-            authData,
-            customer: { name: `${first_name} ${last_name}`, email: email ?? 'john@example.com' },
-            ORD_string,
-          }),
-        );
-
-        const receiptResp = await uploadReceipt(receiptPayload);
-        if (!receiptResp?.ok) {
-          errorToast({
-            header: 'Payment details upload failed',
-            message: receiptResp?.error?.message ?? 'Error occurred during receipt upload',
-          });
-          return;
-        }
-
-        successToast({
-          header: 'Payment Successful!',
-          message: `Transaction complete: ${capturedOrder.id}`,
-        });
-
-        // 4️⃣ Save Payment to Backend
-        const { pdfReceiptLink, receiptFileName } = receiptResp;
-        const paymentSavePayload = encrypt(
-          JSON.stringify({
-            authData,
-            finalCapturedOrder: capturedOrder,
-            capturedOrderPaypalID: capturedOrder.id,
-            customer: { name: `${first_name} ${last_name}`, email },
-            delivery_address,
-            userId,
-            ORD_string,
-            pdfReceiptLink,
-            receiptFileName,
-          }),
-        );
-
-        const paymentResp = await savePaymentDataToBackend(paymentSavePayload);
-
-        console.log(paymentResp);
-
-        if (!paymentResp?.ok) {
-          errorToast({
-            header: 'Payment Save Failed',
-            message: paymentResp?.error?.message ?? 'Could not save payment record',
-          });
-          return;
-        }
-
-        // 5️⃣ Push Order to Merchize
-        const orderVariants = cart.map(({ quantity, variantId }) => ({ quantity, variantId }));
-        const orderRecipientInfo = {
-          delivery_address,
-          customer: { name: `${first_name} ${last_name}`, email },
-        };
-        const merchizePayload = encrypt(
-          JSON.stringify({ orderVariants, orderRecipientInfo, ORD_string, country_iso2 }),
-        );
-
-        const pushRes = await pushOrderToMerchizeClient(merchizePayload);
-
-        console.log(pushRes);
+        // run bg server post processing
+        serverPostProcessingFunc({ authData, capturedOrder });
       } catch (err) {
         const message =
           err instanceof Error
@@ -153,7 +190,7 @@ export const usePayPalTXApproveCallback = () => {
       }
     },
     //prettier-ignore
-    [ cart, country_iso2, delivery_address, email, first_name, last_name, uploadReceipt, savePaymentDataToBackend, pushOrderToMerchizeClient, ORD_string, userId, ],
+    [serverPostProcessingFunc],
   );
 
   return {

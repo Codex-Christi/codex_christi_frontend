@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'My Wishlist | Codex Christi Shop',
-  description: 'View and edit your shooping wishlist',
+  description: 'View and edit your shopping wishlist',
 };
 export default function MyWishlistPage() {
   return (

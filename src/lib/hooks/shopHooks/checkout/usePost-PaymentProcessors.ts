@@ -125,7 +125,7 @@ export const usePost_PaymentProcessors = () => {
       const reqKeys = [
         'orderVariants',
         'orderRecipientInfo',
-        'ORD_string',
+        'order_custom_id',
         'country_iso2',
       ] as (keyof MerchizeBackendOrderProps)[];
 
@@ -137,7 +137,7 @@ export const usePost_PaymentProcessors = () => {
         return { ok: false as const, error: orderPushRes.error };
       }
 
-      return { ok: true as const, data: orderPushRes.data.data };
+      return { ok: true as const, data: orderPushRes.data };
     } catch (err: unknown) {
       return {
         ok: false as const,

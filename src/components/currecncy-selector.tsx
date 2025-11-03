@@ -1,50 +1,53 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import en from "react-phone-number-input/locale/en";
-import Image from "next/image";
+import * as React from 'react';
+import en from 'react-phone-number-input/locale/en';
+import Image from 'next/image';
 import countryAlphaCodes from 'i18n-iso-countries';
-import { getCountries } from "react-phone-number-input/input";
-import { Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { getCountries } from 'react-phone-number-input/input';
+import { Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
-	Command,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
-} from "@/components/UI/primitives/command";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/UI/primitives/popover";
-import { GlobeIcon } from "lucide-react";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/UI/primitives/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/UI/primitives/popover';
+import { GlobeIcon } from 'lucide-react';
 
 export default function CurrencySelector() {
-	const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
 
-    const [searchTerm, setSearchTerm] = React.useState("");
+  const [searchTerm, setSearchTerm] = React.useState('');
 
-	const [value, setValue] = React.useState("");
+  const [value, setValue] = React.useState('');
 
-	const countries = getCountries()
-		.map((code) => ({
-			code,
-			name: en[code as keyof typeof en],
-		}))
-		.sort((a, b) => a.name.localeCompare(b.name));
+  const countries = getCountries()
+    .map((code) => ({
+      name: en[code as keyof typeof en],
+      code: code,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
-	const filteredCountries = countries.filter((c) =>
-		c.name.toLowerCase().includes(searchTerm.toLowerCase()),
-	);
+  const filteredCountries = countries.filter((c) =>
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
 
-	return (
+  return (
     <Popover open={open} onOpenChange={setOpen}>
-      <div className='grid gap-0.5 fixed right-4 bottom-8 rounded-full bg-[#007AFF]/80'>
+      <div
+        className='grid gap-0.5 fixed right-4 font-ocr font-bold bottom-8 lg:bottom-20 rounded-full bg-[#242121c7] backdrop-blur-[10px]
+      shadow-md shadow-slate-200 '
+      >
         <PopoverTrigger asChild>
-          <button className='input border-none flex items-center gap-4 justify-between' type='button' aria-label="Select currency">
+          <button
+            className='input border-none flex items-center gap-4 justify-between'
+            type='button'
+            aria-label='Select currency'
+          >
             <GlobeIcon />
           </button>
         </PopoverTrigger>
@@ -68,9 +71,9 @@ export default function CurrencySelector() {
                   key={code}
                   value={name}
                   onSelect={() => {
-                    setValue(code);
-
                     setOpen(false);
+
+                    setValue(code);
 
                     const getAlpha3Code = countryAlphaCodes.alpha2ToAlpha3(code) ?? 'USA';
 

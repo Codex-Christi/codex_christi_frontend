@@ -15,11 +15,11 @@ type PageProps = {
 };
 
 const OrderConfirmation = ({ params }: PageProps) => {
-  const { id: capturedOrderID } = use(params);
+  // const { id: capturedOrderID } = use(params);
 
   // Hooks
-  const { pdfLink, paymentJSONData, fileName } = useOrderConfirmationStore((state) => state);
-  const { capturedOrderPaypalID } = paymentJSONData || {};
+  const { paymentJSONData } = useOrderConfirmationStore((state) => state);
+  const { pdfReceiptLink, receiptFileName } = paymentJSONData || {};
   const clearCart = useCartStore((store) => store.clearCart);
   const clearCheckoutStore = useShopCheckoutStore((store) => store.clearCheckout);
   useRouteChangeAware(() => {
@@ -33,14 +33,15 @@ const OrderConfirmation = ({ params }: PageProps) => {
   // Handlers
   const handleDownLoad = useCallback(async () => {
     try {
-      const response = await fetch(pdfLink);
+      if (!pdfReceiptLink) throw new Error('No Receipt Link generated');
+      const response = await fetch(pdfReceiptLink);
       const blob = await response.blob(); // Convert the response to a Blob
 
       const downloadUrl = URL.createObjectURL(blob); // Create a temporary URL for the Blob
 
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = `${fileName}.pdf`; // Set the desired filename for the download
+      link.download = `${receiptFileName}.pdf`; // Set the desired receiptFileName for the download
 
       document.body.appendChild(link);
       link.click(); // Programmatically click the link to trigger the download
@@ -56,14 +57,14 @@ const OrderConfirmation = ({ params }: PageProps) => {
     } finally {
       setDownloading(false);
     }
-  }, [fileName, pdfLink]);
+  }, [receiptFileName, pdfReceiptLink]);
 
   // UseEffect for pathname change
 
   // Returned not-found page if the current zustand state doesn't hold the TX
-  if (capturedOrderID !== capturedOrderPaypalID) {
-    return notFound();
-  }
+  // if (capturedOrderID !== capturedOrderPaypalID) {
+  //   return notFound();
+  // }
 
   // Main JSX
   return (
@@ -83,7 +84,7 @@ const OrderConfirmation = ({ params }: PageProps) => {
         <h2 className='text-[1.1rem]'>Thank you for your purchase</h2>
 
         <h2 className='text-[1.275rem] font-[500] text-center my-8 px-2'>
-          Order #{capturedOrderPaypalID} has been confirmed
+          {/* Order #{capturedOrderPaypalID} has been confirmed */}
         </h2>
 
         <svg
@@ -106,7 +107,7 @@ const OrderConfirmation = ({ params }: PageProps) => {
         </svg>
 
         <CustomShopLink
-          href={`/shop/order-details/${capturedOrderPaypalID}`}
+          href={`/shop/order-details/`}
           className='py-3 border border-[#2576CE] rounded-2xl w-full max-w-[400px] font-[500] text-[1.1rem] mx-auto 
           text-center mt-8 bg-[#2576CE] text-[#F3F3F3] transition'
         >

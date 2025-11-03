@@ -34,35 +34,20 @@ const NavList: FC = () => {
         {navListArr.slice(0, 5).map((linkObj, index) => {
           const { linkText, href } = linkObj;
 
-          return (
-            <ActiveLink
-              linkText={linkText}
-              key={linkText}
-              href={href}
-              index={index}
-            />
-          );
+          return <ActiveLink linkText={linkText} key={linkText} href={href} index={index} />;
         })}
       </section>
 
       {/* // Freelance and Shop section */}
       <section
-        className={`flex flex-col lg:flex-row !font-inter
-                text-[1.4rem] gap-7 w-full mx-auto mt-8
+        className={`flex flex-col lg:flex-row !font-inter text-[1.4rem] gap-7 w-full mx-auto mt-8
                 lg:text-[1rem] lg:gap-6 lg:w-auto lg:mx-0 lg:mt-0
                 `}
       >
         {navListArr.slice(5).map((linkObj, index) => {
           const { linkText, href } = linkObj;
 
-          return (
-            <ActiveLink
-              linkText={linkText}
-              key={linkText}
-              href={href}
-              index={index}
-            />
-          );
+          return <ActiveLink linkText={linkText} key={linkText} href={href} index={index} />;
         })}
       </section>
     </>

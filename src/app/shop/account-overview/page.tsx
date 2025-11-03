@@ -1,10 +1,22 @@
 import Link from 'next/link';
-import { ArrowLeftIcon, HeartIcon, ToggleLeftIcon, MapPinIcon, TimerResetIcon } from 'lucide-react';
+import { Metadata } from 'next';
+import {
+  ArrowLeftIcon,
+  HeartIcon,
+  ToggleLeftIcon,
+  MapPinIcon,
+  TimerResetIcon,
+  FilesIcon,
+} from 'lucide-react';
+
+export const metadata: Metadata = {
+  title: 'Account Overview | Codex Christi Shop',
+  description: 'Manage your shop profile',
+};
 
 const AccountOverview = () => {
   return (
-    <div className='min-h-dvh p-2 md:p-6'>
-      <div className='grid items-start gap-8 p-4 bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] rounded-lg backdrop-blur-xl md:p-6 md:w-4/5 md:mx-auto lg:w-3/5'>
+    <>
         <div className='inline-block w-auto'>
           <Link
             className='inline-flex items-center gap-4 transition-all ease-linear duration-200 hover:gap-6 w-auto'
@@ -70,7 +82,7 @@ const AccountOverview = () => {
             <h3 className='font-semibold text-sm'>Payment Information</h3>
 
             <div className='mx-auto'>
-              <TimerResetIcon strokeWidth={1.2} />
+              <FilesIcon strokeWidth={1.2} />
             </div>
           </Link>
 
@@ -85,8 +97,7 @@ const AccountOverview = () => {
             </div>
           </button>
         </div>
-      </div>
-    </div>
+      </>
   );
 };
 

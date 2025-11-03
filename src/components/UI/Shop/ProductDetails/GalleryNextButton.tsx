@@ -5,15 +5,17 @@ import { FaAngleRight } from 'react-icons/fa6';
 export const GalleryNextButton: FC<{
   onClick?: () => void | undefined;
   className?: string;
-}> = ({ onClick, className }) => {
+  ariaLabel?: string;
+  name?: string;
+}> = ({ onClick, className, ariaLabel, name }) => {
   return (
     <Button
-      name='gallery-next-button'
+      name={name ?? 'gallery-next-button'}
       className={`absolute top-[45%] right-2 !text-black hover:scale-125 bg-transparent
       hover:shadow-lg hover:shadow-gray-100 rounded-[50%] !py-4 px-1 !bg-gray-50 hover:bg-white ${className ?? ''}`}
       type='button'
       onClick={onClick}
-      aria-label='Go to next image'
+      aria-label={ariaLabel ?? 'Go to next image'}
     >
       <FaAngleRight className='size-8' />
     </Button>

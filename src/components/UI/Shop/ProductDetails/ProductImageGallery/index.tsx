@@ -19,7 +19,7 @@ import { useLightboxHistory } from './useLightBoxHistory';
 
 const Lightbox = dynamic(() => import('yet-another-react-lightbox'), { ssr: false });
 
-export const prevent = {
+export const imagePreventDefaults = {
   onContextMenu: (e: React.SyntheticEvent) => e.preventDefault(),
   onDragStart: (e: React.SyntheticEvent) => e.preventDefault(),
 };

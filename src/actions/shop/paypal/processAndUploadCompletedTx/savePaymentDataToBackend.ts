@@ -38,16 +38,14 @@ interface ReqBody {
 }
 
 export interface PaymentSaveResponse {
+  status: number;
+  success: boolean;
+  message: string;
   data: {
-    status: number;
-    success: boolean;
-    message: string;
-    data: {
-      id: string;
-      custom_id: string;
-      receipient_email: string;
-      user: string | null;
-    };
+    id: string;
+    custom_id: string;
+    receipient_email: string;
+    user: string | null;
   };
 }
 
@@ -100,7 +98,7 @@ export const savePaymentDataToBackend = cache(async (encProps: string) => {
           : null,
         orderReceipient: {
           name: recepientName?.full_name,
-          recepientEmail: recepientEmail!,
+          recepientEmail: recepientEmail,
           orderID: ORD_string,
         },
         paypal_profile_delivery_address: delivery_address,
@@ -112,6 +110,8 @@ export const savePaymentDataToBackend = cache(async (encProps: string) => {
       receiptFileName,
     },
   };
+
+  console.dir(body, { depth: null });
 
   try {
     const data = await universalFetcher<PaymentSaveResponse, ReqBody>(
@@ -126,6 +126,11 @@ export const savePaymentDataToBackend = cache(async (encProps: string) => {
         } satisfies FetcherOptions,
       },
     );
+
+    // console.log(`Response on Server:`);
+    // console.dir(data, { depth: null });
+    // console.log('\n');
+
     return { ok: true as const, ...data };
   } catch (err: FetcherError | { message: string } | unknown) {
     // Leverage your FetcherError for rich error info

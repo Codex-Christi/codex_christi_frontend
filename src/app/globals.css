@@ -66,30 +66,6 @@
   }
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground;
-  }
-
-  input:-webkit-autofill,
-  input:-webkit-autofill:hover,
-  input:-webkit-autofill:focus,
-  input:-webkit-autofill:active {
-    /* Revert text color */
-    -webkit-text-fill-color: white !important;
-    color: white !important;
-    caret-color: white !important;
-    background-color: transparent !important;
-
-    /* Revert background color */
-    transition: background-color 5000s ease-in-out 0s;
-  }
-}
-
 @layer utilities {
   .scrollbar::-webkit-scrollbar {
     width: 0.8rem;
@@ -113,6 +89,46 @@
 }
 
 @layer components {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-text-fill-color: inherit !important;
+    color: inherit !important;
+    caret-color: white !important;
+    background-color: transparent !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  .custom-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .input {
+    @apply bg-transparent border border-white py-2.5 px-3 focus:!outline-0 focus-visible:!ring-0 autofill:!bg-transparent rounded placeholder:!text-white/50 placeholder:text-sm;
+  }
+
+  .tablepress table .tablepress th,
+  .tablepress td {
+    border: 1px solid #d3d3d3;
+    border-collapse: collapse;
+    text-align: center;
+    padding: 1%;
+  }
+
   .outlined-text {
     color: #fbbf24;
     -webkit-text-stroke: 1px #f59e0b;
@@ -131,24 +147,6 @@
   }
 }
 
-html,
-body {
-  overflow-x: hidden !important;
-}
-
-.custom-scrollbar {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-.input {
-  @apply bg-transparent border border-white py-2.5 px-3 focus:!outline-0 focus-visible:!ring-0 autofill:!bg-transparent rounded placeholder:!text-white/50 placeholder:text-sm;
-}
-
 .PhoneInputInput,
 .PhoneInputCountrySelect {
   @apply !bg-inherit !text-inherit focus:outline-none focus:border-none;
@@ -156,12 +154,4 @@ body {
 
 .PhoneInputCountrySelect {
   @apply !bg-black;
-}
-
-.tablepress table .tablepress th,
-.tablepress td {
-  border: 1px solid #d3d3d3;
-  border-collapse: collapse;
-  text-align: center;
-  padding: 1%;
 }

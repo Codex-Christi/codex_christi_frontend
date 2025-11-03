@@ -5,7 +5,7 @@ import {
   CarouselContent,
   CarouselItem,
 } from '@/components/UI/primitives/carousel';
-import { LoadingOverlay, type ImageListLoaderReturnType, prevent } from '.';
+import { LoadingOverlay, type ImageListLoaderReturnType, imagePreventDefaults } from '.';
 import Image from 'next/image';
 import { GalleryPrevButton } from '../GalleryPrevButton';
 import { GalleryNextButton } from '../GalleryNextButton';
@@ -40,7 +40,7 @@ function MainStage({
                 onClick={() => setOpen(true)}
               >
                 <Image
-                  {...prevent}
+                  {...imagePreventDefaults}
                   priority={i === 0}
                   fetchPriority={i === 0 ? 'high' : 'low'}
                   loading={i === 0 ? 'eager' : undefined}
