@@ -14,7 +14,9 @@ const WishlistItems = () => {
           href='/shop/account-overview'
         >
           <ArrowLeftIcon strokeWidth={1.2} />
-          Wishlist (2) <HeartIcon className='fill-white' />
+          <span className='flex items-center gap-2'>
+            Wishlist (2) <HeartIcon className='fill-white' />
+          </span>
         </Link>
       </div>
 
@@ -56,7 +58,7 @@ const WishlistItems = () => {
               className='text-sm border border-[#F3F3F3] hover:bg-red-500 hover:border-red-500 hover:text-white font-bold rounded-xl py-2 px-3'
               type='button'
             >
-              Remove -
+              Remove
             </button>
           </div>
         </div>
@@ -100,7 +102,7 @@ const WishlistItems = () => {
               className='text-sm border border-[#F3F3F3] hover:bg-red-500 hover:border-red-500 hover:text-white font-bold rounded-xl py-2 px-3'
               type='button'
             >
-              Remove -
+              Remove
             </button>
           </div>
         </div>
