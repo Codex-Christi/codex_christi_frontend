@@ -38,6 +38,8 @@ export const middleware = createNEMO({
       return NextResponse.next(); // Proceed with the default Next.js response
     },
   ],
+  '/shop/account-overview': [redirectExpSessionToLoginPage],
+  '/shop/account-overview/(.*)': [redirectExpSessionToLoginPage],
   '/shop/auth/login': [authVerifierAndRouteProtector],
   // For auth routes
   '/auth': {

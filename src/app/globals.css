@@ -101,8 +101,8 @@
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus,
   input:-webkit-autofill:active {
-    -webkit-text-fill-color: inherit !important;
-    color: inherit !important;
+    -webkit-text-fill-color: white !important;
+    color: white !important;
     caret-color: white !important;
     background-color: transparent !important;
     transition: background-color 5000s ease-in-out 0s;
@@ -118,7 +118,7 @@
   }
 
   .input {
-    @apply bg-transparent border border-white py-2.5 px-3 focus:!outline-0 focus-visible:!ring-0 autofill:!bg-transparent rounded placeholder:!text-white/50 placeholder:text-sm;
+    @apply w-full bg-transparent border border-white !text-white py-2.5 px-3 focus:!outline-0 focus-visible:!ring-0 autofill:!bg-transparent rounded placeholder:!text-white/50 placeholder:text-sm;
   }
 
   .tablepress table .tablepress th,
@@ -149,7 +149,7 @@
 
 .PhoneInputInput,
 .PhoneInputCountrySelect {
-  @apply !bg-inherit !text-inherit focus:outline-none focus:border-none;
+  @apply !bg-inherit !text-inherit !w-full !max-w-full focus:outline-none focus:border-none;
 }
 
 .PhoneInputCountrySelect {
