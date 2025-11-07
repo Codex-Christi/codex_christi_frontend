@@ -79,7 +79,7 @@ const EditPhoneNumber = ({
 				className={cn("grid gap-0.5", {
 					hidden: !isOpen || activeTab !== "mobile_phone",
 				})}
-				htmlFor="email"
+				htmlFor="mobile_phone"
 			>
 				<div className="grid gap-4 bg-inherit">
 					<PhoneInput

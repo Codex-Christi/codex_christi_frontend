@@ -72,6 +72,7 @@ interface UniversalFetchOptions<Arg = unknown> {
 // --- Start of new logging utility ---
 const isDebugging = process.env.NODE_ENV !== 'production';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function logFetchRequest(key: string, fo: FetcherOptions) {
   if (!isDebugging) {
     return;

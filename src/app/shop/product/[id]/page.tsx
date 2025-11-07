@@ -99,7 +99,7 @@ const ProductDetails = async ({ params }: PageProps) => {
   // Main JSX
   return (
     <>
-      <ProductDetailsClientComponent fetchedProductData={productData} />;
+      <ProductDetailsClientComponent fetchedProductData={productData} />
       <script type='application/ld+json'>{JSON_LD_Data}</script>
     </>
   );

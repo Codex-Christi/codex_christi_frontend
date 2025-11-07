@@ -34,7 +34,7 @@ const Categories = () => {
                         href={`/shop/product/${product.productId}`}
                       >
                         <Image
-                          className='w-full h-[250px] object-contain object-center md:h-[120px] xl:h-[150px] 2xl:h-[200px]'
+                          className='w-git merge dev h-[250px] object-contain object-center md:h-[120px] xl:h-[150px] 2xl:h-[200px]'
                           src={`/${product.image_name}`}
                           alt={product.img_alt}
                           width={200}
