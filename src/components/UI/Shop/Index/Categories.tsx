@@ -1,9 +1,11 @@
 import Image from 'next/image';
-import CurrencySelector from '@/components/currecncy-selector';
 import { categoriesObj } from '@/lib/utils/shopHomePageProductsData';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import { formatServerPriceForId } from '@/lib/utils/shop/globalFXProductPrice/server/formatServerPrice';
 import GlobalProductPrice from '../GlobalShopComponents/GlobalProductPrice';
+import dynamic from 'next/dynamic';
+
+const CountryDropdownServer = dynamic(() => import('./CountryDropDownServerFloating'));
 
 const Categories = () => {
   // Main JSX
@@ -32,7 +34,7 @@ const Categories = () => {
                         href={`/shop/product/${product.productId}`}
                       >
                         <Image
-                          className='w-full h-[250px] object-cover object-center md:h-[120px] xl:h-[150px] 2xl:h-[200px]'
+                          className='w-full h-[250px] object-contain object-center md:h-[120px] xl:h-[150px] 2xl:h-[200px]'
                           src={`/${product.image_name}`}
                           alt={product.img_alt}
                           width={200}
@@ -40,11 +42,13 @@ const Categories = () => {
                           quality={100}
                         />
 
-                        <GlobalProductPrice
-                          ssrText={ssrText}
-                          usdCentsBase={usdCentsBase ?? 0}
-                          className='text-lg font-semibold'
-                        />
+                        <h6 className='text-center font-bold'>
+                          <GlobalProductPrice
+                            ssrText={ssrText}
+                            usdCentsBase={usdCentsBase ?? 0}
+                            className='text-lg font-semibold'
+                          />
+                        </h6>
                       </CustomShopLink>
                     </div>
                   );
@@ -55,7 +59,7 @@ const Categories = () => {
         ))}
       </div>
 
-      <CurrencySelector />
+      <CountryDropdownServer />
     </div>
   );
 };

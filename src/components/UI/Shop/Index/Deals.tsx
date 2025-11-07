@@ -68,8 +68,8 @@ const Deals = () => {
             key={merch.productId}
           >
             <Image
-              className='!w-[20rem] !h-[22.5rem] block object-cover -mt-[90px] md:mt-0   
-             md:!w-[10rem] md:!h-[150px] md:scale-[1.75] xl:scale-[1.9]'
+              className='!w-[20rem] !h-[22.5rem] block object-contain -mt-[90px] md:mt-0   
+             md:!w-[10rem] md:!h-[150px] scale-[0.7] md:scale-[1.0]'
               src={`/${merch.image_name}`}
               fill
               alt={merch.img_alt}

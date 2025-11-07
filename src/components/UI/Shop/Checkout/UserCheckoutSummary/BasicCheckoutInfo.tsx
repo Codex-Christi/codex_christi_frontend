@@ -17,10 +17,10 @@ import { DeliveryAddressInputFields } from './DeliveryAddressInputFields';
 import errorToast from '@/lib/error-toast';
 import { useVerifyEmailWithOTP } from '@/lib/hooks/shopHooks/checkout/useVerifyEmailWithOTP';
 import { CheckoutOTPModalHandles } from './CheckoutOTPModal';
-import { updateGlobalCountryISO3 } from '@/lib/utils/shop/globalFXProductPrice/updateGlobalCountryISO3';
 
 //Dynamic component import
 import dynamic from 'next/dynamic';
+import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore';
 const CheckoutOTPMainWrapper = dynamic(
   () => import('./CheckoutOTPMainWrapper').then((mod) => mod.CheckoutOTPMainWrapper),
   { ssr: false },
@@ -66,6 +66,7 @@ export const BasicCheckoutInfo = () => {
       email: s.email,
     })),
   );
+  const changeCookieStoreCountry = useCurrencyCookie((s) => s.changeCountry);
   const otpSendHookProps = useVerifyEmailWithOTP(email, () => setIsOtpOpen(true));
   const { isEmailVerified, sendInitialOTPToEmail } = otpSendHookProps;
 
@@ -215,7 +216,7 @@ export const BasicCheckoutInfo = () => {
                   onChange={(country) => {
                     field.onChange(country.alpha3);
                     startTransition(() => {
-                      updateGlobalCountryISO3(country.alpha3); // updates both stores + FX
+                      changeCookieStoreCountry(country.alpha3); // updates both stores + FX
                     });
                   }}
                 />
