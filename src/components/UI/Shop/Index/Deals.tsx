@@ -61,7 +61,7 @@ const Deals = () => {
         md:grid md:grid-cols-5 md:w-full md:col-span-9'
         ref={slideContainerRef}
       >
-        {lauchMerchProducts.map((merch) => (
+        {lauchMerchProducts.map((merch, i) => (
           <CustomShopLink
             className='w-[12rem] h-[12rem] md:h-[150px] relative shrink-0 overflow-hidden'
             href={`/shop/product/${merch.productId}`}
@@ -72,6 +72,7 @@ const Deals = () => {
              md:!w-[10rem] md:!h-[150px] scale-[0.7] md:scale-[1.0]'
               src={`/${merch.image_name}`}
               fill
+              fetchPriority={i === 0 ? 'high' : 'auto'}
               alt={merch.img_alt}
               draggable={false}
               onDragStart={(e) => e.preventDefault()} // prevent ghost drag only

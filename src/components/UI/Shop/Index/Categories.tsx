@@ -34,12 +34,13 @@ const Categories = () => {
                         href={`/shop/product/${product.productId}`}
                       >
                         <Image
-                          className='w-git merge dev h-[250px] object-contain object-center md:h-[120px] xl:h-[150px] 2xl:h-[200px]'
+                          className='w-git merge dev h-[250px] mx-auto object-contain object-center md:h-[120px] xl:h-[150px] 2xl:h-[200px]'
                           src={`/${product.image_name}`}
                           alt={product.img_alt}
                           width={200}
                           height={200}
                           quality={100}
+                          sizes='(max-width: 412px) 120px, (max-width: 640px) 120px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 200px'
                         />
 
                         <h6 className='text-center font-bold'>
