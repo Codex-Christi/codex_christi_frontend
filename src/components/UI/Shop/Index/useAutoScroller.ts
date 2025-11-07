@@ -43,7 +43,7 @@ export function useAutoScroller(
       return device.isMobile
         ? clamp(base * 0.05, 30, 70) //(-+3, -+20, -+30)
         : device.isTabletOnly
-          ? clamp(base * 0.04, 50, 80) //(-+3, -+20, -+40)
+          ? clamp(base * 0.01, 30, 40) //(-+3, -+20, -+40)
           : clamp(base * 0.04, 60, 90); //(-+3, -+20, -+50)
     },
     [device.isMobile, device.isTabletOnly],

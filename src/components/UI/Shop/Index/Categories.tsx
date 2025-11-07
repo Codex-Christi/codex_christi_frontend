@@ -1,10 +1,12 @@
 import Image from 'next/image';
-import Link from 'next/link';
 import CurrencySelector from '@/components/currecncy-selector';
-import PriceDisplay from '@/components/price-display';
-import { categoriesObj } from '@/lib/utils/shop_home_pics';
+import { categoriesObj } from '@/lib/utils/shopHomePageProductsData';
+import CustomShopLink from '../HelperComponents/CustomShopLink';
+import { formatServerPriceForId } from '@/lib/utils/shop/globalFXProductPrice/server/formatServerPrice';
+import GlobalProductPrice from '../GlobalShopComponents/GlobalProductPrice';
 
 const Categories = () => {
+  // Main JSX
   return (
     <div className='space-y-8'>
       <div className='grid gap-8 md:grid-cols-2 lg:grid-cols-4'>
@@ -20,25 +22,33 @@ const Categories = () => {
               </h2>
 
               <div className='grid gap-8 grid-cols-2 md:grid-cols-1'>
-                {products.content.map((product) => (
-                  <div className='grid gap-4 p-4' key={product.productId}>
-                    <Link
-                      className='grid gap-2 xl:gap-4'
-                      href={`/shop/product/${product.productId}`}
-                    >
-                      <Image
-                        className='w-full h-[250px] object-cover object-center md:h-[120px] xl:h-[150px] 2xl:h-[200px]'
-                        src={`/${product.image_name}`}
-                        alt={product.img_alt}
-                        width={200}
-                        height={200}
-                        quality={100}
-                      />
+                {/* Map through  */}
+                {products.content.map(async (product) => {
+                  const { ssrText, usdCentsBase } = await formatServerPriceForId(product.productId);
+                  return (
+                    <div className='grid gap-4 p-4' key={product.productId}>
+                      <CustomShopLink
+                        className='grid gap-2 xl:gap-4'
+                        href={`/shop/product/${product.productId}`}
+                      >
+                        <Image
+                          className='w-full h-[250px] object-cover object-center md:h-[120px] xl:h-[150px] 2xl:h-[200px]'
+                          src={`/${product.image_name}`}
+                          alt={product.img_alt}
+                          width={200}
+                          height={200}
+                          quality={100}
+                        />
 
-                      <PriceDisplay />
-                    </Link>
-                  </div>
-                ))}
+                        <GlobalProductPrice
+                          ssrText={ssrText}
+                          usdCentsBase={usdCentsBase ?? 0}
+                          className='text-lg font-semibold'
+                        />
+                      </CustomShopLink>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           </div>

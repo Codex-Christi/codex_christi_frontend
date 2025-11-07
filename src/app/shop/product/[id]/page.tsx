@@ -71,7 +71,9 @@ const ProductDetails = async ({ params }: PageProps) => {
     productVariants,
   } = productData;
   const LDImageURL = `https://d2dytk4tvgwhb4.cloudfront.net/${productVariants[0].image_uris[0]}`;
-  const trimmedDescription = description.split('.')[0].replace(/<[^>]*>/g, '');
+  const trimmedDescription = description
+    ? description.split('.')[0].replace(/<[^>]*>/g, '')
+    : `Buy the limited ${title} `;
 
   const JSON_LD_Data = serialize({
     '@context': 'https://schema.org/',

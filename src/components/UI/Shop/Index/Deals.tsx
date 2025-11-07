@@ -1,7 +1,7 @@
 'use client';
+
 import Image from 'next/image';
-import Link from 'next/link';
-import { lauchMerchProducts } from '@/lib/utils/shop_home_pics';
+import { lauchMerchProducts } from '@/lib/utils/shopHomePageProductsData';
 import { useRef } from 'react';
 import { GalleryPrevButton as CarouselPrev } from '../ProductDetails/GalleryPrevButton';
 import { GalleryNextButton as CarouselNext } from '../ProductDetails/GalleryNextButton';
@@ -35,7 +35,7 @@ const Deals = () => {
     >
       {/* Launch Merch Text */}
       <CustomShopLink
-        href='/category/lauch-merch'
+        href='/shop/category/lauch-merch'
         className='flex font-ocr justify-between md:gap-4 -ml-10 md:ml-[unset]
          md:col-span-3 md:flex-col place-items-center select-none md:scale-[0.6] lg:scale-100
       '
@@ -62,9 +62,9 @@ const Deals = () => {
         ref={slideContainerRef}
       >
         {lauchMerchProducts.map((merch) => (
-          <Link
+          <CustomShopLink
             className='w-[12rem] h-[12rem] md:h-[150px] relative shrink-0 overflow-hidden'
-            href={`/product/${merch.productId}`}
+            href={`/shop/product/${merch.productId}`}
             key={merch.productId}
           >
             <Image
@@ -77,9 +77,9 @@ const Deals = () => {
               onDragStart={(e) => e.preventDefault()} // prevent ghost drag only
               priority
               quality={100}
-              sizes='(max-width: 412px) 80px, (max-width: 640px) 100px, (max-width: 1024px) 120px, (min-width: 1280px) 150px, 200px'
+              sizes='(max-width: 412px) 120px, (max-width: 640px) 120px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 200px'
             />
-          </Link>
+          </CustomShopLink>
         ))}
       </div>
 

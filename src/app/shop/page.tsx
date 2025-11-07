@@ -1,10 +1,10 @@
-'use client';
-
 import Categories from '@/components/UI/Shop/Index/Categories';
-import Deals from '@/components/UI/Shop/Index/Deals';
 // import SpecialDeals from '@/components/UI/Shop/Index/SpecialDeals';
 import { FC } from 'react';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
+import dynamic from 'next/dynamic';
+
+const Deals = dynamic(() => import('@/components/UI/Shop/Index/Deals'));
 
 const Shop: FC = () => {
   return (

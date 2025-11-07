@@ -31,6 +31,7 @@ export interface ShopCheckoutState extends ShopCheckoutStoreInterface {
   setEmail: (email: ShopCheckoutStoreInterface['email']) => void;
   setPaymentMehod: (payment_method: ShopCheckoutStoreInterface['payment_method']) => void;
   setDeliveryAddress: (delivery_address: ShopCheckoutStoreInterface['delivery_address']) => void;
+  setShippingCountryISO3: (iso3: string | null) => void; // <-- NEW: single writer for country
   clearCheckout: () => void;
 }
 
@@ -98,6 +99,13 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
       setEmail: (email) => set({ email }),
       setPaymentMehod: (payment_method) => set({ payment_method }),
       setDeliveryAddress: (delivery_address) => set({ delivery_address }),
+      setShippingCountryISO3: (iso3) =>
+        set((s) => ({
+          delivery_address: {
+            ...s.delivery_address,
+            shipping_country: iso3, // ALWAYS ISO-3 or null
+          },
+        })),
       clearCheckout: () => {
         set({
           ...initialObj,

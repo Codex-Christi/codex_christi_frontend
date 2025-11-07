@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import ShopNav from '@/components/UI/Shop/Nav/Navbar';
 import Footer from '@/components/UI/Shop/Footer';
 const CometsContainer = dynamic(() => import('@/components/UI/general/CometsContainer'));
+import GlobalCurrencyFXWrapper from '@/components/UI/Providers/Shop/GlobalCurrencyFXWrapper';
 
 const UserMainProfileStoreInitializer = dynamic(
   () => import('@/components/UI/Providers/UserMainProfileStoreInitializer'),
@@ -25,8 +26,10 @@ export default function ShopRootLayout({ children }: { children: ReactNode }) {
   return (
     <CometsContainer>
       <UserMainProfileStoreInitializer />
-      <ShopNav />
-      {children}
+      <GlobalCurrencyFXWrapper>
+        <ShopNav />
+        {children}
+      </GlobalCurrencyFXWrapper>
       <Footer />
     </CometsContainer>
   );

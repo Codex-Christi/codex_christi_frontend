@@ -10,13 +10,14 @@ import { EmailInput, NameInput } from '@/components/UI/Auth/FormFields';
 import { FaAngleDoubleDown } from 'react-icons/fa';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { useShallow } from 'zustand/react/shallow';
-import { useContext, useRef, useState, useEffect } from 'react';
+import { useContext, useRef, useState, useEffect, startTransition } from 'react';
 import { CheckoutAccordionContext } from '../ProductCheckout';
 import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
 import { DeliveryAddressInputFields } from './DeliveryAddressInputFields';
 import errorToast from '@/lib/error-toast';
 import { useVerifyEmailWithOTP } from '@/lib/hooks/shopHooks/checkout/useVerifyEmailWithOTP';
 import { CheckoutOTPModalHandles } from './CheckoutOTPModal';
+import { updateGlobalCountryISO3 } from '@/lib/utils/shop/globalFXProductPrice/updateGlobalCountryISO3';
 
 //Dynamic component import
 import dynamic from 'next/dynamic';
@@ -213,6 +214,9 @@ export const BasicCheckoutInfo = () => {
                   defaultValue={field.value}
                   onChange={(country) => {
                     field.onChange(country.alpha3);
+                    startTransition(() => {
+                      updateGlobalCountryISO3(country.alpha3); // updates both stores + FX
+                    });
                   }}
                 />
                 <FormMessage />
