@@ -3,7 +3,10 @@ import { getUSDCentsForProduct, getUSDCentsForProducts } from './priceResolver';
 
 type Fx = { multiplier: number; currency: string; currency_symbol?: string };
 
-function formatMajor(amount: number, fx: Fx) {
+/**
+ * Format a major-unit amount using FX metadata
+ */
+export function formatMajor(amount: number, fx: Fx): string {
   try {
     return new Intl.NumberFormat(undefined, { style: 'currency', currency: fx.currency }).format(
       amount,
@@ -37,7 +40,10 @@ export async function formatServerPriceForId(
   const snap = await readCurrencyCookieServer();
   const fx = snap.fx as Fx | undefined;
   const usdCents = await getUSDCentsForProduct(productId);
-  if (!fx || usdCents == null) return { ssrText: null, usdCentsBase: usdCents };
+
+  if (!fx || usdCents == null) {
+    return { ssrText: null, usdCentsBase: usdCents ?? null };
+  }
 
   const convertedCents = Math.round((usdCents / 100) * (fx.multiplier ?? 1) * 100);
   return { ssrText: formatMajor(convertedCents / 100, fx), usdCentsBase: usdCents };
@@ -51,17 +57,19 @@ export async function formatServerPricesByIds(
 ): Promise<Record<string, { ssrText: string | null; usdCentsBase: number | null }>> {
   const snap = await readCurrencyCookieServer();
   const fx = snap.fx as Fx | undefined;
-  const out: Record<string, { ssrText: string | null; usdCentsBase: number | null }> = {};
 
+  const out: Record<string, { ssrText: string | null; usdCentsBase: number | null }> = {};
   const usdMap = await getUSDCentsForProducts(ids);
+
   for (const id of ids) {
     const usdCents = usdMap[id];
     if (!fx || usdCents == null) {
-      out[id] = { ssrText: null, usdCentsBase: usdCents };
+      out[id] = { ssrText: null, usdCentsBase: usdCents ?? null };
       continue;
     }
     const convertedCents = Math.round((usdCents / 100) * (fx.multiplier ?? 1) * 100);
     out[id] = { ssrText: formatMajor(convertedCents / 100, fx), usdCentsBase: usdCents };
   }
+
   return out;
 }

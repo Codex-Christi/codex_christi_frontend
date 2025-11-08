@@ -63,11 +63,24 @@ interface CountryDropdownProps {
   classNames?: ClassNames;
 
   /**
-   * NEW semantics:
-   *   - true: remove ONLY the trigger’s built-in styles
-   *   - internal popover/menu still has sane defaults for sizing & alignment
+   * true: remove ONLY the trigger’s built-in styles.
+   * Internal popover/menu retains sane defaults for sizing & alignment.
    */
   unstyled?: boolean;
+
+  /**
+   * When true, prevents Radix from auto-focusing inside the popover on open
+   * (stops mobile keyboard from appearing until user taps the search box).
+   * Default: false
+   */
+  disableAutoFocusOnOpen?: boolean;
+
+  /**
+   * When true, the search input starts readOnly and becomes editable only after
+   * user taps/focuses it (extra safeguard for stubborn mobile browsers).
+   * Default: false
+   */
+  searchReadOnlyUntilInteract?: boolean;
 }
 
 const CountryDropdownComponent = (
@@ -82,12 +95,15 @@ const CountryDropdownComponent = (
     slim = false,
     classNames,
     unstyled = false,
+    disableAutoFocusOnOpen = false,
+    searchReadOnlyUntilInteract = false,
     ...restTriggerProps
   }: CountryDropdownProps,
   ref: React.ForwardedRef<HTMLButtonElement>,
 ) => {
   const [open, setOpen] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country | undefined>(undefined);
+  const [searchRO, setSearchRO] = useState<boolean>(searchReadOnlyUntilInteract);
 
   // fast lookup for defaultValue selection
   const optionsMapAlpha3 = useMemo(() => {
@@ -114,7 +130,7 @@ const CountryDropdownComponent = (
     [onChange],
   );
 
-  // ⬇︎ IMPORTANT: unstyled now affects only the TRIGGER.
+  // ⬇︎ unstyled now affects only the TRIGGER.
   const triggerClasses = cn(
     unstyled
       ? undefined
@@ -191,11 +207,24 @@ const CountryDropdownComponent = (
           <ChevronDown size={16} className={chevronClasses} />
         </PopoverTrigger>
 
-        <PopoverContent collisionPadding={10} side='bottom' className={popoverClasses}>
+        <PopoverContent
+          collisionPadding={10}
+          side='bottom'
+          className={popoverClasses}
+          onOpenAutoFocus={(e) => {
+            if (disableAutoFocusOnOpen) e.preventDefault();
+          }}
+        >
           <Command className={commandClasses}>
             <CommandList className={commandListClasses}>
               <div className='sticky top-0 z-10 !text-white !bg-black'>
-                <CommandInput className={commandInputClasses} placeholder='Search country...' />
+                <CommandInput
+                  className={commandInputClasses}
+                  placeholder='Search country...'
+                  readOnly={searchRO}
+                  onPointerDownCapture={() => searchRO && setSearchRO(false)}
+                  onFocus={() => searchRO && setSearchRO(false)}
+                />
               </div>
 
               <CommandEmpty className={emptyClasses}>No country found.</CommandEmpty>

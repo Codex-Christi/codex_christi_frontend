@@ -1,7 +1,8 @@
 import dynamic from 'next/dynamic';
 import { useProductDetailsContext } from '.';
 import { useCurrentVariant } from './currentVariantStore';
-import { useMemo } from 'react';
+import { Suspense, useMemo } from 'react';
+import { PriceSkeleton } from '../GlobalShopComponents/GlobalProductPrice';
 
 const DeliveryandPaymentsBanner = dynamic(() =>
   import('./DeliveryandPaymentsBanner').then((mod) => mod.DeliveryandPaymentsBanner),
@@ -10,6 +11,9 @@ const AddToCart = dynamic(() => import('./AddToCart').then((mod) => mod.AddToCar
 const BuyNow = dynamic(() => import('./BuyNow').then((mod) => mod.BuyNow));
 const SizeSelector = dynamic(() => import('./SizeSelector').then((mod) => mod.default));
 const ColorsSelector = dynamic(() => import('./ColorsSelector').then((mod) => mod.default));
+const GlobalProductPrice = dynamic(() =>
+  import('../GlobalShopComponents/GlobalProductPrice').then((mod) => mod.default),
+);
 
 // Main Component
 const ProductTitleAndSizesEtc = () => {
@@ -40,8 +44,12 @@ const ProductTitleAndSizesEtc = () => {
           <h2 className='font-bold text-2xl'>{title}</h2>
 
           <div className='flex items-start gap-2'>
-            <div className='space-y-1.5'>
-              <p className='font-bold text-xl'>{`\$${retail_price}`}</p>
+            <div className='space-y-3 cursor-pointer'>
+              <h3 className='font-bold text-xl select-none text-[1.1rem]'>
+                <Suspense fallback={<PriceSkeleton className='h-5 w-24' />}>
+                  <GlobalProductPrice usdAmount={Number(retail_price)} />
+                </Suspense>
+              </h3>
 
               {/* Stars */}
               <svg width='85' height='16' viewBox='0 0 85 16' fill='none'>

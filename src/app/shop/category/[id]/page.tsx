@@ -6,8 +6,16 @@ import errorToast from '@/lib/error-toast';
 import dynamic from 'next/dynamic';
 
 // Dynamic Components
-const ProductList = dynamic(() => import('./ProductList'));
-const PaginationControls = dynamic(() => import('./PaginationControls'));
+const ProductList = dynamic(
+  () =>
+    import('@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/ProductList'),
+);
+const PaginationControls = dynamic(
+  () =>
+    import(
+      '@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/PaginationControls'
+    ),
+);
 
 type PageProps = {
   params: Promise<{ id: string }>;

@@ -20,10 +20,7 @@ interface SideDrawerInterface {
   openCloseController: Dispatch<SetStateAction<boolean>>;
 }
 
-const SideDrawer: FC<SideDrawerInterface> = ({
-  openState,
-  openCloseController,
-}) => {
+const SideDrawer: FC<SideDrawerInterface> = ({ openState, openCloseController }) => {
   // Hooks
   const { isDesktopOnly } = useResponsiveSSRValue();
 
@@ -31,15 +28,11 @@ const SideDrawer: FC<SideDrawerInterface> = ({
   return (
     <>
       {!isDesktopOnly && (
-        <Drawer
-          direction='right'
-          open={openState}
-          onOpenChange={openCloseController}
-        >
+        <Drawer direction='right' open={openState} onOpenChange={openCloseController}>
           <DrawerOverlay className={` bg-black/[0.01] !backdrop-blur-[10px]`}>
             <DrawerContent
               className={` !rounded-none h-full bg-black/80  !border-none
-                !fixed !bottom-0 !right-0 !z-[500] w-full max-w-[600px]`}
+                !fixed !bottom-0 !right-0 !z-[500] w-full ml-auto !max-w-[600px] after:!hidden`}
             >
               <DrawerTitle className='!invisible'>
                 <DrawerDescription>Mobile Navigation Sidebar</DrawerDescription>

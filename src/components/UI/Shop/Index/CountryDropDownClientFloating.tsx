@@ -2,6 +2,7 @@
 
 import { CountryDropdown, type Country } from '@/components/UI/primitives/country-dropdown';
 import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore';
+import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 
 export type FloatingDropdownProps = {
   initialIso3: string;
@@ -20,6 +21,7 @@ export default function CountryDropdownClientFloating({
 }: FloatingDropdownProps) {
   const iso3 = useCurrencyCookie((s) => s.iso3);
   const changeCountry = useCurrencyCookie((s) => s.changeCountry);
+  const setCheckoutStoreCountry = useShopCheckoutStore((s) => s.setShippingCountryISO3);
 
   const defaultValue = iso3 || initialIso3 || 'USA';
   const key = defaultValue;
@@ -37,8 +39,14 @@ export default function CountryDropdownClientFloating({
         key={key}
         defaultValue={defaultValue}
         onChange={(c: Country) => {
-          if (c.alpha3 && c.alpha3 !== iso3) changeCountry(c.alpha3);
+          if (c.alpha3 && c.alpha3 !== iso3) {
+            changeCountry(c.alpha3);
+            setCheckoutStoreCountry(c.alpha3);
+          }
         }}
+        disableAutoFocusOnOpen
+        // Optional extra guard:
+        searchReadOnlyUntilInteract
         placeholder={placeholder}
         slim={slim}
         unstyled={unstyled ?? true}

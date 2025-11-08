@@ -159,11 +159,16 @@ export async function universalFetcher<Data, Arg = undefined>(
     });
 
     if (!res.ok) {
+      console.log(await res.text());
+
       let errInfo: Record<string, unknown> | null = null;
       try {
         errInfo = await res.json();
       } catch {
-        const txt = await res.text().catch(() => null);
+        const txt = await res
+          .text()
+          .then((v) => v)
+          .catch(() => null);
         if (txt !== null) {
           errInfo = { message: txt };
         }

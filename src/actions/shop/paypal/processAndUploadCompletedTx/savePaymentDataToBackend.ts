@@ -111,7 +111,7 @@ export const savePaymentDataToBackend = cache(async (encProps: string) => {
     },
   };
 
-  console.dir(body, { depth: null });
+  // console.dir(body, { depth: null });
 
   try {
     const data = await universalFetcher<PaymentSaveResponse, ReqBody>(

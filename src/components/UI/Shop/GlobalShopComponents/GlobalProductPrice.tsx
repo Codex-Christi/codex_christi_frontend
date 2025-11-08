@@ -6,10 +6,12 @@ import { Skeleton } from '@/components/UI/primitives/skeleton';
 
 type BaseProps = {
   className?: string;
-  ssrText: string | null;
+  /** Optional preformatted text from a server wrapper; not required anymore */
+  ssrText?: string | null;
   emitJsonLd?: boolean;
   seo?: { sku?: string; url?: string; name?: string; availability?: string };
 };
+
 type Props =
   | ({ usdAmount: number; usdCentsBase?: never } & BaseProps)
   | ({ usdAmount?: never; usdCentsBase: number } & BaseProps);
@@ -26,18 +28,37 @@ export function PriceSkeleton({ className }: { className?: string }) {
   return <Skeleton className={className ?? 'h-5 w-24 rounded'} />;
 }
 
+function formatUSD(major: number): string {
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(major);
+  } catch {
+    return `$ ${major.toFixed(2)}`;
+  }
+}
+
 export default function GlobalProductPrice(props: Props) {
-  // Initialize with SSR text so crawlers & first paint see a price.
-  const [text, setText] = useState<string | null>(props.ssrText);
+  // Compute a safe initial SSR text if none was provided: format USD using the given base amount.
+  const initialText = useMemo(() => {
+    if (props.ssrText != null) return props.ssrText;
+    const baseCents: number =
+      'usdCentsBase' in props
+        ? (props.usdCentsBase ?? 0)
+        : Math.round((props.usdAmount ?? 0) * 100);
+    const major = baseCents / 100;
+    return formatUSD(major);
+  }, [props]);
+
+  // Initialize with SSR (either provided, or computed USD) so crawlers & first paint see a price.
+  const [text, setText] = useState<string | null>(initialText);
 
   // Store selectors
   const convertUSDCents = useCurrencyCookie((s) => s.convertUSDCents);
   const fx = useCurrencyCookie((s) => s.fx);
 
   // Determine the immutable base cents for this node
-  const baseCents = useMemo(() => {
-    if ('usdCentsBase' in props) return props.usdCentsBase;
-    return Math.round(props.usdAmount * 100);
+  const baseCents = useMemo<number>(() => {
+    if ('usdCentsBase' in props) return props.usdCentsBase ?? 0;
+    return Math.round((props.usdAmount ?? 0) * 100);
   }, [props]);
 
   // Memoize the formatter per currency for efficiency
@@ -52,7 +73,7 @@ export default function GlobalProductPrice(props: Props) {
 
   // Compute live text when fx/base changes
   useEffect(() => {
-    if (baseCents == null || !fx) return;
+    if (baseCents == null || !fx) return; // stay on initial USD until FX exists
 
     const converted = convertUSDCents(baseCents);
     const major = converted / 100;
@@ -65,7 +86,7 @@ export default function GlobalProductPrice(props: Props) {
     }
   }, [baseCents, fx, convertUSDCents, formatter]);
 
-  // Lightweight loading state: show Skeleton when we have neither SSR text nor fx yet
+  // Lightweight loading state: show Skeleton when we have neither initial text nor fx yet
   const isLoading = !text && !fx;
 
   return (
