@@ -6,7 +6,7 @@ import {
   ArrowLeftIcon,
   PenLineIcon,
   Trash2Icon,
-  PhoneIcon,
+//   PhoneIcon,
   MapPinIcon,
   UserIcon,
 } from 'lucide-react';
@@ -34,19 +34,22 @@ const ShippingAddress = () => {
 
   if (!hasCompleteShippingInfo(userShopProfile)) {
     return (
-      <div className='text-center py-8 text-white space-y-4'>
-        <p className="text-lg">No shipping address found.</p>
+      <>
+        <div className='text-center py-8 text-white space-y-4'>
+          <p className='text-lg'>No shipping address found.</p>
 
-        <p>
-          <button
-            className='text-sm border border-[#F3F3F3] rounded-xl p-2 hover:bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] transition-color duration-300 ease-linear'
-            type='button'
-            onClick={() => setIsActive(true)}
-          >
-            Add New Address +
-          </button>
-        </p>
-      </div>
+          <p>
+            <button
+              className='text-sm border border-[#F3F3F3] rounded-xl p-2 hover:bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] transition-color duration-300 ease-linear'
+              type='button'
+              onClick={() => setIsActive(true)}
+            >
+              Add New Address +
+            </button>
+          </p>
+        </div>
+        <ShippingAddressModal isActive={isActive} setIsActive={setIsActive} />
+      </>
     );
   }
 
@@ -63,13 +66,13 @@ const ShippingAddress = () => {
           </Link>
         </div>
 
-        <button
+        {/* <button
           className='text-sm border border-[#F3F3F3] rounded-xl p-2 hover:bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] transition-color duration-300 ease-linear'
           type='button'
           onClick={() => setIsActive(true)}
         >
           Add New Address +
-        </button>
+        </button> */}
       </div>
 
       <div className='grid gap-4 md:grid-cols-2'>
@@ -81,8 +84,8 @@ const ShippingAddress = () => {
                 {userShopProfile?.data?.first_name} {userShopProfile?.data?.last_name}
               </p>
 
-              <p className='flex items-center gap-2 text-sm'>
-                <MapPinIcon width={18} />
+              <p className='flex items-start gap-2 text-sm'>
+                <MapPinIcon className='shrink-0' width={18} />
                 {userShopProfile?.data?.shipping_address}, {userShopProfile?.data?.shipping_city},{' '}
                 {userShopProfile?.data?.shipping_state}, {userShopProfile?.data?.shipping_country}
               </p>
@@ -109,10 +112,6 @@ const ShippingAddress = () => {
             </div>
           </div>
         )}
-
-        {/* {Array.from({ length: 2 }).map((_, index) => (
-
-        ))} */}
       </div>
 
       <ShippingAddressModal isActive={isActive} setIsActive={setIsActive} />

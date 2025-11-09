@@ -47,7 +47,7 @@ export const useUserShopProfile = create<UserShopProfile>()(
           const storeData = get().userShopProfile;
 
           try {
-            const serverData = await fetchUserShopProfile()
+            const serverData = await fetchUserShopProfile();
 
             // If no server data, return early
             if (!serverData) {
@@ -71,13 +71,12 @@ export const useUserShopProfile = create<UserShopProfile>()(
             } else {
               set({ isLoading: false });
             }
-          } catch (error) {
+          } catch {
             set({ isLoading: false });
           }
         },
 
-        setUserShopProfile: (userShopProfile: IUserShopProfile | null) =>
-          set({ userShopProfile }),
+        setUserShopProfile: (userShopProfile: IUserShopProfile | null) => set({ userShopProfile }),
 
         clearProfile: () => set({ userShopProfile: null, isLoading: false }),
 
@@ -90,8 +89,8 @@ export const useUserShopProfile = create<UserShopProfile>()(
         replacer: (key, value) => {
           // Serialize and Encrypt before saving
           if (key === 'userShopProfile' && value) {
-            if (isUserShopProfileData(value)) {
-              return encryptData(value);
+            if (isUserShopProfileData(value as unknown as IUserShopProfile)) {
+              return encryptData(value as unknown as IUserShopProfile);
             }
           }
           return value;
@@ -123,7 +122,7 @@ export const clearUserShopProfile = () => {
 };
 
 // Type guard function - Fixed to check the correct structure
-function isUserShopProfileData(value: any): value is IUserShopProfile {
+function isUserShopProfileData(value: IUserShopProfile): value is IUserShopProfile {
   if (!value || typeof value !== 'object') return false;
 
   // Check if it has a data property with the required fields
