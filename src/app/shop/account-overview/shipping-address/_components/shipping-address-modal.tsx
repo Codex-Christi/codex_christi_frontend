@@ -2,7 +2,7 @@ import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { ArrowLeftIcon } from 'lucide-react';
 import { SetStateAction } from 'react';
-import { useState } from 'react';
+import { useState, use } from 'react';
 import { Button } from '@/components/UI/primitives/button';
 import { cn } from '@/lib/utils';
 import {
@@ -12,6 +12,7 @@ import {
   DrawerOverlay,
   DrawerTitle,
 } from '@/components/UI/primitives/drawer';
+import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
 
 const ShippingAddressModal = ({
   isActive,
@@ -20,6 +21,10 @@ const ShippingAddressModal = ({
   isActive: boolean;
   setIsActive: React.Dispatch<SetStateAction<boolean>>;
 }) => {
+    const userShopProfile = useUserShopProfile((state) => state.userShopProfile);
+
+    console.log('details', userShopProfile);
+
   const [phoneValue, setPhoneValue] = useState<string | undefined>('+2348105008304');
 
   const handlePhoneChange = (newValue: string | undefined) => {
