@@ -61,7 +61,7 @@ export default function RootLayout({
       {/* !w-screen */}
       <body
         className={cn(
-          ` font-inter bg-black text-white !max-w-full !overflow-x-hidden antialiased`,
+          ` font-inter bg-black text-white !max-w-full !overflow-x-hidden antialiased break-words [word-break:break-word] [word-wrap:break-word]`,
           // break-words [word-break:break-word] [word-wrap:break-word]
           nicoMoji.variable,
           OCR_ext.variable,

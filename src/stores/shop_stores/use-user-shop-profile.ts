@@ -22,7 +22,7 @@ const decryptData = (encryptedData: string): IUserShopProfile | null => {
     const bytes = CryptoJS.AES.decrypt(encryptedData, ENCRYPTION_KEY);
     const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
     return JSON.parse(decryptedData);
-  } catch (error) {
+  } catch {
     return null;
   }
 };

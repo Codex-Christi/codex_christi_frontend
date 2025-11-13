@@ -28,7 +28,7 @@ const ShippingAddress = () => {
 
   if (isLoading) {
     return (
-      <div className='animate-pulse bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] border border-[#F3F3F3] rounded-[20px] h-32' />
+      <div className='animate-pulse bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] border border-[#F3F3F3]/50 rounded-[20px] h-32' />
     );
   }
 

@@ -126,7 +126,7 @@ const ShippingAddressModal = ({
         shipping_country: selectedCountry?.name ?? 'United States',
       };
 
-      const response = await updateShippingAddress(data);
+      const response = await updateShippingAddress(payload);
 
       toast.dismiss(loadingToastID);
 
@@ -143,8 +143,6 @@ const ShippingAddressModal = ({
     } catch (error) {
       toast.dismiss(loadingToastID);
 
-      console.error('Error updating shipping address:', error);
-
       const axiosError = error as AxiosError<{
         errors?: Array<{ message: string }>;
         message?: string;
@@ -152,7 +150,8 @@ const ShippingAddressModal = ({
 
       const errorMessage =
         axiosError.response?.data?.errors?.[0]?.message ||
-        axiosError.response?.data?.message || axiosError.message ||
+        axiosError.response?.data?.message ||
+        axiosError.message ||
         'Error updating shipping address. Please try again.';
 
       errorToast({
@@ -221,14 +220,6 @@ const ShippingAddressModal = ({
 
                 <label className='grid gap-2' htmlFor='shipping_country'>
                   <span className='text-[#F3F3F399] text-sm'>Country</span>
-
-                  {/* <input
-                    {...register('shipping_country')}
-                    className='input rounded-xl'
-                    placeholder='Enter country'
-                    id='shipping_country'
-                  /> */}
-
                   <Controller
                     name='shipping_country'
                     control={control}
