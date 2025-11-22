@@ -1,96 +1,61 @@
-import React, { FC, useCallback, useMemo, use } from 'react';
-import { OptionalProductVariantProps, ProductDetailsContext } from '.';
-import {
-  ColorAttribute,
-  hasColorAndSize,
-  ProductAttribute,
-  SizeAttribute,
-} from '@/app/shop/product/[id]/productDetailsSSR';
-import dynamic from 'next/dynamic';
-const RadioButtonGroup = dynamic(() =>
-  import('./RadioButtonGroupWithText').then((mod) => mod.default),
-);
+import React, { FC, useCallback, useMemo } from 'react';
+import RadioButtonGroup from './RadioButtonGroupWithText';
+import { ColorAttribute } from '@/app/shop/product/[id]/productDetailsSSR';
 import { useCurrentVariant } from './currentVariantStore';
 
-function isColorAttribute(
-  option: SizeAttribute | ColorAttribute | ProductAttribute | undefined,
-): option is ColorAttribute {
-  const attr = option?.attribute;
-  return (
-    typeof attr === 'object' &&
-    attr !== null &&
-    'name' in attr &&
-    (attr as { name: string }).name === 'Color'
-  );
-}
+type ColorsSelectorProps = {
+  colorOptionsList: ColorAttribute[];
+};
 
 // Main Component for Colors Selector
-const ColorsSelector: FC<OptionalProductVariantProps> = ({ variants }) => {
-  // Hooks
+const ColorsSelector: FC<ColorsSelectorProps> = ({ colorOptionsList }) => {
   const { setColor } = useCurrentVariant();
 
-  //   Variables
-  let productDetailsContext;
-
-  if (!variants) {
-    productDetailsContext = use(ProductDetailsContext);
-  }
-
-  const productVariants = variants ?? productDetailsContext!.productVariants;
-
-  const productHasColorAndSize = hasColorAndSize(productVariants[0]!.options);
-
   const uniqueColorOptions = useMemo(() => {
-    if (productHasColorAndSize) {
-      const arrayOfColors = productVariants.map((variant) => {
-        const attr = variant!.options[2];
-        if (attr) {
-          return { label: attr.name, value: attr.value, key: attr.slug };
-        }
-        return null;
-      });
-
-      const uniqueColors = [
-        ...new Map(
-          arrayOfColors
-            .filter((obj): obj is { label: string; value: string; key: string } => obj !== null)
-            .map((obj) => [`${obj.label}:${obj.value}`, obj]),
-        ).values(),
-      ];
-
-      return uniqueColors;
+    if (!Array.isArray(colorOptionsList) || colorOptionsList.length === 0) {
+      return [];
     }
-    return [];
-  }, [productHasColorAndSize, productVariants]);
 
-  //   Handlers
+    const mapped = colorOptionsList.map((opt) => ({
+      label: opt.name ?? opt.attribute?.name ?? 'Color',
+      value: opt.value,
+      key: opt.slug ?? `${opt.value}-${opt.attribute?.name ?? 'color'}`,
+    }));
+
+    const uniqueColors = [
+      ...new Map(mapped.map((obj) => [`${obj.label}:${obj.value}`.toLowerCase(), obj])).values(),
+    ];
+
+    return uniqueColors;
+  }, [colorOptionsList]);
+
   const onChangeColor = useCallback(
     (value: string | { name: string; value: string }) => {
-      const colorValue = typeof value === 'string' ? value : value.value;
-      const matched = productVariants.find((variant) => variant!.options[2]!.value === colorValue);
+      const raw = typeof value === 'string' ? value : value?.value;
+      if (!raw) return;
 
-      const colorOption = matched?.options[2];
+      const normalized = raw.toLowerCase();
 
-      if (isColorAttribute(colorOption)) {
-        setColor(colorOption);
-      } else {
-        console.warn('[onChangeSize] colorOption not valid ColorAttribute:', colorOption);
+      // Find the matching ColorAttribute from the list we were given.
+      const matched = colorOptionsList.find((opt) => opt.value.toLowerCase() === normalized);
+
+      if (!matched) {
+        console.warn('[ColorsSelector:onChangeColor] No ColorAttribute matched for value:', value);
+        return;
       }
+
+      setColor(matched);
     },
-    [productVariants, setColor],
+    [colorOptionsList, setColor],
   );
 
-  return (
-    <>
-      {/* Colors */}
-      {productHasColorAndSize && (
-        <div className='space-y-1'>
-          <h4 className='text-xl'>Colors:</h4>
+  if (uniqueColorOptions.length === 0) return null;
 
-          <RadioButtonGroup props={uniqueColorOptions} onChange={onChangeColor} />
-        </div>
-      )}
-    </>
+  return (
+    <div className='space-y-1'>
+      <h4 className='text-xl'>Colors:</h4>
+      <RadioButtonGroup props={uniqueColorOptions} onChange={onChangeColor} />
+    </div>
   );
 };
 

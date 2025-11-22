@@ -6,9 +6,23 @@ import { Button } from '@/components/UI/primitives/button';
 import { Skeleton } from '@/components/UI/primitives/skeleton'; // Import shadcn/ui Skeleton
 import { AddToCart } from '../../../ProductDetails/AddToCart';
 import { BuyNow } from '../../../ProductDetails/BuyNow';
-import SizeSelector from '../../../ProductDetails/SizeSelector';
-import ColorsSelector from '../../../ProductDetails/ColorsSelector';
+import VariantAttributeSelector from '../../../ProductDetails/VariantAttributeSelector';
+import {
+  ProductVariantsInterface,
+  SizeAttribute,
+  ColorAttribute,
+  ProductVariantOptions,
+} from '@/app/shop/product/[id]/productDetailsSSR';
 import { useProductVariants } from '@/lib/hooks/shopHooks/products/variants/useProductVariants';
+
+const getOptionsByAttribute = (variants: ProductVariantsInterface['data'], attrName: string) => [
+  ...new Map(
+    variants
+      .flatMap((v) => v.options)
+      .filter((o) => o.attribute?.name.toLowerCase() === attrName.toLowerCase())
+      .map((o) => [o.value, o]),
+  ).values(),
+];
 
 interface SizeAndColorSelectorPopoverProps {
   buttonProps?: ComponentProps<typeof Button>;
@@ -23,6 +37,27 @@ const SizeAndColorSelectorPopover: FC<SizeAndColorSelectorPopoverProps> = (props
   const { data, error, isLoading } = useProductVariants(productId, isOpen);
 
   const stopPropagation = (e: Event) => e.stopPropagation();
+
+  const { sizeAttrList, colorAttrList, labelAttrList } = useMemo(() => {
+    const empty = {
+      sizeAttrList: [] as SizeAttribute[],
+      colorAttrList: [] as ColorAttribute[],
+      labelAttrList: [] as ProductVariantOptions[number][],
+    };
+
+    if (!data?.data || !Array.isArray(data.data)) return empty;
+
+    const variants = data.data as ProductVariantsInterface['data'];
+
+    const sizeAttrList = getOptionsByAttribute(variants, 'size') as SizeAttribute[];
+    const colorAttrList = getOptionsByAttribute(variants, 'color') as ColorAttribute[];
+    const labelAttrList = getOptionsByAttribute(
+      variants,
+      'label',
+    ) as ProductVariantOptions[number][];
+
+    return { sizeAttrList, colorAttrList, labelAttrList };
+  }, [data]);
 
   // Memoize the popover content to prevent unnecessary re-renders
   const popoverContent = useMemo(
@@ -70,9 +105,24 @@ const SizeAndColorSelectorPopover: FC<SizeAndColorSelectorPopoverProps> = (props
           {/* Fetched data display */}
           {data && (
             <>
-              {/* Size and Color Selectors */}
-              <SizeSelector variants={data.data} />
-              <ColorsSelector variants={data.data} />
+              {/* Size, Color and Label Selectors */}
+              {sizeAttrList.length > 0 && (
+                <VariantAttributeSelector title='Size:' attribute='size' options={sizeAttrList} />
+              )}
+              {colorAttrList.length > 0 && (
+                <VariantAttributeSelector
+                  title='Colors:'
+                  attribute='color'
+                  options={colorAttrList}
+                />
+              )}
+              {labelAttrList.length > 0 && (
+                <VariantAttributeSelector
+                  title='Label:'
+                  attribute='label'
+                  options={labelAttrList}
+                />
+              )}
 
               {/* Add to Cart and Buy Now buttons */}
               <div className='space-y-4'>
@@ -87,7 +137,7 @@ const SizeAndColorSelectorPopover: FC<SizeAndColorSelectorPopoverProps> = (props
         </div>
       </PopoverContent>
     ),
-    [data, error, isLoading, productSlug, productTitle],
+    [data, error, isLoading, productSlug, productTitle, sizeAttrList, colorAttrList, labelAttrList],
   );
 
   return (

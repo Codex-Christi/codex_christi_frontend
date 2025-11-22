@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId } from 'react';
 import { Input } from '../../primitives/input';
 import { cn } from '@/lib/utils';
 import { useCurrentVariant } from './currentVariantStore';
@@ -10,29 +10,51 @@ interface RadioOption {
 }
 
 interface RadioButtonGroupProps {
+  /** The list of radio options to render */
   props: RadioOption[];
+  /** Called when selection changes (native radio change) */
   onChange: (value: string | { name: string; value: string }) => void;
+  /** Optional accessible name for the radio group */
+  groupLabel?: string;
 }
 
-const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({ props, onChange }) => {
+const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({ props, onChange, groupLabel }) => {
   const [selectedValue, setSelectedValue] = React.useState<string | undefined>();
+  const groupId = useId();
+  const groupName = `radio-group-${groupId}`;
 
   // Hooks
   const { currentVariantOptions } = useCurrentVariant();
 
   // useEffect
   useEffect(() => {
-    const isMatchingVariantsAvailable = currentVariantOptions.some(
-      (elem) => elem != null && elem !== undefined && elem.value.length > 0,
+    // currentVariantOptions is now a map of attributeName -> selectedValue (string | null)
+    // We clear the local selection when there are no active selections in the store.
+    const hasAnySelection = Object.values(currentVariantOptions).some(
+      (value) => value !== null && value !== '',
     );
-    if (!isMatchingVariantsAvailable) {
+
+    if (!hasAnySelection) {
       setSelectedValue(undefined);
     }
   }, [currentVariantOptions]);
 
+  // Helpers
+  const handleSelect = (prop: RadioOption, radioValue: string | undefined, scroll = false) => {
+    if (prop.value != null && radioValue != null) {
+      setSelectedValue(radioValue);
+      onChange(prop.value);
+      if (scroll) scrollToSection('mainGallery');
+    }
+  };
+
   // JSX
   return (
-    <div className='flex py-3 gap-8 flex-wrap justify-start items-center'>
+    <div
+      role='radiogroup'
+      aria-label={groupLabel}
+      className='flex py-3 gap-8 flex-wrap justify-start items-center'
+    >
       {props.map((prop) => {
         const radioValue = typeof prop.value === 'string' ? prop.value : prop.value?.value;
         const isSelected = selectedValue === radioValue;
@@ -40,29 +62,35 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({ props, onChange }) 
           ? radioValue.startsWith('#') && radioValue.length === 7
           : false;
         const hexCode = isColorValue ? radioValue : null;
+        const inputId = `radio-${groupId}-${prop.key}`;
+        const labelId = `radio-label-${groupId}-${prop.key}`;
+        const isDisabled = prop.value == null || radioValue == null;
 
         return (
-          <div key={radioValue} className='flex flex-col items-center'>
+          <div key={prop.key} className='flex flex-col items-center'>
+            {/* Native radio controls keyboard behavior (arrow keys, space, tab). Keep it visible to AT via sr-only. */}
             <Input
-              className='bg-transparent w-0 h-0 invisible'
+              className='sr-only peer'
               type='radio'
-              id={radioValue}
-              name='radio-group'
-              value={radioValue}
-              checked={isSelected}
-              onChange={() => {
-                if (prop.value != null) {
-                  setSelectedValue(radioValue);
-                  onChange(prop.value);
-                }
-              }}
+              id={inputId}
+              name={groupName}
+              value={radioValue ?? ''}
+              checked={!!isSelected}
+              onChange={() => handleSelect(prop, radioValue)}
+              aria-labelledby={labelId}
+              disabled={isDisabled}
+              aria-disabled={isDisabled}
             />
+
             {isColorValue ? (
               <label
-                onClick={() => scrollToSection('mainGallery')}
-                htmlFor={radioValue}
+                id={labelId}
+                htmlFor={inputId}
+                aria-disabled={isDisabled}
                 className={cn(
                   'w-6 h-6 rounded-full border-2 cursor-pointer flex items-center justify-center transition-all',
+                  'focus:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-black',
+                  isDisabled && 'opacity-40 cursor-not-allowed',
                   isSelected ? 'border-black ring-2 ring-black scale-150' : 'border-gray-300',
                 )}
                 style={{
@@ -71,7 +99,6 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({ props, onChange }) 
                 }}
                 title={prop.label}
               >
-                {/* Optional: show checkmark if selected */}
                 {isSelected && (
                   <span
                     style={{
@@ -86,18 +113,22 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({ props, onChange }) 
               </label>
             ) : (
               <label
+                id={labelId}
+                htmlFor={inputId}
+                aria-disabled={isDisabled}
                 className={cn(
                   '!text-[.8rem] font-semibold border px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-500',
+                  'focus:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-black',
+                  isDisabled && 'opacity-40 cursor-not-allowed',
                   isSelected &&
                     `bg-gray-600 text-white border-[2.5px] font-extrabold border-gray-600 
                     hover:bg-gray-600 shadow-gray-200 shadow-md hover:text-white font-ocr`,
                 )}
-                htmlFor={radioValue}
               >
                 {prop.label}
               </label>
             )}
-            {/* Optional: show color name below swatch */}
+
             {isColorValue && prop.label && (
               <span
                 className={cn(
@@ -127,7 +158,7 @@ function hex_is_light(color: string) {
 const scrollToSection = (id: string) => {
   const element = document.getElementById(id);
   if (element && typeof window !== 'undefined') {
-    element.scrollIntoView({ behavior: 'smooth' }); // 'smooth' for animated scroll
+    element.scrollIntoView({ behavior: 'smooth' });
   }
 };
 

@@ -64,7 +64,7 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
     if (isBusy) return;
     setIsBusy(true);
     // Keep the block for 600ms to catch double-taps
-    const unblock = setTimeout(() => setIsBusy(false), 600);
+    setTimeout(() => setIsBusy(false), 600);
 
     try {
       if (!canSubmit || !matchingVariant) {
@@ -90,10 +90,7 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
           typeof err === 'string' ? err : err instanceof Error ? err.message : JSON.stringify(err),
       });
     } finally {
-      // IMPORTANT: do not clear the timeout or flip isBusy here,
-      // or you remove the debounce. Let the timeout re-enable the button.
-      clearTimeout(unblock);
-      setIsBusy(false); // <- leave commented
+      // Let the timeout re-enable the button to preserve the debounce behaviour.
     }
   }, [
     addToCart,
@@ -110,7 +107,10 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
   // Subscribes with a proper Variant[]; auto-unsub on deps change/unmount.
   useEffect(() => {
     if (cleanVariants.length === 0) return;
-    const unsubscribe = setupVariantAutoMatching(cleanVariants);
+    // Adapt local Variant[] to the shape expected by setupVariantAutoMatching
+    const unsubscribe = setupVariantAutoMatching(
+      cleanVariants as Parameters<typeof setupVariantAutoMatching>[0],
+    );
     return unsubscribe;
   }, [cleanVariants]);
 

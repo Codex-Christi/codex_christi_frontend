@@ -12,6 +12,13 @@ import {
 import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 import SubNav from '../ShopSubNav';
 import { useRouteChangeAware } from '@/lib/hooks/useRouteChangeAware';
+import { useAmIOnShopRoute } from '@/lib/hooks/shopHooks/useAmIOnShopRoute';
+import { getDefaultISO3 } from '@/lib/utils/shop/geo/getDefaultISO3.client';
+import dynamic from 'next/dynamic';
+
+const CountryDropdown = dynamic(
+  () => import('@/components/UI/Shop/Index/CountryDropDownClientFloating'),
+);
 
 // Interfaces
 interface SideDrawerInterface {
@@ -22,10 +29,12 @@ interface SideDrawerInterface {
 
 const ShopMobileSideBar: FC<SideDrawerInterface> = ({ openState, openCloseController }) => {
   // Hooks
-  const { isDesktopOnly } = useResponsiveSSRValue();
+  const { isDesktopOnly, isMobile } = useResponsiveSSRValue();
   useRouteChangeAware(() => {
     openCloseController(false);
   });
+  const defaultISO3 = getDefaultISO3();
+  const { youAreOnDesiredShopRoute: amIOnShopHome } = useAmIOnShopRoute('/shop');
 
   // Main JSX
   return (
@@ -34,16 +43,43 @@ const ShopMobileSideBar: FC<SideDrawerInterface> = ({ openState, openCloseContro
         <Drawer direction='left' open={openState} onOpenChange={openCloseController}>
           <DrawerOverlay className={` bg-black/[0.01] !backdrop-blur-[2px]`}>
             <DrawerContent
-              className={` !rounded-none h-full bg-[#131313] bg-opacity-95  !border-none
-                !fixed !bottom-0 !left-0 !z-[500] w-full max-w-[350px] overflow-y-auto`}
+              id='drawer-root'
+              className={` !rounded-none min-h-[100svh] h-[100svh] bg-[#131313] bg-opacity-95  !border-none
+                !fixed !bottom-0 !left-0 !z-[500] w-full max-w-[350px] overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]`}
             >
               <DrawerTitle className='!invisible'>
                 <DrawerDescription>Mobile Navigation Sidebar</DrawerDescription>
               </DrawerTitle>
 
-              <DrawerClose className='ml-16 mb-10 mt-2'>
-                <CloseButtonSVG className='w-7 h-7 ' />
-              </DrawerClose>
+              <section className='flex justify-between'>
+                <DrawerClose className='ml-16 mb-10 mt-2'>
+                  <CloseButtonSVG className='w-7 h-7 ' />
+                </DrawerClose>
+
+                {!amIOnShopHome && isMobile && (
+                  <CountryDropdown
+                    popoverModal={isMobile} // default true; explicit if you want
+                    trapInsideDrawer={isMobile}
+                    mobileBlockAutoFocus={isMobile}
+                    isMobileOverride={isMobile}
+                    portalContainer={
+                      typeof document !== 'undefined'
+                        ? (document.querySelector('#drawer-root') as HTMLElement)
+                        : null
+                    }
+                    initialIso3={defaultISO3}
+                    slim
+                    wrapperClassName='scale-[1.25] mr-5 !z-[999]'
+                    chevronClassName='ml-2 shrink-0 opacity-100 size-[1.5rem] text-white' // wrapper-only bump
+                    classNames={{
+                      trigger: ` inline-flex items-center gap-2 h-12 px-3 rounded-full border border-white/20 bg-black/60 text-white whitespace-nowrap 
+                  hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60`,
+                      popover:
+                        'w-[320px] p-0 !z-[1000] will-change-transform [transform:translateZ(0)]',
+                    }}
+                  />
+                )}
+              </section>
 
               {/* SubNav Container */}
               <div className='flex flex-col gap-7'>

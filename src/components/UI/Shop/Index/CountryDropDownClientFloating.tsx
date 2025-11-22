@@ -10,6 +10,15 @@ export type FloatingDropdownProps = {
   unstyled?: boolean;
   placeholder?: string;
   slim?: boolean;
+  popoverModal?: boolean;
+  trapInsideDrawer?: boolean;
+  mobileBlockAutoFocus?: boolean;
+  portalContainer?: HTMLElement | null | undefined;
+  isMobileOverride?: boolean;
+  /** Optional: control the outer wrapper when slim=true or to override defaults */
+  wrapperClassName?: string;
+  /** Optional: extra classes to style the chevron icon on the trigger (spacing/visibility). */
+  chevronClassName?: string;
 };
 
 export default function CountryDropdownClientFloating({
@@ -18,6 +27,13 @@ export default function CountryDropdownClientFloating({
   unstyled,
   placeholder = 'Select country',
   slim = false,
+  wrapperClassName,
+  popoverModal,
+  chevronClassName,
+  isMobileOverride,
+  trapInsideDrawer,
+  mobileBlockAutoFocus,
+  portalContainer,
 }: FloatingDropdownProps) {
   const iso3 = useCurrencyCookie((s) => s.iso3);
   const changeCountry = useCurrencyCookie((s) => s.changeCountry);
@@ -26,15 +42,18 @@ export default function CountryDropdownClientFloating({
   const defaultValue = iso3 || initialIso3 || 'USA';
   const key = defaultValue;
 
-  return (
-    <div
-      className='
+  const wrapperClasses = slim
+    ? (wrapperClassName ?? '')
+    : (wrapperClassName ??
+      `
         fixed right-4 bottom-8 lg:bottom-20
         z-[500]
         rounded-full bg-[#242121c7] backdrop-blur-[10px]
         shadow-md shadow-slate-200 font-ocr font-bold
-      '
-    >
+      `);
+
+  return (
+    <div className={wrapperClasses}>
       <CountryDropdown
         key={key}
         defaultValue={defaultValue}
@@ -44,24 +63,33 @@ export default function CountryDropdownClientFloating({
             setCheckoutStoreCountry(c.alpha3);
           }
         }}
-        disableAutoFocusOnOpen
         // Optional extra guard:
         searchReadOnlyUntilInteract
+        trapInsideDrawer={trapInsideDrawer}
         placeholder={placeholder}
+        mobileBlockAutoFocus={mobileBlockAutoFocus}
         slim={slim}
+        isMobileOverride={isMobileOverride}
+        popoverModal={popoverModal}
+        portalContainer={portalContainer}
         unstyled={unstyled ?? true}
         classNames={{
+          // Trigger defaults; caller can override freely (used for positioning/styling in slim mode)
           trigger:
             classNames?.trigger ??
-            'input border-none flex items-center gap-4 justify-between h-10 px-4 ' +
-              'text-white bg-transparent rounded-full',
+            (slim
+              ? 'inline-flex items-center justify-center gap-1 h-9 px-2 rounded-full border border-white/15 bg-black/40 text-white whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50'
+              : 'input border-none inline-flex items-center gap-2 justify-between h-10 px-4 text-white bg-transparent rounded-full whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60'),
+
+          // Keep popover/menu defaults IDENTICAL in both modes unless user overrides
           popover: classNames?.popover ?? 'w-[320px] p-0 !z-[500]',
           command: classNames?.command ?? 'bg-[#0D0D0DFA] text-white',
           commandList: classNames?.commandList ?? '',
           commandInput: classNames?.commandInput ?? 'bg-transparent placeholder:text-white/60',
           commandItem: classNames?.commandItem ?? 'text-white',
+
           name: classNames?.name ?? 'overflow-hidden text-ellipsis whitespace-nowrap',
-          chevron: classNames?.chevron ?? '',
+          chevron: classNames?.chevron ?? chevronClassName ?? 'ml-2 shrink-0 opacity-90',
           ...(classNames || {}),
         }}
       />

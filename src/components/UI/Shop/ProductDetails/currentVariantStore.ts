@@ -2,7 +2,7 @@ import {
   ProductVariantsInterface,
   ColorAttribute,
   SizeAttribute,
-  hasColorAndSize,
+  LabelAttribute,
 } from '@/app/shop/product/[id]/productDetailsSSR';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
@@ -12,81 +12,130 @@ import { shallow } from 'zustand/shallow';
 type Variant = ProductVariantsInterface['data'][0];
 type Variants = ProductVariantsInterface['data'];
 
+// keep the raw option type around for label setters etc.
+type VariantSelectionState = Record<string, string | null>;
+
 interface CurrentVariantStore {
   matchingVariant: Variant | null;
   setMatchingVariant: (variant: Variant | null) => void;
 
-  // Tuple: [ProductAttribute (unused), Size, Color]
-  currentVariantOptions: [null, SizeAttribute | null, ColorAttribute | null];
-  setColor: (color: ColorAttribute) => void;
-  setSize: (size: SizeAttribute, variant: Variant) => void;
+  // currentVariantOptions is keyed by normalized attribute name (e.g. 'size', 'color', 'label')
+  currentVariantOptions: VariantSelectionState;
+  setColor: (color: ColorAttribute | null, variant?: Variant) => void;
+  setSize: (size: SizeAttribute | null, variant?: Variant) => void;
+  setLabel: (label: LabelAttribute | null, variant?: Variant) => void;
   resetVariantOptions: () => void;
 
   findMatchingVariant: (variants: Variants) => Variant | undefined;
 }
 
-// Helper: find indices by attribute name (case-insensitive)
-function getOptionIndices(options: Variant['options']) {
-  let sizeIdx: number | null = null;
-  let colorIdx: number | null = null;
+// Helpers
+const normalizeAttrName = (name?: string | null): string => (name ?? '').trim().toLowerCase();
 
-  options?.forEach((opt, idx) => {
-    const n = opt?.attribute?.name?.toLowerCase();
-    if (n === 'size') sizeIdx = idx;
-    if (n === 'color') colorIdx = idx;
+type WithOptionalValue = { value?: string | number | null };
+
+const extractValue = (option: WithOptionalValue | null | undefined): string | null => {
+  if (!option) return null;
+  const raw = option.value;
+  if (raw === undefined || raw === null) return null;
+  return String(raw);
+};
+
+const buildVariantValueMap = (variant: Variant): Record<string, string | undefined> => {
+  const map: Record<string, string | undefined> = {};
+
+  variant?.options?.forEach((opt) => {
+    const key = normalizeAttrName(opt?.attribute?.name);
+    const value = opt?.value;
+    if (key) {
+      map[key] = value;
+    }
   });
 
-  return { sizeIdx, colorIdx };
-}
+  return map;
+};
 
 export const useCurrentVariant = create<CurrentVariantStore>()(
-  subscribeWithSelector<CurrentVariantStore>((set, get) => ({
+  subscribeWithSelector((set, get) => ({
     matchingVariant: null,
-    currentVariantOptions: [null, null, null],
 
-    setMatchingVariant: (variant) =>
-      set((s) => (s.matchingVariant === variant ? s : { matchingVariant: variant })),
-
-    setColor: (color) =>
-      set((state) => ({
-        currentVariantOptions: [null, state.currentVariantOptions[1], color],
-      })),
-
-    setSize: (size, variant) => {
-      const hasBoth = hasColorAndSize(variant.options);
-      return set((state) => ({
-        currentVariantOptions: [null, size, hasBoth ? state.currentVariantOptions[2] : null],
-      }));
+    // initialise known keys, but store is flexible enough to accept others as needed
+    currentVariantOptions: {
+      size: null,
+      color: null,
+      label: null,
     },
 
-    resetVariantOptions: () =>
-      set({ currentVariantOptions: [null, null, null], matchingVariant: null }),
+    setMatchingVariant: (variant: Variant | null) =>
+      set((s) => (s.matchingVariant === variant ? s : { ...s, matchingVariant: variant })),
 
-    findMatchingVariant: (variants) => {
+    // Note: `variant` parameter is optional and currently unused, but kept for backwards compatibility
+    setColor: (color: ColorAttribute | null) =>
+      set((state) => ({
+        currentVariantOptions: {
+          ...state.currentVariantOptions,
+          color: extractValue(color as unknown as WithOptionalValue),
+        },
+      })),
+
+    setSize: (size: SizeAttribute | null) =>
+      set((state) => ({
+        currentVariantOptions: {
+          ...state.currentVariantOptions,
+          size: extractValue(size as unknown as WithOptionalValue),
+        },
+      })),
+
+    setLabel: (label: LabelAttribute | null) =>
+      set((state) => ({
+        currentVariantOptions: {
+          ...state.currentVariantOptions,
+          label: extractValue(label as unknown as WithOptionalValue),
+        },
+      })),
+
+    resetVariantOptions: () =>
+      set({
+        currentVariantOptions: {
+          size: null,
+          color: null,
+          label: null,
+        },
+        matchingVariant: null,
+      }),
+
+    findMatchingVariant: (variants: Variants) => {
       if (!Array.isArray(variants) || variants.length === 0) {
         console.error('Invalid variants passed to findMatchingVariant');
-        get().setMatchingVariant(null);
+        set((s) => ({ ...s, matchingVariant: null }));
         return undefined;
       }
 
-      const [, selSize, selColor] = get().currentVariantOptions;
+      const selections = get().currentVariantOptions;
 
-      // Determine indices from the first variant’s option schema
-      const { sizeIdx, colorIdx } = getOptionIndices(variants[0]?.options ?? []);
+      // Only use attributes that actually have a non-empty selection
+      const activeKeys = Object.entries(selections)
+        .filter(([, v]) => v !== null && v !== '')
+        .map(([k]) => k);
 
-      const eq = (a?: string, b?: string) => (a ?? '').toLowerCase() === (b ?? '').toLowerCase();
+      if (activeKeys.length === 0) {
+        set((s) => ({ ...s, matchingVariant: null }));
+        return undefined;
+      }
 
       const matched = variants.find((variant) => {
-        const sizeVal = sizeIdx != null ? variant?.options?.[sizeIdx]?.value : undefined;
-        const colorVal = colorIdx != null ? variant?.options?.[colorIdx]?.value : undefined;
+        const map = buildVariantValueMap(variant);
 
-        if (selSize && selColor) return eq(sizeVal, selSize.value) && eq(colorVal, selColor.value);
-        if (selSize) return eq(sizeVal, selSize.value);
-        if (selColor) return eq(colorVal, selColor.value);
-        return false; // nothing selected → no match (don’t force first variant)
+        return activeKeys.every((attrName) => {
+          const selected = selections[attrName];
+          if (!selected) return false;
+
+          const variantVal = map[attrName];
+          return (variantVal ?? '').toLowerCase() === selected.toLowerCase();
+        });
       });
 
-      get().setMatchingVariant(matched ?? null);
+      set((s) => ({ ...s, matchingVariant: matched ?? null }));
       return matched;
     },
   })),
@@ -99,21 +148,41 @@ export function setupVariantAutoMatching(variants: Variants) {
     return () => {};
   }
 
+  // Determine which attributes are actually used to describe variants for this product.
+  // We treat these as the "required" selection set before we attempt a match.
+  const requiredAttributes = new Set<string>();
+
+  const firstVariant = variants[0];
+  firstVariant?.options?.forEach((opt) => {
+    const name = normalizeAttrName(opt?.attribute?.name);
+    if (name) requiredAttributes.add(name);
+  });
+
   return useCurrentVariant.subscribe(
     (s) => s.currentVariantOptions,
-    () => {
-      useCurrentVariant.getState().findMatchingVariant(variants);
+    (currentOptions) => {
+      const activeKeys = Object.entries(currentOptions)
+        .filter(([, v]) => v !== null && v !== '')
+        .map(([k]) => k);
+
+      const hasAllRequired = Array.from(requiredAttributes).every((attr) => {
+        const v = currentOptions[attr];
+        return typeof v === 'string' && v.length > 0;
+      });
+
+      const state = useCurrentVariant.getState();
+
+      // If no active selection or not all required attributes are selected yet,
+      // we do not attempt a match and clear any previous match.
+      if (!hasAllRequired || activeKeys.length === 0) {
+        if (state.matchingVariant !== null) {
+          state.setMatchingVariant(null);
+        }
+        return;
+      }
+
+      state.findMatchingVariant(variants);
     },
-    { equalityFn: shallow }, // <— only fire when tuple actually changes top-level
+    { equalityFn: shallow },
   );
 }
-
-// Optional: keep a dev log when the matched variant changes (fireImmediately true if you want)
-// useCurrentVariant.subscribe(
-//   (s) => s.matchingVariant,
-//   (mv) => {
-//     // no-op now; useful for debugging:
-//     // console.debug('[matchingVariant]', mv?._id);
-//   },
-//   // { fireImmediately: true }
-// );

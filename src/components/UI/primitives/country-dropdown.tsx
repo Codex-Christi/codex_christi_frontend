@@ -81,6 +81,26 @@ interface CountryDropdownProps {
    * Default: false
    */
   searchReadOnlyUntilInteract?: boolean;
+
+  /** If true (default), block popover auto-focus ONLY on mobile devices. */
+  mobileBlockAutoFocus?: boolean;
+  /** Optional override for mobile detection; if provided, it overrides UA sniff. */
+  isMobileOverride?: boolean;
+
+  /** If true (default), render Popover in modal mode to play nicely inside Drawer/Dialog. */
+  popoverModal?: boolean;
+
+  /**
+   * When true, keeps interactions inside the Drawer by preventing Radix "outside" events
+   * from closing/stealing focus. Useful when used inside a Drawer/Dialog.
+   */
+  trapInsideDrawer?: boolean;
+
+  /**
+   * Optional container to portal the PopoverContent into (e.g., a DrawerContent element).
+   * Rendering inside the Drawer subtree avoids it being considered an outside click.
+   */
+  portalContainer?: HTMLElement | null;
 }
 
 const CountryDropdownComponent = (
@@ -97,6 +117,11 @@ const CountryDropdownComponent = (
     unstyled = false,
     disableAutoFocusOnOpen = false,
     searchReadOnlyUntilInteract = false,
+    mobileBlockAutoFocus = true,
+    isMobileOverride,
+    popoverModal = true,
+    trapInsideDrawer = false,
+    portalContainer,
     ...restTriggerProps
   }: CountryDropdownProps,
   ref: React.ForwardedRef<HTMLButtonElement>,
@@ -104,6 +129,14 @@ const CountryDropdownComponent = (
   const [open, setOpen] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country | undefined>(undefined);
   const [searchRO, setSearchRO] = useState<boolean>(searchReadOnlyUntilInteract);
+
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  useEffect(() => {
+    if (typeof navigator !== 'undefined') {
+      const ua = navigator.userAgent || '';
+      setIsMobile(/Mobi|Android|iPhone|iPad|iPod/i.test(ua));
+    }
+  }, []);
 
   // fast lookup for defaultValue selection
   const optionsMapAlpha3 = useMemo(() => {
@@ -134,11 +167,11 @@ const CountryDropdownComponent = (
   const triggerClasses = cn(
     unstyled
       ? undefined
-      : `flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input
+      : `flex h-9 items-center justify-between whitespace-nowrap rounded-md border border-input
          bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground
          focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50
          [&>span]:line-clamp-1 autofill:!bg-transparent rounded-3xl`,
-    slim === true && !unstyled && 'w-20',
+    !unstyled && !slim && 'w-full',
     classNames?.trigger,
   );
 
@@ -150,7 +183,7 @@ const CountryDropdownComponent = (
 
   const nameClasses = cn('overflow-hidden text-ellipsis whitespace-nowrap', classNames?.name);
 
-  const chevronClasses = cn('', classNames?.chevron);
+  const chevronClasses = cn('ml-2 shrink-0 opacity-90', classNames?.chevron);
 
   const popoverClasses = cn(
     'min-w-[--radix-popper-anchor-width] p-0 !bg-transparent',
@@ -196,23 +229,42 @@ const CountryDropdownComponent = (
 
   return (
     <div className={classNames?.root}>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={setOpen} modal={popoverModal}>
         <PopoverTrigger
           ref={ref}
           className={triggerClasses}
           disabled={disabled}
+          type='button'
+          aria-haspopup='listbox'
+          aria-expanded={open}
           {...restTriggerProps}
         >
           <TriggerContent />
-          <ChevronDown size={16} className={chevronClasses} />
+          <ChevronDown size={25} className={chevronClasses} />
         </PopoverTrigger>
 
         <PopoverContent
           collisionPadding={10}
           side='bottom'
           className={popoverClasses}
+          {...(portalContainer ? { container: portalContainer } : {})}
           onOpenAutoFocus={(e) => {
-            if (disableAutoFocusOnOpen) e.preventDefault();
+            const mobileBool = typeof isMobileOverride === 'boolean' ? isMobileOverride : isMobile;
+            const shouldBlock =
+              // legacy prop still blocks on all platforms if set
+              disableAutoFocusOnOpen ||
+              // new behavior: block only on mobile by default
+              (mobileBlockAutoFocus && mobileBool);
+            if (shouldBlock) e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            if (trapInsideDrawer) e.preventDefault();
+          }}
+          onPointerDownOutside={(e) => {
+            if (trapInsideDrawer) e.preventDefault();
+          }}
+          onCloseAutoFocus={(e) => {
+            if (trapInsideDrawer) e.preventDefault();
           }}
         >
           <Command className={commandClasses}>

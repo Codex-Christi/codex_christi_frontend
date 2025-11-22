@@ -3,17 +3,12 @@ import { cache } from 'react';
 
 // --- Env Config ---
 // const merchizeToken = process.env.MERCHIZE_TOKEN!;
-const baseURL = process.env.NEXT_PUBLIC_BASE_URL!;
 export const merchizeBaseURL = process.env.MERCHIZE_BASE_URL!;
 export const merchizeAPIKey = process.env.MERRCHIZE_API_KEY!;
 
 export const cacheForDays = (days: number): number => 60 * 60 * 24 * days;
 
 // --- In-Memory Memoization Maps ---
-const externalProductIDMemo = new Map<
-  string,
-  Promise<{ external_product_id: string; image: string; slug: string }>
->();
 const baseProductMemo = new Map<string, Promise<BasicProductInterface['data']>>();
 const productVariantsMemo = new Map<string, Promise<ProductVariantsInterface['data']>>();
 
@@ -31,52 +26,56 @@ export interface BasicProductInterface {
 
 // --- Attribute Types ---
 // Base type for attributes to ensure consistency
-
 type AttributeBase<Name extends string, ValueType extends string> = {
-  slug: string;
+  slug?: string;
   value: string;
   name: string;
-  attribute: {
+  attribute?: {
     name: Name;
     value_type: ValueType;
   };
 };
 
-export type ProductAttribute = AttributeBase<'Product', 'slide'> & {
-  is_preselected: boolean;
-  position: 0;
-  hide_storefront: false;
+// canonical value_type literals used across variants
+type VariantValueType = 'size' | 'color' | 'product' | 'label';
+
+export type ProductAttribute = AttributeBase<'Product', VariantValueType> & {
+  is_preselected?: boolean;
+  position?: number;
+  hide_storefront?: boolean;
 };
 
 type ClothingSizeSlug = 'xs' | 's' | 'm' | 'l' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
 export type ClothingSizeValue = Uppercase<ClothingSizeSlug>;
 
-export type SizeAttribute = {
-  slug: ClothingSizeSlug;
-  value: ClothingSizeValue;
-  name: ClothingSizeValue;
-  attribute: {
-    name: 'Size';
-    value_type: 'size';
-  };
+// Required size attribute shape
+type AttrRequired<Name extends string, ValueType extends string, Value = string, Slug = string> = {
+  slug: Slug;
+  value: Value;
+  name: Value;
+  attribute: { name: Name; value_type: ValueType };
 };
 
-export type ColorAttribute = {
+type AttrOptionalAttr<Name extends string, ValueType extends string, Value = string> = {
   slug?: string;
-  value: string; // could be hex or named
-  name: string;
-  attribute?: {
-    name: 'Color';
-    value_type: 'color';
-  };
+  value: Value;
+  name: Value;
+  attribute?: { name: Name; value_type: ValueType };
 };
+
+export type SizeAttribute = AttrRequired<'Size', 'size', ClothingSizeValue, ClothingSizeSlug>;
+export type ColorAttribute = AttrOptionalAttr<'Color', 'color', string>;
+export type LabelAttribute = AttrOptionalAttr<'label', 'label', string>;
 
 // Supported combinations based on required SizeAttribute and optional Color/ProductAttribute
-export type ProductVariantOptions =
-  | [SizeAttribute]
-  | [SizeAttribute, ColorAttribute]
-  | [SizeAttribute, ProductAttribute]
-  | [ProductAttribute, SizeAttribute, ColorAttribute];
+export type ProductOption = SizeAttribute | ColorAttribute | ProductAttribute | LabelAttribute;
+
+/**
+ * Flexible variant options:
+ * - Must contain at least one option (enforced by tuple type)
+ * - Order is not fixed; normalization helpers will canonicalize ordering when needed
+ */
+export type ProductVariantOptions = [ProductOption, ...ProductOption[]];
 
 export interface ProductVariantsInterface {
   data: {
@@ -91,8 +90,18 @@ export interface ProductVariantsInterface {
 
 // Utility: Check if a product variant has both Color and Size attributes
 export function hasColorAndSize(options: ProductVariantOptions): boolean {
-  const hasColor = options.some((opt) => opt.attribute && opt.attribute.name === 'Color');
-  const hasSize = options.some((opt) => opt.attribute && opt.attribute.name === 'Size');
+  const hasColor = options.some(
+    (opt) =>
+      !!opt.attribute &&
+      typeof opt.attribute.name === 'string' &&
+      opt.attribute.name.toLowerCase() === 'color',
+  );
+  const hasSize = options.some(
+    (opt) =>
+      !!opt.attribute &&
+      typeof opt.attribute.name === 'string' &&
+      opt.attribute.name.toLowerCase() === 'size',
+  );
   return hasColor && hasSize;
 }
 
@@ -100,46 +109,6 @@ export interface ProductResult {
   productMetaData: BasicProductInterface['data'];
   productVariants: ProductVariantsInterface['data'];
 }
-
-function isValidUUID(uuid: string) {
-  const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-  return regex.test(uuid);
-}
-
-// --- Fetch External ID with dual memoization ---
-export const fetchExternalProductID = cache((productIDorSlug: string) => {
-  if (externalProductIDMemo.has(productIDorSlug)) {
-    return externalProductIDMemo.get(productIDorSlug)!;
-  }
-
-  const isUUID = isValidUUID(productIDorSlug);
-
-  const idOrSlugEndpoint = isUUID
-    ? `${baseURL}/product/${productIDorSlug}/filter-by-id`
-    : ` ${baseURL}/product/filter-by-slug/${productIDorSlug}`;
-
-  const promise = (async () => {
-    const res = await fetch(idOrSlugEndpoint, {
-      next: { revalidate: cacheForDays(7) },
-    });
-
-    if (!res.ok) {
-      const error = `[fetchExternalProductID] Failed: ${res.statusText}`;
-      console.error(error);
-      throw new Error(error);
-    }
-
-    const { data } = await res.json();
-    return {
-      external_product_id: data.external_product_id,
-      image: data.image,
-      slug: data.slug,
-    };
-  })();
-
-  externalProductIDMemo.set(productIDorSlug, promise);
-  return promise;
-});
 
 // --- Fetch Base Product Info ---
 export const fetchBaseProduct = cache((externalProductID: string) => {
@@ -173,6 +142,7 @@ export const fetchBaseProduct = cache((externalProductID: string) => {
 });
 
 // --- Fetch Variants Info ---
+
 export const fetchProductVariants = cache((productIDorSlug: string) => {
   if (productVariantsMemo.has(productIDorSlug)) {
     return productVariantsMemo.get(productIDorSlug)!;
@@ -193,37 +163,46 @@ export const fetchProductVariants = cache((productIDorSlug: string) => {
     const json: ProductVariantsInterface = await res.json();
 
     const variantsData = json.data;
-    // Example: log for the first variant if present
-    if (variantsData.length > 0) {
-      if (hasColorAndSize(json.data[0].options)) {
-        // CHECK FOR OPTION ABNORMALITIES AND RETRANSFORM
-        return variantsData.map((variant) => {
-          const options = variant.options;
-          if (options[1]?.attribute?.value_type === 'color') {
-            // This is when color comes before size
-            // Returns the retransformed array of options
+    // Normalize options ordering and attributes for each variant
+    // if (variantsData.length > 0) {
+    //   return variantsData.map((variant) => {
+    //     const rawOptions = variant.options || ([] as ProductOption[]);
 
-            const retransformed_options = [options[0], options[2], options[1]].filter(
-              Boolean,
-            ) as ProductVariantOptions;
+    //     // Normalize each option first
+    //     const normalized = rawOptions.map((o) => normalizeOption(o as ProductOption));
 
-            return { ...variant, options: retransformed_options };
-          } else {
-            return {
-              ...variant,
-              options: variant.options as ProductVariantOptions,
-            };
-          }
-        });
-      } else {
-        return variantsData;
-      }
-    }
+    //     // Find canonical size and color (if present)
+    //     const sizeIdx = normalized.findIndex(
+    //       (o) => o.attribute && o.attribute.value_type === 'size',
+    //     );
+    //     const colorIdx = normalized.findIndex(
+    //       (o) => o.attribute && o.attribute.value_type === 'color',
+    //     );
+
+    //     const others = normalized.filter(
+    //       (_, idx) => idx !== sizeIdx && idx !== colorIdx,
+    //     ) as ProductOption[];
+
+    //     const ordered: ProductOption[] = [];
+    //     if (sizeIdx !== -1) ordered.push(normalized[sizeIdx]);
+    //     if (colorIdx !== -1) ordered.push(normalized[colorIdx]);
+    //     ordered.push(...others);
+
+    //     // Ensure we return a ProductVariantOptions tuple type when possible:
+    //     const finalOptions = ordered as unknown as ProductVariantOptions;
+
+    //     return {
+    //       ...variant,
+    //       options: finalOptions,
+    //     };
+    //   });
+    // }
 
     return variantsData;
   })();
 
   productVariantsMemo.set(productIDorSlug, promise);
+
   return promise;
 });
 

@@ -16,20 +16,18 @@ export async function generateMetadata(): Promise<Metadata> {
 const AboutUsPage = () => {
   return (
     <DefaultPageWrapper hasMainNav>
-      <div className='relative'>
-        <h1 className='text-3xl leading-6 font-nico w-auto inline-block absolute top-1/3 z-50 mx-12 md:mx-20'>
-          About <br />{' '}
-          <span className='text-right ml-auto block w-full'>Us</span>
+      <div className='relative h-[20rem]'>
+        <h1 className='text-3xl leading-6 font-nico w-auto inline-block absolute top-1/3 z-50 mx-10 md:mx-20'>
+          About <br /> <span className='text-right ml-auto block w-full'>Us</span>
         </h1>
 
         <Image
           priority
           fetchPriority='high'
           alt='About Us'
-          height={0}
-          width={0}
+          fill={true}
           src='/media/img/about-hero.svg'
-          className={`w-full relative -z-50 h-1/3`}
+          className={`!w-full relative -z-50 object-cover object-center`}
         />
       </div>
 

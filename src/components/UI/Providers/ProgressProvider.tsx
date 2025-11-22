@@ -13,7 +13,7 @@ const NextProgressProvider = ({ children }: { children?: React.ReactNode }) => {
       height='6px'
       color='#0085FF'
       options={{ showSpinner: true }}
-      shallowRouting
+      shallowRouting={false}
       startOnLoad
       spinnerPosition='bottom-right'
     >
