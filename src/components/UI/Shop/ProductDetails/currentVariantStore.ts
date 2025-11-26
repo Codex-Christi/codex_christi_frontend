@@ -155,7 +155,7 @@ export function setupVariantAutoMatching(variants: Variants) {
   const firstVariant = variants[0];
   firstVariant?.options?.forEach((opt) => {
     const name = normalizeAttrName(opt?.attribute?.name);
-    if (name) requiredAttributes.add(name);
+    if (name && name !== 'product') requiredAttributes.add(name);
   });
 
   return useCurrentVariant.subscribe(

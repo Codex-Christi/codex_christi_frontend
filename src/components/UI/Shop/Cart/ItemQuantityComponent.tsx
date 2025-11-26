@@ -39,10 +39,7 @@ export const ItemQuantityComponent: FC<{
       <h4 className={`text-[1.05rem] font-bold`}>{`${quantity}`}</h4>
 
       {/* Increment quantity */}
-      <OperationButton
-        name={`Add ${title} ${variantId} to Cart`}
-        onClick={incrementItemQuantity}
-      >
+      <OperationButton name={`Add ${title} ${variantId} to Cart`} onClick={incrementItemQuantity}>
         +
       </OperationButton>
     </section>

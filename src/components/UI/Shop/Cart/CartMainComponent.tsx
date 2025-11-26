@@ -9,20 +9,14 @@ const CartEmptyComponent = dynamic(
   () => import('./CartEmptyComponent').then((mod) => mod.CartEmptyComponent),
   {
     ssr: false,
-  }
+  },
 );
-const CartItems = dynamic(
-  () => import('./CartItems').then((mod) => mod.default),
-  {
-    ssr: false,
-  }
-);
-const OrderSummary = dynamic(
-  () => import('./OrderSummary').then((mod) => mod.default),
-  {
-    ssr: false,
-  }
-);
+const CartItems = dynamic(() => import('./CartItems').then((mod) => mod.default), {
+  ssr: false,
+});
+const OrderSummary = dynamic(() => import('./OrderSummary').then((mod) => mod.default), {
+  ssr: false,
+});
 
 // Main component
 const CartMainComponent = () => {
@@ -40,15 +34,13 @@ const CartMainComponent = () => {
       {/* Container for cart contents */}
       <div
         className='bg-[#3D3D3D4D] backdrop-blur-[5px] text-white rounded-[20px] 
-          min-h-[20svh] w-full sm:w-[85vw] md:w-[80vw] mx-auto lg:!w-[90vw] xl:!w-[85vw] py-8
+          min-h-[20svh] w-full sm:w-[85vw] md:w-[85vw] mx-auto lg:!w-[90vw] xl:!w-[85vw] py-8
           justify-center'
       >
         {/* Cart Title */}
         <h1 className=' font-light text-white text-4xl font-ocr text-left mb-4 pl-5'>
           Your Cart{' '}
-          {!isCartEmpty
-            ? `(${variants.length} item${variants.length > 1 ? 's' : ''})`
-            : ''}
+          {!isCartEmpty ? `(${variants.length} item${variants.length > 1 ? 's' : ''})` : ''}
         </h1>
 
         {isCartEmpty && <CartEmptyComponent />}

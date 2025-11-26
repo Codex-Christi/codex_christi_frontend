@@ -8,6 +8,7 @@ import {
   LabelAttribute,
 } from '@/app/shop/product/[id]/productDetailsSSR';
 import { useCurrentVariant } from './currentVariantStore';
+import { sizeFormatArr } from './SizeSelector';
 
 type AttributeKind = 'size' | 'color' | 'label';
 
@@ -29,14 +30,21 @@ const VariantAttributeSelector = <T extends AttributeOption>({
   const radioOptions = useMemo(() => {
     if (!Array.isArray(options) || options.length === 0) return [];
 
-    const mapped = options.map((opt) => {
-      const attrName = opt?.attribute?.name;
-      return {
-        label: opt.name ?? attrName ?? attribute,
-        value: opt.value,
-        key: opt.slug ?? `${opt.value}-${attrName ?? attribute}`,
-      };
-    });
+    const mapped = options
+      .map((opt) => {
+        const attrName = opt?.attribute?.name;
+        return {
+          label: opt.name ?? attrName ?? attribute,
+          value: opt.value,
+          key: opt.slug ?? `${opt.value}-${attrName ?? attribute}`,
+        };
+      })
+      .sort((elemA, elemB) =>
+        attribute === 'size'
+          ? sizeFormatArr.indexOf(elemA.label.toLowerCase()) -
+            sizeFormatArr.indexOf(elemB.label.toLowerCase())
+          : elemA.label.localeCompare(elemB.label),
+      );
 
     // de-dupe by label+value
     return [

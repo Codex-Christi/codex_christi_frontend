@@ -6,7 +6,7 @@ import { FC, useCallback, useEffect, useMemo } from 'react';
 import { useCurrentVariant } from './currentVariantStore';
 
 // Keep this outside the component
-const sizeFormatArr = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl'];
+export const sizeFormatArr = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl'];
 
 const SizeSelector: FC<{ sizeOptionsList: SizeAttribute[] }> = ({ sizeOptionsList }) => {
   // -------------------- ALWAYS TOP-LEVEL HOOK CALLS --------------------
