@@ -70,6 +70,7 @@ const ProductDetails = async ({ params }: PageProps) => {
     productMetaData: { description, title, retail_price },
     productVariants,
   } = productData;
+
   const LDImageURL = `https://d2dytk4tvgwhb4.cloudfront.net/${productVariants[0].image_uris[0]}`;
   const trimmedDescription = description
     ? description.split('.')[0].replace(/<[^>]*>/g, '')

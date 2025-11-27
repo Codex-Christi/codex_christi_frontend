@@ -59,17 +59,19 @@ export default function ProductCard({ product }: { product: CategoryProductDetai
 
             {/* 3) Raise the Popover trigger ABOVE the stretched link (so it’s clickable) */}
             <div className='relative z-20'>
-              <SizeAndColorSelectorPopover
-                productId={_id}
-                productTitle={title}
-                productSlug={slug}
-                buttonProps={{
-                  type: 'button',
-                  name: `Add ${product.title} to cart`,
-                  className: `px-3 py-1 bg-[#0085FF] font-ocr text-[0.95rem] font-[900] rounded-md hover:bg-gray-500 
+              {_id && (
+                <SizeAndColorSelectorPopover
+                  productId={_id}
+                  productTitle={title}
+                  productSlug={slug}
+                  buttonProps={{
+                    type: 'button',
+                    name: `Add ${product.title} to cart`,
+                    className: `px-3 py-1 bg-[#0085FF] font-ocr text-[0.95rem] font-[900] rounded-md hover:bg-gray-500 
                     transition-colors hover:scale-110`,
-                }}
-              />
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>

@@ -106,13 +106,15 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
 
   // Subscribes with a proper Variant[]; auto-unsub on deps change/unmount.
   useEffect(() => {
-    if (cleanVariants.length === 0) return;
     // Adapt local Variant[] to the shape expected by setupVariantAutoMatching
     const unsubscribe = setupVariantAutoMatching(
       cleanVariants as Parameters<typeof setupVariantAutoMatching>[0],
     );
-    return unsubscribe;
-  }, [cleanVariants]);
+    return () => {
+      resetVariantOptions();
+      unsubscribe();
+    };
+  }, [cleanVariants, resetVariantOptions]);
 
   return (
     <Button

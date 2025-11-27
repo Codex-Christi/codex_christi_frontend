@@ -115,7 +115,7 @@ export const useCurrentVariant = create<CurrentVariantStore>()(
 
       // Only use attributes that actually have a non-empty selection
       const activeKeys = Object.entries(selections)
-        .filter(([, v]) => v !== null && v !== '')
+        .filter(([, v]) => v !== null && v !== '' && v !== 'product')
         .map(([k]) => k);
 
       if (activeKeys.length === 0) {
@@ -131,6 +131,7 @@ export const useCurrentVariant = create<CurrentVariantStore>()(
           if (!selected) return false;
 
           const variantVal = map[attrName];
+
           return (variantVal ?? '').toLowerCase() === selected.toLowerCase();
         });
       });
