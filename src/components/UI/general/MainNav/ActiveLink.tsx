@@ -22,9 +22,7 @@ const ActiveLink: FC<ActiveLinkInterface> = (props) => {
   return (
     <Link
       className={`${
-        linkText === 'ABOUT US' ||
-        linkText === 'SHOP' ||
-        linkText === 'FREELANCING'
+        linkText === 'ABOUT US' || linkText === 'SHOP' || linkText === 'FREELANCING'
           ? 'flex items-center gap-2'
           : 'flex items-center '
       }
@@ -45,15 +43,13 @@ const ActiveLink: FC<ActiveLinkInterface> = (props) => {
       ${
         linkText === 'FREELANCING' &&
         `px-[3rem] py-4 lg:px-[1.25rem] lg:py-2.5 w-full justify-center max-w-[300px]
-        rounded-2xl lg:rounded-lg border-white border-[1.5px]`
+        rounded-2xl lg:rounded-lg border-white border-[1.5px] min-w-max`
       }
 
      
 
       ${
-        (index >= 3 && index <= 7) ||
-        linkText === 'SHOP' ||
-        linkText === 'FREELANCING'
+        (index >= 3 && index <= 7) || linkText === 'SHOP' || linkText === 'FREELANCING'
           ? 'font-bold text-white'
           : 'font-semibold text-white/70'
       }
@@ -66,15 +62,11 @@ const ActiveLink: FC<ActiveLinkInterface> = (props) => {
       //
       href={href.toString().toLowerCase()}
     >
-      {linkText === 'ABOUT US' && !isDesktopOnly && (
-        <BsCaretLeftFill className='!h-[45%]' />
-      )}
+      {linkText === 'ABOUT US' && !isDesktopOnly && <BsCaretLeftFill className='!h-[45%]' />}
       {/* ↑↑↑↑ Caret for Mobiles only ↑↑↑↑ */}
       {linkText} {/* ⟸⟸⟸⟸ the Text of each Link */}
       {/*  */}
-      {linkText === 'ABOUT US' && isDesktopOnly && (
-        <BsCaretDownFill className='!h-[45%]' />
-      )}
+      {linkText === 'ABOUT US' && isDesktopOnly && <BsCaretDownFill className='!h-[45%]' />}
       {/* ↑↑↑↑ Caret for Desktop only ↑↑↑↑ */}
       {linkText === 'SHOP' && (
         <svg

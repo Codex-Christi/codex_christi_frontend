@@ -73,3 +73,7 @@ certs
 # Next.js runtime logs
 serverlogs.txt
 deploy-*.log
+
+# Don’t send local DBs into build context
+data/
+*.db

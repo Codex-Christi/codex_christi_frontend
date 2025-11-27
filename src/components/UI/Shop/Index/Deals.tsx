@@ -30,14 +30,14 @@ const Deals = () => {
   // Main JSX
   return (
     <div
-      className='md:pt-12 pb-8 px-4  bg-[linear-gradient(95.55deg,_#9747FF_3.68%,_#4264FF_53.29%,_#007AFF_100%)] relative md:grid md:grid-cols-12 md:gap-2
-    items-center'
+      className='md:pt-12 pb-8 px-4 bg-[linear-gradient(95.55deg,_#9747FF_3.68%,_#4264FF_53.29%,_#007AFF_100%)] relative 
+      md:grid md:grid-cols-12 md:gap-2 items-center'
     >
       {/* Launch Merch Text */}
       <CustomShopLink
         href='/shop/category/lauch-merch'
         className='flex font-ocr justify-between md:gap-4 -ml-10 md:ml-[unset]
-         md:col-span-3 md:flex-col place-items-center select-none md:scale-[0.6] lg:scale-100
+         md:col-span-4 md:flex-col place-items-center select-none md:scale-[0.6] lg:scale-100
       '
       >
         <div className=' -space-y-8 md:-space-y-2 flex flex-col items-center justify-center'>
@@ -58,7 +58,7 @@ const Deals = () => {
       <div
         className='overflow-x-auto overflow-y-hidden min-w-full flex gap-2 md:gap-[10rem] lg:gap-10 xl:gap-7
         scroll-smooth snap-x snap-mandatory md:justify-items-center  md:content-center
-        md:grid md:grid-cols-5 md:w-full md:col-span-9 custom-scrollbar'
+        md:grid md:grid-cols-5 md:w-full md:col-span-8 custom-scrollbar'
         ref={slideContainerRef}
       >
         {lauchMerchProducts.map((merch, i) => (

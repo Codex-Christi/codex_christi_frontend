@@ -44,10 +44,12 @@ export const getMerchizeTotalWIthShipping = cache(
     country_iso3: ShippingCountryObj['country_iso3'],
     opts?: { state_iso2?: string },
   ) => {
+    // Expand cart by quantity → ['SKU1', 'SKU1', 'SKU2', ...]
     const skus = cart.flatMap(
       ({ itemDetail, quantity }) =>
         Array.from({ length: quantity }, () => itemDetail.sku).filter(Boolean) as string[],
     );
+
     if (!skus.length) {
       return {
         shippingPriceNum: 0,
@@ -60,14 +62,10 @@ export const getMerchizeTotalWIthShipping = cache(
 
     let catalogRows;
     try {
+      // ⬇️ now hits Prisma DB via getItemCatalogInfo.ts, not JSON
       catalogRows = await getCatalogItems(skus, country_iso3);
     } catch (e) {
-      const err = e as Error & { code?: string; misses?: string[] };
-      if (err.code === 'SKU_PREFIX_NO_MATCH') {
-        const detail = err.misses?.length ? ` Missing: ${err.misses.join(', ')}` : '';
-        throw new Error(`Failed to resolve one or more SKUs via prefix matching.${detail}`);
-      }
-      throw err;
+      throw e;
     }
 
     const shippingPriceObj = await getShippingPriceMerchizecatalog(catalogRows, country_iso3, opts);
@@ -129,7 +127,8 @@ export const getShippingPriceMerchizecatalog = cache(
     const normalized = await loadNormalizedRows();
     const extrasBySku = new Map(normalized.map((r) => [r.sku, r.extras ?? {}]));
 
-    const numOfSKUs = Array.from(counts.entries()).reduce((acc, [, qty]) => acc + qty, 0);
+    // number of SKUs in cart (expanded by quantity)
+    const numOfSKUS = Array.from(counts.entries()).reduce((acc, [, qty]) => acc + qty, 0);
 
     let sum = 0;
     for (const [sku, qty] of counts) {
@@ -168,18 +167,11 @@ export const getShippingPriceMerchizecatalog = cache(
           break;
       }
 
-      console.debug(`[AUDIT] SKU ${sku}, dest=${dest}, raw band = first:${first}, addl:${addl}`);
       if ((first == null || Number.isNaN(first)) && fallback) {
-        console.warn(
-          `[AUDIT] SKU ${sku}, dest=${dest}: fallback to ROW band first:${row.ROW_shipping_fee}, addl:${row.ROW_additional_shipping_fee}`,
-        );
         first = row.ROW_shipping_fee;
         addl = row.ROW_additional_shipping_fee;
       }
-      if (first == null || Number.isNaN(first)) {
-        console.error(`[AUDIT] SKU ${sku}, dest=${dest}: no valid first band after fallback`);
-        continue;
-      }
+      if (first == null || Number.isNaN(first)) continue;
 
       const f = Number(first) || 0;
       const a = Number(addl ?? 0);
@@ -192,62 +184,35 @@ export const getShippingPriceMerchizecatalog = cache(
             ? (extra['us_post_service_added_fee'] as number)
             : null;
         if (surcharge !== null) {
-          console.debug(`[AUDIT] SKU ${sku}: US surcharge ${surcharge}`);
           cost += surcharge;
         }
       }
-
-      console.debug(`[AUDIT] SKU ${sku} cost contribution = ${cost}`);
       sum += cost;
     }
 
-    console.debug(`[AUDIT] total sum (USD base raw) = ${sum}`);
-
-    const computedUsd = Math.ceil(sum);
-    const fallbackThreshold = 5 * numOfSKUs;
-    let baseUsdShipping: number;
-
-    if (computedUsd < fallbackThreshold) {
-      baseUsdShipping = fallbackThreshold;
-      console.warn(
-        `[AUDIT] fallback rule applied: computedUsd (${computedUsd}) < fallbackThreshold (${fallbackThreshold}), baseUsdShipping = ${baseUsdShipping}`,
-      );
-    } else {
-      baseUsdShipping = computedUsd;
-      console.debug(`[AUDIT] no fallback: baseUsdShipping = computedUsd = ${computedUsd}`);
-    }
-
-    const fxRaw = await getDollarMultiplier(country_iso3);
-    console.debug(`[AUDIT] fxRaw =`, fxRaw);
-    const fx = asFX(fxRaw);
-    const multiplier = typeof fx.multiplier === 'number' ? fx.multiplier : 1;
+    // Your rule: if calculated sum < 5 * numOfSKUS (in USD),
+    // fall back to 5 * numOfSKUS. Otherwise, use sum.
+    const base = Math.max(sum, 5 * numOfSKUS);
+    const fx = asFX(await getDollarMultiplier(country_iso3));
     const currency = fx.currency ?? 'USD';
     const currency_symbol = fx.currency_symbol ?? symbolFromCurrency(currency);
+    const multiplier = typeof fx.multiplier === 'number' ? fx.multiplier : null;
 
-    console.debug(`[AUDIT] multiplier = ${multiplier}, currency = ${currency}`);
-
-    const pricedForeign = baseUsdShipping * multiplier;
-    console.debug(`[AUDIT] pricedForeign = ${pricedForeign}`);
-
-    const shippingPriceNum = Math.ceil(pricedForeign * 100) / 100;
-    console.debug(`[AUDIT] shippingPriceNum (foreign) = ${shippingPriceNum}`);
-
-    const usdBack = multiplier > 0 ? shippingPriceNum / multiplier : shippingPriceNum;
-    console.debug(
-      `[AUDIT] back-converted USD = ${usdBack} vs baseUsdShipping = ${baseUsdShipping}`,
-    );
+    const priced =
+      typeof multiplier === 'number'
+        ? Math.ceil(base * multiplier * 100) / 100
+        : Math.ceil(base * 100) / 100;
 
     return {
       multiplier,
-      shippingPriceNum,
+      shippingPriceNum: priced,
       currency,
       currency_symbol,
     };
   },
 );
 
-// (realTimePriceFromMerchize unchanged)
-
+// Retail total (unchanged, typed FX)
 const merchizeAPIKey = process.env.MERRCHIZE_API_KEY!;
 const merchizeBaseURL = process.env.MERCHIZE_BASE_URL;
 type MerchizeVariant = { _id: string; retail_price?: number };

@@ -54,3 +54,7 @@ deploy-*.log
 
 # TX error logs
 transaction-errors
+
+# Merchize catalog DB
+/data/
+*.db

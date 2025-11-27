@@ -58,10 +58,7 @@ const MainNav: FC = () => {
       </nav>
 
       {/* Drawer */}
-      <SideDrawer
-        openState={isSideDrawerOpen}
-        openCloseController={setIsSideDrawerOpen}
-      />
+      <SideDrawer openState={isSideDrawerOpen} openCloseController={setIsSideDrawerOpen} />
     </>
   );
 };

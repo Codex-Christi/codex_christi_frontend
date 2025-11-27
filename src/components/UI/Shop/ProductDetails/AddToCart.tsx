@@ -91,6 +91,7 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
       });
     } finally {
       // Let the timeout re-enable the button to preserve the debounce behaviour.
+      resetVariantOptions();
     }
   }, [
     addToCart,

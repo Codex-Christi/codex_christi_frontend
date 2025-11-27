@@ -5,9 +5,9 @@ type Params = Promise<{ id: string }>;
 
 export async function GET(req: Request, ctx: { params: Params }) {
   const { id } = await ctx.params; // ✅ await params
-  const MERRCHIZE_API_KEY = process.env.MERRCHIZE_API_KEY;
+  const MERCHIZE_API_KEY = process.env.MERCHIZE_API_KEY;
 
-  if (!MERRCHIZE_API_KEY) {
+  if (!MERCHIZE_API_KEY) {
     return NextResponse.json({ error: 'Missing server API token' }, { status: 500 });
   }
 
@@ -19,7 +19,7 @@ export async function GET(req: Request, ctx: { params: Params }) {
       // keep no-store so Next doesn't serve a cached fetch result
       headers: {
         Accept: 'application/json',
-        'X-API-KEY': `${MERRCHIZE_API_KEY}`,
+        'X-API-KEY': `${MERCHIZE_API_KEY}`,
         'User-Agent': 'CodexChristi/1.0 (+https://codexchristi.org)',
       },
       next: { revalidate: 86400 },
