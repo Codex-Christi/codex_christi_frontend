@@ -58,3 +58,6 @@ transaction-errors
 # Merchize catalog DB
 /data/
 *.db
+
+# Prisma generated Merchize catalog client
+/src/lib/prisma/shop/merchize/generated/

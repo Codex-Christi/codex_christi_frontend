@@ -77,3 +77,5 @@ deploy-*.log
 # Don’t send local DBs into build context
 data/
 *.db
+
+src/lib/prisma/shop/merchize/generated/
