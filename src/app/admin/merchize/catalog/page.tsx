@@ -8,7 +8,7 @@ const ADMIN_PASSWORD = process.env.MERCHIZE_PRICE_CATALOG_ADMIN_PASSWORD!;
 
 // --- server action for login only ---
 
-export async function loginAction(formData: FormData) {
+async function loginAction(formData: FormData) {
   'use server';
   const pass = formData.get('password');
   if (pass === ADMIN_PASSWORD) {
