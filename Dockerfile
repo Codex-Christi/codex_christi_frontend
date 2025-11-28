@@ -2,7 +2,10 @@
 
 FROM node:lts-bookworm-slim AS base
 WORKDIR /app
-RUN corepack enable
+RUN corepack enable \
+  && apt-get update -y \
+  && apt-get install -y openssl \
+  && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deps
 WORKDIR /app
@@ -15,12 +18,11 @@ WORKDIR /app
 # ⬇️ Make sure the env file is available to `next build`
 COPY .env.production ./
 COPY . .
-# Use .env.production as .env so Prisma config and setup script see the DB URL
-RUN cp .env.production .env
 
-# Run Merchize catalog Prisma setup (generate + migrate/db push) without re-installing deps or building
-RUN chmod +x ./scripts/setup_merchize_catalog.sh && \
-    ./scripts/setup_merchize_catalog.sh --no-deps --no-build
+# NOTE:
+# We no longer run the Prisma setup script in the Docker build stage.
+# The SQLite DB lives in a Docker volume at runtime and is initialized/updated
+# by your app (e.g. via the admin refresh route), not during image build.
 
 # More heap for Next build (3 GB) to prevent OOM on small VPS
 ENV NODE_OPTIONS="--max-old-space-size=3072"
@@ -45,7 +47,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # Runtime-read datasets / resources
-COPY --from=builder --chown=nextjs:nodejs /app/data ./data
+# The SQLite DB lives in a Docker volume mounted at /app/data in docker-compose.
+# We do NOT copy any DB file from build stages to avoid accidental resets.
 COPY --from=builder --chown=nextjs:nodejs /app/src/datasets ./src/datasets
 
 EXPOSE 3000
