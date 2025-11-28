@@ -24,6 +24,13 @@ COPY . .
 # The SQLite DB lives in a Docker volume at runtime and is initialized/updated
 # by your app (e.g. via the admin refresh route), not during image build.
 
+# Generate Prisma client for the Merchize catalog schema so the
+# TypeScript imports like "./generated/merchizeCatalog/client" work
+# inside the built image. This does NOT touch the database.
+RUN cp .env.production .env \
+  && yarn prisma generate --schema prisma/shop/merchize/priceCatalog.prisma \
+  && rm .env
+
 # More heap for Next build (3 GB) to prevent OOM on small VPS
 ENV NODE_OPTIONS="--max-old-space-size=3072"
 ENV NEXT_TELEMETRY_DISABLED=1
