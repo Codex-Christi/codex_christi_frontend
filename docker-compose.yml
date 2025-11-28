@@ -13,9 +13,11 @@ services:
     restart: always
     networks:
       - webserver-network
+    volumes:
+      - merchize_price_catalog_data:/app/data
 
 volumes:
-  my_volume: {}
+  merchize_price_catalog_data: {}
 
 networks:
   webserver-network:

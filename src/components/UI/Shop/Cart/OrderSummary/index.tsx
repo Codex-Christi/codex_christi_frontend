@@ -43,7 +43,7 @@ const getMaxandMinShippingPrice = (
 
     const numericVals = values.filter((v): v is number => typeof v === 'number' && v > 0);
 
-    if (!numericVals.length) return accum;
+    if (!numericVals.length) return accum + 10;
 
     const segment = comparator(...numericVals);
 
@@ -66,7 +66,6 @@ const OrderSummary: FC<OrderSummaryProps> = ({ countryIso3 = 'USA' }) => {
     [cartItems],
   );
   const [shippingEstimates, setShippingEstimates] = useState<{
-    min: number;
     max: number;
   } | null>(null);
 
@@ -87,11 +86,9 @@ const OrderSummary: FC<OrderSummaryProps> = ({ countryIso3 = 'USA' }) => {
       // Our legacy catalog only has US/EU/ROW fields. Everything else falls back to ROW.
       const region: 'US' | 'EU' | 'ROW' = dest === 'US' ? 'US' : dest === 'EU' ? 'EU' : 'ROW';
 
-      const minShippingFee = getMaxandMinShippingPrice(skuCatalogData, 'min', region);
       const maxShippingFee = getMaxandMinShippingPrice(skuCatalogData, 'max', region);
 
       return {
-        min: Math.ceil(minShippingFee),
         max: Math.ceil(maxShippingFee),
       };
     } catch (error) {
@@ -137,10 +134,9 @@ const OrderSummary: FC<OrderSummaryProps> = ({ countryIso3 = 'USA' }) => {
         <>
           <h3 className='pt-2 font-semibold flex text-lg justify-between'>
             <span>
-              Shipping Fee <span className='font-extrabold'>**</span>
+              Est. Shipping Fee <span className='font-extrabold'>**</span>
             </span>
             <section>
-              <GlobalProductPrice className='px-0' usdAmount={shippingEstimates.min} /> -{' '}
               <GlobalProductPrice className='px-0' usdAmount={shippingEstimates.max} />
             </section>
           </h3>
