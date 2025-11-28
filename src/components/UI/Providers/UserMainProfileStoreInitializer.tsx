@@ -8,8 +8,6 @@ export default function UserMainProfileStoreInitializer() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   useEffect(() => {
-    console.log(window.location);
-
     const { _hydrated, setProfileFromServer } = useUserMainProfileStore.getState();
     if (isAuthenticated) setProfileFromServer();
     if (!_hydrated) useUserMainProfileStore.persist.rehydrate();
