@@ -7,6 +7,12 @@ import { refreshMerchizeCatalog } from '@/lib/merchizeCatalog/sync';
 export async function refreshAction() {
   try {
     const result = await refreshMerchizeCatalog();
+
+    console.log(`---RESPONSE from [refreshAction()] server action \n`);
+
+    console.dir(result, { depth: 1 });
+    console.log('\n');
+
     const syncState = await merchizeCatalogPrisma.syncState.findUnique({
       where: { id: 'merchize_catalog' },
     });
