@@ -7,10 +7,6 @@ import Footer from '@/components/UI/Shop/Footer';
 const CometsContainer = dynamic(() => import('@/components/UI/general/CometsContainer'));
 import GlobalCurrencyFXWrapper from '@/components/UI/Providers/Shop/GlobalCurrencyFXWrapper';
 
-const UserMainProfileStoreInitializer = dynamic(
-  () => import('@/components/UI/Providers/UserMainProfileStoreInitializer'),
-);
-
 export async function generateMetadata(): Promise<Metadata> {
   return {
     // dynamically get the host from the Next headers
