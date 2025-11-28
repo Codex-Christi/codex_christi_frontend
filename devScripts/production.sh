@@ -66,3 +66,6 @@ if [ "${SKIP_DOCKER_PRUNE:-0}" != "1" ]; then
 fi
 
 echo "== deploy finished $(date -u +%FT%TZ) =="
+
+echo "Services started. Current status:"
+docker compose -f "$COMPOSE_FILE" ps
