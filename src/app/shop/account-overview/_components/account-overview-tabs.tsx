@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import {
   ArrowLeftIcon,
   HeartIcon,
@@ -11,11 +10,12 @@ import {
 } from 'lucide-react';
 import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
+import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 
 const AccountOverviewTabs = () => {
-    const { userShopProfile, isLoading } = useUserShopProfile((state) => state);
+  const { userShopProfile, isLoading } = useUserShopProfile((state) => state);
 
-    const userMainProfile = useUserMainProfileStore((state) => state.userMainProfile);
+  const userMainProfile = useUserMainProfileStore((state) => state.userMainProfile);
 
   if (isLoading) {
     return (
@@ -26,13 +26,13 @@ const AccountOverviewTabs = () => {
   return (
     <>
       <div className='inline-block w-auto'>
-        <Link
+        <CustomShopLink
           className='inline-flex items-center gap-4 transition-all ease-linear duration-200 hover:gap-6 w-auto'
           href='/shop'
         >
           <ArrowLeftIcon strokeWidth={1.2} />
           Account Overview
-        </Link>
+        </CustomShopLink>
       </div>
 
       <div className='rounded-lg grid grid-cols-2 md:grid-cols-3'>
@@ -48,7 +48,7 @@ const AccountOverviewTabs = () => {
           </div>
         </div>
 
-        <Link
+        <CustomShopLink
           className='text-center border border-l-0 border-[#F3F3F3] py-4 px-2 grid gap-4 rounded-tr-lg md:rounded-tr-none md:border-r-0 place-content-center hover:bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] transition-color duration-300 ease-linear'
           href='/shop/account-overview/wishlist'
         >
@@ -59,9 +59,9 @@ const AccountOverviewTabs = () => {
           </div>
 
           <p className='text-center text-sm'>See your favorites</p>
-        </Link>
+        </CustomShopLink>
 
-        <Link
+        <CustomShopLink
           className='text-center border border-[#F3F3F3] py-4 px-2 grid gap-4 md:rounded-tr-lg place-content-center hover:bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] transition-color duration-300 ease-linear'
           href='/shop/account-overview/shipping-address'
         >
@@ -72,9 +72,9 @@ const AccountOverviewTabs = () => {
           </div>
 
           <p className='text-center text-sm'>Set default address +</p>
-        </Link>
+        </CustomShopLink>
 
-        <Link
+        <CustomShopLink
           className='text-center border max-md:border-l-0 max-md:border-t-0 border-[#F3F3F3] py-4 px-2 grid gap-4 place-content-center md:rounded-bl-lg hover:bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] transition-color duration-300 ease-linear'
           href='/shop/account-overview/order-history'
         >
@@ -83,9 +83,9 @@ const AccountOverviewTabs = () => {
           <div className='mx-auto'>
             <TimerResetIcon strokeWidth={1.2} />
           </div>
-        </Link>
+        </CustomShopLink>
 
-        <Link
+        <CustomShopLink
           className='text-center border max-md:border-t-0 border-[#F3F3F3] py-4 px-2 grid gap-4 max-md:rounded-bl-lg place-content-center md:border-l-0 hover:bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] transition-color duration-300 ease-linear'
           href='/shop/account-overview/payment-info'
         >
@@ -94,7 +94,7 @@ const AccountOverviewTabs = () => {
           <div className='mx-auto'>
             <FilesIcon strokeWidth={1.2} />
           </div>
-        </Link>
+        </CustomShopLink>
 
         <button
           className='text-center border border-l-0 max-md:border-t-0 border-[#F3F3F3] py-4 px-2 grid gap-4 rounded-br-lg place-content-center text-[#F3F3F3]/50 hover:bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] transition-color duration-300 ease-linear'
