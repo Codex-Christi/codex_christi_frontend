@@ -23,6 +23,7 @@ import {
 import showErrorToast from '@/lib/error-toast';
 import showSuccessToast from '@/lib/success-toast';
 import showLoadingToast from '@/lib/loading-toast';
+import { toast } from 'sonner';
 
 type VariantWithRelations = Variant & {
   product: Product | null;
@@ -72,11 +73,11 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
   const handleRefreshConfirmed = () => {
     startTransition(async () => {
       setStatus({ type: 'loading', message: 'Refreshing catalog…' });
-      showLoadingToast({ message: 'Refreshing catalog…' });
+      const loadID1 = showLoadingToast({ message: 'Refreshing catalog…' });
 
       try {
         const res = await refreshAction();
-
+        toast.dismiss(loadID1);
         if (res.ok) {
           setSyncState(res.syncState ?? null);
           const msg = `Refreshed. Variants: ${res.ingestedVariants}, products: ${res.totalProducts}`;
@@ -104,10 +105,11 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
   const handleSearch = () => {
     startTransition(async () => {
       setStatus({ type: 'loading', message: 'Searching…' });
-      showLoadingToast({ message: 'Searching catalog…' });
+      const loadID2 = showLoadingToast({ message: 'Searching catalog…' });
 
       try {
         const res = await searchCatalogBySku(searchTerm);
+        toast.dismiss(loadID2);
         if (res.ok) {
           setSearchResults(res.variants as VariantWithRelations[]);
           const msg = `Found ${res.variants.length} result(s).`;
