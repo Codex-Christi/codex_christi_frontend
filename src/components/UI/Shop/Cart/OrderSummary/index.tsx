@@ -9,6 +9,7 @@ import { FaAngleRight } from 'react-icons/fa6';
 import CustomShopLink from '../../HelperComponents/CustomShopLink';
 import { iso3ToDest } from '@/lib/datasetSearchers/merchize/dest-map';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
+import GlobalProductPrice from '../../GlobalShopComponents/GlobalProductPrice';
 
 type OrderSummaryProps = {
   /** ISO-3 destination country code, e.g. 'USA', 'GBR', 'CAN'. Defaults to 'USA'. */
@@ -127,20 +128,21 @@ const OrderSummary: FC<OrderSummaryProps> = ({ countryIso3 = 'USA' }) => {
         Order Summary
       </h1>
 
-      <h3 className='pt-12 font-normal flex text-xl justify-between'>
+      <h3 className='pt-12 font-semibold flex text-xl justify-between'>
         <span>Subtotal </span>
-        <span>${subTotal}</span>
+        <GlobalProductPrice usdAmount={subTotal}></GlobalProductPrice>
       </h3>
 
       {shippingEstimates && (
         <>
-          <h3 className='pt-2 font-normal flex text-xl justify-between'>
+          <h3 className='pt-2 font-semibold flex text-lg justify-between'>
             <span>
               Shipping Fee <span className='font-extrabold'>**</span>
             </span>
-            <span>
-              ${shippingEstimates.min} - ${shippingEstimates.max}
-            </span>
+            <section>
+              <GlobalProductPrice className='px-0' usdAmount={shippingEstimates.min} /> -{' '}
+              <GlobalProductPrice className='px-0' usdAmount={shippingEstimates.max} />
+            </section>
           </h3>
 
           <p className='font-semibold pt-8'>

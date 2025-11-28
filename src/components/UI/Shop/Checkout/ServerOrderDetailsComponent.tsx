@@ -25,10 +25,6 @@ export const ServerOrderDetailsComponent: FC<{ children?: ReactNode }> = ({ chil
       'merchize',
     );
 
-    console.log('Country:', country);
-
-    console.log(orderDetailsFromServer);
-
     setServerOrderDetails(orderDetailsFromServer);
   }, [cart, country]);
 

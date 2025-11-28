@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
 import AdminCatalogClient from './AdminCatalogClient';
+import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
+import CometsContainer from '@/components/UI/general/CometsContainer';
 
 const ADMIN_PASSWORD = process.env.MERCHIZE_PRICE_CATALOG_ADMIN_PASSWORD!;
 
@@ -27,9 +29,11 @@ export default async function MerchizeAdminPage() {
   const cookieStore = await cookies();
   const authed = cookieStore.get('merchize_admin')?.value === 'ok';
 
+  let content;
+
   if (!authed) {
-    return (
-      <div className='min-h-screen flex items-center justify-center bg-slate-950 text-slate-50'>
+    content = (
+      <div className='min-h-screen flex items-center justify-center bg-slate-950/30 backdrop-blur-[2px] text-slate-50'>
         <form
           action={loginAction}
           className='bg-slate-900/70 border border-slate-800 rounded-2xl p-6 backdrop-blur-md shadow-xl w-full max-w-sm'
@@ -50,18 +54,24 @@ export default async function MerchizeAdminPage() {
         </form>
       </div>
     );
+  } else {
+    const [syncState, sampleVariants] = await Promise.all([
+      merchizeCatalogPrisma.syncState.findUnique({
+        where: { id: 'merchize_catalog' },
+      }),
+      merchizeCatalogPrisma.variant.findMany({
+        include: { product: true, shippingBands: true },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    content = <AdminCatalogClient initialSyncState={syncState} initialSamples={sampleVariants} />;
   }
 
-  const [syncState, sampleVariants] = await Promise.all([
-    merchizeCatalogPrisma.syncState.findUnique({
-      where: { id: 'merchize_catalog' },
-    }),
-    merchizeCatalogPrisma.variant.findMany({
-      include: { product: true, shippingBands: true },
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-    }),
-  ]);
-
-  return <AdminCatalogClient initialSyncState={syncState} initialSamples={sampleVariants} />;
+  return (
+    <DefaultPageWrapper>
+      <CometsContainer>{content}</CometsContainer>
+    </DefaultPageWrapper>
+  );
 }
