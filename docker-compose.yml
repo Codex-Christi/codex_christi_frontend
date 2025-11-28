@@ -7,40 +7,14 @@ services:
     container_name: codex-con-app-start
     env_file:
       - .env.production
-    volumes:
-      - app_build:/app/.next # app consumes the volume
-    command: ['yarn', 'start']
+    command: ['node', 'server.js']
     ports:
       - '3000:3000'
     restart: always
     networks:
       - webserver-network
-    depends_on:
-      app_build:
-        condition: service_completed_successfully
-
-  # one-off container to copy the already-built .next from the builder image
-  app_build:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: builder # important: has /app/.next produced by `yarn build`
-    container_name: codex-con-app-build
-    env_file:
-      - .env.production
-    volumes:
-      - app_build:/cache # mount the volume at /cache so we don't shadow /app/.next
-    command:
-      [
-        'sh',
-        '-c',
-        'set -eu; rm -rf /cache/*; cp -a /app/.next/. /cache/; chown -R 1001:1001 /cache; test -f /cache/BUILD_ID',
-      ]
-    restart: 'no'
-    # healthcheck removed; we rely on exit code for depends_on: service_completed_successfully
 
 volumes:
-  app_build: {}
 
 networks:
   webserver-network:

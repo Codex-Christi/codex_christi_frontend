@@ -34,23 +34,20 @@ WORKDIR /app
 RUN groupadd --gid 1001 nodejs \
  && useradd --uid 1001 --create-home --shell /bin/bash --gid 1001 nextjs
 
-# copy only what runtime needs
-COPY --from=builder --chown=nextjs:nodejs /app/data /app/data
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules /app/node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/.next /app/.next
-COPY --from=builder --chown=nextjs:nodejs /app/public /app/public
-COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/yarn.lock ./
-# 3) CRITICAL: copy next.config.* so image config applies at runtime
-COPY --from=builder /app/next.config.* ./
-# Runtime-read datasets / resources
-COPY --from=builder --chown=nextjs:nodejs /app/src/datasets /app/src/datasets
-# If you read files from src/res at runtime (templates/locales/etc.), include it too:
-# COPY --from=builder --chown=nextjs:nodejs /app/src/res /app/src/res    
-
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 
+# copy only what runtime needs (Next.js standalone output)
+# Standalone bundle already includes the minimal node_modules tree.
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Runtime-read datasets / resources
+COPY --from=builder --chown=nextjs:nodejs /app/data ./data
+COPY --from=builder --chown=nextjs:nodejs /app/src/datasets ./src/datasets
+
 EXPOSE 3000
 USER nextjs:nodejs
-CMD ["yarn", "start"]
+CMD ["node", "server.js"]
