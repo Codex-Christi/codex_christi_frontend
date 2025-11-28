@@ -104,8 +104,6 @@ async function fetchCatalogPage(
     next: { revalidate: 0 },
   });
 
-  console.log(`---RESPONSE from [fetchCatalogPage] server action \n`, await res.json(), '\n');
-
   if (!res.ok) {
     throw new Error(`Merchize catalog API failed: ${res.status} ${res.statusText}`);
   }
