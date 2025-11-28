@@ -105,7 +105,7 @@ async function fetchCatalogPage(
   });
 
   console.log(`---RESPONSE from [fetchCatalogPage] server action \n`);
-  console.dir(await res.json(), { depth: null });
+  if (!res.bodyUsed) console.dir(await res.json(), { depth: null });
   console.log('\n');
 
   if (!res.ok) {
