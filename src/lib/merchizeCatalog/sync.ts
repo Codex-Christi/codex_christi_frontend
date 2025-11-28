@@ -124,6 +124,7 @@ export async function refreshMerchizeCatalog() {
 
   while (page <= SAFETY_MAX_PAGES) {
     const { success, data } = await fetchCatalogPage(page);
+
     if (!success) break;
 
     const { products, total, page: currentPage, limit: pageLimit, total: totalCount } = data;

@@ -8,11 +8,6 @@ export async function refreshAction() {
   try {
     const result = await refreshMerchizeCatalog();
 
-    console.log(`---RESPONSE from [refreshAction()] server action \n`);
-
-    console.dir(result, { depth: 1 });
-    console.log('\n');
-
     const syncState = await merchizeCatalogPrisma.syncState.findUnique({
       where: { id: 'merchize_catalog' },
     });
@@ -25,7 +20,6 @@ export async function refreshAction() {
     };
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Unknown error while refreshing catalog';
-    console.dir(e, { depth: null });
     return {
       ok: false as const,
       error: message,

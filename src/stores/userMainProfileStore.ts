@@ -6,6 +6,23 @@ import { PersistedStorageWithRehydration } from '@/lib/types/general_store_inter
 import { getUser } from '@/lib/funcs/userProfileFetchers/getUser';
 import { getUpdatedKeys } from '@/lib/utils/getUpdatedObjKeys';
 
+let inFlightUserProfilePromise: Promise<UserProfileDataInterface | null> | null = null;
+
+const fetchUserProfileOnce = async (): Promise<UserProfileDataInterface | null> => {
+  if (!inFlightUserProfilePromise) {
+    inFlightUserProfilePromise = getUser()
+      .then((result) => result ?? null)
+      .catch((error) => {
+        console.error('Failed to fetch user profile from server:', error);
+        // Reset so a later call can retry
+        inFlightUserProfilePromise = null;
+        return null;
+      });
+  }
+
+  return inFlightUserProfilePromise;
+};
+
 const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_USER_PROFILE_DATA_ENCRYPTION_KEY!;
 
 // === 🔐 Encryption ===
@@ -38,26 +55,23 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
     (set, get) => ({
       userMainProfile: null, // Fetch user profile data on initialization
       setProfileFromServer: async () => {
-        const serverData = await getUser();
+        const serverData = await fetchUserProfileOnce();
+        if (!serverData) return;
+
         const storeData = get().userMainProfile;
 
-        // Check if the data has changed before updating the store
-        const isDataDifferent = Object.values(getUpdatedKeys(serverData!, storeData!)).length > 0;
-        if (isDataDifferent) {
-          // console.log('User profile data has changed, updating store...');
-          set({ userMainProfile: serverData! });
+        // If there is no data in the store yet, just set it once
+        if (!storeData) {
+          set({ userMainProfile: serverData });
           return;
-        } else {
-          // console.log('No changes in user profile data, not updating store.');
         }
 
-        // If no data is present in the store, fetch from server
-        // This is to ensure that the store is initialized with the latest data
-        if (get().userMainProfile === null || !get().userMainProfile) {
-          const userData = (await getUser()) as UserProfileDataInterface;
+        // Only update when there are actual changes between server and store
+        const updatedKeys = getUpdatedKeys(serverData, storeData);
+        const isDataDifferent = Object.values(updatedKeys).length > 0;
 
-          set({ userMainProfile: userData });
-          return;
+        if (isDataDifferent) {
+          set({ userMainProfile: serverData });
         }
       },
       setUserMainProfile: (userMainProfile: UserProfileDataInterface | null) =>
@@ -91,9 +105,15 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
       }),
       skipHydration: true,
       // Skip initial hydration to avoid  loading encrypted data  on server-side
-      onRehydrateStorage: () => async (state) => {
+      onRehydrateStorage: () => (state) => {
         state?.hydrate();
-        state?.setProfileFromServer();
+
+        // Only sync from the server if we don't have a profile yet.
+        if (state && !state.userMainProfile) {
+          state
+            .setProfileFromServer()
+            .catch((error) => console.error('Failed to sync user profile on rehydrate:', error));
+        }
       },
     },
   ),

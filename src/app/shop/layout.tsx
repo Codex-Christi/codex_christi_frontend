@@ -25,7 +25,6 @@ export async function generateMetadata(): Promise<Metadata> {
 export default function ShopRootLayout({ children }: { children: ReactNode }) {
   return (
     <CometsContainer>
-      <UserMainProfileStoreInitializer />
       <GlobalCurrencyFXWrapper>
         <ShopNav />
         {children}
