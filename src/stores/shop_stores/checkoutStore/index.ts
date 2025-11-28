@@ -3,6 +3,7 @@ import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-pro
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { create } from 'zustand';
 import { persist, PersistStorage, StorageValue } from 'zustand/middleware';
+import { useUserShopProfile } from '../use-user-shop-profile';
 
 type CheckoutPickType = Pick<UserProfileDataInterface, 'first_name' | 'last_name' | 'email'>;
 export interface ShopCheckoutStoreInterface extends CheckoutPickType {
@@ -90,8 +91,8 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
   persist(
     (set) => ({
       ...initialObj,
-      first_name: useUserMainProfileStore.getState().userMainProfile?.first_name,
-      last_name: useUserMainProfileStore.getState().userMainProfile?.last_name,
+      first_name: useUserShopProfile.getState().userShopProfile?.data.first_name,
+      last_name: useUserShopProfile.getState().userShopProfile?.data.last_name,
       email: useUserMainProfileStore.getState().userMainProfile?.email,
       payment_method: null,
       setFirstName: (first_name) => set({ first_name }),
