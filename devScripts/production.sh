@@ -6,7 +6,7 @@ set -euo pipefail
 # - Reuses an existing buildx builder with the *docker* driver (e.g. "default")
 # - Only creates a builder if none exists
 # - Builds services in parallel with layer cache
-# - Starts stack with up -d (app_build then app)
+# - Starts stack with up -d (all services, including app)
 ##############################################################################
 
 APP_DIR="/root/apps/codexchristi"          # <-- adjust if needed
@@ -58,8 +58,11 @@ docker compose -f "$COMPOSE_FILE" build --progress=plain --parallel
 echo "Starting services…"
 docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
 
-# Light cleanup of dangling images older than 24h
-# docker image prune --force --filter "until=24h" >/dev/null 2>&1 || true
-docker system prune --force
+# Light cleanup of dangling images unless explicitly skipped
+# Set SKIP_DOCKER_PRUNE=1 in the environment to disable this step.
+if [ "${SKIP_DOCKER_PRUNE:-0}" != "1" ]; then
+  # Use a conservative prune; adjust flags if you want more aggressive cleanup
+  docker system prune --force >/dev/null 2>&1 || true
+fi
 
 echo "== deploy finished $(date -u +%FT%TZ) =="
