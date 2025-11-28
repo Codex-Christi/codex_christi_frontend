@@ -25,6 +25,7 @@ export async function refreshAction() {
     };
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Unknown error while refreshing catalog';
+    console.dir(e, { depth: null });
     return {
       ok: false as const,
       error: message,
