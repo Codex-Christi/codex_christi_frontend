@@ -53,7 +53,7 @@ use_first_docker_builder_or_create
 docker buildx inspect --bootstrap >/dev/null
 
 echo "Building services (parallel)…"
-docker compose -f "$COMPOSE_FILE" build --progress=plain --parallel
+docker compose --progress=plain -f "$COMPOSE_FILE" build --parallel
 
 echo "Starting services…"
 docker compose -f "$COMPOSE_FILE" up -d --remove-orphans

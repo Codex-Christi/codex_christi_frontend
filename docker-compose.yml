@@ -15,6 +15,7 @@ services:
       - webserver-network
 
 volumes:
+  my_volume: {}
 
 networks:
   webserver-network:
