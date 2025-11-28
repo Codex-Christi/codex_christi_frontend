@@ -126,6 +126,7 @@ export async function getMultipleSKUsData(skus: string[]): Promise<CatalogItem[]
 
   for (const sku of skus) {
     const v = bySku.get(sku);
+
     if (!v) {
       missing.push(sku);
       continue;
@@ -134,8 +135,9 @@ export async function getMultipleSKUsData(skus: string[]): Promise<CatalogItem[]
   }
 
   if (missing.length) {
-    // You can make this a custom error with code if you like.
-    throw new Error(`Catalog rows missing for SKUs: ${missing.join(', ')}`);
+    console.warn(
+      `[AUDIT] Catalog rows missing for ${missing.length} SKUs. Missing SKUs: ${missing.join(', ')}`,
+    );
   }
 
   return result;

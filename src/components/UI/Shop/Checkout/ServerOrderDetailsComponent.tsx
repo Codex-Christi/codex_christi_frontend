@@ -17,11 +17,17 @@ export const ServerOrderDetailsComponent: FC<{ children?: ReactNode }> = ({ chil
   const [serverOrderDetails, setServerOrderDetails] = useState<ServerOrderDetailsType>(null);
 
   const serverOrderDetailsUpdaterFunc = useCallback(async () => {
+    console.log(cart.map((p) => ({ sku: p.itemDetail.sku, name: p.title })));
+
     const orderDetailsFromServer = await getOrderFinalDetails(
       cart,
       country ? country : 'USA',
       'merchize',
     );
+
+    console.log('Country:', country);
+
+    console.log(orderDetailsFromServer);
 
     setServerOrderDetails(orderDetailsFromServer);
   }, [cart, country]);

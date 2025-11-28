@@ -13,14 +13,13 @@ export const getOrderFinalDetails = cache(
   async (
     cart: CartVariant[],
     country_iso3: ShippingCountryObj['country_iso3'],
-    supplier: dropShippingSupplier
+    supplier: dropShippingSupplier,
   ) => {
-    const countrySupport = await getCountrySupport(country_iso3, supplier);
-    const finalPricesWithShippingFee = await getMerchizeTotalWIthShipping(
-      cart,
-      country_iso3
-    );
+    const [countrySupport, finalPricesWithShippingFee] = await Promise.all([
+      getCountrySupport(country_iso3, supplier),
+      getMerchizeTotalWIthShipping(cart, country_iso3),
+    ]);
 
     return { countrySupport, finalPricesWithShippingFee };
-  }
+  },
 );

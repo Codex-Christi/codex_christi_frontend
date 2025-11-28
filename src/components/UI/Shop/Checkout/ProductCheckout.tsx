@@ -7,7 +7,9 @@ import { ServerOrderDetailsComponent } from './ServerOrderDetailsComponent';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 
 // Dynamic Imports
-const OrderSummary = dynamic(() => import('./OrderSummary').then((comp) => comp.default));
+const CheckoutPageOrderSummary = dynamic(() =>
+  import('./CheckoutPageOrderSummary').then((comp) => comp.default),
+);
 const PaymentSection = dynamic(() => import('./PaymentSection').then((comp) => comp.default));
 const BasicCheckoutInfo = dynamic(() =>
   import('./UserCheckoutSummary/BasicCheckoutInfo').then((comp) => comp.BasicCheckoutInfo),
@@ -68,7 +70,7 @@ const CheckoutPage = () => {
           </Accordion>
 
           {/* Order Summary, on it's own */}
-          <OrderSummary />
+          <CheckoutPageOrderSummary />
         </div>
       </CheckoutAccordionContext.Provider>
     </ServerOrderDetailsComponent>

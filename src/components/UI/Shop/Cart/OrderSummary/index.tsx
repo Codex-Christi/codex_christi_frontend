@@ -7,54 +7,56 @@ import Link from 'next/link';
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { FaAngleRight } from 'react-icons/fa6';
 import CustomShopLink from '../../HelperComponents/CustomShopLink';
+import { iso3ToDest } from '@/lib/datasetSearchers/merchize/dest-map';
+import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
+
+type OrderSummaryProps = {
+  /** ISO-3 destination country code, e.g. 'USA', 'GBR', 'CAN'. Defaults to 'USA'. */
+  countryIso3?: string;
+};
 
 /**
- * Gets the max and min shipping fee for an order (cart instance)
+ * Gets the max or min shipping fee for an order (cart instance) for a given region.
+ *
+ * NOTE: This uses the same US/EU/ROW shipping band fields as the legacy catalog.
+ * For GB/CA/AU/etc we map them to the closest band (ROW) at the call site.
  */
-const getMaxandMinShippingPrice = (catalogData: CatalogItem[], findValue: 'max' | 'min') => {
+const getMaxandMinShippingPrice = (
+  catalogData: CatalogItem[],
+  findValue: 'max' | 'min',
+  region: 'US' | 'EU' | 'ROW',
+) => {
   const comparator = findValue === 'max' ? Math.max : Math.min;
   let sku = '';
 
-  //   Reducer
-  return catalogData.reduce((accum, current) => {
-    const {
-      EU_additional_shipping_fee,
-      ROW_additional_shipping_fee,
-      EU_shipping_fee,
-      ROW_shipping_fee,
-      US_additional_shipping_fee,
-      US_shipping_fee,
-      SKU_variant,
-    } = current;
+  const baseKey = `${region}_shipping_fee` as keyof CatalogItem;
+  const addlKey = `${region}_additional_shipping_fee` as keyof CatalogItem;
 
-    // new object
-    const passInObj =
-      sku === SKU_variant
-        ? {
-            EU_additional_shipping_fee,
-            ROW_additional_shipping_fee,
-            US_additional_shipping_fee,
-          }
-        : {
-            EU_shipping_fee,
-            ROW_shipping_fee,
-            US_shipping_fee,
-          };
+  return catalogData.reduce((accum, current) => {
+    const { SKU_variant } = current;
+
+    // For repeated SKUs, we use the additional-item band; otherwise the first-item band.
+    const values = sku === SKU_variant ? [current[addlKey]] : [current[baseKey]];
 
     sku = SKU_variant;
 
-    return (
-      comparator(
-        ...Object.values(passInObj).filter((v): v is number => typeof v === 'number' && v > 0),
-      ) + accum
-    );
+    const numericVals = values.filter((v): v is number => typeof v === 'number' && v > 0);
+
+    if (!numericVals.length) return accum;
+
+    const segment = comparator(...numericVals);
+
+    // Preserve original behavior: accumulate per-SKU segment rather than global min/max.
+    return segment + accum;
   }, 0);
 };
 
 // Main Component
-const OrderSummary: FC = () => {
+const OrderSummary: FC<OrderSummaryProps> = ({ countryIso3 = 'USA' }) => {
   // Hooks
   const { variants: cartItems } = useCartStore();
+  const country = useShopCheckoutStore((state) => state.delivery_address.shipping_country);
+
   const subTotal = useMemo(
     () =>
       cartItems.reduce((acc, { itemDetail: { retail_price }, quantity }) => {
@@ -69,27 +71,42 @@ const OrderSummary: FC = () => {
 
   //   Funcs
   const getShippingEstimates = useCallback(async () => {
-    const filt = cartItems.flatMap(({ itemDetail, quantity }) => {
-      return Array(quantity).fill(itemDetail.sku);
-    });
-    if (filt) {
-      const skuCatalogData = await getCatalogItems(
-        filt ? filt.filter((sku): sku is string => typeof sku === 'string') : [''],
-      );
+    // Expand cart by quantity → ['SKU1', 'SKU1', 'SKU2', ...]
+    const skus = cartItems
+      .flatMap(({ itemDetail, quantity }) => Array.from({ length: quantity }, () => itemDetail.sku))
+      .filter((sku): sku is string => typeof sku === 'string' && !!sku);
 
-      const minShippingFee = getMaxandMinShippingPrice(skuCatalogData, 'min');
-      const maxShippingFee = getMaxandMinShippingPrice(skuCatalogData, 'max');
+    if (!skus.length) return null;
 
-      return { min: Math.ceil(minShippingFee), max: Math.ceil(maxShippingFee) };
+    try {
+      const skuCatalogData = await getCatalogItems(skus);
+
+      // Map ISO-3 country code to shipping destination band
+      const dest = iso3ToDest((country ?? countryIso3).toUpperCase());
+      // Our legacy catalog only has US/EU/ROW fields. Everything else falls back to ROW.
+      const region: 'US' | 'EU' | 'ROW' = dest === 'US' ? 'US' : dest === 'EU' ? 'EU' : 'ROW';
+
+      const minShippingFee = getMaxandMinShippingPrice(skuCatalogData, 'min', region);
+      const maxShippingFee = getMaxandMinShippingPrice(skuCatalogData, 'max', region);
+
+      return {
+        min: Math.ceil(minShippingFee),
+        max: Math.ceil(maxShippingFee),
+      };
+    } catch (error) {
+      console.error('[OrderSummary] Failed to fetch shipping estimates:', error);
+      return null;
     }
-  }, [cartItems]);
+  }, [cartItems, country, countryIso3]);
 
   //   UseEffects
   useEffect(() => {
     async function fetchShippingEstimates() {
-      const shippingEstimates = await getShippingEstimates();
-      if (shippingEstimates) {
-        setShippingEstimates(shippingEstimates);
+      const estimates = await getShippingEstimates();
+      if (estimates) {
+        setShippingEstimates(estimates);
+      } else {
+        setShippingEstimates(null);
       }
     }
     fetchShippingEstimates();
@@ -122,7 +139,7 @@ const OrderSummary: FC = () => {
               Shipping Fee <span className='font-extrabold'>**</span>
             </span>
             <span>
-              ${shippingEstimates.min} -${shippingEstimates.max}
+              ${shippingEstimates.min} - ${shippingEstimates.max}
             </span>
           </h3>
 
