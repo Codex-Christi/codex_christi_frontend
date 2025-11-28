@@ -43,7 +43,7 @@ const getMaxandMinShippingPrice = (
 
     const numericVals = values.filter((v): v is number => typeof v === 'number' && v > 0);
 
-    if (!numericVals.length) return accum + 10;
+    if (!numericVals.length) return accum + 7;
 
     const segment = comparator(...numericVals);
 
