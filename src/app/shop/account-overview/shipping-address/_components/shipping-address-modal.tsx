@@ -225,7 +225,7 @@ const ShippingAddressModal = ({
                     control={control}
                     render={({ field: { onChange, value } }) => (
                       <EditCountry
-                        value={value}
+                        value={value ?? null}
                         onChange={onChange}
                         showLabel={false}
                         className='rounded-xl'
