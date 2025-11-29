@@ -1,6 +1,7 @@
+// src/components/UI/profile/ProfileBanner.tsx
 'use client';
 
-import { FC, Dispatch, SetStateAction } from 'react';
+import type { FC, Dispatch, SetStateAction } from 'react';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import UserAvatar from './UserAvatar';
 
@@ -8,17 +9,40 @@ const ProfileBanner: FC<{
   setIsActive: Dispatch<SetStateAction<boolean>>;
   isActive: boolean;
 }> = ({ setIsActive, isActive }) => {
-  // Hooks
-  const userMainProfile = useUserMainProfileStore(
-    (state) => state.userMainProfile
-  );
+  // Again: separate selectors to avoid object allocation in selector
+  const userMainProfile = useUserMainProfileStore((state) => state.userMainProfile);
+  const hydrated = useUserMainProfileStore((state) => state._hydrated);
 
-  //   Consts
+  // While hydrating, show a skeleton banner
+  if (!hydrated) {
+    return (
+      <div className='px-4 py-8 bg-black backdrop-blur-[30px] rounded-t-[20px] animate-pulse'>
+        <div className='flex items-start flex-wrap justify-between gap-4'>
+          <div className='flex flex-wrap md:flex-nowrap items-center gap-4'>
+            <div className='size-24 rounded-full bg-gray-800' />
+            <div className='space-y-4 w-40'>
+              <div className='h-5 bg-gray-800 rounded' />
+              <div className='h-4 bg-gray-800 rounded w-3/4' />
+              <div className='h-4 bg-gray-800 rounded w-2/3' />
+            </div>
+          </div>
+          <div className='h-9 w-28 bg-gray-800 rounded-[10px]' />
+        </div>
+      </div>
+    );
+  }
+
   const { first_name, last_name, username, bio } = userMainProfile || {};
 
-  // Main JSX
+  const displayName =
+    first_name || last_name ? `${first_name ?? ''} ${last_name ?? ''}`.trim() : 'Your Name';
+
+  const displayUsername = username || 'username';
+  const displayBio = bio || `Christ in me 💛 the hope of Glory.`;
+
   return (
     <>
+      {/* Mobile "Go Live" bar */}
       <div className='text-[#F3F3F30D] bg-[#0D0D0D] rounded-[20px] p-4 flex gap-4 items-center mb-8 lg:hidden'>
         <UserAvatar className='size-12 aspect-square' height={48} width={48} />
 
@@ -84,6 +108,7 @@ const ProfileBanner: FC<{
         </button>
       </div>
 
+      {/* Main profile banner */}
       <div className='flex items-start flex-wrap justify-between gap-4 px-4 py-8 bg-black backdrop-blur-[30px] rounded-t-[20px]'>
         <div className='flex flex-wrap md:flex-nowrap items-center gap-4'>
           <UserAvatar className='size-24' height={80} width={80} />
@@ -91,19 +116,13 @@ const ProfileBanner: FC<{
           <div className='space-y-4'>
             <div>
               <h1 className='md:text-2xl font-semibold flex items-center gap-1'>
-                {`${first_name} ${last_name}`}{' '}
+                {displayName}{' '}
                 <svg width='19' height='13' viewBox='0 0 19 13' fill='none'>
                   <path
                     d='M0.522461 1.50098C0.522461 0.948692 0.970176 0.500977 1.52246 0.500977H6.52246V12.501H1.52246C0.970176 12.501 0.522461 12.0533 0.522461 11.501V1.50098Z'
                     fill='#056A00'
                   />
-                  <rect
-                    x='6.52246'
-                    y='0.500977'
-                    width='6'
-                    height='12'
-                    fill='white'
-                  />
+                  <rect x='6.52246' y='0.500977' width='6' height='12' fill='white' />
                   <path
                     d='M12.5225 0.500977H17.5225C18.0747 0.500977 18.5225 0.948692 18.5225 1.50098V11.501C18.5225 12.0533 18.0747 12.501 17.5225 12.501H12.5225V0.500977Z'
                     fill='#056A00'
@@ -111,17 +130,14 @@ const ProfileBanner: FC<{
                 </svg>
               </h1>
 
-              <p className='text-white/70'>@{username}</p>
+              <p className='text-white/70'>@{displayUsername}</p>
             </div>
 
             <div>
-              <p className='text-lg'>
-                {bio ? bio : `Christ in me 💛 the hope of Glory.`}
-              </p>
+              <p className='text-lg'>{displayBio}</p>
 
               <p className='flex items-center gap-10 text-white/70'>
                 <span>30 following</span>
-
                 <span>3.2k followers</span>
               </p>
             </div>

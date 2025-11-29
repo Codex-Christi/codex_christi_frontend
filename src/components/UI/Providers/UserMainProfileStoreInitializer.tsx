@@ -1,17 +1,18 @@
-// stroes/user-main-profile-store-initializer.tsx
+// src/components/UI/Providers/UserMainProfileStoreInitializer.tsx
 'use client';
+
 import { useEffect } from 'react';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
-import useAuthStore from '@/stores/authStore';
 
+/**
+ * This component is mounted high in the tree (e.g. in app/layout.tsx).
+ * It simply triggers Zustand-persist rehydration on the client once.
+ */
 export default function UserMainProfileStoreInitializer() {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-
   useEffect(() => {
-    const { _hydrated, setProfileFromServer } = useUserMainProfileStore.getState();
-    if (isAuthenticated) setProfileFromServer();
-    if (!_hydrated) useUserMainProfileStore.persist.rehydrate();
-  }, [isAuthenticated]);
+    // Hydrate from sessionStorage on client mount
+    useUserMainProfileStore.persist.rehydrate();
+  }, []);
 
   return null;
 }

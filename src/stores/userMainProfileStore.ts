@@ -1,11 +1,13 @@
+// src/stores/userMainProfileStore.ts
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
 import CryptoJS from 'crypto-js';
+import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
 import { PersistedStorageWithRehydration } from '@/lib/types/general_store_interfaces';
 import { getUser } from '@/lib/funcs/userProfileFetchers/getUser';
 import { getUpdatedKeys } from '@/lib/utils/getUpdatedObjKeys';
 
+// Prevent multiple simultaneous fetches from the server
 let inFlightUserProfilePromise: Promise<UserProfileDataInterface | null> | null = null;
 
 const fetchUserProfileOnce = async (): Promise<UserProfileDataInterface | null> => {
@@ -47,15 +49,24 @@ interface UserMainProfileStore extends PersistedStorageWithRehydration {
   setProfileFromServer: () => Promise<void>;
 }
 
+// Type guard function to check if value is UserProfileData
+function isUserProfileData(value: {
+  id?: string;
+  email?: string;
+}): value is UserProfileDataInterface {
+  return value && typeof value.id === 'string' && typeof value.email === 'string';
+}
+
 // Persisted store for user main profile
-// This store will persist the user profile data in session storage
-// and encrypt it for security.
+// This store will persist the user profile data in session storage and encrypt it for security.
 export const useUserMainProfileStore = create<UserMainProfileStore>()(
   persist(
     (set, get) => ({
-      userMainProfile: null, // Fetch user profile data on initialization
+      userMainProfile: null,
+
       setProfileFromServer: async () => {
         const serverData = await fetchUserProfileOnce();
+
         if (!serverData) return;
 
         const storeData = get().userMainProfile;
@@ -68,15 +79,20 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
 
         // Only update when there are actual changes between server and store
         const updatedKeys = getUpdatedKeys(serverData, storeData);
+
         const isDataDifferent = Object.values(updatedKeys).length > 0;
 
         if (isDataDifferent) {
           set({ userMainProfile: serverData });
         }
       },
+
       setUserMainProfile: (userMainProfile: UserProfileDataInterface | null) =>
         set((state) => ({ ...state, userMainProfile })),
+
       clearProfile: () => set({ userMainProfile: null }),
+
+      // hydration tracking
       _hydrated: false,
       hydrate: () => set({ _hydrated: true }),
     }),
@@ -84,19 +100,18 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
       name: 'user-main-profile-storage',
       storage: createJSONStorage(() => sessionStorage, {
         replacer: (key, value) => {
-          // Serialize and Encrypt before saving
+          // Serialize and encrypt before saving
           if (key === 'userMainProfile' && value) {
-            // Type guard to ensure value is of type UserProfileData
             if (isUserProfileData(value)) {
               return encryptData(value);
             } else {
               console.error('Invalid data type for userMainProfile:', value);
             }
           }
-          return value; // Return the value unchanged if no conditions are met
+          return value;
         },
         reviver: (key, value) => {
-          // Decrypt and Deserialize when loading
+          // Decrypt and deserialize when loading
           if (key === 'userMainProfile' && value) {
             return typeof value === 'string' ? decryptData(value) : null;
           }
@@ -104,16 +119,10 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
         },
       }),
       skipHydration: true,
-      // Skip initial hydration to avoid  loading encrypted data  on server-side
+      // Skip initial hydration on the server; we'll trigger rehydrate on the client.
       onRehydrateStorage: () => (state) => {
+        // Mark store as hydrated after sessionStorage is loaded
         state?.hydrate();
-
-        // Only sync from the server if we don't have a profile yet.
-        if (state && !state.userMainProfile) {
-          state
-            .setProfileFromServer()
-            .catch((error) => console.error('Failed to sync user profile on rehydrate:', error));
-        }
       },
     },
   ),
@@ -123,11 +132,3 @@ export const clearUserMainProfileStore = () => {
   useUserMainProfileStore.getState().clearProfile();
   useUserMainProfileStore.persist.clearStorage();
 };
-
-// Type guard function to check if value is UserProfileData
-function isUserProfileData(value: {
-  id?: string;
-  email?: string;
-}): value is UserProfileDataInterface {
-  return value && typeof value.id === 'string' && typeof value.email === 'string';
-}

@@ -1,7 +1,8 @@
+// src/components/UI/profile/UserAvatar.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { FC, useEffect, useState } from 'react';
+import type { FC } from 'react';
 import Image, { StaticImageData } from 'next/image';
 import ProfileImage from '@/assets/img/profile-img.png';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
@@ -14,42 +15,33 @@ const UserAvatar: FC<{
   src?: string | StaticImageData;
   [key: string]: any;
 }> = ({ height = 50, width = 50, className, src, ...rest }) => {
-  const userMainProfile = useUserMainProfileStore(
-    (state) => state.userMainProfile
-  );
+  // ⚠️ IMPORTANT: use separate selectors to avoid returning a new object every time
+  const userMainProfile = useUserMainProfileStore((state) => state.userMainProfile);
+  const hydrated = useUserMainProfileStore((state) => state._hydrated);
 
-  const [hasHydrated, setHasHydrated] = useState(false);
-
-  useEffect(() => {
-    setHasHydrated(true);
-  }, [userMainProfile]);
-
-  const fallbackSrc =
-    userMainProfile?.profile_pic &&
-    typeof userMainProfile.profile_pic === 'string'
-      ? userMainProfile.profile_pic
-      : ProfileImage;
-
-  const imageSrc = src ?? fallbackSrc;
-
-  if (!hasHydrated) {
+  // While store is still hydrating from sessionStorage, show skeleton
+  if (!hydrated) {
     return (
       <div
-        className={cn(
-          'size-12 rounded-full bg-gray-200 animate-pulse',
-          className
-        )}
+        className={cn('size-12 rounded-full bg-gray-200 animate-pulse', className)}
         style={{ width, height }}
       />
     );
   }
 
+  // After hydration:
+  // - If userMainProfile is null → use static fallback image
+  // - If profile_pic is a string → use that
+  const fallbackSrc =
+    userMainProfile?.profile_pic && typeof userMainProfile.profile_pic === 'string'
+      ? userMainProfile.profile_pic
+      : ProfileImage;
+
+  const imageSrc = src ?? fallbackSrc;
+
   return (
     <Image
-      className={cn(
-        'rounded-full h-[inherit] object-cover object-center',
-        className
-      )}
+      className={cn('rounded-full h-[inherit] object-cover object-center', className)}
       src={imageSrc}
       width={width}
       height={height}

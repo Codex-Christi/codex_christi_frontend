@@ -3,7 +3,6 @@ import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-pro
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { create } from 'zustand';
 import { persist, PersistStorage, StorageValue } from 'zustand/middleware';
-import { useUserShopProfile } from '../use-user-shop-profile';
 
 type CheckoutPickType = Pick<UserProfileDataInterface, 'first_name' | 'last_name' | 'email'>;
 export interface ShopCheckoutStoreInterface extends CheckoutPickType {
@@ -30,7 +29,7 @@ export interface ShopCheckoutState extends ShopCheckoutStoreInterface {
   setFirstName: (first_name: ShopCheckoutStoreInterface['first_name']) => void;
   setLastName: (last_name: ShopCheckoutStoreInterface['last_name']) => void;
   setEmail: (email: ShopCheckoutStoreInterface['email']) => void;
-  setPaymentMehod: (payment_method: ShopCheckoutStoreInterface['payment_method']) => void;
+  setPaymentMethod: (payment_method: ShopCheckoutStoreInterface['payment_method']) => void;
   setDeliveryAddress: (delivery_address: ShopCheckoutStoreInterface['delivery_address']) => void;
   setShippingCountryISO3: (iso3: string | null) => void; // <-- NEW: single writer for country
   clearCheckout: () => void;
@@ -85,39 +84,47 @@ const initialObj = {
 };
 
 export const useShopCheckoutStore = create<ShopCheckoutState>()(
-  // Hooks
-  // const {userMainProfile} = useUserMainProfileStore((state)=>state)
-
   persist(
-    (set) => ({
-      ...initialObj,
-      first_name: useUserShopProfile.getState().userShopProfile?.data.first_name,
-      last_name: useUserShopProfile.getState().userShopProfile?.data.last_name,
-      email: useUserMainProfileStore.getState().userMainProfile?.email,
-      payment_method: null,
-      setFirstName: (first_name) => set({ first_name }),
-      setLastName: (last_name) => set({ last_name }),
-      setEmail: (email) => set({ email }),
-      setPaymentMehod: (payment_method) => set({ payment_method }),
-      setDeliveryAddress: (delivery_address) => set({ delivery_address }),
-      setShippingCountryISO3: (iso3) =>
-        set((s) => ({
-          delivery_address: {
-            ...s.delivery_address,
-            shipping_country: iso3, // ALWAYS ISO-3 or null
-          },
-        })),
-      clearCheckout: () => {
-        set({
-          ...initialObj,
-          first_name: useUserMainProfileStore.getState().userMainProfile?.first_name,
-          last_name: useUserMainProfileStore.getState().userMainProfile?.last_name,
-          email: useUserMainProfileStore.getState().userMainProfile?.email,
-          payment_method: null,
-        });
-        localStorage.removeItem('checkout-storage');
-      },
-    }),
+    (set) => {
+      // Always initialize with non-undefined values
+      const userProfile = useUserMainProfileStore.getState().userMainProfile;
+      return {
+        first_name: userProfile?.first_name ?? '',
+        last_name: userProfile?.last_name ?? '',
+        email: userProfile?.email ?? '',
+        payment_method: null,
+        delivery_address: {
+          shipping_address_line_1: null,
+          shipping_address_line_2: null,
+          shipping_city: null,
+          shipping_state: null,
+          shipping_country: null,
+          zip_code: null,
+        },
+        setFirstName: (first_name) => set({ first_name }),
+        setLastName: (last_name) => set({ last_name }),
+        setEmail: (email) => set({ email }),
+        setPaymentMethod: (payment_method) => set({ payment_method }),
+        setDeliveryAddress: (delivery_address) => set({ delivery_address }),
+        setShippingCountryISO3: (iso3) =>
+          set((s) => ({
+            delivery_address: {
+              ...s.delivery_address,
+              shipping_country: iso3,
+            },
+          })),
+        clearCheckout: () => {
+          set({
+            ...initialObj,
+            first_name: useUserMainProfileStore.getState().userMainProfile?.first_name || '',
+            last_name: useUserMainProfileStore.getState().userMainProfile?.last_name || '',
+            email: useUserMainProfileStore.getState().userMainProfile?.email || '',
+            payment_method: null,
+          });
+          localStorage.removeItem('checkout-storage');
+        },
+      };
+    },
     {
       name: 'checkout-storage',
       storage: createEncryptedStorage<ShopCheckoutState>({ encrypt, decrypt }),

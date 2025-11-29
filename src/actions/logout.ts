@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import axios from 'axios';
 import loadingToast from '@/lib/loading-toast';
 import errorToast from '@/lib/error-toast';
 import successToast from '@/lib/success-toast';
@@ -8,72 +7,79 @@ import { getCookie } from '@/lib/session/main-session';
 import { clearUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { toast } from 'sonner';
 
-export const axiosClient = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
-});
+type LogoutResult = {
+  status: boolean;
+  error?: string;
+};
 
-export const logoutUser = async () => {
+export const logoutUser = async (): Promise<boolean | LogoutResult> => {
   const loadingToastID = loadingToast({
     message: 'Please wait a moment...',
   });
 
   try {
-    const refreshToken = await getCookie('refreshToken');
+    // Get refresh token cookie once and short-circuit early if missing
+    const refreshTokenCookie = await getCookie('refreshToken');
+    const encryptedRefreshToken = refreshTokenCookie?.value;
 
-    const decryptRefreshToken = await decrypt(refreshToken?.value);
-
-    const mainRefreshToken = decryptRefreshToken
-      ? (decryptRefreshToken.mainRefreshToken as string)
-      : ('' as string);
-
-    const res = await axiosClient.post(
-      '/auth/user-logout',
-      { refresh: mainRefreshToken },
-      // {
-      //   headers: {
-      //     Authorization: `Bearer ${mainAccessToken}`,
-      //   },
-      // }
-    );
-
-    if (res?.data?.success) {
-      await deleteSession();
-
-      clearUserMainProfileStore();
-
-      successToast({
-        message: 'You have successfully logged out.',
-        header: 'Logout Successful.',
-      });
-
-      toast.dismiss(loadingToastID);
-
-      window.location.replace('/auth/sign-in');
-      return true;
+    if (!encryptedRefreshToken) {
+      throw new Error('No refresh token found');
     }
 
-    throw new Error(res?.data?.message);
+    // Decrypt once and safely access mainRefreshToken
+    const decrypted = await decrypt(encryptedRefreshToken);
+    const mainRefreshToken = (decrypted as any)?.mainRefreshToken as string | undefined;
+
+    if (!mainRefreshToken) {
+      throw new Error('Invalid refresh token');
+    }
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/auth/user-logout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refresh: mainRefreshToken }),
+      cache: 'no-store',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data?.success) {
+      const message = data?.message || 'Logout failed.';
+      throw new Error(message);
+    }
+
+    // Ensure local session and in-memory user state are cleared before redirect
+    await deleteSession();
+    clearUserMainProfileStore();
+
+    successToast({
+      message: 'You have successfully logged out.',
+      header: 'Logout Successful.',
+    });
+
+    toast.dismiss(loadingToastID);
+
+    window.location.replace('/auth/sign-in');
+
+    return true;
   } catch (err: any) {
     toast.dismiss(loadingToastID);
 
-    if (err?.response?.data?.errors) {
-      errorToast({
-        message: err?.response?.data?.errors[0]?.message as string,
-      });
-
-      return {
-        status: false,
-        error: err?.response?.data?.errors[0]?.message as string,
-      };
-    }
+    const apiErrorMessage =
+      err?.response?.data?.errors?.[0]?.message ||
+      err?.response?.data?.message ||
+      err?.message ||
+      'Something went wrong. Please try again.';
 
     errorToast({
-      message: String(err),
+      message: apiErrorMessage,
     });
 
     return {
       status: false,
-      error: err,
+      error: apiErrorMessage,
     };
   }
 };
