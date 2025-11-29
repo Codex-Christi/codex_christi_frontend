@@ -6,25 +6,31 @@ import { TiChevronRight } from 'react-icons/ti';
 import useAuthStore from '@/stores/authStore';
 
 const WaitlistButton = () => {
-  // Hooks
   const router = useRouter();
-  const isAuthenticated = useAuthStore((store) => store.isAuthenticated);
 
-  // Main JSX
+  // Use a simple selector so React/Zustand can memoize properly
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  const handleClick = () => {
+    if (isAuthenticated) {
+      router.push('/profile');
+    } else {
+      router.push('/auth/signup?waitlist=true');
+    }
+  };
+
+  const label = isAuthenticated ? 'View Profile' : 'Join waitlist';
+
   return (
     <Button
       name='Join Waitlist Button'
-      onClick={() =>
-        router.push(isAuthenticated ? '/profile' : '/auth/signup?waitlist=true')
-      }
+      onClick={handleClick}
       variant='secondary'
       className={`mt-[150px] md:mt-[144px] lg:mt-[136px] !mx-auto font-inter
          bg-white text-black font-bold text-[1.15rem] py-3 !h-[unset] flex`}
     >
-      <h3>{isAuthenticated ? 'View Profile' : `Join waitlist`}</h3>
-      {!isAuthenticated && (
-        <TiChevronRight className='text-[1.5rem] text-black ml-2' size={20} />
-      )}
+      <h3>{label}</h3>
+      {!isAuthenticated && <TiChevronRight className='text-[1.5rem] text-black ml-2' size={20} />}
     </Button>
   );
 };

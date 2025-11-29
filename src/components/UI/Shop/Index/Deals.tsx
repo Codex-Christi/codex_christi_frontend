@@ -55,10 +55,10 @@ const Deals = () => {
         </div>
       </CustomShopLink>
 
+      {/* Product Slider Carousel */}
       <div
-        className='overflow-x-auto overflow-y-hidden min-w-full flex gap-2 md:gap-[10rem] lg:gap-10 xl:gap-7
-        scroll-smooth snap-x snap-mandatory md:justify-items-center  md:content-center
-        md:grid md:grid-cols-5 md:w-full md:col-span-8 custom-scrollbar'
+        className='overflow-x-auto overflow-y-hidden min-w-full flex gap-2 lg:gap-10 xl:gap-7
+        scroll-smooth snap-x snap-mandatory md:grid-cols-5 md:w-full md:col-span-8 custom-scrollbar'
         ref={slideContainerRef}
       >
         {lauchMerchProducts.map((merch, i) => (

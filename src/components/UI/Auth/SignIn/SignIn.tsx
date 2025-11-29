@@ -36,10 +36,7 @@ const SignIn = () => {
   });
 
   //   Signup form submit handler
-  const signInFormSubmitHandler: SubmitHandler<signInSchemaType> = async (
-    fieldValues,
-    event
-  ) => {
+  const signInFormSubmitHandler: SubmitHandler<signInSchemaType> = async (fieldValues, event) => {
     // Prevent default first
     event?.preventDefault();
 
