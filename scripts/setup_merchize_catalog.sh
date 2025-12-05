@@ -2,7 +2,6 @@
 set -euo pipefail
 
 # Resolve script directory and project root so this script is location-agnostic.
-# This allows running it from anywhere (e.g. repo root, scripts/, or via absolute path).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
@@ -11,22 +10,12 @@ cd "$ROOT_DIR"
 
 echo "→ Running setup_merchize_catalog.sh from project root: $ROOT_DIR"
 
-WITH_CRON=0
-RUN_BUILD=1
-RUN_DEPS=1
 FORCE_MIGRATE=0
 
+# Flags:
+#   --force-migrate  Always run `prisma migrate dev` instead of comparing schema fingerprint.
 for arg in "$@"; do
   case "$arg" in
-    --with-cron)
-      WITH_CRON=1
-      ;;
-    --no-build)
-      RUN_BUILD=0
-      ;;
-    --no-deps)
-      RUN_DEPS=0
-      ;;
     --force-migrate)
       FORCE_MIGRATE=1
       ;;
@@ -66,7 +55,7 @@ fi
 echo "→ Ensuring data directory exists at $ROOT_DIR/data"
 mkdir -p "$ROOT_DIR/data"
 
-# Determine which env file to require
+# Determine which env file to require, based only on NODE_ENV.
 if [ "${NODE_ENV:-development}" = "production" ]; then
   ENV_FILE="$ROOT_DIR/.env.production"
 else
@@ -90,19 +79,13 @@ EOF
   exit 1
 fi
 
-# Export variables from the env file
+# Export variables from the env file so Prisma can see the DB URL.
 set -a
+# shellcheck disable=SC1090
 source "$ENV_FILE"
 set +a
 
-if [ "$RUN_DEPS" -eq 1 ]; then
-  echo "→ Installing deps (yarn)"
-  yarn install --frozen-lockfile || yarn install
-else
-  echo "→ Skipping yarn install (RUN_DEPS=0)"
-fi
-
-echo "→ Generate Prisma client (Merchize catalog schema)"
+echo "→ Generating Prisma client (Merchize catalog schema)"
 yarn prisma generate \
   --schema "$SCHEMA_PATH"
 
@@ -112,29 +95,9 @@ if [ "${MERCHIZE_PRICE_CATALOG_SCHEMA_CHANGED:-1}" = "1" ]; then
     --schema "$SCHEMA_PATH" \
     -n bootstrap_merchize_catalog
 else
-  echo "→ Schema unchanged: skipping migrate dev, ensuring DB is in sync with db push"
+  echo "→ Schema unchanged: running Prisma db push to ensure DB is in sync"
   yarn prisma db push \
     --schema "$SCHEMA_PATH"
 fi
 
-if [ "$RUN_BUILD" -eq 1 ]; then
-  echo "→ Build Next.js app"
-  yarn build
-else
-  echo "→ Skipping Next.js build (RUN_BUILD=0)"
-fi
-
-echo "✓ Merchize catalog setup complete."
-
-echo
-echo "Next steps:"
-echo "1) Start your app: yarn start (or your PM2 / Docker command)."
-echo "2) Once the app is running, ingest the catalog via either:"
-echo "   curl -X POST -H \"x-cron-secret: \$MERCHIZE_PRICE_CATALOG_CRON_SECRET\" http://localhost:3000/api/jobs/merchize-refresh"
-echo "   or visit /admin/merchize and click 'Refresh now'."
-
-if [ $WITH_CRON -eq 1 ]; then
-  echo
-  echo "→ Example cron on VPS:"
-  echo "   10 3 * * * curl -fsS -X POST -H \"x-cron-secret: \$MERCHIZE_PRICE_CATALOG_CRON_SECRET\" https://YOUR_DOMAIN/api/jobs/merchize-refresh >/dev/null"
-fi
+echo "✓ Merchize catalog Prisma setup complete."
