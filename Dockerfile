@@ -20,7 +20,7 @@ RUN corepack enable
 FROM base AS deps
 WORKDIR /app
 
-COPY package.json yarn.lock .yarnrc.yml ./
+COPY package.json ./
 
 # Cache Yarn downloads
 RUN --mount=type=cache,target=/root/.cache/yarn \
@@ -65,7 +65,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next /app/.next
 COPY --from=builder --chown=nextjs:nodejs /app/public /app/public
 
 # Package + lockfile so scripts like "yarn prisma" work
-COPY --from=builder --chown=nextjs:nodejs /app/package.json /app/yarn.lock ./
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
 
 # Next config needed at runtime for images etc.
 COPY --from=builder /app/next.config.* ./
