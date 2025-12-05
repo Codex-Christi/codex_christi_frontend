@@ -23,7 +23,7 @@ for arg in "$@"; do
   esac
 done
 
-SCHEMA_PATH="prisma/shop/merchize/priceCatalog.prisma"
+SCHEMA_PATH="../prisma/shop/merchize/priceCatalog.prisma"
 SCHEMA_HASH_FILE=".merchize_price_catalog_schema.sha"
 
 echo "→ Checking Merchize catalog Prisma schema fingerprint"
