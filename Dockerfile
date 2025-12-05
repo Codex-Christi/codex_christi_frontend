@@ -76,6 +76,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/src/datasets /app/src/datasets
 # ⬇️ CRITICAL: copy Prisma schema + migrations so migrate deploy can run in production
 COPY --from=builder --chown=nextjs:nodejs /app/prisma /app/prisma
 
+# Copy Prisma config so Prisma 7 sees datasource URL in production
+COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.* ./
+
 # We DO NOT copy any SQLite .db files here.
 # The DB file lives in a Docker volume mounted at /app/data in docker-compose.
 
