@@ -25,7 +25,7 @@ export const ItemQuantityComponent: FC<{
   return (
     <section
       className={`flex-row items-center border-gray-300 border-[.5px]
-         rounded-lg ${className} justify-between w-full max-w-[8.5rem]`}
+         rounded-lg ${className} justify-between w-full min-w-[6.5rem]`}
     >
       {/* Reduce quantity */}
       <OperationButton

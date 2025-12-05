@@ -48,10 +48,14 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 
 # copy only what runtime needs (Next.js standalone output)
-# Standalone bundle already includes the minimal node_modules tree.
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Ensure runtime dependencies such as `next` and server externals are available.
+# This copies the node_modules tree (built in the deps stage) into the final image.
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
 # Runtime-read datasets / resources
 # The SQLite DB lives in a Docker volume mounted at /app/data in docker-compose.
