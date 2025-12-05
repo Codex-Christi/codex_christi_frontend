@@ -66,10 +66,19 @@ fi
 echo "→ Ensuring data directory exists at $ROOT_DIR/data"
 mkdir -p "$ROOT_DIR/data"
 
-if [ ! -f "$ROOT_DIR/.env" ]; then
-  cat <<'EOF'
-⚠️  .env missing. Create it with at least:
+# Determine which env file to require
+if [ "${NODE_ENV:-development}" = "production" ]; then
+  ENV_FILE="$ROOT_DIR/.env.production"
+else
+  ENV_FILE="$ROOT_DIR/.env.local"
+fi
 
+echo "→ Using env file: $ENV_FILE"
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "⚠️  Required env file missing: $ENV_FILE"
+  echo "Create it with at least:"
+  cat <<'EOF'
 MERCHIZE_PRICE_CATALOG_DATABASE_URL="file:./data/merchize_price_catalog.db"
 MERCHIZE_PRICE_CATALOG_CRON_SECRET="some-long-random"
 MERCHIZE_PRICE_CATALOG_ADMIN_PASSWORD="your-admin-password"
@@ -77,10 +86,14 @@ MERCHIZE_PRICE_CATALOG_ADMIN_PASSWORD="your-admin-password"
 MERCHIZE_CATALOG_URL="https://bo-group-2-2.merchize.com/27mkjsl/bo-api/product/catalog/"
 MERCHIZE_API_KEY="YOUR_MERCHIZE_TOKEN"
 MERCHIZE_BASE_URL="https://bo-group-2-2.merchize.com/27mkjsl/bo-api"
-MERCHIZE_API_KEY="YOUR_MERCHIZE_TOKEN"
 EOF
   exit 1
 fi
+
+# Export variables from the env file
+set -a
+source "$ENV_FILE"
+set +a
 
 if [ "$RUN_DEPS" -eq 1 ]; then
   echo "→ Installing deps (yarn)"
