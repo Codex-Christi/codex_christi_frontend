@@ -39,6 +39,11 @@ COPY . .
 ENV NODE_OPTIONS="--max-old-space-size=3072"
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Generate Prisma client for Merchize catalog schema so imports like
+# ./src/lib/prisma/shop/merchize/generated/merchizeCatalog/client
+# exist when `yarn build` runs.
+RUN yarn prisma generate --schema prisma/shop/merchize/priceCatalog.prisma
+
 RUN --mount=type=cache,target=/root/.cache/yarn \
   yarn build
 
