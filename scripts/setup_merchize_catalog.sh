@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Resolve script directory and project root so this script is location-agnostic.
+# This allows running it from anywhere (e.g. repo root, scripts/, or via absolute path).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Always execute from project root so relative paths (prisma/, data/, etc.) are consistent.
+cd "$ROOT_DIR"
+
+echo "→ Running setup_merchize_catalog.sh from project root: $ROOT_DIR"
+
 WITH_CRON=0
 RUN_BUILD=1
 RUN_DEPS=1
@@ -23,8 +33,8 @@ for arg in "$@"; do
   esac
 done
 
-SCHEMA_PATH="../prisma/shop/merchize/priceCatalog.prisma"
-SCHEMA_HASH_FILE=".merchize_price_catalog_schema.sha"
+SCHEMA_PATH="$ROOT_DIR/prisma/shop/merchize/priceCatalog.prisma"
+SCHEMA_HASH_FILE="$ROOT_DIR/.merchize_price_catalog_schema.sha"
 
 echo "→ Checking Merchize catalog Prisma schema fingerprint"
 
@@ -53,10 +63,10 @@ else
   fi
 fi
 
-echo "→ Ensuring data directory exists"
-mkdir -p ./data
+echo "→ Ensuring data directory exists at $ROOT_DIR/data"
+mkdir -p "$ROOT_DIR/data"
 
-if [ ! -f .env ]; then
+if [ ! -f "$ROOT_DIR/.env" ]; then
   cat <<'EOF'
 ⚠️  .env missing. Create it with at least:
 
@@ -81,17 +91,17 @@ fi
 
 echo "→ Generate Prisma client (Merchize catalog schema)"
 yarn prisma generate \
-  --schema prisma/shop/merchize/priceCatalog.prisma
+  --schema "$SCHEMA_PATH"
 
 if [ "${MERCHIZE_PRICE_CATALOG_SCHEMA_CHANGED:-1}" = "1" ]; then
   echo "→ Schema changed (or unknown): running Prisma migrate dev for Merchize catalog DB"
   yarn prisma migrate dev \
-    --schema prisma/shop/merchize/priceCatalog.prisma \
+    --schema "$SCHEMA_PATH" \
     -n bootstrap_merchize_catalog
 else
   echo "→ Schema unchanged: skipping migrate dev, ensuring DB is in sync with db push"
   yarn prisma db push \
-    --schema prisma/shop/merchize/priceCatalog.prisma
+    --schema "$SCHEMA_PATH"
 fi
 
 if [ "$RUN_BUILD" -eq 1 ]; then
