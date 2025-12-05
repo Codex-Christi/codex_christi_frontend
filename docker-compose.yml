@@ -7,7 +7,12 @@ services:
     container_name: codex-con-app-start
     env_file:
       - .env.production
-    command: ['node', 'server.js']
+    command:
+      [
+        'sh',
+        '-c',
+        'yarn prisma migrate deploy --schema prisma/shop/merchize/priceCatalog.prisma && node server.js',
+      ]
     ports:
       - '3000:3000'
     restart: always
