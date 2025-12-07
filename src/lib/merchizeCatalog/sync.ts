@@ -84,12 +84,41 @@ export interface MerchizeCatalogPage {
   };
 }
 
+// --- Small helpers -----------------------------------------------------
+
+const SAFETY_MAX_PAGES = 10_000; // absolute hard stop
+const SAFETY_MAX_VARIANTS = 100_000; // hard cap for variants ingested per run
+
+function toJsonValue(value: unknown): Prisma.InputJsonValue | undefined {
+  // Prisma JSON inputs for optional fields should be either a valid JSON value or undefined.
+  // Returning undefined lets Prisma treat it as "no change" / default null at the DB level,
+  // which avoids the strict `NullableJsonNullValueInput` typing issues.
+  if (value === null || value === undefined) return undefined;
+  return value as Prisma.InputJsonValue;
+}
+
+function extractTierPrices(tiers: MerchizeTier[] | null | undefined) {
+  const list = tiers ?? [];
+  return {
+    tier1: list.find((t) => t.name === 'tier1')?.price ?? null,
+    tier2: list.find((t) => t.name === 'tier2')?.price ?? null,
+    tier3: list.find((t) => t.name === 'tier3')?.price ?? null,
+  };
+}
+
 // --- Fetch one page ----------------------------------------------------
 
 async function fetchCatalogPage(
   page: number,
   limit = 50, // 🔧 default 50
 ): Promise<MerchizeCatalogPage> {
+  if (!CATALOG_URL) {
+    throw new Error('MERCHIZE_CATALOG_URL is not set');
+  }
+  if (!API_KEY) {
+    throw new Error('MERCHIZE_API_KEY is not set');
+  }
+
   // clamp to [1, 50] because API demands limit <= 50
   const safeLimit = Math.min(Math.max(limit, 1), 50);
 
@@ -105,150 +134,199 @@ async function fetchCatalogPage(
   });
 
   if (!res.ok) {
-    throw new Error(`Merchize catalog API failed: ${res.status} ${res.statusText}`);
+    const text = await res.text().catch(() => '');
+    throw new Error(
+      `Merchize catalog API failed: ${res.status} ${res.statusText}${
+        text ? ` - ${text.slice(0, 200)}` : ''
+      }`,
+    );
   }
 
   const json = (await res.json()) as MerchizeCatalogPage;
+  if (!json.success || !json.data) {
+    throw new Error('Merchize catalog API returned unsuccessful response');
+  }
+
   return json;
+}
+
+// --- Per-product + per-variant upsert helpers --------------------------
+
+async function upsertProduct(product: MerchizeProduct) {
+  const merchizeProductId = String(product._id);
+
+  const dataBase = {
+    merchizeId: merchizeProductId,
+    skuPrefix: product.sku ?? null,
+    title: product.title ?? null,
+    slug: product.slug ?? null,
+    thumbUrl: product.thumbnail_link ?? null,
+    fulfillCode: product.fulfillment_location?.code ?? null,
+    fulfillName: product.fulfillment_location?.name ?? null,
+    productionMin: product.production_time?.min ?? null,
+    productionMax: product.production_time?.max ?? null,
+    printingJson: toJsonValue(product.printing_methods ?? null),
+    attributesJson: toJsonValue(product.attributes ?? null),
+    mockupUrl: product.mockup_and_templates_link ?? null,
+  };
+
+  return merchizeCatalogPrisma.product.upsert({
+    where: { merchizeId: merchizeProductId },
+    create: dataBase,
+    update: dataBase,
+  });
+}
+
+async function upsertVariantAndBands(productRecordId: string, variant: MerchizeVariant) {
+  const merchizeVariantId = String(variant._id);
+  const { tier1, tier2, tier3 } = extractTierPrices(variant.tiers);
+
+  const variantDataBase = {
+    merchizeId: merchizeVariantId,
+    sku: variant.sku,
+    productId: productRecordId,
+    attributesJson: toJsonValue(variant.attributes ?? null),
+    tiersJson: toJsonValue(variant.tiers ?? null),
+    tier1Price: tier1,
+    tier2Price: tier2,
+    tier3Price: tier3,
+  };
+
+  const variantRecord = await merchizeCatalogPrisma.variant.upsert({
+    where: { merchizeId: merchizeVariantId },
+    create: variantDataBase,
+    update: variantDataBase,
+  });
+
+  const bands: MerchizeShippingPrice[] = variant.shipping_prices ?? [];
+  for (const s of bands) {
+    await merchizeCatalogPrisma.shippingBand.upsert({
+      where: {
+        variantId_toZone: {
+          variantId: variantRecord.id,
+          toZone: s.to_zone,
+        },
+      },
+      create: {
+        variantId: variantRecord.id,
+        toZone: s.to_zone,
+        firstItem: s.first_item ?? null,
+        addlItem: s.additional_item ?? null,
+      },
+      update: {
+        firstItem: s.first_item ?? null,
+        addlItem: s.additional_item ?? null,
+      },
+    });
+  }
+
+  return 1; // number of variants ingested
 }
 
 // --- Main sync ---------------------------------------------------------
 
 export async function refreshMerchizeCatalog() {
+  const startedAt = new Date();
   let page = 1;
   let ingestedVariants = 0;
   let totalProducts = 0;
 
-  const now = new Date();
-  const SAFETY_MAX_PAGES = 10_000;
+  // Simple log so you can see when a run starts in the server logs
+  console.log('[MerchizeCatalog] Refresh started at', startedAt.toISOString());
 
-  while (page <= SAFETY_MAX_PAGES) {
-    const { success, data } = await fetchCatalogPage(page);
+  try {
+    // loop over catalog pages until we reach the last page or safety caps
+    while (page <= SAFETY_MAX_PAGES && ingestedVariants < SAFETY_MAX_VARIANTS) {
+      const { data } = await fetchCatalogPage(page);
+      const { products, total, page: currentPage, limit: pageLimit } = data;
 
-    if (!success) break;
+      totalProducts = total;
+      if (!products || products.length === 0) {
+        console.log(`[MerchizeCatalog] No products found on page ${currentPage}, stopping sync.`);
+        break;
+      }
 
-    const { products, total, page: currentPage, limit: pageLimit, total: totalCount } = data;
+      console.log(
+        `[MerchizeCatalog] Page ${currentPage} of ~${Math.ceil(
+          total / pageLimit,
+        )} (${products.length} products, total=${total})`,
+      );
 
-    totalProducts = total ?? totalProducts;
+      // Process this page's products sequentially to keep memory lower
+      for (const product of products) {
+        const productRecord = await upsertProduct(product);
+        const variants: MerchizeVariant[] = product.variants ?? [];
 
-    if (!products || products.length === 0) break;
+        for (const v of variants) {
+          ingestedVariants += await upsertVariantAndBands(productRecord.id, v);
 
-    for (const product of products) {
-      const merchizeProductId = String(product._id);
-
-      const productRecord = await merchizeCatalogPrisma.product.upsert({
-        where: { merchizeId: merchizeProductId },
-        create: {
-          merchizeId: merchizeProductId,
-          skuPrefix: product.sku ?? null,
-          title: product.title ?? null,
-          slug: product.slug ?? null,
-          thumbUrl: product.thumbnail_link ?? null,
-          fulfillCode: product.fulfillment_location?.code ?? null,
-          fulfillName: product.fulfillment_location?.name ?? null,
-          productionMin: product.production_time?.min ?? null,
-          productionMax: product.production_time?.max ?? null,
-          printingJson: (product.printing_methods ?? null) as unknown as Prisma.InputJsonValue,
-          attributesJson: (product.attributes ?? null) as unknown as Prisma.InputJsonValue,
-          mockupUrl: product.mockup_and_templates_link ?? null,
-        },
-        update: {
-          skuPrefix: product.sku ?? null,
-          title: product.title ?? null,
-          slug: product.slug ?? null,
-          thumbUrl: product.thumbnail_link ?? null,
-          fulfillCode: product.fulfillment_location?.code ?? null,
-          fulfillName: product.fulfillment_location?.name ?? null,
-          productionMin: product.production_time?.min ?? null,
-          productionMax: product.production_time?.max ?? null,
-          printingJson: (product.printing_methods ?? null) as unknown as Prisma.InputJsonValue,
-          attributesJson: (product.attributes ?? null) as unknown as Prisma.InputJsonValue,
-          mockupUrl: product.mockup_and_templates_link ?? null,
-        },
-      });
-
-      const variants: MerchizeVariant[] = product.variants ?? [];
-
-      for (const v of variants) {
-        const merchizeVariantId = String(v._id);
-        const tiers: MerchizeTier[] = v.tiers ?? [];
-
-        const tier1 = tiers.find((t) => t.name === 'tier1')?.price ?? null;
-        const tier2 = tiers.find((t) => t.name === 'tier2')?.price ?? null;
-        const tier3 = tiers.find((t) => t.name === 'tier3')?.price ?? null;
-
-        const variantRecord = await merchizeCatalogPrisma.variant.upsert({
-          where: { merchizeId: merchizeVariantId },
-          create: {
-            merchizeId: merchizeVariantId,
-            sku: v.sku,
-            productId: productRecord.id,
-            attributesJson: (v.attributes ?? null) as unknown as Prisma.InputJsonValue,
-            tiersJson: (tiers ?? null) as unknown as Prisma.InputJsonValue,
-            tier1Price: tier1,
-            tier2Price: tier2,
-            tier3Price: tier3,
-          },
-          update: {
-            sku: v.sku,
-            productId: productRecord.id,
-            attributesJson: (v.attributes ?? null) as unknown as Prisma.InputJsonValue,
-            tiersJson: (tiers ?? null) as unknown as Prisma.InputJsonValue,
-            tier1Price: tier1,
-            tier2Price: tier2,
-            tier3Price: tier3,
-          },
-        });
-
-        const bands: MerchizeShippingPrice[] = v.shipping_prices ?? [];
-        for (const s of bands) {
-          await merchizeCatalogPrisma.shippingBand.upsert({
-            where: {
-              variantId_toZone: {
-                variantId: variantRecord.id,
-                toZone: s.to_zone,
-              },
-            },
-            create: {
-              variantId: variantRecord.id,
-              toZone: s.to_zone,
-              firstItem: s.first_item ?? null,
-              addlItem: s.additional_item ?? null,
-            },
-            update: {
-              firstItem: s.first_item ?? null,
-              addlItem: s.additional_item ?? null,
-            },
-          });
+          // Safety cap – bail out if we somehow hit a huge catalog
+          if (ingestedVariants >= SAFETY_MAX_VARIANTS) {
+            console.warn(
+              `[MerchizeCatalog] Reached SAFETY_MAX_VARIANTS (${SAFETY_MAX_VARIANTS}), aborting further ingestion.`,
+            );
+            break;
+          }
         }
 
-        ingestedVariants += 1;
+        if (ingestedVariants >= SAFETY_MAX_VARIANTS) break;
       }
+
+      // compute if we have reached the last page
+      const lastPage = Math.ceil(total / pageLimit);
+      if (currentPage >= lastPage) {
+        console.log(`[MerchizeCatalog] Reached last page (${currentPage}/${lastPage}), stopping.`);
+        break;
+      }
+
+      page += 1;
     }
 
-    // stop when we've reached or gone past the last page
-    const effectiveTotal = totalCount ?? totalProducts;
-    if (currentPage * pageLimit >= effectiveTotal) break;
+    const now = new Date();
+    await merchizeCatalogPrisma.syncState.upsert({
+      where: { id: 'merchize_catalog' },
+      create: {
+        id: 'merchize_catalog',
+        lastPage: page,
+        lastTotal: totalProducts,
+        lastRunAt: now,
+        lastSuccessAt: now,
+      },
+      update: {
+        lastPage: page,
+        lastTotal: totalProducts,
+        lastRunAt: now,
+        lastSuccessAt: now,
+      },
+    });
 
-    page += 1;
+    console.log(
+      `[MerchizeCatalog] Refresh completed: pagesProcessed=${page}, variants=${ingestedVariants}, totalProducts=${totalProducts}`,
+    );
+
+    return { ingestedVariants, totalProducts };
+  } catch (err) {
+    const now = new Date();
+    console.error('[MerchizeCatalog] Refresh failed:', err);
+
+    // still record that a run was attempted
+    await merchizeCatalogPrisma.syncState.upsert({
+      where: { id: 'merchize_catalog' },
+      create: {
+        id: 'merchize_catalog',
+        lastPage: page,
+        lastTotal: totalProducts,
+        lastRunAt: now,
+        lastSuccessAt: null,
+      },
+      update: {
+        lastPage: page,
+        lastTotal: totalProducts,
+        lastRunAt: now,
+        // keep lastSuccessAt as-is on failure
+      },
+    });
+
+    throw err;
   }
-
-  await merchizeCatalogPrisma.syncState.upsert({
-    where: { id: 'merchize_catalog' },
-    create: {
-      id: 'merchize_catalog',
-      lastPage: page,
-      lastTotal: totalProducts,
-      lastRunAt: now,
-      lastSuccessAt: now,
-    },
-    update: {
-      lastPage: page,
-      lastTotal: totalProducts,
-      lastRunAt: now,
-      lastSuccessAt: now,
-    },
-  });
-
-  return { ingestedVariants, totalProducts };
 }

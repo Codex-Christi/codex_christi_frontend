@@ -19,6 +19,7 @@ export async function refreshAction() {
       syncState,
     };
   } catch (e: unknown) {
+    console.error('[MerchizeCatalog] refreshAction error', e);
     const message = e instanceof Error ? e.message : 'Unknown error while refreshing catalog';
     return {
       ok: false as const,
@@ -33,11 +34,17 @@ export async function searchCatalogBySku(query: string) {
     return { ok: false as const, message: 'Enter a SKU or partial SKU' };
   }
 
-  const variants = await merchizeCatalogPrisma.variant.findMany({
-    where: { sku: { contains: q } }, // Prisma SQLite StringFilter: no `mode`
-    include: { product: true, shippingBands: true },
-    take: 10,
-  });
+  try {
+    const variants = await merchizeCatalogPrisma.variant.findMany({
+      where: { sku: { contains: q } }, // Prisma SQLite StringFilter: no `mode`
+      include: { product: true, shippingBands: true },
+      take: 10,
+    });
 
-  return { ok: true as const, variants };
+    return { ok: true as const, variants };
+  } catch (e: unknown) {
+    console.error('[MerchizeCatalog] searchCatalogBySku error', e);
+    const message = e instanceof Error ? e.message : 'Unknown error while searching catalog';
+    return { ok: false as const, message };
+  }
 }
