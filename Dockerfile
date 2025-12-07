@@ -81,6 +81,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma /app/prisma
 # Copy Prisma config so Prisma 7 sees datasource URL in production
 COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.* ./
 
+# Runtime scripts (e.g. catalog setup, cron helpers)
+COPY --from=builder --chown=nextjs:nodejs /app/scripts /app/scripts
+
 # We DO NOT copy any SQLite .db files here.
 # The DB file lives in a Docker volume mounted at /app/data in docker-compose.
 
@@ -94,4 +97,4 @@ USER nextjs:nodejs
 # On container start:
 #   1. Run `prisma migrate deploy` for the Merchize catalog schema (idempotent, prod-safe)
 #   2. Start Next.js (via `node server.js` from standalone output)
-CMD ["sh", "-c", "yarn prisma migrate deploy --schema prisma/shop/merchize/priceCatalog.prisma && node server.js"]
+# CMD ["sh", "-c", "yarn prisma migrate deploy --schema prisma/shop/merchize/priceCatalog.prisma && node server.js"]
