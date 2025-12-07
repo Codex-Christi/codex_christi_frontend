@@ -105,13 +105,16 @@ export const getShippingPriceMerchizecatalog = cache(
     country_iso3: ShippingCountryObj['country_iso3'],
     opts?: { state_iso2?: string; fallbackToROW?: boolean; originalSkus?: string[] },
   ) => {
+    // Central helper: resolve per-SKU band and track when we fall back to flat $7/$5
     const computeBand = (
+      sku: string,
       row: ShippingRow | undefined,
       dest: ReturnType<typeof iso3ToDest>,
       fallbackToROW: boolean,
     ): { first: number; addl: number; bandSource: 'DB' | 'FLAT_7' } => {
+      const hasRow = !!row;
       if (!row) {
-        // No row in DB → flat fallback
+        console.warn(`[SHIP] Missing DB row for ${sku} (${dest}) → fallback`);
         return { first: 7, addl: 5, bandSource: 'FLAT_7' };
       }
 
@@ -120,7 +123,7 @@ export const getShippingPriceMerchizecatalog = cache(
       const addl = band.addl;
 
       if (first == null || Number.isNaN(first)) {
-        // Bad or missing band even after ROW fallback → flat fallback
+        console.warn(`[SHIP] Invalid band for ${sku} (${dest}) → fallback`);
         return { first: 7, addl: 5, bandSource: 'FLAT_7' };
       }
 
@@ -147,10 +150,13 @@ export const getShippingPriceMerchizecatalog = cache(
     let sum = 0;
     for (const [sku, qty] of counts) {
       const row = bySku.get(sku);
-      const { first, addl, bandSource } = computeBand(row, dest, fallback);
+      const { first, addl, bandSource } = computeBand(sku, row, dest, fallback);
 
       if (bandSource === 'FLAT_7') {
         missingSkus.push(sku);
+        // console.debug(
+        //   `[AUDIT] Using flat band for SKU ${sku}: first=${first}, addl=${addl}, qty=${qty}`,
+        // );
       }
 
       const f = Number(first) || 0;
@@ -182,10 +188,7 @@ export const getShippingPriceMerchizecatalog = cache(
     }
 
     if (missingSkus.length > 0) {
-      console.warn(
-        `[AUDIT] ${missingSkus.length} SKUs had no valid shipping bands in DB for dest ${dest}. ` +
-          `Used flat $7 first-item / $5 additional fallback for: ${missingSkus.join(', ')}`,
-      );
+      console.warn(`[SHIP] ${missingSkus.length} fallback SKUs: ${missingSkus.join(', ')}`);
     }
 
     // console.debug('[AUDIT] Shipping breakdown per SKU:', JSON.stringify(debugBreakdown, null, 2));
@@ -238,36 +241,75 @@ export const realTimePriceFromMerchize = cache(
     }
 
     // 2) Variants that have a parentProductID → fetch from Merchize API
-    const withParent = variantsAndParents.filter((v) => v.parentProductID && merchizeBaseURL);
+    const withParent = variantsAndParents.filter(
+      (v) => v.parentProductID && typeof merchizeBaseURL === 'string' && merchizeBaseURL.length > 0,
+    );
 
     try {
       if (withParent.length) {
-        const requests = withParent.map(({ parentProductID }) =>
-          fetch(`${merchizeBaseURL}/product/products/${parentProductID}/variants/search`, {
-            method: 'POST',
-            headers: { 'X-API-KEY': `${merchizeAPIKey}` },
-            next: { revalidate: 3600 },
-          }),
+        // Group by parent product ID so we don't hammer the API with duplicate calls
+        const groupedByParent = new Map<
+          string,
+          { units: VariantUnitMeta[]; response?: MerchizeApiResponse }
+        >();
+
+        for (const meta of withParent) {
+          const key = meta.parentProductID as string;
+          const existing = groupedByParent.get(key);
+          if (existing) {
+            existing.units.push(meta);
+          } else {
+            groupedByParent.set(key, { units: [meta] });
+          }
+        }
+
+        // One request per unique parentProductID
+        const parentIds = Array.from(groupedByParent.keys());
+        const responses = await Promise.all(
+          parentIds.map((parentProductID) =>
+            fetch(`${merchizeBaseURL}/product/products/${parentProductID}/variants/search`, {
+              method: 'POST',
+              headers: { 'X-API-KEY': `${merchizeAPIKey}` },
+              next: { revalidate: 3600 },
+            }).then(async (res) => {
+              try {
+                const json = (await res.json()) as MerchizeApiResponse;
+                return { parentProductID, json };
+              } catch {
+                return { parentProductID, json: {} as MerchizeApiResponse };
+              }
+            }),
+          ),
         );
 
-        const responses = await Promise.all(requests);
-        const data: MerchizeApiResponse[] = await Promise.all(responses.map((res) => res.json()));
+        // Attach responses back to the map
+        for (const { parentProductID, json } of responses) {
+          const entry = groupedByParent.get(parentProductID);
+          if (entry) {
+            entry.response = json;
+          }
+        }
 
-        // Align each response with the corresponding entry in withParent
-        const apiSum = data.reduce((acc, resp, i) => {
-          const meta = withParent[i];
-          const candidates = resp.data?.variants ?? [];
-          const match = candidates.find((v) => v._id === meta.variantId);
-          const apiPrice = match?.retail_price;
-          const fallback = typeof meta.unitPriceUSD === 'number' ? meta.unitPriceUSD : 0;
-          return acc + (typeof apiPrice === 'number' ? apiPrice : fallback);
-        }, 0);
+        // Now compute total using API price where available, else per-unit fallback
+        for (const [parentProductID, entry] of groupedByParent.entries()) {
+          const variants = entry.response?.data?.variants ?? [];
 
-        reducedPriceUSD += apiSum;
+          for (const meta of entry.units) {
+            const match = variants.find((v) => v._id === meta.variantId);
+            const apiPrice = match?.retail_price;
+            const fallback = typeof meta.unitPriceUSD === 'number' ? meta.unitPriceUSD : 0;
+
+            reducedPriceUSD += typeof apiPrice === 'number' ? apiPrice : fallback;
+          }
+        }
       }
     } catch (err) {
       console.error('[AUDIT] realTimePriceFromMerchize failed:', err);
-      // If the API fails, we still keep whatever was accumulated so far (fallbacks)
+      // If the API fails, fall back to any local unitPriceUSD we have for withParent units
+      const fallbackForWithParent = variantsAndParents
+        .filter((v) => v.parentProductID)
+        .reduce((acc, v) => acc + (typeof v.unitPriceUSD === 'number' ? v.unitPriceUSD : 0), 0);
+      reducedPriceUSD += fallbackForWithParent;
     }
 
     const fx = asFX(await getDollarMultiplier(country_iso3));

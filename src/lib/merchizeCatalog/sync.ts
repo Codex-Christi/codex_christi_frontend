@@ -15,8 +15,15 @@ export interface MerchizeTier {
 
 export interface MerchizeShippingPrice {
   to_zone: string; // "US" | "EU" | "GB" | "CA" | "ROW" | ...
-  first_item: number | null;
-  additional_item: number | null;
+  to_country?: string; // "all" or specific country code, if present
+
+  // Old field names (earlier API shape)
+  first_item?: number | null;
+  additional_item?: number | null;
+
+  // New field names (current API shape)
+  first_item_price?: number | null;
+  additional_item_price?: number | null;
 }
 
 export interface MerchizeVariantAttribute {
@@ -200,6 +207,11 @@ async function upsertVariantAndBands(productRecordId: string, variant: MerchizeV
 
   const bands: MerchizeShippingPrice[] = variant.shipping_prices ?? [];
   for (const s of bands) {
+    // Support both old (first_item/additional_item) and new (first_item_price/additional_item_price) field names.
+    // Use null only when all candidates are undefined; keep 0 as a valid "free shipping" value.
+    const first = s.first_item ?? s.first_item_price ?? null;
+    const addl = s.additional_item ?? s.additional_item_price ?? null;
+
     await merchizeCatalogPrisma.shippingBand.upsert({
       where: {
         variantId_toZone: {
@@ -210,12 +222,12 @@ async function upsertVariantAndBands(productRecordId: string, variant: MerchizeV
       create: {
         variantId: variantRecord.id,
         toZone: s.to_zone,
-        firstItem: s.first_item ?? null,
-        addlItem: s.additional_item ?? null,
+        firstItem: first,
+        addlItem: addl,
       },
       update: {
-        firstItem: s.first_item ?? null,
-        addlItem: s.additional_item ?? null,
+        firstItem: first,
+        addlItem: addl,
       },
     });
   }
