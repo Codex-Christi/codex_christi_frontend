@@ -59,13 +59,15 @@ RUN apt-get update -y \
   && groupadd --gid 1001 nodejs \
   && useradd --uid 1001 --create-home --shell /bin/bash --gid 1001 nextjs
 
-# 4a) Runtime deps + app build
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules /app/node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/.next /app/.next
-COPY --from=builder --chown=nextjs:nodejs /app/public /app/public
+# 4a) Runtime deps + app build (Next.js standalone output)
+# Copy only the standalone server bundle, static assets, and runtime deps.
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Package + lockfile so scripts like "yarn prisma" work
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./
+# Ensure runtime dependencies such as `next` and server externals are available.
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
 # Next config needed at runtime for images etc.
 COPY --from=builder /app/next.config.* ./
@@ -92,4 +94,4 @@ USER nextjs:nodejs
 # On container start:
 #   1. Run `prisma migrate deploy` for the Merchize catalog schema (idempotent, prod-safe)
 #   2. Start Next.js (via `node server.js` from standalone output)
-# CMD ["sh", "-c", "yarn prisma migrate deploy --schema prisma/shop/merchize/priceCatalog.prisma && node server.js"]
+CMD ["sh", "-c", "yarn prisma migrate deploy --schema prisma/shop/merchize/priceCatalog.prisma && node server.js"]
