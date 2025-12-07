@@ -55,18 +55,23 @@ export default async function MerchizeAdminPage() {
       </div>
     );
   } else {
-    const [syncState, sampleVariants] = await Promise.all([
-      merchizeCatalogPrisma.syncState.findUnique({
-        where: { id: 'merchize_catalog' },
-      }),
-      merchizeCatalogPrisma.variant.findMany({
-        include: { product: true, shippingBands: true },
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
+    try {
+      const [syncState, sampleVariants] = await Promise.all([
+        merchizeCatalogPrisma.syncState.findUnique({
+          where: { id: 'merchize_catalog' },
+        }),
+        merchizeCatalogPrisma.variant.findMany({
+          include: { product: true, shippingBands: true },
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+        }),
+      ]);
 
-    content = <AdminCatalogClient initialSyncState={syncState} initialSamples={sampleVariants} />;
+      content = <AdminCatalogClient initialSyncState={syncState} initialSamples={sampleVariants} />;
+    } catch (error) {
+      console.error('Failed to fetch catalog data:', error);
+      content = <div className='text-white my-[200px]'>Error loading catalog</div>;
+    }
   }
 
   return (
