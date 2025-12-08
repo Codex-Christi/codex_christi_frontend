@@ -1,7 +1,7 @@
 // src/components/UI/profile/ProfileBanner.tsx
 'use client';
 
-import type { FC, Dispatch, SetStateAction } from 'react';
+import { type FC, type Dispatch, type SetStateAction } from 'react';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import UserAvatar from './UserAvatar';
 

@@ -118,12 +118,7 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
           return value;
         },
       }),
-      skipHydration: true,
       // Skip initial hydration on the server; we'll trigger rehydrate on the client.
-      onRehydrateStorage: () => (state) => {
-        // Mark store as hydrated after sessionStorage is loaded
-        state?.hydrate();
-      },
     },
   ),
 );

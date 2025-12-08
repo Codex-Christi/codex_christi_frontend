@@ -112,7 +112,7 @@ export const getShippingPriceMerchizecatalog = cache(
       dest: ReturnType<typeof iso3ToDest>,
       fallbackToROW: boolean,
     ): { first: number; addl: number; bandSource: 'DB' | 'FLAT_7' } => {
-      const hasRow = !!row;
+      // const hasRow = !!row;
       if (!row) {
         console.warn(`[SHIP] Missing DB row for ${sku} (${dest}) → fallback`);
         return { first: 7, addl: 5, bandSource: 'FLAT_7' };
@@ -291,7 +291,7 @@ export const realTimePriceFromMerchize = cache(
         }
 
         // Now compute total using API price where available, else per-unit fallback
-        for (const [parentProductID, entry] of groupedByParent.entries()) {
+        for (const [, entry] of groupedByParent.entries()) {
           const variants = entry.response?.data?.variants ?? [];
 
           for (const meta of entry.units) {
