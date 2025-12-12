@@ -109,12 +109,11 @@ export const useLogin = () => {
             autoUpDateSession();
 
             // Fetch profile into Zustand BEFORE redirecting (non-shop flows)
-            const { setProfileFromServer, hydrate } = useUserMainProfileStore.getState();
+            const { setProfileFromServer } = useUserMainProfileStore.getState();
 
             if (!isCodexChristiShop) {
               try {
                 await setProfileFromServer(); // fills userMainProfile
-                hydrate(); // mark _hydrated = true for consumers
               } catch (e) {
                 console.error('Failed to fetch user profile after login:', e);
                 // Optional: you could still proceed; profile page will show "Loading..."
