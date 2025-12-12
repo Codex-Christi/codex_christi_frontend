@@ -10,6 +10,8 @@ import errorToast from '@/lib/error-toast';
 import { toast } from 'sonner';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import { useShallow } from 'zustand/react/shallow';
+import { PaymentSaveResponse } from '@/actions/shop/paypal/processAndUploadCompletedTx/savePaymentDataToBackend';
+import { universalFetcher, FetcherOptions } from '@/lib/utils/SWRfetcherAdvanced';
 
 // ——— Types ———
 type Variant = NonNullable<OptionalProductVariantProps['variants'][number]>;
@@ -19,6 +21,7 @@ function isVariant(v: OptionalProductVariantProps['variants'][number] | undefine
   return !!v && typeof v._id === 'string' && Array.isArray(v.options);
 }
 
+// Main Component
 export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
   // Always read context at top-level (ok even if no provider)
   const ctx = use(ProductDetailsContext);
@@ -105,6 +108,12 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
     title,
   ]);
 
+  const variantLineProductName = matchingVariant?.options.find(
+    (opt) => opt.attribute?.name.toLowerCase() === 'product',
+  )?.name;
+
+  // if (!variantLineProductName) return;
+
   // Subscribes with a proper Variant[]; auto-unsub on deps change/unmount.
   useEffect(() => {
     // Adapt local Variant[] to the shape expected by setupVariantAutoMatching
@@ -117,6 +126,7 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
     };
   }, [cleanVariants, resetVariantOptions]);
 
+  // Main JSX
   return (
     <Button
       className='bg-white hover:bg-white rounded-lg !py-6 !px-8 flex items-center justify-between w-full'

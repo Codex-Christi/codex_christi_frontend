@@ -3,7 +3,6 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import CryptoJS from 'crypto-js';
 import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
-import { PersistedStorageWithRehydration } from '@/lib/types/general_store_interfaces';
 import { getUser } from '@/lib/funcs/userProfileFetchers/getUser';
 import { getUpdatedKeys } from '@/lib/utils/getUpdatedObjKeys';
 
@@ -42,7 +41,7 @@ const decryptData = (encryptedData: string): UserProfileDataInterface | null => 
   return JSON.parse(decryptedData);
 };
 
-interface UserMainProfileStore extends PersistedStorageWithRehydration {
+interface UserMainProfileStore {
   userMainProfile: UserProfileDataInterface | null;
   setUserMainProfile: (userMainProfile: UserProfileDataInterface | null) => void;
   clearProfile: () => void;
@@ -91,10 +90,6 @@ export const useUserMainProfileStore = create<UserMainProfileStore>()(
         set((state) => ({ ...state, userMainProfile })),
 
       clearProfile: () => set({ userMainProfile: null }),
-
-      // hydration tracking
-      _hydrated: false,
-      hydrate: () => set({ _hydrated: true }),
     }),
     {
       name: 'user-main-profile-storage',

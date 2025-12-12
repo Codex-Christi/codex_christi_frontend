@@ -6,6 +6,11 @@ export const authVerifierAndRouteProtector = async (req: NextRequest) => {
   const hostname = req.headers.get('host'); // Get the incoming hostname
 
   if (hostname === 'localhost:3000' || hostname === 'codexchristi.shop') {
+    const isLocalHost = hostname === 'localhost:3000';
+    const isProdShopDomian = hostname === 'codexchristi.shop';
+
+    const checkObj = { isLocalHost, isProdShopDomian, req };
+
     try {
       // const referrer = req.headers.get('referer')?.split(hostname)[1];
       // const url = req.nextUrl.clone().toString()?.split(hostname)[1];
@@ -13,13 +18,13 @@ export const authVerifierAndRouteProtector = async (req: NextRequest) => {
       // Check if the referrer and URL are the same
       // and if the session is valid for GET requests
 
-      return checkAndRedirect(req);
+      return checkAndRedirect(checkObj);
     } catch (error) {
       console.error('Error verifying session:', error);
     }
   } else {
     // return redirectToReferrer(req);
-    return checkAndRedirect(req);
+    return checkAndRedirect();
   }
 };
 
@@ -35,9 +40,18 @@ export const authVerifierAndRouteProtector = async (req: NextRequest) => {
 //   return NextResponse.redirect(new URL('/', req.url));
 // };
 
-const checkAndRedirect = async (req: NextRequest) => {
-  if ((await verifySession()) === true) {
-    return NextResponse.redirect(new URL('/shop/account-overview', req.url)); // Redirect to the referrer if session is valid
+type CheckAndRedirectType = {
+  isLocalHost?: boolean;
+  req: NextRequest;
+  isProdShopDomian?: boolean;
+};
+
+const checkAndRedirect = async (obj?: CheckAndRedirectType) => {
+  const { req, isLocalHost, isProdShopDomian } = obj || {};
+  if ((await verifySession()) === true && obj) {
+    return NextResponse.redirect(
+      new URL(`${isLocalHost ? '/shop' : isProdShopDomian ? '' : ''}/account-overview`, req?.url),
+    ); // Redirect to the referrer if session is valid
   } else {
     return NextResponse.next(); // Proceed with the request if session is valid
   }

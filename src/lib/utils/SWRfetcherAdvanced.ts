@@ -136,8 +136,8 @@ export async function universalFetcher<Data, Arg = undefined>(
   const fo: FetcherOptions = {
     method: isMutation ? 'POST' : 'GET',
     headers: {
-      'Content-Type': 'application/json',
       ...(options.fetcherOptions?.headers ?? {}),
+      'Content-Type': 'application/json',
     },
     ...options.fetcherOptions,
   };

@@ -17,10 +17,9 @@ const UserAvatar: FC<{
 }> = ({ height = 50, width = 50, className, src, ...rest }) => {
   // ⚠️ IMPORTANT: use separate selectors to avoid returning a new object every time
   const userMainProfile = useUserMainProfileStore((state) => state.userMainProfile);
-  const hydrated = useUserMainProfileStore((state) => state._hydrated);
 
   // While store is still hydrating from sessionStorage, show skeleton
-  if (!hydrated) {
+  if (!userMainProfile) {
     return (
       <div
         className={cn('size-12 rounded-full bg-gray-200 animate-pulse', className)}

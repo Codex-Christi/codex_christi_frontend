@@ -11,10 +11,9 @@ const ProfileBanner: FC<{
 }> = ({ setIsActive, isActive }) => {
   // Again: separate selectors to avoid object allocation in selector
   const userMainProfile = useUserMainProfileStore((state) => state.userMainProfile);
-  const hydrated = useUserMainProfileStore((state) => state._hydrated);
 
   // While hydrating, show a skeleton banner
-  if (!hydrated) {
+  if (!userMainProfile) {
     return (
       <div className='px-4 py-8 bg-black backdrop-blur-[30px] rounded-t-[20px] animate-pulse'>
         <div className='flex items-start flex-wrap justify-between gap-4'>
