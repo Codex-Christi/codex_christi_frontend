@@ -61,3 +61,5 @@ transaction-errors
 
 # Prisma generated Merchize catalog client
 /src/lib/prisma/shop/merchize/generated/
+
+.merchize_price_catalog_schema.sha
