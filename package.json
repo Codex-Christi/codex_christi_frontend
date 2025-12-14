@@ -46,6 +46,7 @@
     "crypto-js": "^4.2.0",
     "currency-map-country": "^1.0.12",
     "date-fns": "^4.1.0",
+    "didyoumean2": "^7.0.4",
     "dotenv": "^17.2.3",
     "embla-carousel-react": "^8.6.0",
     "fast-equals": "^5.2.2",

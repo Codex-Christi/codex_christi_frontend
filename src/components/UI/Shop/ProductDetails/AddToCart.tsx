@@ -10,8 +10,7 @@ import errorToast from '@/lib/error-toast';
 import { toast } from 'sonner';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import { useShallow } from 'zustand/react/shallow';
-import { PaymentSaveResponse } from '@/actions/shop/paypal/processAndUploadCompletedTx/savePaymentDataToBackend';
-import { universalFetcher, FetcherOptions } from '@/lib/utils/SWRfetcherAdvanced';
+import { checkProductLineAvail } from '@/actions/shop/product/[each]/checkProdLineAvail';
 
 // ——— Types ———
 type Variant = NonNullable<OptionalProductVariantProps['variants'][number]>;
@@ -62,7 +61,7 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
 
   const canSubmit = Boolean(matchingVariant?._id);
 
-  const addToCartHandler = useCallback(() => {
+  const addToCartHandler = useCallback(async () => {
     // leading-edge debounce
     if (isBusy) return;
     setIsBusy(true);
@@ -70,9 +69,49 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
     setTimeout(() => setIsBusy(false), 600);
 
     try {
+      const fail = (message: string) => {
+        errorToast({ message });
+      };
+
       if (!canSubmit || !matchingVariant) {
-        errorToast({ message: selectOptionsMessage });
+        fail(selectOptionsMessage);
         return;
+      }
+
+      // Only run Line availability check when the variant includes a "product" option.
+      // Some products don't have this attribute; for those, we skip the Line check entirely.
+      const matchingVariantLineProductOption = matchingVariant.options.find(
+        (opt) => opt.attribute?.name?.toLowerCase() === 'product',
+      );
+
+      if (matchingVariantLineProductOption) {
+        if (!ctx) {
+          fail('Unable to verify production availability right now. Please refresh and try again.');
+          return;
+        }
+
+        const lineCheckResp = await checkProductLineAvail({
+          matchingVariantLineProductOption,
+          matchingVariant,
+        });
+
+        // Hard gate: if we cannot verify, we do NOT proceed (prevents backend SKU-not-available surprises).
+        if (!lineCheckResp?.ok) {
+          fail('We could not verify availability for production. Please try again in a moment.');
+          return;
+        }
+
+        if (!lineCheckResp.isAvailable) {
+          // Do not auto-correct drift; only inform.
+          const driftHint = lineCheckResp.drift?.suggested?.key
+            ? ` (possible naming drift: ${lineCheckResp.drift.suggested.key.color}/${lineCheckResp.drift.suggested.key.size})`
+            : '';
+
+          fail(
+            `This exact variant is not available for production right now. Please pick a different color or size.${driftHint}`,
+          );
+          return;
+        }
       }
 
       addToCart({
@@ -85,7 +124,6 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
 
       cartSuccessToast({ message: 'Item added to cart successfully.' });
 
-      resetVariantOptions();
       setMatchingVariant(null);
     } catch (err: unknown) {
       errorToast({
@@ -93,12 +131,12 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
           typeof err === 'string' ? err : err instanceof Error ? err.message : JSON.stringify(err),
       });
     } finally {
-      // Let the timeout re-enable the button to preserve the debounce behaviour.
       resetVariantOptions();
     }
   }, [
     addToCart,
     canSubmit,
+    ctx,
     isBusy,
     matchingVariant,
     resetVariantOptions,
@@ -107,10 +145,6 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
     slug,
     title,
   ]);
-
-  const variantLineProductName = matchingVariant?.options.find(
-    (opt) => opt.attribute?.name.toLowerCase() === 'product',
-  )?.name;
 
   // if (!variantLineProductName) return;
 

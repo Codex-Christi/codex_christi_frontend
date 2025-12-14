@@ -63,8 +63,7 @@ interface CartState {
 const SECRET_KEY = process.env.NEXT_PUBLIC_CART_KEY || 'fallback-secret';
 
 // LocalStorage encryption
-export const encrypt = (data: string) =>
-  CryptoJS.AES.encrypt(data, SECRET_KEY).toString();
+export const encrypt = (data: string) => CryptoJS.AES.encrypt(data, SECRET_KEY).toString();
 export const decrypt = (data: string) => {
   try {
     const bytes = CryptoJS.AES.decrypt(data, SECRET_KEY);
@@ -94,7 +93,7 @@ const encryptedStorage: import('zustand/middleware').PersistStorage<{
     value: import('zustand/middleware').StorageValue<{
       variants: CartVariant[];
       offlineOnly: boolean;
-    }>
+    }>,
   ) => {
     try {
       const stringified = JSON.stringify(value);
@@ -122,9 +121,7 @@ export const useCartStore = create<CartState>()(
       },
 
       addToCart: (variant) => {
-        const existing = get().variants.find(
-          (v) => v.variantId === variant.variantId
-        );
+        const existing = get().variants.find((v) => v.variantId === variant.variantId);
         const filtered = get().applyMetadataTransform?.(variant) || variant;
 
         set({
@@ -132,7 +129,7 @@ export const useCartStore = create<CartState>()(
             ? get().variants.map((v) =>
                 v.variantId === variant.variantId
                   ? { ...v, quantity: v.quantity + filtered.quantity }
-                  : v
+                  : v,
               )
             : [filtered, ...get().variants],
         });
@@ -147,7 +144,7 @@ export const useCartStore = create<CartState>()(
         if (newQuantity > 0) {
           set({
             variants: get().variants.map((v) =>
-              v.variantId === variantId ? { ...v, quantity: newQuantity } : v
+              v.variantId === variantId ? { ...v, quantity: newQuantity } : v,
             ),
           });
         } else {
@@ -226,8 +223,8 @@ export const useCartStore = create<CartState>()(
         variants: state.variants,
         offlineOnly: state.offlineOnly,
       }),
-    }
-  )
+    },
+  ),
 );
 
 // Auto-sync when coming online or toggling offlineOnly

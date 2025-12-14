@@ -1,70 +1,74 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-"use client";
+'use client';
 
-import * as React from "react";
-import en from "react-phone-number-input/locale/en";
-import Image from "next/image";
-import { getCountries } from "react-phone-number-input/input";
-import { Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+import React, { useMemo, useState } from 'react';
+import en from 'react-phone-number-input/locale/en';
+import Image from 'next/image';
+import { getCountries } from 'react-phone-number-input/input';
+import { Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
-	Command,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
-} from "@/components/UI/primitives/command";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/UI/primitives/popover";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/UI/primitives/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/UI/primitives/popover';
 
 export default function EditCountry({
-	onChange,
-    value,
-    showLabel = true,
-    className
+  onChange,
+  value,
+  showLabel = true,
+  className,
 }: {
-	onChange: (e: any) => void;
-        value: string | null | number;
-    showLabel?: boolean
-    className?: string
+  onChange: (e: any) => void;
+  value: string | null | number;
+  showLabel?: boolean;
+  className?: string;
 }) {
-	const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-	const [selectedCountryName, setSelectedCountryName] = React.useState("");
+  const countries = useMemo(
+    () =>
+      getCountries()
+        .map((code) => ({
+          code,
+          name: en[code as keyof typeof en],
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [],
+  );
 
-	const [searchTerm, setSearchTerm] = React.useState("");
+  const filteredCountries = useMemo(
+    () =>
+      countries.filter((c) =>
+        c.name.toLowerCase().includes(searchTerm.trim().toLowerCase()),
+      ),
+    [countries, searchTerm],
+  );
 
-	const countries = getCountries()
-		.map((code) => ({
-			code,
-			name: en[code as keyof typeof en],
-		}))
-		.sort((a, b) => a.name.localeCompare(b.name));
+  const selectedLabel =
+    (value && en[value as keyof typeof en]) ||
+    (typeof value === 'string' && en[value as keyof typeof en]);
 
-	const filteredCountries = countries.filter((c) =>
-		c.name.toLowerCase().includes(searchTerm.toLowerCase()),
-	);
-
-	return (
+  return (
     <Popover open={open} onOpenChange={setOpen}>
       <div className='grid gap-0.5'>
         {showLabel && <p className='text-white/70'>Nationality</p>}
 
         <PopoverTrigger asChild>
-          <button className={cn('input flex items-center gap-4 justify-between', className)} type='button'>
-            <span>
-              {value
-                ? String(en[value as keyof typeof en])
-                : selectedCountryName
-                  ? selectedCountryName
-                  : 'Select country'}
-            </span>
+          <button
+            className={cn('input flex items-center justify-between gap-4', className)}
+            type='button'
+            aria-expanded={open}
+            aria-haspopup='listbox'
+          >
+            <span>{selectedLabel ?? 'Select country'}</span>
 
-            <svg width='11' height='8' viewBox='0 0 11 8' fill='none'>
+            <svg width='11' height='8' viewBox='0 0 11 8' fill='none' aria-hidden='true'>
               <path
                 d='M10.6876 2.14168C11.0781 1.75115 11.0781 1.11799 10.6876 0.727464C10.2971 0.336939 9.66389 0.336939 9.27336 0.727464L10.6876 2.14168ZM9.27336 0.727464L4.14201 5.85881L5.55623 7.27302L10.6876 2.14168L9.27336 0.727464Z'
                 fill='white'
@@ -96,10 +100,7 @@ export default function EditCountry({
                   key={code}
                   value={name}
                   onSelect={() => {
-                    setSelectedCountryName(name);
-
                     onChange(code);
-
                     setOpen(false);
                   }}
                 >

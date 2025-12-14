@@ -85,6 +85,8 @@ export interface ProductVariantsInterface {
     is_default: boolean;
     title: string;
     options: ProductVariantOptions;
+    sku: string;
+    product: string;
   }[];
 }
 

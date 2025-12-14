@@ -43,13 +43,13 @@ const Categories = () => {
                           sizes='(max-width: 412px) 120px, (max-width: 640px) 120px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 200px'
                         />
 
-                        <h4 className='text-center font-bold'>
+                        <h3 className='text-center font-bold'>
                           <GlobalProductPrice
                             ssrText={ssrText}
                             usdCentsBase={usdCentsBase ?? 0}
                             className='text-lg font-semibold'
                           />
-                        </h4>
+                        </h3>
                       </CustomShopLink>
                     </div>
                   );

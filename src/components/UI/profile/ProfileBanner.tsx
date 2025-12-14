@@ -15,17 +15,17 @@ const ProfileBanner: FC<{
   // While hydrating, show a skeleton banner
   if (!userMainProfile) {
     return (
-      <div className='px-4 py-8 bg-black backdrop-blur-[30px] rounded-t-[20px] animate-pulse'>
-        <div className='flex items-start flex-wrap justify-between gap-4'>
-          <div className='flex flex-wrap md:flex-nowrap items-center gap-4'>
-            <div className='size-24 rounded-full bg-gray-800' />
-            <div className='space-y-4 w-40'>
+      <div className='px-4 py-6 sm:px-6 sm:py-8 bg-black backdrop-blur-[30px] rounded-t-[20px] animate-pulse'>
+        <div className='flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between'>
+          <div className='flex items-center gap-4'>
+            <div className='size-16 sm:size-20 md:size-24 rounded-full bg-gray-800 shrink-0' />
+            <div className='space-y-3 sm:space-y-4 w-44 sm:w-52'>
               <div className='h-5 bg-gray-800 rounded' />
               <div className='h-4 bg-gray-800 rounded w-3/4' />
               <div className='h-4 bg-gray-800 rounded w-2/3' />
             </div>
           </div>
-          <div className='h-9 w-28 bg-gray-800 rounded-[10px]' />
+          <div className='h-10 w-full sm:w-28 bg-gray-800 rounded-[10px]' />
         </div>
       </div>
     );
@@ -42,10 +42,10 @@ const ProfileBanner: FC<{
   return (
     <>
       {/* Mobile "Go Live" bar */}
-      <div className='text-[#F3F3F30D] bg-[#0D0D0D] rounded-[20px] p-4 flex gap-4 items-center mb-8 lg:hidden'>
-        <UserAvatar className='size-12 aspect-square' height={48} width={48} />
+      <div className='text-[#F3F3F30D] bg-[#0D0D0D] rounded-[20px] p-4 flex flex-col gap-4 sm:flex-row sm:items-center mb-6 sm:mb-8 lg:hidden'>
+        <UserAvatar className='size-12 sm:size-14 aspect-square shrink-0' height={56} width={56} />
 
-        <div className='bg-inherit relative text-white w-full'>
+        <div className='bg-inherit relative text-white w-full min-w-0'>
           <svg
             className='absolute right-4 top-1/3'
             width='15'
@@ -88,7 +88,7 @@ const ProfileBanner: FC<{
         </div>
 
         <button
-          className='text-[#0D0D0D] bg-[#F3F3F3E5] backdrop-blur-[30px] px-4 py-2.5 border border-[#F3F3F3E5] rounded-[15px] flex items-center gap-1 shrink-0 font-bold'
+          className='text-[#0D0D0D] bg-[#F3F3F3E5] backdrop-blur-[30px] px-4 py-2.5 border border-[#F3F3F3E5] rounded-[15px] flex items-center justify-center gap-1 w-full sm:w-auto shrink-0 font-bold'
           type='button'
         >
           <svg width='17' height='12' viewBox='0 0 17 12' fill='none'>
@@ -108,13 +108,13 @@ const ProfileBanner: FC<{
       </div>
 
       {/* Main profile banner */}
-      <div className='flex items-start flex-wrap justify-between gap-4 px-4 py-8 bg-black backdrop-blur-[30px] rounded-t-[20px]'>
-        <div className='flex flex-wrap md:flex-nowrap items-center gap-4'>
-          <UserAvatar className='size-24' height={80} width={80} />
+      <div className='flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between px-4 py-6 sm:px-6 sm:py-8 bg-black backdrop-blur-[30px] rounded-t-[20px]'>
+        <div className='flex items-center gap-4 min-w-0'>
+          <UserAvatar className='size-16 sm:size-20 md:size-24 shrink-0' height={96} width={96} />
 
-          <div className='space-y-4'>
+          <div className='space-y-3 sm:space-y-4 min-w-0'>
             <div>
-              <h1 className='md:text-2xl font-semibold flex items-center gap-1'>
+              <h1 className='text-xl sm:text-2xl font-semibold flex flex-wrap items-center gap-1 break-words'>
                 {displayName}{' '}
                 <svg width='19' height='13' viewBox='0 0 19 13' fill='none'>
                   <path
@@ -133,9 +133,9 @@ const ProfileBanner: FC<{
             </div>
 
             <div>
-              <p className='text-lg'>{displayBio}</p>
+              <p className='text-base sm:text-lg break-words'>{displayBio}</p>
 
-              <p className='flex items-center gap-10 text-white/70'>
+              <p className='flex flex-wrap items-center gap-x-10 gap-y-2 text-white/70'>
                 <span>30 following</span>
                 <span>3.2k followers</span>
               </p>
@@ -144,7 +144,7 @@ const ProfileBanner: FC<{
         </div>
 
         <button
-          className='inline-block border border-white rounded-[10px] py-2 px-3 md:py-3 md:px-4 md:rounded-sm shrink-0'
+          className='inline-flex items-center justify-center border border-white rounded-[10px] py-2 px-3 md:py-3 md:px-4 md:rounded-sm w-full sm:w-auto shrink-0'
           type='button'
           onClick={() => setIsActive(!isActive)}
         >

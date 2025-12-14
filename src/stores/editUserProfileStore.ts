@@ -8,9 +8,16 @@ import { ZodError } from 'zod';
 import { useCallback, useMemo } from 'react';
 
 // Types
+type EditableProfileShape = Partial<UserProfileDataInterface>;
+
 type UserEditProfileStoreType = {
-  userEditData: UserProfileDataInterface | null;
-  setUserEditData: (userEditData: UserProfileDataInterface | null) => void;
+  userEditData: EditableProfileShape | null;
+  setUserEditData: (userEditData: EditableProfileShape | null) => void;
+  updateUserEditField: <K extends keyof UserProfileDataInterface>(
+    field: K,
+    value: UserProfileDataInterface[K] | undefined,
+  ) => void;
+  initializeFromMainProfile: () => void;
   fieldErrors: Record<string, string> | null;
   setFieldErrors: (fieldErrors: Record<string, string> | null) => void;
   clearEditData: () => void;
@@ -21,13 +28,54 @@ export const useEditUserMainProfileStore = create<UserEditProfileStoreType>((set
   userEditData: null,
   fieldErrors: null,
   // Set the user edit data
-  setUserEditData: (userEditProfileState: UserProfileDataInterface | null) =>
+  setUserEditData: (userEditProfileState: EditableProfileShape | null) =>
     set((state) => ({
       ...state,
       userEditData: userEditProfileState,
       fieldErrors: null,
     })),
-  setFieldErrors: (fieldErrors: Record<string, string> | null) => fieldErrors,
+  updateUserEditField: (field, value) =>
+    set((state) => {
+      const mainProfileSnapshot = useUserMainProfileStore.getState().userMainProfile ?? {};
+      const existingData: EditableProfileShape = { ...(state.userEditData ?? {}) };
+      const nextValue =
+        value instanceof File
+          ? value
+          : value === null || typeof value === 'undefined'
+            ? ''
+            : value;
+
+      const baseValue = mainProfileSnapshot?.[field];
+      const areValuesEqual =
+        nextValue instanceof File
+          ? false
+          : baseValue instanceof File
+            ? false
+            : (nextValue ?? '') === (baseValue ?? '');
+
+      if (areValuesEqual) {
+        delete existingData[field];
+      } else {
+        existingData[field] = nextValue;
+      }
+
+      return {
+        ...state,
+        userEditData: Object.keys(existingData).length > 0 ? existingData : null,
+        fieldErrors: null,
+      };
+    }),
+  initializeFromMainProfile: () =>
+    set((state) => ({
+      ...state,
+      userEditData: null,
+      fieldErrors: null,
+    })),
+  setFieldErrors: (fieldErrors: Record<string, string> | null) =>
+    set((state) => ({
+      ...state,
+      fieldErrors,
+    })),
 
   // Clear the user edit data
   clearEditData: () => set({ userEditData: null, fieldErrors: null }),
@@ -39,6 +87,12 @@ export const useValidateUserEditData = () => {
   const { setFieldErrors, fieldErrors: errors } = useEditUserMainProfileStore((state) => state);
 
   const validate = useCallback(() => {
+    if (!currentEditData || Object.keys(currentEditData).length === 0) {
+      const noChangeError = { undefined: 'You have not made any changes.' };
+      setFieldErrors(noChangeError);
+      return { success: false as const, errors: noChangeError };
+    }
+
     const result = PatchUserProfileSchema.safeParse(currentEditData);
 
     //   If validation passes, set the fieldErrors to null
@@ -46,7 +100,7 @@ export const useValidateUserEditData = () => {
       //   Return the validated data
       return {
         success: true as const,
-        data: result.data as unknown as UserProfileDataInterface,
+        data: result.data as EditableProfileShape,
       };
     }
 

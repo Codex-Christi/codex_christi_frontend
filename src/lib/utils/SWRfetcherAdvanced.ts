@@ -133,18 +133,36 @@ export async function universalFetcher<Data, Arg = undefined>(
 ): Promise<Data> {
   const isMutation = options.arg !== undefined;
 
+  const fetcherOptions = options.fetcherOptions ?? {};
   const fo: FetcherOptions = {
-    method: isMutation ? 'POST' : 'GET',
-    headers: {
-      ...(options.fetcherOptions?.headers ?? {}),
-      'Content-Type': 'application/json',
-    },
-    ...options.fetcherOptions,
+    method: fetcherOptions.method ?? (isMutation ? 'POST' : 'GET'),
   };
 
+  const mergedHeaders = new Headers(fetcherOptions.headers ?? undefined);
+
+  let resolvedBody: BodyInit | undefined;
   if (isMutation) {
     const body = options.arg as unknown;
-    fo.body = typeof body === 'string' ? body : JSON.stringify(body);
+    resolvedBody = typeof body === 'string' ? body : JSON.stringify(body);
+  } else if (fetcherOptions.body !== undefined) {
+    resolvedBody = fetcherOptions.body as BodyInit;
+  }
+
+  const isFormLikeBody =
+    typeof FormData !== 'undefined' && resolvedBody instanceof FormData
+      ? true
+      : typeof Blob !== 'undefined' && resolvedBody instanceof Blob
+        ? true
+        : false;
+
+  if (!mergedHeaders.has('Content-Type') && !isFormLikeBody && (isMutation || resolvedBody)) {
+    mergedHeaders.set('Content-Type', 'application/json');
+  }
+
+  fo.headers = mergedHeaders;
+
+  if (resolvedBody !== undefined) {
+    fo.body = resolvedBody;
   }
 
   // --- Start of logging integration ---
