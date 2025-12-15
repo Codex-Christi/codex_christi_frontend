@@ -1,34 +1,17 @@
 import { ProductVariantOptions } from '@/app/shop/product/[id]/productDetailsSSR';
-import React, { FC } from 'react';
+import React, { FC, useMemo } from 'react';
+import { getColorAndSizeLabels, toCartOptions } from './cartOptionHelpers';
 
 const SizeAndColorElem: FC<{
   options: ProductVariantOptions;
   className?: string;
 }> = ({ options, className }) => {
-  // Find options by attribute name, regardless of order.
-  const sizeOption = options.find(
-    (o: (typeof options)[number]) => o.attribute?.name?.toLowerCase() === 'size',
-  );
-  const colorOption = options.find(
-    (o: (typeof options)[number]) => o.attribute?.name?.toLowerCase() === 'color',
-  );
-
-  const hasSize = Boolean(sizeOption);
-  const hasColor = Boolean(colorOption);
-
-  // Fallback: if no explicit "size" attribute, use the first option as "size-like"
-  const fallbackSizeOption = !hasSize && options.length > 0 ? options[0] : null;
+  const { color, size } = useMemo(() => getColorAndSizeLabels(toCartOptions(options)), [options]);
 
   return (
     <section className={`flex flex-col gap-1 ${className ?? ''}`}>
-      {hasColor && (
-        <h4 className={`capitalize`}>Color: {colorOption?.slug ?? colorOption?.value}</h4>
-      )}
-      {(hasSize || fallbackSizeOption) && (
-        <h4>
-          Size: {(sizeOption?.value ?? fallbackSizeOption?.value ?? '')?.toString().toUpperCase()}
-        </h4>
-      )}
+      {color && <h4 className='capitalize'>Color: {color}</h4>}
+      {size && <h4>Size: {`${size}`.toUpperCase()}</h4>}
     </section>
   );
 };

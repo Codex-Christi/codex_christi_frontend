@@ -1,13 +1,10 @@
 'use client';
 
-import { getCatalogItems } from '@/actions/merchize/getItemCatalogInfo';
-import { CatalogItem } from '@/lib/datasetSearchers/merchize/shipping.types';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import Link from 'next/link';
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { FaAngleRight } from 'react-icons/fa6';
 import CustomShopLink from '../../HelperComponents/CustomShopLink';
-import { iso3ToDest } from '@/lib/datasetSearchers/merchize/dest-map';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import GlobalProductPrice from '../../GlobalShopComponents/GlobalProductPrice';
 
@@ -16,40 +13,9 @@ type OrderSummaryProps = {
   countryIso3?: string;
 };
 
-/**
- * Gets the max or min shipping fee for an order (cart instance) for a given region.
- *
- * NOTE: This uses the same US/EU/ROW shipping band fields as the legacy catalog.
- * For GB/CA/AU/etc we map them to the closest band (ROW) at the call site.
- */
-const getMaxandMinShippingPrice = (
-  catalogData: CatalogItem[],
-  findValue: 'max' | 'min',
-  region: 'US' | 'EU' | 'ROW',
-) => {
-  const comparator = findValue === 'max' ? Math.max : Math.min;
-  let sku = '';
-
-  const baseKey = `${region}_shipping_fee` as keyof CatalogItem;
-  const addlKey = `${region}_additional_shipping_fee` as keyof CatalogItem;
-
-  return catalogData.reduce((accum, current) => {
-    const { SKU_variant } = current;
-
-    // For repeated SKUs, we use the additional-item band; otherwise the first-item band.
-    const values = sku === SKU_variant ? [current[addlKey]] : [current[baseKey]];
-
-    sku = SKU_variant;
-
-    const numericVals = values.filter((v): v is number => typeof v === 'number' && v > 0);
-
-    if (!numericVals.length) return accum + (sku === SKU_variant ? 3 : 7);
-
-    const segment = comparator(...numericVals);
-
-    // Preserve original behavior: accumulate per-SKU segment rather than global min/max.
-    return segment + accum;
-  }, 0);
+type ShippingEstimate = {
+  /** USD amount for FX conversions */
+  max: number;
 };
 
 // Main Component
@@ -57,6 +23,7 @@ const OrderSummary: FC<OrderSummaryProps> = ({ countryIso3 = 'USA' }) => {
   // Hooks
   const { variants: cartItems } = useCartStore();
   const country = useShopCheckoutStore((state) => state.delivery_address.shipping_country);
+  const shippingState = useShopCheckoutStore((state) => state.delivery_address.shipping_state);
 
   const subTotal = useMemo(
     () =>
@@ -65,37 +32,46 @@ const OrderSummary: FC<OrderSummaryProps> = ({ countryIso3 = 'USA' }) => {
       }, 0),
     [cartItems],
   );
-  const [shippingEstimates, setShippingEstimates] = useState<{
-    max: number;
-  } | null>(null);
+  const [shippingEstimates, setShippingEstimates] = useState<ShippingEstimate | null>(null);
 
   //   Funcs
   const getShippingEstimates = useCallback(async () => {
-    // Expand cart by quantity → ['SKU1', 'SKU1', 'SKU2', ...]
-    const skus = cartItems
-      .flatMap(({ itemDetail, quantity }) => Array.from({ length: quantity }, () => itemDetail.sku))
-      .filter((sku): sku is string => typeof sku === 'string' && !!sku);
-
-    if (!skus.length) return null;
+    if (!cartItems.length) return null;
 
     try {
-      const skuCatalogData = await getCatalogItems(skus);
+      const res = await fetch('/api/shop/cart/shipping-estimate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cart: cartItems,
+          countryIso3: (country ?? countryIso3).toUpperCase(),
+          stateIso2: shippingState,
+        }),
+      });
 
-      // Map ISO-3 country code to shipping destination band
-      const dest = iso3ToDest((country ?? countryIso3).toUpperCase());
-      // Our legacy catalog only has US/EU/ROW fields. Everything else falls back to ROW.
-      const region: 'US' | 'EU' | 'ROW' = dest === 'US' ? 'US' : dest === 'EU' ? 'EU' : 'ROW';
+      if (!res.ok) {
+        throw new Error(`Failed to fetch shipping estimate (${res.status})`);
+      }
 
-      const maxShippingFee = getMaxandMinShippingPrice(skuCatalogData, 'max', region);
+      const data = await res.json();
+      const totals = data?.totals;
+
+      if (!totals || typeof totals.shippingPriceNum !== 'number') return null;
+
+      const multiplier = typeof totals?.multiplier === 'number' ? totals.multiplier : null;
+      const usdBase =
+        multiplier && multiplier > 0
+          ? totals.shippingPriceNum / multiplier
+          : totals.shippingPriceNum;
 
       return {
-        max: Math.ceil(maxShippingFee),
+        max: Number(Math.max(usdBase, 0).toFixed(2)),
       };
     } catch (error) {
       console.error('[OrderSummary] Failed to fetch shipping estimates:', error);
       return null;
     }
-  }, [cartItems, country, countryIso3]);
+  }, [cartItems, country, countryIso3, shippingState]);
 
   //   UseEffects
   useEffect(() => {
@@ -110,12 +86,14 @@ const OrderSummary: FC<OrderSummaryProps> = ({ countryIso3 = 'USA' }) => {
     fetchShippingEstimates();
   }, [getShippingEstimates]);
 
+  const estimatedTotal = subTotal + (shippingEstimates?.max ?? 0);
+
   // JSX
   return (
     <section
       className='bg-[#3D3D3D4D] backdrop-blur-[5px] text-white rounded-[20px] 
      w-full sm:w-[85vw] md:w-[80vw] lg:!w-[35%] xl:!w-[32.5%] py-8 lg:self-start mx-auto
-     px-5 flex flex-col select-none'
+     px-5 flex flex-col select-none md:sticky md:top-6'
     >
       {/* Header */}
       <h1
@@ -125,23 +103,24 @@ const OrderSummary: FC<OrderSummaryProps> = ({ countryIso3 = 'USA' }) => {
         Order Summary
       </h1>
 
-      <h3 className='pt-12 font-semibold flex text-xl justify-between'>
-        <span>Subtotal </span>
-        <GlobalProductPrice usdAmount={subTotal}></GlobalProductPrice>
-      </h3>
+      <div className='pt-8 font-semibold flex flex-wrap gap-3 text-xl items-center max-[1289px]:text-lg'>
+        <span className='flex-1 min-w-[55%]'>Subtotal</span>
+        <GlobalProductPrice className='flex-1 min-w-[35%] text-right' usdAmount={subTotal} />
+      </div>
 
       {shippingEstimates && (
         <>
-          <h3 className='pt-2 font-semibold flex text-lg justify-between'>
-            <span>
+          <div className='pt-2 font-semibold flex flex-wrap gap-3 text-lg items-center max-[1289px]:text-base'>
+            <span className='flex-1 min-w-[55%]'>
               Est. Shipping Fee <span className='font-extrabold'>**</span>
             </span>
-            <section>
-              <GlobalProductPrice className='px-0' usdAmount={shippingEstimates.max} />
-            </section>
-          </h3>
+            <GlobalProductPrice
+              className='flex-1 min-w-[35%] text-right px-0'
+              usdAmount={shippingEstimates.max}
+            />
+          </div>
 
-          <p className='font-semibold pt-8'>
+          <p className='font-semibold pt-8 leading-relaxed text-sm sm:text-base'>
             <span className='font-extrabold'>**</span> &nbsp; Shipping fee varies by location.{' '}
             <br />
             <Link
@@ -154,6 +133,17 @@ const OrderSummary: FC<OrderSummaryProps> = ({ countryIso3 = 'USA' }) => {
           </p>
         </>
       )}
+
+      {!shippingEstimates && (
+        <p className='text-sm text-white/60 pt-6'>
+          Shipping is calculated at checkout once we know your delivery details.
+        </p>
+      )}
+
+      <div className='mt-8 border-t border-white/10 pt-6 flex flex-wrap gap-3 items-center text-2xl font-semibold max-[1289px]:text-xl'>
+        <span className='flex-1 min-w-[55%]'>Estimated Total</span>
+        <GlobalProductPrice className='flex-1 min-w-[35%] text-right' usdAmount={estimatedTotal} />
+      </div>
 
       <CustomShopLink
         href='/shop/checkout'

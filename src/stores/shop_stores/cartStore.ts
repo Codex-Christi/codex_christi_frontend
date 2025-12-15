@@ -4,7 +4,7 @@ import CryptoJS from 'crypto-js';
 import { ProductVariantOptions } from '@/app/shop/product/[id]/productDetailsSSR';
 
 // Types
-type VariantOption = {
+export type VariantOption = {
   is_preselected: boolean;
   position: number;
   hide_storefront: boolean;

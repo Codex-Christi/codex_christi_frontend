@@ -130,12 +130,15 @@ const CartItems: FC<{ cartItems: CartVariant[] }> = ({ cartItems }) => {
             </section>
 
             {/* Total (tablet & desktop) */}
-            <h3
-              className='hidden md:block text-[1.075rem] font-semibold self-end text-right
+            <div
+              className='hidden md:flex flex-col justify-center items-end text-right
               col-span-2 md:col-span-4 xl:col-span-1 py-4 lg:py-0'
             >
-              Total: <GlobalProductPrice usdAmount={lineTotal} />
-            </h3>
+              <span className='text-sm text-white/80 uppercase tracking-wide'>Line Total</span>
+              <h3 className='text-[1.075rem] font-semibold'>
+                <GlobalProductPrice usdAmount={lineTotal} />
+              </h3>
+            </div>
           </div>
         );
       })}
