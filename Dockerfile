@@ -22,8 +22,6 @@ WORKDIR /app
 
 # Copy dependency manifests first for better layer caching
 COPY package.json yarn.lock .yarnrc.yml ./
-# If you use Yarn Berry (recommended), keep the .yarn directory
-COPY .yarn ./.yarn
 
 # Cache Yarn downloads
 RUN --mount=type=cache,target=/root/.cache/yarn \
