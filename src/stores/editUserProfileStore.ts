@@ -39,11 +39,7 @@ export const useEditUserMainProfileStore = create<UserEditProfileStoreType>((set
       const mainProfileSnapshot = useUserMainProfileStore.getState().userMainProfile ?? {};
       const existingData: EditableProfileShape = { ...(state.userEditData ?? {}) };
       const nextValue =
-        value instanceof File
-          ? value
-          : value === null || typeof value === 'undefined'
-            ? ''
-            : value;
+        value instanceof File ? value : value === null || typeof value === 'undefined' ? '' : value;
 
       const baseValue = mainProfileSnapshot?.[field];
       const areValuesEqual =
@@ -56,7 +52,7 @@ export const useEditUserMainProfileStore = create<UserEditProfileStoreType>((set
       if (areValuesEqual) {
         delete existingData[field];
       } else {
-        existingData[field] = nextValue;
+        existingData[field] = nextValue === '' ? undefined : nextValue;
       }
 
       return {
