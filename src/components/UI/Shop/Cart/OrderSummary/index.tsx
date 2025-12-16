@@ -39,7 +39,7 @@ const OrderSummary: FC<OrderSummaryProps> = ({ countryIso3 = 'USA' }) => {
     if (!cartItems.length) return null;
 
     try {
-      const res = await fetch('/api/shop/cart/shipping-estimate', {
+      const res = await fetch('/next-api/shop/cart/shipping-estimate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
