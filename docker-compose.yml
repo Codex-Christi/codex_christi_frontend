@@ -1,20 +1,54 @@
 services:
+  # One build, two runtime containers (no extra image bloat)
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrate
+    image: codexchristi-next:migrate
+    container_name: codex-con-app-migrate
+    env_file:
+      - .env.production
+    restart: 'no'
+    networks:
+      - webserver-network
+    volumes:
+      - merchize_price_catalog_data:/app/data
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
-      target: production
+      target: runtime
+    image: codexchristi-next:runtime
     container_name: codex-con-app-start
     env_file:
       - .env.production
-    command:
-      [
-        'sh',
-        '-c',
-        'yarn prisma migrate deploy --schema prisma/shop/merchize/priceCatalog.prisma && node server.js',
-      ]
-    ports:
-      - '3000:3000'
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    expose:
+      - '3000'
+    restart: always
+    networks:
+      - webserver-network
+    volumes:
+      - merchize_price_catalog_data:/app/data
+
+  app_shop:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: codexchristi-next:runtime
+    container_name: codex-con-app-shop
+    env_file:
+      - .env.production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    expose:
+      - '3000'
     restart: always
     networks:
       - webserver-network

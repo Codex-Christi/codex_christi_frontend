@@ -41,7 +41,10 @@ const OrderSummary = () => {
     serverOrderDetails?.finalPricesWithShippingFee ?? {};
 
   return (
-    <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[10px] md:p-10 space-y-8 lg:col-span-5'>
+    <div
+      className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[10px] md:p-10 space-y-8 lg:col-span-5
+    md:sticky'
+    >
       <h2 className='border-b border-white pb-1 text-xl font-bold flex items-center justify-between'>
         <span>Order Summary</span>
         <span className='text-sm font-medium text-white/70'>{`${cartCount} ${cartPlural}`}</span>
@@ -71,7 +74,7 @@ const OrderSummary = () => {
                   View remaining {remainingItems.length} item
                   {remainingItems.length === 1 ? '' : 's'}
                 </AccordionTrigger>
-                <AccordionContent className='pb-4'>
+                <AccordionContent className='pb-4 px-1 max-h-80 overflow-y-auto scrollbar'>
                   <MiniCartList
                     items={remainingItems}
                     showQuantityControls={false}
@@ -87,14 +90,18 @@ const OrderSummary = () => {
 
         <div className='flex items-start gap-3'>
           <input
-            className='input w-full !px-4 !py-2.5 !rounded-[10px] !border-[#F3F3F399]'
+            className='input w-full !px-4 !py-2.5 !rounded-[10px] !border-[#F3F3F399] cursor-not-allowed'
             type='text'
             placeholder='Coupon or discount code'
             id='coupon'
             name='coupon'
+            disabled
           />
 
-          <button className='btn border-[#F3F3F366] text-[#F3F3F3] bg-[#F3F3F366] hover:bg-[#F3F3F366]/30 hover:text-[#F3F3F3] !font-bold px-4 sm:px-6 !py-2.5 rounded-[10px] text-sm sm:text-base text-center shrink-0'>
+          <button
+            className='btn border-[#F3F3F366] text-[#F3F3F3] bg-[#F3F3F366] hover:bg-[#F3F3F366]/30 hover:text-[#F3F3F3] 
+          !font-bold px-4 sm:px-6 !py-2.5 rounded-[10px] text-sm sm:text-base text-center shrink-0 cursor-not-allowed'
+          >
             Apply
           </button>
         </div>

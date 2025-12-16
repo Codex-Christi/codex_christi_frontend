@@ -36,7 +36,7 @@ export const MiniCartList: FC<MiniCartListProps> = ({
   onRemove,
   className,
   emptyState = <p className='text-sm text-white/60 pt-2'>Your cart is empty.</p>,
-  variant = 'default',
+  variant = 'compact',
   confirmBeforeRemove = false,
 }) => {
   const defaultRemove = useCartStore((state) => state.removeFromCart);
