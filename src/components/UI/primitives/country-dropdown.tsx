@@ -127,8 +127,21 @@ const CountryDropdownComponent = (
   ref: React.ForwardedRef<HTMLButtonElement>,
 ) => {
   const [open, setOpen] = useState(false);
-  const [selectedCountry, setSelectedCountry] = useState<Country | undefined>(undefined);
+
+  // Initialize selection deterministically on first render (server + client)
+  // to keep markup stable and avoid hydration issues.
+  const [selectedCountry, setSelectedCountry] = useState<Country | undefined>(() => {
+    if (!defaultValue) return undefined;
+    const wanted = defaultValue.toUpperCase();
+    return options.find((c) => (c.alpha3 || '').toUpperCase() === wanted);
+  });
+
   const [searchRO, setSearchRO] = useState<boolean>(searchReadOnlyUntilInteract);
+
+  // Prevent Radix (Popover) auto-generated IDs from being rendered on the server,
+  // which can cause hydration mismatches when the overall tree ordering differs.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const [isMobile, setIsMobile] = useState<boolean>(false);
   useEffect(() => {
@@ -146,12 +159,12 @@ const CountryDropdownComponent = (
   }, [options]);
 
   useEffect(() => {
-    if (defaultValue) {
-      const initial = optionsMapAlpha3.get(defaultValue.toUpperCase());
-      setSelectedCountry(initial);
-    } else {
+    if (!defaultValue) {
       setSelectedCountry(undefined);
+      return;
     }
+    const initial = optionsMapAlpha3.get(defaultValue.toUpperCase());
+    setSelectedCountry(initial);
   }, [defaultValue, optionsMapAlpha3]);
 
   const handleSelect = useCallback(
@@ -227,6 +240,26 @@ const CountryDropdownComponent = (
     return <span>{slim === false ? placeholder : <Globe size={20} />}</span>;
   };
 
+  // SSR-safe placeholder: render a simple button until mounted,
+  // then swap in the Radix Popover UI on the client.
+  if (!mounted) {
+    return (
+      <div className={classNames?.root}>
+        <button
+          ref={ref}
+          className={triggerClasses}
+          disabled={disabled}
+          type='button'
+          aria-haspopup='listbox'
+          aria-expanded={false}
+          {...restTriggerProps}
+        >
+          <TriggerContent />
+          <ChevronDown size={25} className={chevronClasses} />
+        </button>
+      </div>
+    );
+  }
   return (
     <div className={classNames?.root}>
       <Popover open={open} onOpenChange={setOpen} modal={popoverModal}>

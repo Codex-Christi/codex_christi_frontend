@@ -5,213 +5,178 @@ import * as React from 'react';
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 const clamp01 = (n: number) => clamp(n, 0, 1);
 
-type EdgeY = 'top' | 'bottom';
-
-/**
- * Hook 1
- * Compare a SOURCE element vs a TARGET element (with optional offset),
- * and return:
- * - isClose / isClashing
- * - a smooth progress 0..1 you can use to fade/transform the SOURCE (or anything)
- *
- * Typical use:
- * - source = fixed mini-summary
- * - target = the real accordion section further down
- * - as target approaches source, progress rises 0->1 (fade out source)
- */
-export function useFadeWhenNearTarget(opts: {
+type FadeOpts = {
+  /**
+   * Kept for API compatibility.
+   * In the current IntersectionObserver (visibility-based) implementation, this ref is not used.
+   */
   sourceRef: React.RefObject<HTMLElement>;
+
+  /** In-flow element you’re scrolling toward (usually the full summary wrapper). */
   targetRef: React.RefObject<HTMLElement>;
+
   enabled?: boolean;
 
-  /** Which edge of source to compare (default: bottom) */
-  sourceEdge?: EdgeY;
-  /** Which edge of target to compare (default: top) */
-  targetEdge?: EdgeY;
-
   /**
-   * Offset in px added to the "clash line".
-   * Example: if target is already partially visible, increase offset
-   * so "close" becomes true earlier/later.
-   * Default 0.
+   * Visibility-based start offset.
+   *
+   * - If `offsetPx` >= 0: progress stays 0 until at least `offsetPx` vertical pixels of the target are visible.
+   * - If `offsetPx` < 0: "pre-trigger" before the target enters from the bottom by `abs(offsetPx)` pixels
+   *   (implemented via `IntersectionObserver.rootMargin`).
    */
   offsetPx?: number;
 
   /**
-   * Distance (px) over which progress ramps from 0 -> 1.
-   * If you want it to fade quickly, keep this small (ex: 80-160).
-   * Default 160.
+   * Visibility-based ramp length.
+   *
+   * - If `rangePx` > 1: treated as pixels. Progress ramps to 1 after `rangePx` additional visible pixels.
+   * - If 0 < `rangePx` <= 1: treated as a ratio of the target height (e.g. 0.1 = 10% visible).
+   * - If omitted: defaults to target height (or viewport height as a fallback).
    */
-  fadeDistancePx?: number;
+  rangePx?: number;
 
   /**
-   * Optional extra: treat as "close" slightly before actual contact.
-   * Default 0.
+   * Optional quantization.
+   *
+   * If set, we:
+   * - use it to build a threshold array for smoother IntersectionObserver updates
+   * - snap `progress` to N steps (e.g. 100 => 0.01 increments)
    */
-  closeThresholdPx?: number;
-}) {
+  quantizeSteps?: number;
+};
+
+/**
+ * Visibility-based scroll progress using IntersectionObserver.
+ *
+ * `progress` increases as more vertical pixels of the target become visible.
+ * Use `fadeOut = 1 - progress` to fade out a fixed overlay as the in-flow target appears.
+ *
+ * Notes:
+ * - This implementation avoids per-scroll `getBoundingClientRect()` reads for smoother performance.
+ * - `sourceRef` is kept only for API compatibility.
+ */
+export function useFadeWhenNearTarget(opts: FadeOpts) {
   const {
-    sourceRef,
+    // kept for API compatibility (not used in the visibility-based approach)
     targetRef,
     enabled = true,
-    sourceEdge = 'bottom',
-    targetEdge = 'top',
     offsetPx = 0,
-    fadeDistancePx = 160,
-    closeThresholdPx = 0,
+    rangePx,
+    quantizeSteps,
   } = opts;
 
   const [progress, setProgress] = React.useState(0);
-  const [isClose, setIsClose] = React.useState(false);
-  const [isClashing, setIsClashing] = React.useState(false);
-
-  const raf = React.useRef<number | null>(null);
-
-  const compute = React.useCallback(() => {
-    if (!enabled) return;
-
-    const source = sourceRef.current;
-    const target = targetRef.current;
-    if (!source || !target) return;
-
-    const s = source.getBoundingClientRect();
-    const t = target.getBoundingClientRect();
-
-    const sY = sourceEdge === 'top' ? s.top : s.bottom;
-    const tY = targetEdge === 'top' ? t.top : t.bottom;
-
-    /**
-     * Define "gap" between the chosen edges.
-     * - gap > 0 means target edge is still away from source edge
-     * - gap = 0 means touching (with offset)
-     * - gap < 0 means overlapping/past (clash)
-     */
-    const gap = tY - sY - offsetPx;
-
-    // "Close" is a softer boolean (within threshold)
-    const close = gap <= closeThresholdPx;
-    const clashing = gap <= 0;
-
-    setIsClose(close);
-    setIsClashing(clashing);
-
-    /**
-     * Progress design:
-     * - gap >= fadeDistancePx  => progress = 0 (far away)
-     * - gap <= 0              => progress = 1 (fully “taken over” / clashing)
-     * - between               => ramps smoothly 0..1
-     */
-    const p = clamp01(1 - gap / Math.max(1, fadeDistancePx));
-    setProgress(p);
-  }, [
-    enabled,
-    sourceRef,
-    targetRef,
-    sourceEdge,
-    targetEdge,
-    offsetPx,
-    fadeDistancePx,
-    closeThresholdPx,
-  ]);
 
   React.useEffect(() => {
     if (!enabled) return;
 
-    const onScrollOrResize = () => {
-      if (raf.current) return;
-      raf.current = window.requestAnimationFrame(() => {
-        raf.current = null;
-        compute();
-      });
-    };
+    const target = targetRef.current;
+    if (!target) return;
 
-    // run once on mount (your “one time trigger” requirement)
-    compute();
+    // More thresholds = smoother progress updates.
+    // Default to 60 steps unless user explicitly provides quantizeSteps.
+    const steps = Math.max(1, Math.floor(quantizeSteps ?? 60));
+    const thresholds = Array.from({ length: steps + 1 }, (_, i) => i / steps);
 
-    window.addEventListener('scroll', onScrollOrResize, { passive: true });
-    window.addEventListener('resize', onScrollOrResize);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+
+        // Visibility-based progress:
+        // - visiblePx: how many vertical pixels of the target are visible in the viewport
+        // - offsetPx: how many visible pixels before progress starts moving
+        // - rangePx: how many visible pixels needed to reach progress=1
+        const visiblePx = entry.intersectionRect?.height ?? 0;
+        const targetPx = entry.boundingClientRect?.height ?? 0;
+
+        // If offsetPx is negative, we interpret it as "pre-trigger" pixels
+        // (i.e. start progress before the target becomes visible, via rootMargin).
+        // In that mode we start at 0 visible pixels.
+        const startVisiblePx = offsetPx < 0 ? 0 : Math.max(0, Math.floor(offsetPx));
+
+        // Support `rangePx` as either:
+        // - pixels (>= 1)
+        // - ratio (0 < rangePx <= 1) of the target's height
+        const rampBase =
+          typeof rangePx === 'number' && rangePx > 0 && rangePx <= 1
+            ? targetPx * rangePx
+            : (rangePx ?? targetPx ?? window.innerHeight ?? 1);
+
+        const ramp = Math.max(1, Math.floor(rampBase));
+
+        let p = clamp01((visiblePx - startVisiblePx) / ramp);
+
+        // Optional snap to N steps.
+        if (quantizeSteps && quantizeSteps > 0) {
+          const q = Math.max(1, Math.floor(quantizeSteps));
+          p = clamp01(Math.round(p * q) / q);
+        }
+
+        setProgress((prev) => (prev === p ? prev : p));
+      },
+      {
+        root: null,
+        threshold: thresholds,
+        // Negative offsetPx means: start observing a bit before the element enters the viewport from the bottom.
+        // Example: offsetPx = -30 -> start progress ~30px early.
+        rootMargin: offsetPx < 0 ? `0px 0px ${Math.abs(Math.floor(offsetPx))}px 0px` : '0px',
+      },
+    );
+
+    observer.observe(target);
 
     return () => {
-      window.removeEventListener('scroll', onScrollOrResize);
-      window.removeEventListener('resize', onScrollOrResize);
-      if (raf.current) cancelAnimationFrame(raf.current);
+      observer.disconnect();
     };
-  }, [enabled, compute]);
+  }, [enabled, targetRef, offsetPx, rangePx, quantizeSteps]);
 
+  // Keep exported API identical.
   return {
     /** 0..1 */
     progress,
-
-    /** Convenience values */
-    fadeOut: 1 - progress,
     fadeIn: progress,
-
-    /** Booleans you asked for */
-    isClose,
-    isClashing,
+    fadeOut: 1 - progress,
   };
 }
 
-/**
- * Hook 2
- * "Smart pin" logic that is UI-independent.
- *
- * It does NOT force fixed styles.
- * It only tells you:
- * - whether you are in the pinned state
- * - measurements you may want (left/width/top recommendation)
- * - placeholderHeight so YOU can prevent layout jump
- *
- * Why a sentinel?
- * - The sentinel is a tiny div placed in the layout where the pinned element
- *   *would normally sit*. When the element becomes fixed, the sentinel remains
- *   in the flow, so we can still measure the correct left/width alignment.
- */
-export function useSmartPin(opts: {
+type SmartPinOpts = {
   enabled?: boolean;
 
-  /** Put this where the element “belongs” in normal flow (often an empty div). */
+  /** A small marker placed where the element “belongs” in flow. */
   sentinelRef: React.RefObject<HTMLElement>;
 
-  /** The element you may pin (used for height measuring). */
-  elementRef: React.RefObject<HTMLElement>;
+  /** Optional: the element you’re visually pinning (only used to report placeholder height). */
+  elementRef?: React.RefObject<HTMLElement>;
 
-  /** When sentinel top crosses this, we pin. (use navbar height here) */
+  /** Pin when sentinel top crosses this (px from viewport top). Default 24. */
   thresholdTopPx?: number;
 
-  /** Anti-jitter buffer so it doesn't flicker around the threshold. */
+  /** Anti-jitter buffer. Default 16. */
   hysteresisPx?: number;
-}) {
+};
+
+/**
+ * Minimal “smart pin” state.
+ *
+ * It does NOT apply styles.
+ * It just tells you when the sentinel has crossed a top threshold.
+ */
+export function useSmartPin(opts: SmartPinOpts) {
   const { enabled = true, sentinelRef, elementRef, thresholdTopPx = 24, hysteresisPx = 16 } = opts;
 
   const [isPinned, setIsPinned] = React.useState(false);
   const [placeholderHeight, setPlaceholderHeight] = React.useState(0);
 
-  // “metrics” you can use for fixed OR absolute OR anything
-  const [pinMetrics, setPinMetrics] = React.useState<{
-    left: number;
-    width: number;
-    top: number;
-  } | null>(null);
-
-  const raf = React.useRef<number | null>(null);
-
   const compute = React.useCallback(() => {
     if (!enabled) return;
 
     const sentinel = sentinelRef.current;
-    const el = elementRef.current;
-    if (!sentinel || !el) return;
+    if (!sentinel) return;
 
     const sRect = sentinel.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
 
-    // Measure height so YOU can render a placeholder when pinned
-    setPlaceholderHeight(elRect.height);
-
-    // pin when sentinel goes above thresholdTopPx
     const shouldPin = sRect.top <= thresholdTopPx;
-    // unpin when it goes back below threshold + hysteresis
     const shouldUnpin = sRect.top > thresholdTopPx + hysteresisPx;
 
     setIsPinned((prev) => {
@@ -220,46 +185,53 @@ export function useSmartPin(opts: {
       return prev;
     });
 
-    // Always publish metrics (useful even before pinning)
-    setPinMetrics({
-      left: sRect.left,
-      width: sRect.width,
-      top: thresholdTopPx,
-    });
+    const el = elementRef?.current;
+    if (el) {
+      const h = el.getBoundingClientRect().height;
+      setPlaceholderHeight((prev) => (prev === h ? prev : h));
+    }
   }, [enabled, sentinelRef, elementRef, thresholdTopPx, hysteresisPx]);
+
+  const rafIdRef = React.useRef<number | null>(null);
+  const scheduledRef = React.useRef(false);
+
+  const scheduleCompute = React.useCallback(() => {
+    if (!enabled) return;
+    if (scheduledRef.current) return;
+
+    scheduledRef.current = true;
+    rafIdRef.current = window.requestAnimationFrame(() => {
+      scheduledRef.current = false;
+      compute();
+    });
+  }, [enabled, compute]);
 
   React.useEffect(() => {
     if (!enabled) return;
 
-    const onScrollOrResize = () => {
-      if (raf.current) return;
-      raf.current = window.requestAnimationFrame(() => {
-        raf.current = null;
-        compute();
-      });
-    };
+    const onScrollOrResize = () => scheduleCompute();
 
-    compute();
+    // initial
+    scheduleCompute();
 
     window.addEventListener('scroll', onScrollOrResize, { passive: true });
     window.addEventListener('resize', onScrollOrResize);
 
     return () => {
+      if (rafIdRef.current != null) {
+        window.cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      scheduledRef.current = false;
+
       window.removeEventListener('scroll', onScrollOrResize);
       window.removeEventListener('resize', onScrollOrResize);
-      if (raf.current) cancelAnimationFrame(raf.current);
     };
-  }, [enabled, compute]);
+  }, [enabled, scheduleCompute]);
 
   return {
-    /** state */
     isPinned,
-    isFixedState: isPinned, // alias (your request)
-
-    /** measurements for you to apply however you like */
-    pinMetrics, // { left, width, top } | null
-
-    /** you can render <div style={{height: placeholderHeight}} /> when pinned */
+    isFixedState: isPinned,
     placeholderHeight,
   };
 }
