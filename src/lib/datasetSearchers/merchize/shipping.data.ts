@@ -30,6 +30,15 @@ export const getIndexBySku = cache(async () => {
   return map;
 });
 
+export const loadExtrasBySku = cache(async () => {
+  const rows = await loadNormalizedRows();
+  const map = new Map<string, Record<string, unknown> | undefined>();
+  for (const r of rows) {
+    map.set(r.sku, r.extras ?? undefined);
+  }
+  return map;
+});
+
 export function normalizeRows(raw: RawRow[]): Row[] {
   const out: Row[] = [];
   for (const r of raw) {

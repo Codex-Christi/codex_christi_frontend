@@ -140,7 +140,7 @@ const OrderSummary: FC<OrderSummaryProps> = ({ countryIso3 = 'USA' }) => {
         </p>
       )}
 
-      <div className='mt-8 border-t border-white/10 pt-6 flex flex-wrap gap-3 items-center text-2xl font-semibold max-[1289px]:text-xl'>
+      <div className='mt-8 border-t border-white/10 pt-6 flex flex-wrap gap-3 items-center text-xl font-semibold max-[1289px]:text-xl'>
         <span className='flex-1 min-w-[55%]'>Estimated Total</span>
         <GlobalProductPrice className='flex-1 min-w-[35%] text-right' usdAmount={estimatedTotal} />
       </div>

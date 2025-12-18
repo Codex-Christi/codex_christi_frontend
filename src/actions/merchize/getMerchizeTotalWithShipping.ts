@@ -9,14 +9,11 @@ import { currencyCodesWithoutDecimalPrecision } from '@/datasets/shop_general/pa
 import { symbolFromCurrency } from '@/lib/currency/symbol';
 import { getShippingPriceMerchizecatalog, realTimePriceFromMerchize } from './priceFromMerchize';
 
-function expandByQuantity<T>(cart: CartVariant[], fn: (item: CartVariant) => T): T[] {
-  return cart.flatMap((item) => Array.from({ length: item.quantity }, () => fn(item)));
-}
-
 export type VariantUnitMeta = {
   variantId: string | undefined;
   parentProductID: string | undefined;
   unitPriceUSD?: number;
+  quantity: number;
 };
 
 export const removeOrKeepDecimalPrecision = async (curr: string, num: number) =>
@@ -30,12 +27,23 @@ export const getMerchizeTotalWIthShipping = cache(
     country_iso3: ShippingCountryObj['country_iso3'],
     opts?: { state_iso2?: string },
   ) => {
-    // Expand cart by quantity → ['SKU1', 'SKU1', 'SKU2', ...]
-    const skus = expandByQuantity(cart, ({ itemDetail }) => itemDetail.sku).filter(
-      (v): v is string => Boolean(v),
-    );
+    const skuCountsMap = new Map<string, number>();
+    const uniqueSkus: string[] = [];
+    let totalUnits = 0;
 
-    if (!skus.length) {
+    for (const item of cart) {
+      const sku = item.itemDetail?.sku;
+      if (!sku) continue;
+      if (!skuCountsMap.has(sku)) {
+        uniqueSkus.push(sku);
+      }
+      const currentQty = skuCountsMap.get(sku) ?? 0;
+      const nextQty = currentQty + item.quantity;
+      skuCountsMap.set(sku, nextQty);
+      totalUnits += item.quantity;
+    }
+
+    if (!totalUnits) {
       return {
         shippingPriceNum: 0,
         retailPriceTotalNum: 0,
@@ -45,31 +53,34 @@ export const getMerchizeTotalWIthShipping = cache(
       };
     }
 
+    const skuCountsEntries = Array.from(skuCountsMap.entries());
+
     let catalogRows;
     try {
       // ⬇️ now hits Prisma DB via getItemCatalogInfo.ts, not JSON
-      catalogRows = await getCatalogItems(skus, country_iso3);
+      catalogRows = await getCatalogItems(uniqueSkus, country_iso3);
     } catch (e) {
       throw e;
     }
 
-    // console.debug('[AUDIT] Cart SKUs expanded (one per unit):', skus);
-    const shippingPriceObj = await getShippingPriceMerchizecatalog(catalogRows, country_iso3, {
-      ...opts,
-      originalSkus: skus,
-    });
-
-    const variantsAndParents: VariantUnitMeta[] = expandByQuantity(
-      cart,
-      ({ itemDetail, variantId }) => ({
+    const variantsAndParents: VariantUnitMeta[] = cart
+      .map(({ itemDetail, variantId, quantity }) => ({
         variantId,
         parentProductID: itemDetail?.product,
         unitPriceUSD:
-          typeof itemDetail.retail_price === 'number' ? itemDetail.retail_price : undefined,
-      }),
-    );
+          typeof itemDetail?.retail_price === 'number' ? itemDetail.retail_price : undefined,
+        quantity,
+      }))
+      .filter((meta) => meta.quantity > 0);
 
-    const realTimePriceTotal = await realTimePriceFromMerchize(variantsAndParents, country_iso3);
+    const [shippingPriceObj, realTimePriceTotal] = await Promise.all([
+      getShippingPriceMerchizecatalog(catalogRows, country_iso3, {
+        ...opts,
+        skuCounts: skuCountsEntries,
+        totalUnitsOverride: totalUnits,
+      }),
+      realTimePriceFromMerchize(variantsAndParents, country_iso3),
+    ]);
 
     const currency = shippingPriceObj.currency || realTimePriceTotal.currency || 'USD';
     const currency_symbol =

@@ -3,11 +3,8 @@ import { getDollarMultiplier } from '../shop/general/currencyConvert';
 import { cache } from 'react';
 import { ShippingCountryObj } from '@/lib/datasetSearchers/shippingSupportMerchize';
 import { VariantUnitMeta } from './getMerchizeTotalWithShipping';
-import {
-  iso3ToDest,
-  isUSPostServiceSurchargeState,
-} from '@/lib/datasetSearchers/merchize/dest-map';
-import { loadNormalizedRows } from '@/lib/datasetSearchers/merchize/shipping.data';
+import { iso3ToDest } from '@/lib/datasetSearchers/merchize/dest-map';
+import { loadExtrasBySku } from '@/lib/datasetSearchers/merchize/shipping.data';
 
 type ShippingRow = {
   SKU_variant: string;
@@ -103,7 +100,13 @@ export const getShippingPriceMerchizecatalog = cache(
   async (
     catalogArr: ShippingRow[],
     country_iso3: ShippingCountryObj['country_iso3'],
-    opts?: { state_iso2?: string; fallbackToROW?: boolean; originalSkus?: string[] },
+    opts?: {
+      state_iso2?: string;
+      fallbackToROW?: boolean;
+      originalSkus?: string[];
+      skuCounts?: Array<[string, number]>;
+      totalUnitsOverride?: number;
+    },
   ) => {
     // Central helper: resolve per-SKU band and track when we fall back to flat $7/$5
     const computeBand = (
@@ -134,15 +137,15 @@ export const getShippingPriceMerchizecatalog = cache(
       };
     };
 
-    const counts = countBy(
-      (opts?.originalSkus ?? catalogArr.map((c) => c.SKU_variant)) as string[],
-    );
+    const counts =
+      opts?.skuCounts && opts.skuCounts.length
+        ? new Map<string, number>(opts.skuCounts)
+        : countBy((opts?.originalSkus ?? catalogArr.map((c) => c.SKU_variant)) as string[]);
     const dest = iso3ToDest(country_iso3);
     const fallback = opts?.fallbackToROW ?? true;
 
     const bySku = new Map(catalogArr.map((r) => [r.SKU_variant, r]));
-    const normalized = await loadNormalizedRows();
-    const extrasBySku = new Map(normalized.map((r) => [r.sku, r.extras ?? {}]));
+    const extrasBySku = await loadExtrasBySku();
 
     const missingSkus: string[] = [];
     const debugBreakdown: ShippingDebugEntry[] = [];
@@ -163,7 +166,7 @@ export const getShippingPriceMerchizecatalog = cache(
       const a = Number(addl ?? 0);
       let cost = f + Math.max(0, qty - 1) * a;
 
-      if (dest === 'US' && opts?.state_iso2 && isUSPostServiceSurchargeState(opts.state_iso2)) {
+      if (dest === 'US') {
         const extra = extrasBySku.get(sku) as Record<string, unknown> | undefined;
         const surcharge =
           typeof extra?.['us_post_service_added_fee'] === 'number'
@@ -195,7 +198,10 @@ export const getShippingPriceMerchizecatalog = cache(
 
     // Your rule: if calculated sum < 5 * numOfSKUS (in USD),
     // fall back to 5 * numOfSKUS. Otherwise, use sum.
-    const numOfSKUS = Array.from(counts.entries()).reduce((acc, [, qty]) => acc + qty, 0);
+    const numOfSKUS =
+      typeof opts?.totalUnitsOverride === 'number'
+        ? opts.totalUnitsOverride
+        : Array.from(counts.values()).reduce((acc, qty) => acc + qty, 0);
     const base = Math.max(sum, 5 * numOfSKUS);
     const fx = asFX(await getDollarMultiplier(country_iso3));
     const currency = fx.currency ?? 'USD';
@@ -234,7 +240,8 @@ export const realTimePriceFromMerchize = cache(
     const withoutParent = variantsAndParents.filter((v) => !v.parentProductID);
     if (withoutParent.length) {
       const fallbackSum = withoutParent.reduce(
-        (acc, v) => acc + (typeof v.unitPriceUSD === 'number' ? v.unitPriceUSD : 0),
+        (acc, v) =>
+          acc + (typeof v.unitPriceUSD === 'number' ? v.unitPriceUSD * v.quantity : 0),
         0,
       );
       reducedPriceUSD += fallbackSum;
@@ -299,7 +306,8 @@ export const realTimePriceFromMerchize = cache(
             const apiPrice = match?.retail_price;
             const fallback = typeof meta.unitPriceUSD === 'number' ? meta.unitPriceUSD : 0;
 
-            reducedPriceUSD += typeof apiPrice === 'number' ? apiPrice : fallback;
+            const unitPrice = typeof apiPrice === 'number' ? apiPrice : fallback;
+            reducedPriceUSD += unitPrice * meta.quantity;
           }
         }
       }
@@ -308,7 +316,11 @@ export const realTimePriceFromMerchize = cache(
       // If the API fails, fall back to any local unitPriceUSD we have for withParent units
       const fallbackForWithParent = variantsAndParents
         .filter((v) => v.parentProductID)
-        .reduce((acc, v) => acc + (typeof v.unitPriceUSD === 'number' ? v.unitPriceUSD : 0), 0);
+        .reduce(
+          (acc, v) =>
+            acc + (typeof v.unitPriceUSD === 'number' ? v.unitPriceUSD * v.quantity : 0),
+          0,
+        );
       reducedPriceUSD += fallbackForWithParent;
     }
 

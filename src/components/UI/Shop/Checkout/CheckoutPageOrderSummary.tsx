@@ -66,7 +66,7 @@ const OrderSummary = () => {
   return (
     <>
       <div
-        className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[10px] md:p-10 space-y-8 lg:col-span-5 min-h-[25rem]'
+        className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[10px] md:p-10 space-y-8 lg:col-span-5 min-h-[15rem]'
         ref={originalSummaryTotalsRef}
       >
         <h2 className='border-b border-white pb-1 text-xl font-bold flex items-center justify-between'>

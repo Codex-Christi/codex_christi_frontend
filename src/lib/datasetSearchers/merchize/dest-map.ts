@@ -34,7 +34,8 @@ const EU_ISO3 = new Set([
 export function iso3ToDest(iso3: string): DestKey {
   const c = (iso3 || '').toUpperCase();
   if (c === 'USA') return 'US';
-  if (c === 'CAN') return 'CA';
+  // Canada now shares ROW rates in our catalog, so map CAN → ROW
+  if (c === 'CAN') return 'ROW';
   if (c === 'AUS') return 'AU';
   if (c === 'GBR') return 'GB';
   if (EU_ISO3.has(c)) return 'EU';

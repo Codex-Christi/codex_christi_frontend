@@ -75,9 +75,9 @@ const OrderSummaryTotals = ({
       {renderValue(total, 'h-4 w-24', 'text-sm font-semibold')}
     </div>
   ) : (
-    <div className='flex items-center justify-between gap-4 font-semibold text-[#F3F3F3]'>
+    <div className='flex items-center justify-between gap-4 mt-5 font-semibold text-[#F3F3F3]'>
       <span>Total</span>
-      {renderValue(total, 'h-5 w-28', 'text-lg')}
+      {renderValue(total, 'h-5 w-28', 'text-xl')}
     </div>
   );
 

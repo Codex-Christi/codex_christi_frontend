@@ -66,6 +66,7 @@ export const BasicCheckoutInfo = () => {
       email: s.email,
     })),
   );
+  const setShippingCountryISO3 = useShopCheckoutStore((s) => s.setShippingCountryISO3);
   const changeCookieStoreCountry = useCurrencyCookie((s) => s.changeCountry);
   const otpSendHookProps = useVerifyEmailWithOTP(email, () => setIsOtpOpen(true));
   const { isEmailVerified, sendInitialOTPToEmail } = otpSendHookProps;
@@ -216,8 +217,9 @@ export const BasicCheckoutInfo = () => {
                   onChange={(country) => {
                     field.onChange(country.alpha3);
                     startTransition(() => {
-                      changeCookieStoreCountry(country.alpha3); // updates both stores + FX
+                      changeCookieStoreCountry(country.alpha3);
                     });
+                    setShippingCountryISO3(country.alpha3);
                   }}
                 />
                 <FormMessage />
