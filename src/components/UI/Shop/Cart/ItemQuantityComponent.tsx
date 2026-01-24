@@ -25,12 +25,14 @@ export const ItemQuantityComponent: FC<{
   return (
     <section
       className={`flex-row items-center border-gray-300 border-[.5px]
-         rounded-lg ${className} justify-between w-full min-w-[6.5rem]`}
+         rounded-lg ${className} justify-between w-full min-w-[6.5rem] not-a`}
     >
       {/* Reduce quantity */}
       <OperationButton
         name={`Remove ${title} ${variantId} from Cart`}
-        // disabled={quantity <= 1}
+        disabled={quantity <= 1}
+        aria-disabled={quantity <= 1}
+        className={`${quantity <= 1 ? '!cursor-not-allowed' : ''}`}
         onClick={decrementQuantity}
       >
         -
@@ -62,7 +64,7 @@ const OperationButton: FC<OperationButtonInterface> = ({
 }) => {
   return (
     <Button
-      className={`bg-slate-950 rounded-lg text-2xl p-3 ${clasName}`}
+      className={`bg-slate-950 !rounded-lg text-2xl p-3 ${clasName}`}
       name={`${name}`}
       onClick={onClick}
       {...rest}

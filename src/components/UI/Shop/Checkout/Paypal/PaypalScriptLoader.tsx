@@ -1,7 +1,13 @@
 import { Spinner } from '@/components/UI/primitives/spinner';
-import { loadScript, PayPalNamespace, PayPalScriptOptions } from '@paypal/paypal-js';
-import { PayPalScriptProvider } from '@paypal/react-paypal-js';
-import { FC, useEffect, useRef, useState } from 'react';
+import { PayPalScriptOptions } from '@paypal/paypal-js';
+import {
+  DISPATCH_ACTION,
+  PayPalScriptProvider,
+  ScriptContext,
+  usePayPalScriptReducer,
+} from '@paypal/react-paypal-js';
+import { FC, useContext, useEffect, useMemo, useRef } from 'react';
+import PayPalLoadingSkeleton from './PayPalLoadingSkeleton';
 
 // Single namespace for the PayPal JS SDK globals
 const PAYPAL_NAMESPACE = 'paypal_sdk_cc' as const;
@@ -18,95 +24,59 @@ type PayPalLoaderOptions = {
   'data-sdk-integration-source'?: string; // informational/analytics
 };
 
-// A tiny loader that guarantees the SDK script is fully initialized before children render
-const PayPalScriptLoader: FC<{ options: PayPalLoaderOptions; children: React.ReactNode }> = ({
-  options,
-  children,
-}) => {
-  const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const retryRef = useRef(0);
-  const MAX_RETRIES = 1; // try once more if zoid destroys components
+type PayPalMode = 'card' | 'paypal_buttons' | 'google_pay' | '';
+
+const areOptionsEqual = (a: PayPalScriptOptions, b: PayPalScriptOptions) =>
+  a.clientId === b.clientId &&
+  a.components === b.components &&
+  a.enableFunding === b.enableFunding &&
+  a.intent === b.intent &&
+  a.buyerCountry === b.buyerCountry &&
+  a.currency === b.currency &&
+  a.dataNamespace === b.dataNamespace &&
+  a.dataSdkIntegrationSource === b.dataSdkIntegrationSource;
+
+const PayPalScriptGate: FC<{
+  options: PayPalScriptOptions;
+  children: React.ReactNode;
+  mode?: PayPalMode;
+}> = ({ options, children, mode }) => {
+  const [{ isInitial, isPending, isRejected }, dispatch] = usePayPalScriptReducer();
+  const scriptContext = useContext(ScriptContext);
+  const loadingStatusErrorMessage = scriptContext?.loadingStatusErrorMessage;
+  const prevOptionsRef = useRef<PayPalScriptOptions | null>(null);
+  const shouldLoad = mode === 'card' || mode === 'paypal_buttons';
 
   useEffect(() => {
-    let cancelled = false;
-    setLoaded(false);
-    setError(null);
+    if (!prevOptionsRef.current) {
+      prevOptionsRef.current = options;
+      return;
+    }
 
-    const doLoad = () => {
-      // Map our options to loadScript expected keys
-      const loadOpts: PayPalScriptOptions = {
-        clientId: options.clientId,
-        components: options.components,
-        enableFunding: options['enable-funding'],
-        intent: options.intent,
-        buyerCountry: options['buyer-country'],
-        currency: options.currency,
-        dataNamespace: PAYPAL_NAMESPACE,
-        dataSdkIntegrationSource: options['data-sdk-integration-source'],
-      };
+    if (!areOptionsEqual(prevOptionsRef.current, options)) {
+      dispatch({ type: DISPATCH_ACTION.RESET_OPTIONS, value: options });
+      prevOptionsRef.current = options;
+    }
+  }, [dispatch, options]);
 
-      loadScript(loadOpts)
-        .then((ns: PayPalNamespace | null) => {
-          if (cancelled) return;
-          if (ns?.Buttons) {
-            setLoaded(true);
-          } else {
-            throw new Error('PayPal SDK loaded but Buttons factory is missing');
-          }
-        })
-        .catch((err) => {
-          if (cancelled) return;
-          console.error('PayPal script load failed:', err);
-          setError(err as Error);
-        });
-    };
+  useEffect(() => {
+    if (isInitial && shouldLoad) {
+      dispatch({ type: DISPATCH_ACTION.RESET_OPTIONS, value: options });
+    }
+  }, [dispatch, isInitial, options, shouldLoad]);
 
-    // Global listeners to catch PayPal SDK v5 unhandled exceptions like
-    // "Error: zoid destroyed all components"
-    const onWindowError = (evt: ErrorEvent) => {
-      const msg = String(evt?.error?.message || evt?.message || '');
-      if (msg.includes('zoid destroyed all components')) {
-        if (!cancelled && retryRef.current < MAX_RETRIES) {
-          retryRef.current += 1;
-          // Attempt a single retry
-          doLoad();
-        }
-      }
-    };
-
-    const onUnhandledRejection = (evt: PromiseRejectionEvent) => {
-      const reason = evt?.reason;
-      const msg = typeof reason === 'string' ? reason : String(reason?.message || reason || '');
-      if (msg.includes('zoid destroyed all components')) {
-        if (!cancelled && retryRef.current < MAX_RETRIES) {
-          retryRef.current += 1;
-          doLoad();
-        }
-      }
-    };
-
-    window.addEventListener('error', onWindowError);
-    window.addEventListener('unhandledrejection', onUnhandledRejection);
-
-    // initial load
-    retryRef.current = 0;
-    doLoad();
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener('error', onWindowError);
-      window.removeEventListener('unhandledrejection', onUnhandledRejection);
-    };
-  }, [options.clientId, options.components, options.intent, options.currency, options]);
-
-  if (error) {
+  if (isRejected) {
     return (
-      <div className='text-error text-sm'>PayPal failed to load. Please refresh or try again.</div>
+      <div className='space-y-2 text-error text-sm'>
+        <div>PayPal failed to load. Please refresh or try again.</div>
+        {loadingStatusErrorMessage ? <div>{loadingStatusErrorMessage}</div> : null}
+      </div>
     );
   }
-  if (!loaded) {
-    // Render a loading spinner or placeholder while loading
+  if (isPending) {
+    if (mode === 'card' || mode === 'paypal_buttons') {
+      return <PayPalLoadingSkeleton mode={mode} />;
+    }
     return (
       <div className='flex items-center justify-center py-4'>
         <Spinner />
@@ -115,18 +85,50 @@ const PayPalScriptLoader: FC<{ options: PayPalLoaderOptions; children: React.Rea
     );
   }
 
-  // Mirror the loadScript options using camelCase for the provider
-  const providerOptions: PayPalScriptOptions = {
-    clientId: options.clientId,
-    components: options.components,
-    enableFunding: options['enable-funding'],
-    intent: options.intent,
-    buyerCountry: options['buyer-country'],
-    currency: options.currency,
-    dataNamespace: PAYPAL_NAMESPACE,
-    dataSdkIntegrationSource: options['data-sdk-integration-source'],
-  };
-
-  return <PayPalScriptProvider options={providerOptions}>{children}</PayPalScriptProvider>;
+  return <>{children}</>;
 };
+
+// Provider wrapper that reloads the SDK via resetOptions (no manual loadScript)
+const PayPalScriptLoader: FC<{
+  options: PayPalLoaderOptions;
+  children: React.ReactNode;
+  mode?: PayPalMode;
+}> = ({ options, children, mode }) => {
+  const {
+    clientId,
+    components,
+    intent,
+    currency,
+    'enable-funding': enableFunding,
+    'buyer-country': buyerCountry,
+    'data-sdk-integration-source': dataSdkIntegrationSource,
+  } = options;
+
+  const nextOptions = useMemo<PayPalScriptOptions>(
+    () => ({
+      clientId,
+      components,
+      enableFunding,
+      intent,
+      buyerCountry,
+      currency,
+      dataNamespace: PAYPAL_NAMESPACE,
+      dataSdkIntegrationSource,
+    }),
+    [clientId, components, enableFunding, intent, buyerCountry, currency, dataSdkIntegrationSource],
+  );
+  const initialOptionsRef = useRef<PayPalScriptOptions | null>(null);
+  if (!initialOptionsRef.current) {
+    initialOptionsRef.current = nextOptions;
+  }
+
+  return (
+    <PayPalScriptProvider options={initialOptionsRef.current} deferLoading={true}>
+      <PayPalScriptGate options={nextOptions} mode={mode}>
+        {children}
+      </PayPalScriptGate>
+    </PayPalScriptProvider>
+  );
+};
+
 export default PayPalScriptLoader;

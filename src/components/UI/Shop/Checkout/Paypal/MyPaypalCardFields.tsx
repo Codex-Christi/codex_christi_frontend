@@ -19,10 +19,11 @@ import loadingToast from '@/lib/loading-toast';
 import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
 import { CheckoutOptions } from '../PaymentSection';
 import { BillingAddressInterface } from '@/actions/shop/paypal/createOrderAction';
+import PayPalLoadingSkeleton from './PayPalLoadingSkeleton';
 
 export interface MyPayPalCardFieldInterface {
   mode: CheckoutOptions;
-  createOrder: (acceptBilling: boolean) => Promise<string>;
+  createOrder: () => Promise<string>;
   onApprove: (data: OnApproveData) => Promise<void>;
 }
 
@@ -41,6 +42,7 @@ const billingFields: {
 // Main Component
 const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({ mode, createOrder, onApprove }) => {
   const [isPaying, setIsPaying] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   const [billingAddress, setBillingAddress] = useState<BillingAddressInterface>({
     addressLine1: '',
@@ -58,9 +60,10 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({ mode, createOrder,
   if (mode !== 'card') return null;
 
   return (
-    <section className={`${mode === 'card' ? 'block' : 'hidden'} w-full !mx-auto`}>
+    <section className='w-full !mx-auto'>
+      {!isReady ? <PayPalLoadingSkeleton mode='card' /> : null}
       <PayPalCardFieldsProvider
-        createOrder={() => createOrder(true)}
+        createOrder={createOrder}
         onApprove={onApprove}
         onError={(err: unknown) => {
           console.error('PayPal Card Fields Error:', err);
@@ -93,43 +96,56 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({ mode, createOrder,
           '.invalid': { color: '#DC2626' },
         }}
       >
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-          <PayPalNameField />
-          <PayPalNumberField />
-          <PayPalExpiryField />
-          <PayPalCVVField />
+        <CardFieldsReadyGate onReady={() => setIsReady(true)} />
+        <div className={isReady ? '' : 'opacity-0 pointer-events-none'}>
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+            <PayPalNameField />
+            <PayPalNumberField />
+            <PayPalExpiryField />
+            <PayPalCVVField />
 
-          {billingFields.map(
-            ({
-              strName,
-              placeholder,
-            }: {
-              strName: keyof BillingAddressInterface;
-              placeholder: string;
-            }) => (
-              <Input
-                className='bg-transparent placeholder:text-[#ccc] !py-[1rem] !px-[2rem] text-[14px]
+            {billingFields.map(
+              ({
+                strName,
+                placeholder,
+              }: {
+                strName: keyof BillingAddressInterface;
+                placeholder: string;
+              }) => (
+                <Input
+                  className='bg-transparent placeholder:text-[#ccc] !py-[1rem] !px-[2rem] text-[14px]
         h-[unset] rounded-[10px] w-full'
-                key={strName}
-                name={placeholder}
-                placeholder={placeholder}
-                value={billingAddress[strName]}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  handleBillingAddressChange(strName, e.target.value);
-                }}
-              />
-            ),
-          )}
-        </div>
+                  key={strName}
+                  name={placeholder}
+                  placeholder={placeholder}
+                  value={billingAddress[strName]}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    handleBillingAddressChange(strName, e.target.value);
+                  }}
+                />
+              ),
+            )}
+          </div>
 
-        <SubmitPaypalCardPaymentButton
-          isPaying={isPaying}
-          setIsPaying={setIsPaying}
-          billingAddress={billingAddress}
-        />
+          <SubmitPaypalCardPaymentButton
+            isPaying={isPaying}
+            setIsPaying={setIsPaying}
+            billingAddress={billingAddress}
+          />
+        </div>
       </PayPalCardFieldsProvider>
     </section>
   );
+};
+
+const CardFieldsReadyGate: FC<{ onReady: () => void }> = ({ onReady }) => {
+  const { cardFieldsForm } = usePayPalCardFields();
+
+  useEffect(() => {
+    if (cardFieldsForm) onReady();
+  }, [cardFieldsForm, onReady]);
+
+  return null;
 };
 
 // Submit Button Compoanent

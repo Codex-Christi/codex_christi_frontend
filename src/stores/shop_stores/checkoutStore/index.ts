@@ -33,6 +33,7 @@ export interface ShopCheckoutState extends ShopCheckoutStoreInterface {
   setDeliveryAddress: (delivery_address: ShopCheckoutStoreInterface['delivery_address']) => void;
   setShippingCountryISO3: (iso3: string | null) => void; // <-- NEW: single writer for country
   clearCheckout: () => void;
+  resetCheckoutToInitial: () => void;
 }
 
 interface EncryptedStorageOptions {
@@ -122,6 +123,9 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
             payment_method: null,
           });
           localStorage.removeItem('checkout-storage');
+        },
+        resetCheckoutToInitial: () => {
+          set({ ...initialObj });
         },
       };
     },

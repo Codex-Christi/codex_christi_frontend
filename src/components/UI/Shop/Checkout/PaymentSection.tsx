@@ -3,7 +3,7 @@ import { Checkbox } from '../../primitives/checkbox';
 import { Label } from '../../primitives/label';
 import PayPal from '@/assets/img/paypal.png';
 import GooglePay from '@/assets/img/gpay.png';
-import Link from 'next/link';
+import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 import dynamic from 'next/dynamic';
 import { useContext, useState } from 'react';
 import { Button } from '../../primitives/button';
@@ -97,9 +97,9 @@ const PaymentSection = () => {
           Create your account Or{' '}
           <span className='font-medium'>
             Already have an account?{' '}
-            <Link className='underline underline-offset-4 font-semibold' href=''>
+            <CustomShopLink className='underline underline-offset-4 font-semibold' href=''>
               Sign In
-            </Link>
+            </CustomShopLink>
           </span>
         </p>
 
@@ -107,7 +107,20 @@ const PaymentSection = () => {
 
         <PayPalCheckout mode={payOption} />
 
-        {/*  */}
+        <div className='rounded-3xl border border-white/10 bg-gradient-to-br from-[#111827]/80 via-[#0b1220]/70 to-[#1f2937]/80 p-5 text-sm text-white/75 shadow-[0_20px_40px_rgba(0,0,0,0.35)]'>
+          <p className='text-base font-semibold text-white'>Shipping and POD policy</p>
+          <p className='mt-2'>
+            We produce each item on demand. Please confirm your shipping address, size, and
+            quantities before paying. Orders with incorrect buyer-provided details cannot be
+            reshipped or refunded once production begins.
+          </p>
+          <CustomShopLink
+            href='/shop/shipping-pod-policy'
+            className='mt-3 inline-flex items-center gap-2 text-white/90 underline underline-offset-4 hover:text-white'
+          >
+            Read the full Shipping and POD policy
+          </CustomShopLink>
+        </div>
       </div>
     </>
   );

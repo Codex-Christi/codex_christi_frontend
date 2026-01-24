@@ -40,15 +40,18 @@ const PaypalMainCheckout: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
     [currency],
   );
 
-  const liveOptions = {
-    ...initialOptions,
-    'buyer-country': country_iso2 ?? initialOptions['buyer-country'],
-    currency: supportsCurrency ? (currency ?? 'USD') : 'USD',
-    intent: (initialOptions.intent ?? 'authorize') as 'authorize' | 'capture',
-  };
+  const liveOptions = useMemo(
+    () => ({
+      ...initialOptions,
+      'buyer-country': country_iso2 ?? initialOptions['buyer-country'],
+      currency: supportsCurrency ? (currency ?? 'USD') : 'USD',
+      intent: (initialOptions.intent ?? 'authorize') as 'authorize' | 'capture',
+    }),
+    [country_iso2, currency, supportsCurrency],
+  );
 
   return (
-    <PayPalScriptLoader options={liveOptions}>
+    <PayPalScriptLoader options={liveOptions} mode={mode}>
       <PayPalCheckoutChildren mode={mode} />
     </PayPalScriptLoader>
   );

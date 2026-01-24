@@ -26,15 +26,16 @@ const OrderSummary = () => {
   const { isTabletAndAbove, isTabletOnly, isMobile } = useResponsiveSSRValue();
   const fixedMiniSummaryTotalsMobileRef = useRef<HTMLDivElement>(null);
   const originalSummaryTotalsRef = useRef<HTMLDivElement>(null);
+  const isClient = typeof window !== 'undefined';
 
   const { progress } = useFadeWhenNearTarget({
     sourceRef: fixedMiniSummaryTotalsMobileRef, // kept for API compatibility
     targetRef: originalSummaryTotalsRef, // in-flow full summary wrapper div
     // Start ~10px before it enters from the bottom
-    offsetPx: isMobile ? -10 : window && window.innerHeight > 1000 ? 40 : 30,
+    offsetPx: isMobile ? -10 : isClient && window.innerHeight > 1000 ? 40 : 30,
     // Smooth ramp: reach progress=1 by ~8% of the target height visible
     // (Using a ratio is more stable than a fixed px value when the target height changes.)
-    rangePx: isMobile ? 0.08 : window && window.innerHeight > 1000 ? 0.99 : 0.1,
+    rangePx: isMobile ? 0.08 : isClient && window.innerHeight > 1000 ? 0.99 : 0.1,
     // Keep snapping gentle; CSS transition will handle visual smoothing.
     quantizeSteps: 100,
   });
