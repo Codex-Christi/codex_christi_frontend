@@ -2,7 +2,6 @@ import {
   MerchizeBackendOrderProps,
   sendMerchizeOrderDetailsToBackend,
 } from '@/actions/shop/checkout/createMerchizeOrder/sendMerchizeOrderDetailsToBackend';
-import { CreateOrderActionInterface } from '@/actions/shop/paypal/createOrderAction';
 import {
   PaymentSavingActionProps,
   savePaymentDataToBackend,
@@ -15,6 +14,7 @@ import { CartVariant, decrypt } from '@/stores/shop_stores/cartStore';
 import { OrderResponseBody } from '@paypal/paypal-js';
 import { OrdersCapture } from '@paypal/paypal-server-sdk';
 import { useCallback } from 'react';
+import type { CreateOrderActionInterface } from '@/lib/paypal/createPayPalOrder';
 
 export interface CompletedTxInterface {
   authData: OrderResponseBody;

@@ -18,7 +18,7 @@ import errorToast from '@/lib/error-toast';
 import loadingToast from '@/lib/loading-toast';
 import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
 import { CheckoutOptions } from '../PaymentSection';
-import { BillingAddressInterface } from '@/actions/shop/paypal/createOrderAction';
+import type { BillingAddressInterface } from '@/lib/paypal/createPayPalOrder';
 import PayPalLoadingSkeleton from './PayPalLoadingSkeleton';
 
 export interface MyPayPalCardFieldInterface {

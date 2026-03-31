@@ -46,8 +46,6 @@ export const sendMerchizeOrderDetailsToBackend = cache(async (encProps: string) 
     decrypt(encProps),
   ) as MerchizeBackendOrderProps;
 
-  console.log(JSON.parse(decrypt(encProps)));
-
   const {
     customer: { name, email },
     delivery_address: {

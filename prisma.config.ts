@@ -1,41 +1,66 @@
 // prisma.config.ts
-import { defineConfig } from 'prisma/config';
-import * as dotenv from 'dotenv';
-import path from 'path';
 import fs from 'fs';
+import path from 'path';
+import * as dotenv from 'dotenv';
+import { defineConfig } from 'prisma/config';
 
-// Load env for local/dev CLI usage
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 
-// 1) Compute an absolute path for the DB, based on project root
-// __dirname here is the folder where prisma.config.ts lives.
-// In your repo, that's the project root: /Users/devsantorz/Desktop/devProjects/codex_christi
-const projectRoot = __dirname;
+const root = __dirname;
 
-// Default DB location: <projectRoot>/data/db/shop/merchizeCatalog.db
-const defaultDbPath = path.join(projectRoot, 'data', 'db', 'shop', 'merchizeCatalog.db');
+// ── Schema paths ──────────────────────────────────────────────
+const schemas = {
+  merchize: path.join(root, 'prisma', 'shop', 'merchize', 'priceCatalog.prisma'),
+  paypal: path.join(root, 'prisma', 'shop', 'paypal', 'paypalTXLedger.schema.prisma'),
+} as const;
 
-// If you *really* want to override via env, you still can.
-// But for now I'd recommend leaving MERCHIZE_PRICE_CATALOG_DATABASE_URL unset
-// until everything works with the default.
-const envUrl = process.env.MERCHIZE_PRICE_CATALOG_DATABASE_URL;
-
-// If envUrl is provided and already starts with "file:", we trust it as-is.
-// Otherwise we fall back to file:<absolute path we just built>
-const url = envUrl && envUrl.startsWith('file:') ? envUrl : `file:${defaultDbPath}`;
-
-// 2) Ensure the directory exists BEFORE Prisma tries to open the file
-try {
-  const dir = path.dirname(defaultDbPath);
-  fs.mkdirSync(dir, { recursive: true });
-} catch (err) {
-  console.error('Failed to ensure SQLite directory exists:', err);
+// ── Parse --schema from argv ──────────────────────────────────
+function getSchemaArg(): string {
+  const args = process.argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--schema' && args[i + 1]) return path.resolve(root, args[i + 1]);
+    if (args[i].startsWith('--schema=')) return path.resolve(root, args[i].slice(9));
+  }
+  throw new Error(
+    'Prisma schema must be passed explicitly with --schema.\n' +
+    '  e.g. yarn prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma',
+  );
 }
 
+// ── Resolve datasource URL per schema ─────────────────────────
+const schemaPath = getSchemaArg();
+
+const catalogDbPath = path.join(root, 'data', 'db', 'shop', 'merchizeCatalog.db');
+
+function resolve(): { schema: string; url: string } {
+  if (schemaPath === schemas.merchize) {
+    fs.mkdirSync(path.dirname(catalogDbPath), { recursive: true });
+    const envUrl = process.env.MERCHIZE_PRICE_CATALOG_DATABASE_URL;
+    return {
+      schema: './prisma/shop/merchize/priceCatalog.prisma',
+      url: envUrl?.startsWith('file:') ? envUrl : `file:${catalogDbPath}`,
+    };
+  }
+
+  if (schemaPath === schemas.paypal) {
+    const target = process.env.PAYPAL_TX_LEDGER_TARGET;
+    if (target !== 'dev' && target !== 'prod') {
+      throw new Error('PAYPAL_TX_LEDGER_TARGET must be "dev" or "prod".');
+    }
+    const url = target === 'prod'
+      ? process.env.PAYPAL_TX_LEDGER_NEON_DB_STRING
+      : process.env.PAYPAL_TX_LEDGER_NEON_DB_DEV_STRING;
+    if (!url) throw new Error(`Missing Neon DB string for PayPal ${target} branch.`);
+    return { schema: './prisma/shop/paypal/paypalTXLedger.schema.prisma', url };
+  }
+
+  throw new Error(`Unknown schema: ${schemaPath}\nAdd it to prisma.config.ts.`);
+}
+
+const config = resolve();
+
 export default defineConfig({
-  schema: './prisma/shop/merchize/priceCatalog.prisma',
-  datasource: {
-    url,
-  },
+  schema: config.schema,
+  datasource: { url: config.url },
 });

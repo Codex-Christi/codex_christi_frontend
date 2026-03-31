@@ -9,8 +9,12 @@
     "lint": "eslint .",
     "build-with-env": "next build --update-env",
     "merchize:setup-catalog": "bash ./scripts/setup_merchize_catalog.sh",
-    "merchize-catalog:db:push": "prisma db push",
-    "merchize-catalog:generate": "prisma generate"
+    "merchize-catalog:db:push": "prisma db push --schema prisma/shop/merchize/priceCatalog.prisma",
+    "merchize-catalog:generate": "prisma generate --schema prisma/shop/merchize/priceCatalog.prisma",
+    "prisma:paypalTxLedger:generate:dev": "PAYPAL_TX_LEDGER_TARGET=dev prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
+    "prisma:paypalTxLedger:generate:prod": "PAYPAL_TX_LEDGER_TARGET=prod prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
+    "prisma:paypalTxLedger:migrate:dev": "PAYPAL_TX_LEDGER_TARGET=dev prisma migrate dev --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
+    "prisma:paypalTxLedger:migrate:deploy:prod": "PAYPAL_TX_LEDGER_TARGET=prod prisma migrate deploy --schema prisma/shop/paypal/paypalTXLedger.schema.prisma"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.846.0",
@@ -22,6 +26,7 @@
     "@paypal/paypal-server-sdk": "^1.1.0",
     "@paypal/react-paypal-js": "^8.8.3",
     "@prisma/adapter-better-sqlite3": "^7.0.1",
+    "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.0.1",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -61,6 +66,7 @@
     "next": "^15.5.7",
     "next-themes": "^0.4.6",
     "pdfkit": "^0.17.1",
+    "pg": "^8.20.0",
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",
     "react": "^18",
@@ -99,6 +105,7 @@
     "eslint-plugin-prettier": "^5.2.1",
     "postcss": "^8",
     "prettier": "^3.0.0",
+    "prettier-plugin-prisma": "^5.0.0",
     "prisma": "^7.0.1",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"

@@ -41,6 +41,7 @@ const CheckoutPage = () => {
   const { push } = useShopRouter();
   const [cartHydrated, setCartHydrated] = useState(false);
   const [hasRedirected, setHasRedirected] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
   const cartCount = useMemo(() => cartVariants.length, [cartVariants]);
 
   const triggerEmptyCartRedirect = useCallback(() => {
@@ -57,6 +58,7 @@ const CheckoutPage = () => {
   // Manually rehydrate the useShopCheckoutStore
   useEffect(() => {
     useShopCheckoutStore.persist.rehydrate();
+    setHasMounted(true);
   }, []);
 
   useEffect(() => {
@@ -100,28 +102,31 @@ const CheckoutPage = () => {
       <CheckoutAccordionContext.Provider value={{ handleCloseAccordion, handleOpenItem }}>
         <ProcessingStatusModal />
         <div className='grid grid-cols-1 gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] min-h-dvh lg:grid-cols-12'>
-          <Accordion
-            className='bg-[#4C3D3D3D] backdrop-blur-[10px] pt-10 !px-2 rounded-[10px] md:p-10 space-y-8 lg:col-span-7'
-            type='single'
-            value={openItem}
-            onValueChange={setOpenItem}
-          >
-            {/* User Checkout Info Section */}
-            <AccordionItem value='basic-checkout-info' className='border-none px-4'>
-              {/* Note: AccordionTrigger is not needed if you only want programmable control */}
-              <AccordionContent className='w-full'>
-                <BasicCheckoutInfo />
-              </AccordionContent>
-            </AccordionItem>
+          <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] pt-10 !px-2 rounded-[10px] md:p-10 space-y-8 lg:col-span-7'>
+            {hasMounted ? (
+              <Accordion
+                type='single'
+                value={openItem}
+                onValueChange={setOpenItem}
+              >
+                {/* User Checkout Info Section */}
+                <AccordionItem value='basic-checkout-info' className='border-none px-4'>
+                  {/* Note: AccordionTrigger is not needed if you only want programmable control */}
+                  <AccordionContent className='w-full'>
+                    <BasicCheckoutInfo />
+                  </AccordionContent>
+                </AccordionItem>
 
-            {/* Payment details section */}
-            <AccordionItem value='payment-section' className='border-none px-4'>
-              {/* Note: AccordionTrigger is not needed if you only want programmable control */}
-              <AccordionContent>
-                <PaymentSection />
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+                {/* Payment details section */}
+                <AccordionItem value='payment-section' className='border-none px-4'>
+                  {/* Note: AccordionTrigger is not needed if you only want programmable control */}
+                  <AccordionContent>
+                    <PaymentSection />
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            ) : null}
+          </div>
 
           {/* Order Summary, on it's own */}
           <CheckoutPageOrderSummary />
