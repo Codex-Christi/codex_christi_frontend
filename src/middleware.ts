@@ -9,7 +9,7 @@ import { authVerifierAndRouteProtector } from './lib/middlewares/codexchristi.sh
 // const excludePattern =
 //   /^\/(_next(?:\/[^ ]*)*(?:\?[^ ]*)?|media(?:\/[^ ]*)?(?:\?[^ ]*)?)/;
 
-export const middleware = createNEMO({
+export const proxy = createNEMO({
   // For shop
   '/shop': [],
   '/shop/account-overview': [redirectExpSessionToLoginPage],
