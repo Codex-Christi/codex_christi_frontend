@@ -1,8 +1,9 @@
 'use client';
 
 import Link, { LinkProps } from 'next/link';
-import { CSSProperties, FC, ReactNode, useEffect, useState } from 'react';
+import { CSSProperties, FC, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
+import { useHasMounted } from '@/lib/hooks/useHasMounted';
 
 interface ActiveInactiveProps {
   className?: string;
@@ -33,34 +34,20 @@ const CustomShopLink: FC<CustomShopLinkProps> = ({
 }) => {
   // Hooks
   const pathname = usePathname();
-  const [domain, setDomain] = useState<string | null>(null);
-  const [isDev, setIsDev] = useState<boolean>(false);
-  const [isOnShopRouteParentSite, setIsOnShopRouteParentSite] = useState<boolean>(false);
-  const [isActive, setIsActive] = useState<boolean>(false);
+  const hasMounted = useHasMounted();
 
   // Parent & shop domains
   const parentSiteProdHref = 'https://codexchristi.org';
   const parentSiteProdHostName = 'codexchristi.org';
   const shopDomainProd = 'codexchristi.shop';
-
-  // Get the current domain & detect development mode
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const currentDomain = window.location.hostname;
-      setDomain(currentDomain);
-      setIsDev(currentDomain === 'localhost');
-      setIsOnShopRouteParentSite(
-        window.location.pathname.startsWith('/shop') && currentDomain === parentSiteProdHostName,
-      );
-    }
-  }, []);
-
-  // Determine if the link is active
-  useEffect(() => {
-    if (typeof href === 'string') {
-      setIsActive(pathname === href || pathname.startsWith(`${href}/`));
-    }
-  }, [pathname, href]);
+  const domain = hasMounted ? window.location.hostname : null;
+  const isDev = domain === 'localhost';
+  const isOnShopRouteParentSite =
+    hasMounted &&
+    window.location.pathname.startsWith('/shop') &&
+    domain === parentSiteProdHostName;
+  const isActive =
+    typeof href === 'string' ? pathname === href || pathname.startsWith(`${href}/`) : false;
 
   // Adjusted href based on conditions
   let newHref = href as string;

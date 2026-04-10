@@ -53,8 +53,12 @@ function useImageListLoader(urls: string[]) {
   const seenLoaded = useRef<Map<string, true>>(new Map());
 
   useEffect(() => {
-    setLoaded(urls.map((u) => seenLoaded.current.has(u)));
-    setFailed(urls.map(() => false));
+    const loadedTimer = window.setTimeout(() => {
+      setLoaded(urls.map((u) => seenLoaded.current.has(u)));
+      setFailed(urls.map(() => false));
+    }, 0);
+
+    return () => window.clearTimeout(loadedTimer);
   }, [urls]);
 
   const markLoaded = (i: number, url?: string) => {
@@ -117,29 +121,48 @@ export const ProductImageGallery: React.FC = () => {
   }, [matchingVariant?.image_uris, productDetailsContext.productVariants]);
 
   const loader = useImageListLoader(images);
+  const imageKey = useMemo(() => images.join('|'), [images]);
 
   // Pre-measure natural sizes for Lightbox zoom (safe, client-only)
-  const [dims, setDims] = useState<Record<number, { w: number; h: number }>>({});
+  const [dimsState, setDimsState] = useState<{
+    imageKey: string;
+    dims: Record<number, { w: number; h: number }>;
+  }>({
+    imageKey,
+    dims: {},
+  });
+
   useEffect(() => {
-    setDims({});
     images.forEach((src, i) => {
       const img = new window.Image();
       img.onload = () =>
-        setDims((d) => (d[i] ? d : { ...d, [i]: { w: img.naturalWidth, h: img.naturalHeight } }));
+        setDimsState((prev) => {
+          const currentDims = prev.imageKey === imageKey ? prev.dims : {};
+          if (currentDims[i]) {
+            return prev.imageKey === imageKey ? prev : { imageKey, dims: currentDims };
+          }
+
+          return {
+            imageKey,
+            dims: {
+              ...currentDims,
+              [i]: { w: img.naturalWidth, h: img.naturalHeight },
+            },
+          };
+        });
       img.src = src;
     });
-  }, [images]);
+  }, [imageKey, images]);
 
   // URL-driven reset (unchanged)
   useEffect(() => {
-    setCurrentItem(0);
-    setMatchingVariant(null);
-  }, [pathname, searchParams, setMatchingVariant]);
+    const resetTimer = window.setTimeout(() => {
+      setCurrentItem(0);
+      setMatchingVariant(null);
+    }, 0);
 
-  // Single-image guard
-  useEffect(() => {
-    if (images.length === 1) setCurrentItem(0);
-  }, [images.length]);
+    return () => window.clearTimeout(resetTimer);
+  }, [pathname, searchParams, setMatchingVariant]);
 
   // Embla -> React state
   useEffect(() => {
@@ -162,10 +185,16 @@ export const ProductImageGallery: React.FC = () => {
 
   // Build slides with known width/height when available
   const slides = useMemo(
-    () =>
-      images.map((src, i) => (dims[i] ? { src, width: dims[i].w, height: dims[i].h } : { src })),
-    [images, dims],
+    () => {
+      const activeDims = dimsState.imageKey === imageKey ? dimsState.dims : {};
+
+      return images.map((src, i) =>
+        activeDims[i] ? { src, width: activeDims[i].w, height: activeDims[i].h } : { src },
+      );
+    },
+    [dimsState, imageKey, images],
   );
+  const safeCurrentItem = images.length === 1 ? 0 : currentItem;
 
   return (
     <div
@@ -199,7 +228,7 @@ export const ProductImageGallery: React.FC = () => {
         <Lightbox
           open={open}
           close={() => setOpen(false)}
-          index={currentItem}
+          index={safeCurrentItem}
           slides={slides}
           plugins={[Zoom as Plugin]}
           controller={{ ref: controllerRef }}

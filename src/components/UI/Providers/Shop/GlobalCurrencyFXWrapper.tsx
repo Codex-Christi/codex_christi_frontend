@@ -28,7 +28,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     v: 1,
     iso3: snap.iso3 || 'USA',
     fx,
-    updatedAt: Date.now(),
+    updatedAt: snap.updatedAt || fx?.ts || 0,
   };
 
   return (

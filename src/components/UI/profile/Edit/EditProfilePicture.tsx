@@ -16,13 +16,22 @@ const EditProfilePicture: FC = () => {
 
   useEffect(() => {
     if (!(editProfileData?.profile_pic instanceof File)) {
-      return;
+      const resetTimer = window.setTimeout(() => {
+        setPreviewUrl(null);
+      }, 0);
+
+      return () => {
+        window.clearTimeout(resetTimer);
+      };
     }
 
     const objectUrl = URL.createObjectURL(editProfileData.profile_pic);
-    setPreviewUrl(objectUrl);
+    const previewTimer = window.setTimeout(() => {
+      setPreviewUrl(objectUrl);
+    }, 0);
 
     return () => {
+      window.clearTimeout(previewTimer);
       URL.revokeObjectURL(objectUrl);
     };
   }, [editProfileData?.profile_pic]);

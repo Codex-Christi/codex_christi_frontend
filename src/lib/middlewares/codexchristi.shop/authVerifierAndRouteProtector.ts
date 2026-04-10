@@ -12,7 +12,7 @@ export const authVerifierAndRouteProtector = async (req: NextRequest) => {
     const checkObj = { isLocalHost, isProdShopDomian, req };
 
     try {
-      return checkAndRedirect(checkObj);
+      return await checkAndRedirect(checkObj);
     } catch (error) {
       console.error('Error verifying session:', error);
       return NextResponse.next();
@@ -40,17 +40,16 @@ type CheckAndRedirectType = {
   isProdShopDomian?: boolean;
 };
 
-const checkAndRedirect = async (obj?: CheckAndRedirectType) => {
-  const { req, isLocalHost, isProdShopDomian } = obj || {};
-  if (!obj) {
-    return NextResponse.next();
-  }
-
+const checkAndRedirect = async ({
+  req,
+  isLocalHost,
+  isProdShopDomian,
+}: CheckAndRedirectType) => {
   const sessionState = await getRequestSessionState(req);
 
   if (sessionState.isAuthenticated) {
     return NextResponse.redirect(
-      new URL(`${isLocalHost ? '/shop' : isProdShopDomian ? '' : ''}/account-overview`, req?.url),
+      new URL(`${isLocalHost ? '/shop' : isProdShopDomian ? '' : ''}/account-overview`, req.url),
     );
   }
 

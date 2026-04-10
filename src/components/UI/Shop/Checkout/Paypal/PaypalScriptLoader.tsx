@@ -6,7 +6,7 @@ import {
   ScriptContext,
   usePayPalScriptReducer,
 } from '@paypal/react-paypal-js';
-import { FC, useContext, useEffect, useMemo, useRef } from 'react';
+import { FC, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import PayPalLoadingSkeleton from './PayPalLoadingSkeleton';
 
 // Single namespace for the PayPal JS SDK globals
@@ -117,13 +117,10 @@ const PayPalScriptLoader: FC<{
     }),
     [clientId, components, enableFunding, intent, buyerCountry, currency, dataSdkIntegrationSource],
   );
-  const initialOptionsRef = useRef<PayPalScriptOptions | null>(null);
-  if (!initialOptionsRef.current) {
-    initialOptionsRef.current = nextOptions;
-  }
+  const [initialOptions] = useState(nextOptions);
 
   return (
-    <PayPalScriptProvider options={initialOptionsRef.current} deferLoading={true}>
+    <PayPalScriptProvider options={initialOptions} deferLoading={true}>
       <PayPalScriptGate options={nextOptions} mode={mode}>
         {children}
       </PayPalScriptGate>

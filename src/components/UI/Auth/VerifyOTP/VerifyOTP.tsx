@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { SubmitHandler, useForm } from "react-hook-form";
+import { Controller, SubmitHandler, useForm } from "react-hook-form";
 import { Form } from "@/components/UI/primitives/form";
 import {
 	verifyOTPSchema,
@@ -35,7 +35,7 @@ const VerifyOTP = () => {
 		reValidateMode: "onBlur",
 	});
 
-	const { handleSubmit, setValue } = verifyOTPForm;
+	const { handleSubmit } = verifyOTPForm;
 
 	const verifyOTPSubmitHandler: SubmitHandler<verifyOTPSchemaType> = async (
 		fieldValues,
@@ -57,21 +57,27 @@ const VerifyOTP = () => {
 				className="mt-12 px-4 sm:px-0 !font-inter sm:w-[70%] sm:max-w-[400px] md:w-[50%] md:max-w-[410px] lg:w-[100%] lg:max-w-[425px] mx-auto relative"
 			>
 				<div className="flex place-content-center mb-8">
-					<InputOTP
-						maxLength={6}
-						value={verifyOTPForm.watch("otp")}
-						onChange={(otp) => setValue("otp", otp)}
-						pattern={REGEXP_ONLY_DIGITS}
-					>
-						<InputOTPGroup>
-							<InputOTPSlot index={0} />
-							<InputOTPSlot index={1} />
-							<InputOTPSlot index={2} />
-							<InputOTPSlot index={3} />
-							<InputOTPSlot index={4} />
-							<InputOTPSlot index={5} />
-						</InputOTPGroup>
-					</InputOTP>
+					<Controller
+						name="otp"
+						control={verifyOTPForm.control}
+						render={({ field }) => (
+							<InputOTP
+								maxLength={6}
+								value={field.value}
+								onChange={field.onChange}
+								pattern={REGEXP_ONLY_DIGITS}
+							>
+								<InputOTPGroup>
+									<InputOTPSlot index={0} />
+									<InputOTPSlot index={1} />
+									<InputOTPSlot index={2} />
+									<InputOTPSlot index={3} />
+									<InputOTPSlot index={4} />
+									<InputOTPSlot index={5} />
+								</InputOTPGroup>
+							</InputOTP>
+						)}
+					/>
 				</div>
 
 				<p className="w-full text-center mb-4">

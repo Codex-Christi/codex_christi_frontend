@@ -11,19 +11,18 @@ import Link from 'next/link';
 import GoogleIcon from '@/components/UI/general/IconComponents/GoogleIcon';
 import AppleIcon from '@/components/UI/general/IconComponents/AppleIcon';
 import GitHubIcon from '@/components/UI/general/IconComponents/GitHubIcon';
-import { useEffect, useState } from 'react';
+import { useHasMounted } from '@/lib/hooks/useHasMounted';
 
 // Main Component
 const SignIn = () => {
   const { login } = useLogin();
-  const [isClient, setIsClient] = useState(false);
-  const isCodexChristiShop = isClient
-    ? window.location.hostname.includes('codexchristi.shop')
-    : false;
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const hasMounted = useHasMounted();
+  const isCodexChristiShop =
+    hasMounted && window.location.hostname.includes('codexchristi.shop');
+  const signUpHref =
+    isCodexChristiShop && hasMounted
+      ? `https://codexchristi.org/auth/signup?redirect=${window.location.href}`
+      : '/auth/signup';
 
   const signInForm = useForm<signInSchemaType>({
     resolver: zodResolver(signInSchema),
@@ -94,11 +93,7 @@ const SignIn = () => {
           <Link
             className='text-white font-semibold'
             type='button'
-            href={
-              isCodexChristiShop
-                ? `https://codexchristi.org/auth/signup?redirect=${window.location.href}`
-                : '/auth/signup'
-            }
+            href={signUpHref}
           >
             Sign Up
           </Link>

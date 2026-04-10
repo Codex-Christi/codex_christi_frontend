@@ -2,26 +2,27 @@
 
 import { Button } from '@/components/UI/primitives/button';
 import useAuthStore from '@/stores/authStore';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useProductDetailsContext } from '..';
 import successToast from '@/lib/success-toast';
 import errorToast from '@/lib/error-toast';
 import { useParams } from 'next/navigation';
 import { useWishlist } from '@/stores/shop_stores/use-wishlist';
+import { useHasMounted } from '@/lib/hooks/useHasMounted';
 
 export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) => void }) {
   const { id } = useParams();
 
-  const wishlistStore = useWishlist((state) => state);
-  const addWishlistItem = wishlistStore.addWishlistItem;
+  const addWishlistItem = useWishlist((state) => state.addWishlistItem);
+  const getWishlist = useWishlist((state) => state.getWishlist);
+  const hasMounted = useHasMounted();
 
   // Hooks
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const productDetailsContext = useProductDetailsContext();
   const metadata = productDetailsContext.productMetaData;
 
-  // States
-  const [currentUrl, setCurrentUrl] = useState('');
+  const currentUrl = hasMounted ? window.location.href : '';
 
   // Vars
   const shareData = useMemo(() => {
@@ -52,16 +53,9 @@ export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) =>
     }
   }, [currentUrl, shareData]);
 
-  // Effects
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setCurrentUrl(window.location.href);
-    }
-  }, []);
-
-  useEffect(() => {
-    wishlistStore.getWishlist();
-  }, []);
+    getWishlist();
+  }, [getWishlist]);
 
   /* Action buttons (share / wishlist / inspect) */
   return (

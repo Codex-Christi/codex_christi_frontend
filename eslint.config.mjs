@@ -1,7 +1,7 @@
 import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
 import tseslint from '@typescript-eslint/eslint-plugin';
 
-export default [
+const config = [
   ...nextCoreWebVitals,
   ...tseslint.configs['flat/recommended'],
   {
@@ -16,3 +16,5 @@ export default [
     },
   },
 ];
+
+export default config;

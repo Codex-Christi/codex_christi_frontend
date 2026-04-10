@@ -8,6 +8,7 @@ import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import errorToast from '@/lib/error-toast';
 import { useShopRouter } from '@/lib/hooks/useShopRouter';
+import { useHasMounted } from '@/lib/hooks/useHasMounted';
 
 // Dynamic Imports
 const CheckoutPageOrderSummary = dynamic(
@@ -39,9 +40,9 @@ const CheckoutPage = () => {
   const [openItem, setOpenItem] = useState('basic-checkout-info'); // State to hold the value of the open item (string for single type)
   const cartVariants = useCartStore((state) => state.variants);
   const { push } = useShopRouter();
+  const hasMounted = useHasMounted();
   const [cartHydrated, setCartHydrated] = useState(false);
   const [hasRedirected, setHasRedirected] = useState(false);
-  const [hasMounted, setHasMounted] = useState(false);
   const cartCount = useMemo(() => cartVariants.length, [cartVariants]);
 
   const triggerEmptyCartRedirect = useCallback(() => {
@@ -58,13 +59,17 @@ const CheckoutPage = () => {
   // Manually rehydrate the useShopCheckoutStore
   useEffect(() => {
     useShopCheckoutStore.persist.rehydrate();
-    setHasMounted(true);
   }, []);
 
   useEffect(() => {
     if (!cartHydrated || hasRedirected) return;
     if (cartCount > 0) return;
-    triggerEmptyCartRedirect();
+
+    const redirectTimer = window.setTimeout(() => {
+      triggerEmptyCartRedirect();
+    }, 0);
+
+    return () => window.clearTimeout(redirectTimer);
   }, [cartHydrated, cartCount, hasRedirected, triggerEmptyCartRedirect]);
 
   useEffect(() => {
@@ -104,11 +109,7 @@ const CheckoutPage = () => {
         <div className='grid grid-cols-1 gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] min-h-dvh lg:grid-cols-12'>
           <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] pt-10 !px-2 rounded-[10px] md:p-10 space-y-8 lg:col-span-7'>
             {hasMounted ? (
-              <Accordion
-                type='single'
-                value={openItem}
-                onValueChange={setOpenItem}
-              >
+              <Accordion type='single' value={openItem} onValueChange={setOpenItem}>
                 {/* User Checkout Info Section */}
                 <AccordionItem value='basic-checkout-info' className='border-none px-4'>
                   {/* Note: AccordionTrigger is not needed if you only want programmable control */}

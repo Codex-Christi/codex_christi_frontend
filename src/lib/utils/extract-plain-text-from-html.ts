@@ -84,7 +84,7 @@ export const extractPlainTextFromHtml = (
 
   const filteredText = applyTextFilters(rawHtml, options);
   const paragraphMatches = options.preferParagraphs
-    ? [...filteredText.matchAll(/<p\b[^>]*>(.*?)<\/p>/gis)]
+    ? [...filteredText.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
     : [];
 
   const paragraphText = paragraphMatches

@@ -1,6 +1,6 @@
 'use client';
 
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { ServerOrderDetailsContext } from './ServerOrderDetailsComponent';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
@@ -57,11 +57,7 @@ const OrderSummary = () => {
   const opacity = 1 - ease; // overlay fades OUT as target becomes visible
   const glow = (1 - ease) * 0.75; // 0..0.75
 
-  useEffect(() => {
-    if (!hasMoreItems) {
-      setAccordionValue(undefined);
-    }
-  }, [hasMoreItems]);
+  const effectiveAccordionValue = hasMoreItems ? accordionValue : undefined;
 
   // Main JSX
   return (
@@ -90,7 +86,7 @@ const OrderSummary = () => {
               <Accordion
                 type='single'
                 collapsible
-                value={accordionValue}
+                value={effectiveAccordionValue}
                 onValueChange={(value) => setAccordionValue(value || undefined)}
                 className='rounded-[10px] border border-white/10'
               >

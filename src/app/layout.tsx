@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
-import { Inter, Trade_Winds } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import { headers } from 'next/headers';
 import dynamic from 'next/dynamic';
@@ -22,16 +21,15 @@ const OCR_ext = localFont({
   preload: false,
 });
 
-const InterFont = Inter({
-  subsets: ['latin'],
+const InterFont = localFont({
+  src: '../res/fonts/Inter.ttf',
   variable: '--font-inter',
   preload: true,
 });
 
-const TradeWinds = Trade_Winds({
-  subsets: ['latin'],
+const TradeWinds = localFont({
+  src: '../res/fonts/Trade-Winds.ttf',
   variable: '--font-trade-winds',
-  weight: ['400'],
   preload: false,
 });
 

@@ -2,30 +2,37 @@
 
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
 import Footer from '@/components/UI/general/Footer';
+import { useHasMounted } from '@/lib/hooks/useHasMounted';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 export default function NotFound() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hasMounted = useHasMounted();
   const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
   const [audioAllowed, setAudioAllowed] = useState(false);
   const [matrixRain, setMatrixRain] = useState<
     { id: number; left: string; symbol: string; duration: number }[]
   >([]);
-  const [hydrationComplete, setHydrationComplete] = useState(false);
 
   useEffect(() => {
-    setHydrationComplete(true);
     audioRef.current = new Audio('/sounds/beep.wav');
 
-    const rain = Array.from({ length: 50 }).map((_, i) => ({
-      id: i,
-      left: `${Math.random() * 100}%`,
-      symbol: ['0', '1', 'Ξ', '╳', '▲', '█'][Math.floor(Math.random() * 6)],
-      duration: Math.random() * 3 + 2,
-    }));
-    setMatrixRain(rain);
+    const rainTimer = window.setTimeout(() => {
+      setMatrixRain(
+        Array.from({ length: 50 }).map((_, i) => ({
+          id: i,
+          left: `${Math.random() * 100}%`,
+          symbol: ['0', '1', 'Ξ', '╳', '▲', '█'][Math.floor(Math.random() * 6)],
+          duration: Math.random() * 3 + 2,
+        })),
+      );
+    }, 0);
+
+    return () => {
+      window.clearTimeout(rainTimer);
+    };
   }, []);
 
   const enableAudio = () => setAudioAllowed(true);
@@ -47,7 +54,7 @@ export default function NotFound() {
   }, []);
 
   // Main JSX
-  if (!hydrationComplete) return null;
+  if (!hasMounted) return null;
   return (
     <DefaultPageWrapper hasMainNav>
       <div
@@ -56,7 +63,7 @@ export default function NotFound() {
         onClick={enableAudio}
       >
         {/* Matrix Rain Effect (Client-Only to Prevent Hydration Mismatch) */}
-        {hydrationComplete && (
+        {hasMounted && (
           <div className='absolute inset-0 overflow-hidden pointer-events-none'>
             {matrixRain.map((drop) => (
               <motion.div

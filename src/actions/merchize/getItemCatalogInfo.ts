@@ -32,6 +32,7 @@ export async function getCatalogItems(
   skus: string[],
   _country_iso3?: ShippingCountryObj['country_iso3'],
 ): Promise<CatalogItem[]> {
+  void _country_iso3;
   if (!skus.length) return [];
   return await getMultipleSKUsData(skus);
 }

@@ -1,19 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useMediaQuery } from 'react-responsive';
+import { useHasMounted } from './useHasMounted';
 
 function useTheme() {
-  const [isClient, setIsClient] = useState(false);
+  const hasMounted = useHasMounted();
 
   // Favicon updating func
   const updateFavicon = useCallback((isDarkMode: boolean) => {
-    const linkElement = document.querySelector(
-      'link[rel=icon]'
-    ) as HTMLLinkElement;
+    const linkElement = document.querySelector('link[rel=icon]') as HTMLLinkElement | null;
 
     if (linkElement) {
-      linkElement.href = `/media/favicons/favicon-${
-        isDarkMode ? 'dark' : 'light'
-      }-mode.ico`;
+      linkElement.href = `/media/favicons/favicon-${isDarkMode ? 'dark' : 'light'}-mode.ico`;
     }
   }, []);
 
@@ -24,24 +21,17 @@ function useTheme() {
     undefined,
     (darkModeBool) => {
       updateFavicon(darkModeBool);
-    }
+    },
   );
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsClient(true);
-
-      const darkBool = window.matchMedia(
-        '(prefers-color-scheme: dark)'
-      ).matches;
-
-      updateFavicon(darkBool);
-    }
-  }, [updateFavicon]);
+    if (!hasMounted) return;
+    updateFavicon(isDarkMode);
+  }, [hasMounted, isDarkMode, updateFavicon]);
 
   return {
-    isDarkMode: isClient ? isDarkMode : false,
-    isLightMode: isClient ? !isDarkMode : true,
+    isDarkMode: hasMounted ? isDarkMode : false,
+    isLightMode: hasMounted ? !isDarkMode : true,
   };
 }
 

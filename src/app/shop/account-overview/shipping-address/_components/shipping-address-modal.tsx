@@ -65,7 +65,6 @@ const ShippingAddressModal = ({
     handleSubmit,
     control,
     reset,
-    watch,
     trigger,
     formState: { errors, isSubmitting, isValid },
   } = useForm<ShippingAddressFormData>({
@@ -113,7 +112,7 @@ const ShippingAddressModal = ({
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
 
-      const selectedCountry = countries.find((c) => c.code === watch('shipping_country'));
+      const selectedCountry = countries.find((c) => c.code === data.shipping_country);
 
       const payload = {
         ...data,

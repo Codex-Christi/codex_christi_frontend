@@ -43,7 +43,6 @@ type StatusState =
 
 export default function AdminCatalogClient({ initialSyncState, initialSamples }: Props) {
   const [syncState, setSyncState] = useState<SyncState | null>(initialSyncState);
-  const [samples] = useState<VariantWithRelations[]>(initialSamples);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<VariantWithRelations[] | null>(null);
   const [status, setStatus] = useState<StatusState>({ type: 'idle' });
@@ -51,20 +50,14 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
   const [refreshProgress, setRefreshProgress] = useState(0);
 
   const working = isPending || status.type === 'loading';
-  const list = searchResults ?? samples;
+  const list = searchResults ?? initialSamples;
 
   // 🔄 Simple animated progress bar while "loading"
   useEffect(() => {
-    if (status.type !== 'loading') {
-      setRefreshProgress(0);
-      return;
-    }
+    if (status.type !== 'loading') return;
 
-    let pct = 10;
-    setRefreshProgress(pct);
     const id = setInterval(() => {
-      pct = Math.min(95, pct + 5);
-      setRefreshProgress(pct);
+      setRefreshProgress((pct) => Math.min(95, pct + 5));
     }, 400);
 
     return () => clearInterval(id);
@@ -72,6 +65,7 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
 
   const handleRefreshConfirmed = () => {
     startTransition(async () => {
+      setRefreshProgress(10);
       setStatus({ type: 'loading', message: 'Refreshing catalog…' });
       const loadID1 = showLoadingToast({ message: 'Refreshing catalog…' });
 
@@ -80,6 +74,7 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
         toast.dismiss(loadID1);
         if (res.ok) {
           setSyncState(res.syncState ?? null);
+          setRefreshProgress(100);
           const msg = `Refreshed. Variants: ${res.ingestedVariants}, products: ${res.totalProducts}`;
           setStatus({
             type: 'success',
@@ -87,6 +82,7 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
           });
           showSuccessToast({ header: 'Catalog refreshed', message: msg });
         } else {
+          setRefreshProgress(0);
           const msg = res.error ?? 'Refresh failed.';
           setStatus({
             type: 'error',
@@ -95,6 +91,7 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
           showErrorToast?.({ header: 'Search failed', message: msg });
         }
       } catch (e: unknown) {
+        setRefreshProgress(0);
         const message = e instanceof Error ? e.message : 'Refresh failed.';
         setStatus({ type: 'error', message });
         showErrorToast?.({ header: 'Refresh error', message });
@@ -104,6 +101,7 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
 
   const handleSearch = () => {
     startTransition(async () => {
+      setRefreshProgress(10);
       setStatus({ type: 'loading', message: 'Searching…' });
       const loadID2 = showLoadingToast({ message: 'Searching catalog…' });
 
@@ -112,6 +110,7 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
         toast.dismiss(loadID2);
         if (res.ok) {
           setSearchResults(res.variants as VariantWithRelations[]);
+          setRefreshProgress(100);
           const msg = `Found ${res.variants.length} result(s).`;
           setStatus({
             type: 'success',
@@ -119,6 +118,7 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
           });
           showSuccessToast?.({ header: 'Search complete', message: msg });
         } else {
+          setRefreshProgress(0);
           const msg = res.message ?? 'Search failed.';
           setStatus({
             type: 'error',
@@ -127,6 +127,7 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
           showErrorToast?.({ header: 'Search failed', message: msg });
         }
       } catch (e: unknown) {
+        setRefreshProgress(0);
         const message = e instanceof Error ? e.message : 'Search failed.';
         setStatus({ type: 'error', message });
         showErrorToast({ header: 'Search error', message });

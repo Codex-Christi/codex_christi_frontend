@@ -1,33 +1,20 @@
 'use client';
 
-import { FC, useCallback, useMemo, useState, useEffect } from 'react';
+import { FC, useMemo } from 'react';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
+import { useHasMounted } from '@/lib/hooks/useHasMounted';
 
 export const CartIcon: FC = () => {
   // Hooks
   const { variants } = useCartStore();
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  //   Funcs
-  const getApproxCartItems = useCallback(() => {
-    if (isClient) {
-      const cartLenNum = variants.length;
-
-      const approxString = cartLenNum >= 9 ? '9+' : cartLenNum;
-
-      return approxString;
-    }
-  }, [isClient, variants.length]);
+  const hasMounted = useHasMounted();
+  const approxCartItems = useMemo(() => {
+    if (!hasMounted) return 0;
+    return variants.length >= 9 ? '9+' : variants.length;
+  }, [hasMounted, variants.length]);
 
   //   Bools
-  const cartIsMoreThanNine = useMemo(
-    () => isClient && getApproxCartItems() === '9+',
-    [getApproxCartItems, isClient]
-  );
+  const cartIsMoreThanNine = approxCartItems === '9+';
 
   // JSX
   return (
@@ -63,11 +50,9 @@ export const CartIcon: FC = () => {
           fill='#000'
           fontSize={cartIsMoreThanNine ? 10 : 13}
           fontWeight='bold'
-          transform={
-            cartIsMoreThanNine ? 'translate(17.5 10)' : 'translate(19.5 11.7)'
-          }
+          transform={cartIsMoreThanNine ? 'translate(17.5 10)' : 'translate(19.5 11.7)'}
         >
-          {true ? getApproxCartItems() : 0}
+          {approxCartItems}
         </text>
       </g>
     </svg>

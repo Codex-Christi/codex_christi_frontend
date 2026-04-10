@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore';
 import { Skeleton } from '@/components/UI/primitives/skeleton';
 
@@ -48,9 +48,6 @@ export default function GlobalProductPrice(props: Props) {
     return formatUSD(major);
   }, [props]);
 
-  // Initialize with SSR (either provided, or computed USD) so crawlers & first paint see a price.
-  const [text, setText] = useState<string | null>(initialText);
-
   // Store selectors
   const convertUSDCents = useCurrencyCookie((s) => s.convertUSDCents);
   const fx = useCurrencyCookie((s) => s.fx);
@@ -61,30 +58,26 @@ export default function GlobalProductPrice(props: Props) {
     return Math.round((props.usdAmount ?? 0) * 100);
   }, [props]);
 
-  // Memoize the formatter per currency for efficiency
-  const formatter = useMemo(() => {
-    if (!fx?.currency) return null;
-    try {
-      return new Intl.NumberFormat(undefined, { style: 'currency', currency: fx.currency });
-    } catch {
-      return null;
-    }
-  }, [fx?.currency]);
-
-  // Compute live text when fx/base changes
-  useEffect(() => {
-    if (baseCents == null || !fx) return; // stay on initial USD until FX exists
+  const text = useMemo(() => {
+    if (baseCents == null || !fx) return initialText;
 
     const converted = convertUSDCents(baseCents);
     const major = converted / 100;
 
-    if (formatter) {
-      setText(formatter.format(major));
-    } else {
-      const sym = fx?.currency_symbol || '$';
-      setText(`${sym} ${major.toFixed(2)}`);
+    if (fx.currency) {
+      try {
+        return new Intl.NumberFormat(undefined, {
+          style: 'currency',
+          currency: fx.currency,
+        }).format(major);
+      } catch {
+        // Fall through to the symbol-based formatter.
+      }
     }
-  }, [baseCents, fx, convertUSDCents, formatter]);
+
+    const sym = fx.currency_symbol || '$';
+    return `${sym} ${major.toFixed(2)}`;
+  }, [baseCents, convertUSDCents, fx, initialText]);
 
   // Lightweight loading state: show Skeleton when we have neither initial text nor fx yet
   const isLoading = !text && !fx;

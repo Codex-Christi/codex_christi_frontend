@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "next dev --turbo",
     "build": "next build",
+    "build:webpack": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
     "build-with-env": "next build --update-env",
+    "build-with-env:webpack": "next build --webpack --update-env",
     "merchize:setup-catalog": "bash ./scripts/setup_merchize_catalog.sh",
     "merchize-catalog:db:push": "prisma db push --schema prisma/shop/merchize/priceCatalog.prisma",
     "merchize-catalog:generate": "prisma generate --schema prisma/shop/merchize/priceCatalog.prisma",

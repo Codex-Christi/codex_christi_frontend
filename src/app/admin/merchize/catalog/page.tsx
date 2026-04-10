@@ -23,7 +23,25 @@ async function loginAction(formData: FormData) {
   }
 }
 
-// --- page component ---
+async function getCatalogPageData() {
+  try {
+    const [syncState, sampleVariants] = await Promise.all([
+      merchizeCatalogPrisma.syncState.findUnique({
+        where: { id: 'merchize_catalog' },
+      }),
+      merchizeCatalogPrisma.variant.findMany({
+        include: { product: true, shippingBands: true },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return { syncState, sampleVariants };
+  } catch (error) {
+    console.error('Failed to fetch catalog data:', error);
+    return null;
+  }
+}
 
 export default async function MerchizeAdminPage() {
   const cookieStore = await cookies();
@@ -55,22 +73,16 @@ export default async function MerchizeAdminPage() {
       </div>
     );
   } else {
-    try {
-      const [syncState, sampleVariants] = await Promise.all([
-        merchizeCatalogPrisma.syncState.findUnique({
-          where: { id: 'merchize_catalog' },
-        }),
-        merchizeCatalogPrisma.variant.findMany({
-          include: { product: true, shippingBands: true },
-          take: 5,
-          orderBy: { createdAt: 'desc' },
-        }),
-      ]);
-
-      content = <AdminCatalogClient initialSyncState={syncState} initialSamples={sampleVariants} />;
-    } catch (error) {
-      console.error('Failed to fetch catalog data:', error);
+    const pageData = await getCatalogPageData();
+    if (!pageData) {
       content = <div className='text-white my-[200px]'>Error loading catalog</div>;
+    } else {
+      content = (
+        <AdminCatalogClient
+          initialSyncState={pageData.syncState}
+          initialSamples={pageData.sampleVariants}
+        />
+      );
     }
   }
 

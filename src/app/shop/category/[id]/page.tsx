@@ -63,6 +63,23 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
+async function getCategoryPageData(categoryName: string, page: number, productLimit: number) {
+  try {
+    const [categoryMetaData, initialProductFetchResp] = await Promise.all([
+      getCategoryMetadataFromMerchize(categoryName),
+      fetchCategoryProducts({ category: categoryName, page, page_size: productLimit }),
+    ]);
+
+    return {
+      categoryMetaData,
+      initialProductFetchResp,
+    };
+  } catch (err) {
+    console.log(err);
+    return null;
+  }
+}
+
 export default async function EachCategoryPage({ params, searchParams }: PageProps) {
   const { id: categoryName } = await params;
   const searchParamsObj = await searchParams;
@@ -72,50 +89,43 @@ export default async function EachCategoryPage({ params, searchParams }: PagePro
   const userAgent = (await headers()).get('user-agent') || '';
   const deviceType = /mobile|android|iphone|ipad|ipod/i.test(userAgent) ? 'mobile' : 'desktop';
   const productLimit = deviceType === 'mobile' ? 10 : 15;
-
-  try {
-    const [categoryMetaData, initialProductFetchResp] = await Promise.all([
-      getCategoryMetadataFromMerchize(categoryName),
-      fetchCategoryProducts({ category: categoryName, page, page_size: productLimit }),
-    ]);
-
-    const { name, description } = categoryMetaData;
-    const { products, totalPages } = initialProductFetchResp;
-
-    return (
-      <div className='min-h-[60vh]'>
-        <header className='px-8 pt-10'>
-          <h1 className='font-ocr text-3xl'>{name}</h1>
-          <h2 className='text-lg'>{description}</h2>
-        </header>
-
-        {/* <SkeletonContainer count={productLimit} /> */}
-
-        {/* <Suspense fallback={<SkeletonContainer count={productLimit} />}>
-          <main className='px-8'>
-            <h4>Products Loaded: {JSON.stringify(initialProductFetchResp)}</h4>
-          </main>
-        </Suspense> */}
-        <main className='px-8 pt-7 flex flex-col gap-16 mb-10'>
-          <ProductList
-            category={categoryName}
-            count={productLimit}
-            initialData={products}
-            initialPage={page}
-          />
-
-          <PaginationControls
-            currentPage={page}
-            category={categoryName}
-            limit={productLimit}
-            totalPages={totalPages}
-          />
-        </main>
-      </div>
-    );
-  } catch (err) {
-    console.log(err);
-
+  const pageData = await getCategoryPageData(categoryName, page, productLimit);
+  if (!pageData) {
     return notFound();
   }
+
+  const { name, description } = pageData.categoryMetaData;
+  const { products, totalPages } = pageData.initialProductFetchResp;
+
+  return (
+    <div className='min-h-[60vh]'>
+      <header className='px-8 pt-10'>
+        <h1 className='font-ocr text-3xl'>{name}</h1>
+        <h2 className='text-lg'>{description}</h2>
+      </header>
+
+      {/* <SkeletonContainer count={productLimit} /> */}
+
+      {/* <Suspense fallback={<SkeletonContainer count={productLimit} />}>
+        <main className='px-8'>
+          <h4>Products Loaded: {JSON.stringify(initialProductFetchResp)}</h4>
+        </main>
+      </Suspense> */}
+      <main className='px-8 pt-7 flex flex-col gap-16 mb-10'>
+        <ProductList
+          category={categoryName}
+          count={productLimit}
+          initialData={products}
+          initialPage={page}
+        />
+
+        <PaginationControls
+          currentPage={page}
+          category={categoryName}
+          limit={productLimit}
+          totalPages={totalPages}
+        />
+      </main>
+    </div>
+  );
 }

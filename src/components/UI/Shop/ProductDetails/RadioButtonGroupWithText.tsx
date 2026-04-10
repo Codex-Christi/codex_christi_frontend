@@ -1,4 +1,4 @@
-import React, { useEffect, useId } from 'react';
+import React, { useId } from 'react';
 import { Input } from '../../primitives/input';
 import { cn } from '@/lib/utils';
 import { useCurrentVariant } from './currentVariantStore';
@@ -25,19 +25,10 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({ props, onChange, gr
 
   // Hooks
   const { currentVariantOptions } = useCurrentVariant();
-
-  // useEffect
-  useEffect(() => {
-    // currentVariantOptions is now a map of attributeName -> selectedValue (string | null)
-    // We clear the local selection when there are no active selections in the store.
-    const hasAnySelection = Object.values(currentVariantOptions).some(
-      (value) => value !== null && value !== '',
-    );
-
-    if (!hasAnySelection) {
-      setSelectedValue(undefined);
-    }
-  }, [currentVariantOptions]);
+  const hasAnySelection = Object.values(currentVariantOptions).some(
+    (value) => value !== null && value !== '',
+  );
+  const displaySelectedValue = hasAnySelection ? selectedValue : undefined;
 
   // Helpers
   const handleSelect = (prop: RadioOption, radioValue: string | undefined, scroll = false) => {
@@ -57,7 +48,7 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({ props, onChange, gr
     >
       {props.map((prop) => {
         const radioValue = typeof prop.value === 'string' ? prop.value : prop.value?.value;
-        const isSelected = selectedValue === radioValue;
+        const isSelected = displaySelectedValue === radioValue;
         const isColorValue = radioValue
           ? radioValue.startsWith('#') && radioValue.length === 7
           : false;

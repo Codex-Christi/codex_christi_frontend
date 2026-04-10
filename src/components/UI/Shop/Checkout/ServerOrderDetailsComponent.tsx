@@ -1,7 +1,7 @@
 import { getOrderFinalDetails } from '@/actions/shop/checkout/getOrderFinalDetails';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
-import { createContext, FC, ReactNode, useCallback, useEffect, useState } from 'react';
+import { createContext, FC, ReactNode, useEffect, useState } from 'react';
 
 type ServerOrderDetailsType = Awaited<ReturnType<typeof getOrderFinalDetails>> | null;
 
@@ -16,20 +16,27 @@ export const ServerOrderDetailsComponent: FC<{ children?: ReactNode }> = ({ chil
 
   const [serverOrderDetails, setServerOrderDetails] = useState<ServerOrderDetailsType>(null);
 
-  const serverOrderDetailsUpdaterFunc = useCallback(async () => {
-    const orderDetailsFromServer = await getOrderFinalDetails(
-      cart,
-      country ? country : 'USA',
-      'merchize',
-    );
-
-    setServerOrderDetails(orderDetailsFromServer);
-  }, [cart, country]);
-
-  // useEffect
   useEffect(() => {
-    serverOrderDetailsUpdaterFunc();
-  }, [serverOrderDetailsUpdaterFunc]);
+    let active = true;
+
+    const loadOrderDetails = async () => {
+      const orderDetailsFromServer = await getOrderFinalDetails(
+        cart,
+        country ? country : 'USA',
+        'merchize',
+      );
+
+      if (active) {
+        setServerOrderDetails(orderDetailsFromServer);
+      }
+    };
+
+    void loadOrderDetails();
+
+    return () => {
+      active = false;
+    };
+  }, [cart, country]);
 
   return (
     <ServerOrderDetailsContext.Provider value={serverOrderDetails}>
