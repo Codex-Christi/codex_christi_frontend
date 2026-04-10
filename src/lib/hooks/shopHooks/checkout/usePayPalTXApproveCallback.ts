@@ -4,16 +4,16 @@ import { useCartStore } from '@/stores/shop_stores/cartStore';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { useOrderStringStore } from '@/stores/shop_stores/checkoutStore/ORD-stringStore';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
-import { OnApproveData, OrderResponseBody } from '@paypal/paypal-js';
-import { OrdersCapture } from '@paypal/paypal-server-sdk';
+import { OnApproveData } from '@paypal/paypal-js';
+import { OrderAuthorizeResponse, OrdersCapture } from '@paypal/paypal-server-sdk';
 import { usePost_PaymentProcessors } from './usePost-PaymentProcessors';
 import { useServerActionWithState } from '../../useServerActionWithState';
 import { FetcherError } from '@/lib/utils/SWRfetcherAdvanced';
 import errorToast from '@/lib/error-toast';
 import { useOrderProcessingStore } from '@/stores/shop_stores/checkoutStore/orderProcessingStore';
-import { useShopRouter } from '@/lib/hooks/useShopRouter';
 import { useShallow } from 'zustand/react/shallow';
 import { buildServerPostProcessingFunc } from './paypalProcessingHelpers';
+import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 
 // 🧩 Main Hook
 export const usePayPalTXApproveCallback = () => {
@@ -21,8 +21,8 @@ export const usePayPalTXApproveCallback = () => {
   const { userMainProfile } = useUserMainProfileStore();
   const userId = userMainProfile?.id;
   const ORD_string = useOrderStringStore((s) => s.orderString);
+  const orderToken = usePayPalIntentStore((s) => s.orderToken);
   const serverOrderDetails = useContext(ServerOrderDetailsContext);
-  const { push } = useShopRouter();
 
   const {
     initializeProcessing,
@@ -31,7 +31,6 @@ export const usePayPalTXApproveCallback = () => {
     setOrderCustomId,
     setFlowStatus,
     resetProcessingState,
-    setModalVisible,
   } = useOrderProcessingStore(
     useShallow((state) => ({
       initializeProcessing: state.initializeProcessing,
@@ -40,7 +39,6 @@ export const usePayPalTXApproveCallback = () => {
       setOrderCustomId: state.setOrderCustomId,
       setFlowStatus: state.setFlowStatus,
       resetProcessingState: state.resetProcessingState,
-      setModalVisible: state.setModalVisible,
     })),
   );
 
@@ -111,9 +109,10 @@ export const usePayPalTXApproveCallback = () => {
       userId,
     ],
   );
+  void serverPostProcessingFunc;
 
   const finalizeAfterCapture = useCallback(
-    async (authData: OrderResponseBody, capturedOrder: OrdersCapture) => {
+    async (authData: OrderAuthorizeResponse, capturedOrder: OrdersCapture) => {
       if (!capturedOrder.id) return;
       try {
         startProcessingUI(capturedOrder.id);
@@ -138,27 +137,31 @@ export const usePayPalTXApproveCallback = () => {
   const mainPayPalApproveCallback = useCallback(
     async (data: OnApproveData) => {
       try {
+        if (!orderToken) throw new Error('Missing PayPal order token');
+
         // 1️⃣ Authorize PayPal Order
 
         const authRes = await fetch('/next-api/paypal/orders/authorize', {
           method: 'POST',
-          body: JSON.stringify({ orderID: data.orderID }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderToken, orderID: data.orderID }),
         });
         if (!authRes.ok) throw new Error(`Authorization failed: ${authRes.statusText}`);
 
-        const authData = JSON.parse(await authRes.json()) as OrderResponseBody;
-        const authorizationId = authData?.purchase_units?.[0]?.payments?.authorizations?.[0]?.id;
+        const authData = (await authRes.json()) as OrderAuthorizeResponse;
+        const authorizationId = authData?.purchaseUnits?.[0]?.payments?.authorizations?.[0]?.id;
         if (!authorizationId) throw new Error('Missing authorization ID');
 
         // 2️⃣ Capture Payment
 
         const capRes = await fetch('/next-api/paypal/orders/capture', {
           method: 'POST',
-          body: JSON.stringify({ authorizationId }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderToken, authorizationId }),
         });
         if (!capRes.ok) throw new Error(`Capture failed: ${capRes.statusText}`);
 
-        const capturedOrder = JSON.parse(await capRes.json()) as OrdersCapture;
+        const capturedOrder = (await capRes.json()) as OrdersCapture;
         if (capturedOrder?.status !== 'COMPLETED')
           throw new Error(`Payment not completed: ${capturedOrder?.status}`);
         if (!capturedOrder?.id) throw new Error('Missing PayPal order ID');
@@ -180,7 +183,7 @@ export const usePayPalTXApproveCallback = () => {
         // throw new Error('Failed to complete PayPal order');
       }
     },
-    [finalizeAfterCapture],
+    [finalizeAfterCapture, orderToken],
   );
 
   return {

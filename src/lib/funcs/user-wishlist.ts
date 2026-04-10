@@ -3,7 +3,7 @@ import loadingToast from '@/lib/loading-toast';
 import errorToast from '@/lib/error-toast';
 import successToast from '@/lib/success-toast';
 import { toast } from 'sonner';
-import { getCookie, decrypt } from '@/lib/session/main-session';
+import { getServerAccessToken } from '@/lib/session/server-session';
 import { redirect } from 'next/navigation';
 
 const client = axios.create({
@@ -11,13 +11,7 @@ const client = axios.create({
 });
 
 export const fetchUserWishlist = async () => {
-  const sessionCookie = await getCookie('session');
-
-  const decryptedSessionCookie = await decrypt(sessionCookie?.value);
-
-  const mainAccessToken = decryptedSessionCookie
-    ? (decryptedSessionCookie.mainAccessToken as string)
-    : ('' as string);
+  const mainAccessToken = await getServerAccessToken();
 
   try {
     const resp: AxiosResponse<{
@@ -49,13 +43,7 @@ export const addToWishlist = async (product_ids: string[]) => {
     message: 'Processing request...',
   });
 
-  const sessionCookie = await getCookie('session');
-
-  const decryptedSessionCookie = await decrypt(sessionCookie?.value);
-
-  const mainAccessToken = decryptedSessionCookie
-    ? (decryptedSessionCookie.mainAccessToken as string)
-    : ('' as string);
+  const mainAccessToken = await getServerAccessToken();
 
   try {
     const resp: AxiosResponse<{
@@ -106,13 +94,7 @@ export const removeFromWishlist = async (product_ids: string[]) => {
     message: 'Processing request...',
   });
 
-  const sessionCookie = await getCookie('session');
-
-  const decryptedSessionCookie = await decrypt(sessionCookie?.value);
-
-  const mainAccessToken = decryptedSessionCookie
-    ? (decryptedSessionCookie.mainAccessToken as string)
-    : ('' as string);
+  const mainAccessToken = await getServerAccessToken();
 
   try {
     toast.dismiss(loadingToastID);

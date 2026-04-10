@@ -1,6 +1,12 @@
 "use server";
 
-import { createSession, decrypt, getCookie } from "@/lib/session/main-session";
+import { createSession } from "@/lib/session/main-session";
+import { getServerSessionState, getServerUserID } from "@/lib/session/server-session";
+
+export interface AuthSessionState {
+  isAuthenticated: boolean;
+  user_id: string | null;
+}
 
 export async function createLoginSession(
 	accessToken: string,
@@ -21,9 +27,14 @@ export async function createLoginSession(
 }
 
 export async function getUserID() {
-	const sessionCookie = await getCookie("session");
+	return (await getServerUserID()) as string;
+}
 
-	const decryptedSessionCookie = await decrypt(sessionCookie?.value);
+export async function getAuthSessionState(): Promise<AuthSessionState> {
+	const sessionState = await getServerSessionState();
 
-	return decryptedSessionCookie?.userID as string;
+	return {
+		isAuthenticated: sessionState.isAuthenticated,
+		user_id: sessionState.userID,
+	};
 }

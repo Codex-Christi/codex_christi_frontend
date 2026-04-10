@@ -1,11 +1,10 @@
 // src/store/authStore.ts
 import { create } from 'zustand';
-import { verifySession } from '@/lib/session/session-validate';
-import { getUserID } from '@/actions/login';
+import { AuthSessionState, getAuthSessionState } from '@/actions/login';
 
 // Interfaces and types
 interface AuthState {
-  autoUpDateSession: () => Promise<void>;
+  autoUpDateSession: () => Promise<AuthSessionState>;
   isAuthenticated: boolean;
   setIsAuthenticated: (bool: boolean) => void;
   // setLoginState: (accessToken: string, refreshToken: string) => void;
@@ -17,26 +16,36 @@ interface AuthState {
 
 type UserSessionInfoType = AuthState['userSessionInfo'];
 
+let authSessionSyncPromise: Promise<AuthSessionState> | null = null;
+
 // useAuthStore Hook
 export const useAuthStore = create<AuthState>((set) => ({
-  sessionCookie: null,
-  refreshToken: null,
   isAuthenticated: false,
   setIsAuthenticated: (bool: boolean) => set({ isAuthenticated: bool }),
   userSessionInfo: null,
   autoUpDateSession: async () => {
-    // Check if session exists in localStorage
-    // If not, do nothing
+    if (!authSessionSyncPromise) {
+      // Share one in-flight auth check across duplicate mounts and rerenders.
+      authSessionSyncPromise = (async () => {
+        const sessionState = await getAuthSessionState();
+        const userSessionInfo = sessionState.user_id
+          ? ({ user_id: sessionState.user_id } as UserSessionInfoType)
+          : null;
 
-    const userSessionInfo = {
-      user_id: await getUserID(),
-    } as UserSessionInfoType;
-    const isAuthenticated = (await verifySession()) === true ? true : false;
+        set({
+          userSessionInfo,
+          isAuthenticated: sessionState.isAuthenticated,
+        });
 
-    return set({
-      userSessionInfo,
-      isAuthenticated,
-    });
+        return sessionState;
+      })();
+    }
+
+    try {
+      return await authSessionSyncPromise;
+    } finally {
+      authSessionSyncPromise = null;
+    }
   },
 }));
 

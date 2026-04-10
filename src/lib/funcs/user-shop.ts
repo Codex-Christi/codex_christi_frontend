@@ -1,8 +1,7 @@
 'use server';
 
 import axios, { AxiosError, AxiosResponse } from 'axios';
-import { decrypt } from '@/lib/session/main-session';
-import { cookies } from 'next/headers';
+import { getServerAccessToken } from '@/lib/session/server-session';
 import { redirect } from 'next/navigation';
 import { IUserShopProfile } from '../types/user-shop-interface';
 
@@ -11,22 +10,16 @@ const client = axios.create({
 });
 
 export const fetchUserShopProfile = async () => {
-  const cookieValue = (await cookies()).get('session')?.value;
+  const mainAccessToken = await getServerAccessToken();
 
-  if (!cookieValue) {
-    return null;
-  }
-
-  const accessToken = await decrypt(cookieValue);
-
-  if (!accessToken?.mainAccessToken) {
+  if (!mainAccessToken) {
     return null;
   }
 
   try {
     const resp: AxiosResponse<IUserShopProfile> = await client.get('/shop/my-shop-profile', {
       headers: {
-        Authorization: `Bearer ${accessToken.mainAccessToken}`,
+        Authorization: `Bearer ${mainAccessToken}`,
       },
     });
 

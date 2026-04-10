@@ -10,7 +10,7 @@ import loadingToast from '@/lib/loading-toast';
 import errorToast from '@/lib/error-toast';
 import successToast from '@/lib/success-toast';
 import { toast } from 'sonner';
-import { decrypt, getCookie } from '@/lib/session/main-session';
+import { getServerAccessToken } from '@/lib/session/server-session';
 import { FetcherError, universalFetcher } from '@/lib/utils/SWRfetcherAdvanced';
 
 // Interfaces
@@ -23,14 +23,7 @@ interface UserPatchResponse {
 
 // Patch User Function (universal fetcher)
 const patchUser = async (formData: FormData): Promise<UserPatchResponse> => {
-  const sessionCookie = await getCookie('session');
-  const decryptedSessionCookie = await decrypt(sessionCookie?.value);
-
-  const mainAccessToken =
-    decryptedSessionCookie?.mainAccessToken &&
-    typeof decryptedSessionCookie.mainAccessToken === 'string'
-      ? decryptedSessionCookie.mainAccessToken
-      : undefined;
+  const mainAccessToken = (await getServerAccessToken()) ?? undefined;
 
   const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
   if (!baseURL) {

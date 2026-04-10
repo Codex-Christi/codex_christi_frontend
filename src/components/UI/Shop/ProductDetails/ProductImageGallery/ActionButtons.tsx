@@ -13,8 +13,7 @@ export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) =>
   const { id } = useParams();
 
   const wishlistStore = useWishlist((state) => state);
-
-    const addWishlistItem = wishlistStore.addWishlistItem;
+  const addWishlistItem = wishlistStore.addWishlistItem;
 
   // Hooks
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -55,10 +54,13 @@ export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) =>
 
   // Effects
   useEffect(() => {
-    // Access window.location only after the component mounts on the client-side
     if (typeof window !== 'undefined') {
       setCurrentUrl(window.location.href);
     }
+  }, []);
+
+  useEffect(() => {
+    wishlistStore.getWishlist();
   }, []);
 
   /* Action buttons (share / wishlist / inspect) */

@@ -11,7 +11,6 @@ import errorToast from '@/lib/error-toast';
 import loadingToast from '@/lib/loading-toast';
 import successToast from '@/lib/success-toast';
 import { createLoginSession } from '@/actions/login';
-import { verifySession } from '@/lib/session/session-validate';
 import useAuthStore from '@/stores/authStore';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 
@@ -101,13 +100,10 @@ export const useLogin = () => {
             errorMsg: '',
           });
 
-          // Manually check if session is created and active (from server)
-          const isSessionActive = await verifySession();
+          // Sync the auth store from the server session we just created.
+          const sessionState = await autoUpDateSession();
 
-          if (isSessionActive === true) {
-            // Update the auth store
-            autoUpDateSession();
-
+          if (sessionState.isAuthenticated) {
             // Fetch profile into Zustand BEFORE redirecting (non-shop flows)
             const { setProfileFromServer } = useUserMainProfileStore.getState();
 

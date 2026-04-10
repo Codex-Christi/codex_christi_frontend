@@ -1,6 +1,7 @@
 // app/api/logout/route.ts
 import { NextRequest } from 'next/server';
-import { decrypt, deleteSession, getCookie } from '@/lib/session/main-session';
+import { deleteSession } from '@/lib/session/main-session';
+import { getServerRefreshToken } from '@/lib/session/server-session';
 import axios from 'axios';
 import { clearUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { redirect } from 'next/navigation';
@@ -15,15 +16,8 @@ export async function GET(req: NextRequest) {
   const redirectUrl = `${protocol}://${host}/auth/sign-in?from-logout=true`;
 
   try {
-    // Get the refresh token from cookies
-    // and decrypt it to get the main refresh token
-    const refreshToken = await getCookie('refreshToken');
+    const mainRefreshToken = await getServerRefreshToken();
 
-    const decryptRefreshToken = await decrypt(refreshToken?.value);
-
-    const mainRefreshToken = decryptRefreshToken
-      ? (decryptRefreshToken.mainRefreshToken as string)
-      : ('' as string);
     await axiosClient.post('/auth/user-logout', { refresh: mainRefreshToken });
     clearUserMainProfileStore();
     await deleteSession(); // allowed here

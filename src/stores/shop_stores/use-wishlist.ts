@@ -108,18 +108,13 @@ export const useWishlist = create<WishlistStore>()(
           return value;
         },
       }),
-      onRehydrateStorage: () => async (state) => {
+      onRehydrateStorage: () => (state) => {
         state?.hydrate();
-        await state?.getWishlist();
       },
     },
   ),
 );
 
-// Auto-rehydrate on store creation (client-side only)
-if (typeof window !== 'undefined') {
-  useWishlist.persist.rehydrate();
-}
 
 export const clearWishlistStorage = () => {
   useWishlist.getState().clearWishlist();

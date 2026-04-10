@@ -1,5 +1,5 @@
-import { verifySession } from '@/lib/session/session-validate';
 import { NextRequest, NextResponse } from 'next/server';
+import { getRequestSessionState } from '@/lib/session/request-session';
 
 export const authVerifierAndRouteProtector = async (req: NextRequest) => {
   // Auth verifier for shop login page on codexchristi.shop
@@ -12,19 +12,13 @@ export const authVerifierAndRouteProtector = async (req: NextRequest) => {
     const checkObj = { isLocalHost, isProdShopDomian, req };
 
     try {
-      // const referrer = req.headers.get('referer')?.split(hostname)[1];
-      // const url = req.nextUrl.clone().toString()?.split(hostname)[1];
-
-      // Check if the referrer and URL are the same
-      // and if the session is valid for GET requests
-
       return checkAndRedirect(checkObj);
     } catch (error) {
       console.error('Error verifying session:', error);
+      return NextResponse.next();
     }
   } else {
-    // return redirectToReferrer(req);
-    return checkAndRedirect();
+    return NextResponse.next();
   }
 };
 
@@ -48,11 +42,17 @@ type CheckAndRedirectType = {
 
 const checkAndRedirect = async (obj?: CheckAndRedirectType) => {
   const { req, isLocalHost, isProdShopDomian } = obj || {};
-  if ((await verifySession()) === true && obj) {
+  if (!obj) {
+    return NextResponse.next();
+  }
+
+  const sessionState = await getRequestSessionState(req);
+
+  if (sessionState.isAuthenticated) {
     return NextResponse.redirect(
       new URL(`${isLocalHost ? '/shop' : isProdShopDomian ? '' : ''}/account-overview`, req?.url),
-    ); // Redirect to the referrer if session is valid
-  } else {
-    return NextResponse.next(); // Proceed with the request if session is valid
+    );
   }
+
+  return NextResponse.next();
 };

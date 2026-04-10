@@ -1,12 +1,13 @@
 import { z } from 'zod';
 
+const stringField = (requiredMessage: string, invalidTypeMessage = requiredMessage) =>
+  z.string({
+    error: (issue) => (issue.input === undefined ? requiredMessage : invalidTypeMessage),
+  });
+
 export const resetPasswordSchema = z
 	.object({
-		otp: z
-			.string({
-				required_error: "OTP is required",
-				invalid_type_error: "OTP must be a string",
-			})
+		otp: stringField("OTP is required", "OTP must be a string")
 			.length(6, "OTP must be exactly 6 digits long")
 			.refine((val) => /^\d{6}$/.test(val), {
 				message: "OTP must be a valid 6-digit number",

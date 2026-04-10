@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: 'Verify registration OTP',
 };
 
-const VerifyOTPPage = (): JSX.Element => {
+const VerifyOTPPage = () => {
   return (
     <Suspense>
       <VerifyOTP />

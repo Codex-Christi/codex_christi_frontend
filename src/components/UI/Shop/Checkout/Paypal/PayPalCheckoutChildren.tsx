@@ -3,13 +3,13 @@ import MyPaypalButtons from './MyPaypalButtons';
 import MyPayPalCardFields from './MyPaypalCardFields';
 import { FC, useCallback, useContext } from 'react';
 import { CheckoutOptions } from '../PaymentSection';
-import { encrypt, useCartStore } from '@/stores/shop_stores/cartStore';
+import { useCartStore } from '@/stores/shop_stores/cartStore';
 import { ServerOrderDetailsContext } from '../ServerOrderDetailsComponent';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
-
-import { createOrderAction } from '@/actions/shop/paypal/createOrderAction';
-
 import { usePayPalTXApproveCallback } from '@/lib/hooks/shopHooks/checkout/usePayPalTXApproveCallback';
+import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
+import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
+import { useOrderStringStore } from '@/stores/shop_stores/checkoutStore/ORD-stringStore';
 
 const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   // Props
@@ -20,6 +20,9 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   const serverOrderDetails = useContext(ServerOrderDetailsContext);
   const { first_name, last_name, email, delivery_address } = useShopCheckoutStore();
   const { mainPayPalApproveCallback } = usePayPalTXApproveCallback();
+  const setIntent = usePayPalIntentStore((store) => store.setIntent);
+  const userId = useUserMainProfileStore((store) => store.userMainProfile?.id);
+  const otpOrderId = useOrderStringStore((store) => store.orderString);
 
   // Destructuring
   const { countrySupport } = serverOrderDetails || {};
@@ -28,26 +31,30 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   // Create order async function
   const createOrder = useCallback(async (): Promise<string> => {
     try {
-      const response = await createOrderAction(
-        encrypt(
-          JSON.stringify({
-            cart,
-            customer: {
-              name: `${first_name} ${last_name}`,
-              email: email ?? 'john@example.com',
-            },
-            country: country_iso2 ?? 'US',
-            country_iso_3: country_iso3 ?? 'USA',
-            initialCurrency: currency ?? 'USD',
-            delivery_address,
-          }),
-        ),
-      );
+      const response = await fetch('/next-api/paypal/tx-ledger/intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cart,
+          customer: {
+            name: `${first_name} ${last_name}`,
+            email: email ?? 'john@example.com',
+          },
+          country: country_iso2 ?? 'US',
+          country_iso_3: country_iso3 ?? 'USA',
+          initialCurrency: currency ?? 'USD',
+          delivery_address,
+          userId,
+          otpOrderId,
+        }),
+      });
 
-      const orderData = typeof response === 'string' ? JSON.parse(response) : response;
+      const orderData = await response.json();
 
-      if (orderData.id) {
-        return orderData.id as string;
+      if (response.ok && orderData?.orderToken && orderData?.paypalOrderId) {
+        setIntent({ orderToken: orderData.orderToken });
+
+        return orderData.paypalOrderId as string;
       } else {
         type PaypalErrorDetail = { description: string; issue: string };
         type PaypalErrorResponse = {
@@ -60,10 +67,10 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
 
         if (typeof orderData === 'object' && statCode >= 400 && statCode <= 499) {
           const {
-            details: [errorDetail, ,],
-            links: [{ href }],
+            details: [errorDetail, ,] = [{ description: 'Unable to create PayPal order', issue: 'PayPal Error' }],
+            links: [{ href } = { href: '' }] = [],
             debug_id,
-          } = JSON.parse(response.body as string) as PaypalErrorResponse;
+          } = orderData as PaypalErrorResponse;
 
           const { description, issue } = errorDetail;
 
@@ -87,7 +94,19 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
       });
       throw new Error('Failed to create PayPal order');
     }
-  }, [cart, country_iso2, country_iso3, currency, delivery_address, email, first_name, last_name]);
+  }, [
+    cart,
+    country_iso2,
+    country_iso3,
+    currency,
+    delivery_address,
+    email,
+    first_name,
+    last_name,
+    otpOrderId,
+    setIntent,
+    userId,
+  ]);
 
   // Main JSX
   return (

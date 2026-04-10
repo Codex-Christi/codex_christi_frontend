@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { redirectLoggedInUserToProfile } from '../session/session-redirect';
-import { getCookie } from '../session/main-session';
-import { logoutUser } from '@/actions/logout';
+import { clearAuthCookies, getRequestSessionState } from '../session/request-session';
 
 export const redirectLoggedInUserToProfileMiddleware = async (request: NextRequest) => {
   return await redirectLoggedInUserToProfile(request);
@@ -9,20 +8,22 @@ export const redirectLoggedInUserToProfileMiddleware = async (request: NextReque
 
 export const redirectExpSessionToLoginPage = async (req: NextRequest) => {
   const hostname = req.headers.get('host');
-  try {
-    const isSessionAvailable = (await getCookie('session')) ? true : false;
+  const sessionState = await getRequestSessionState(req);
 
-    if (!isSessionAvailable) {
-      await logoutUser();
-
-      return NextResponse.redirect(
-        new URL(
-          `/auth/${hostname === 'codexchristi.shop' ? 'login' : 'sign-in'}?sessionExp=true`,
-          req.url,
-        ),
-      );
-    }
-  } catch {
-    return NextResponse.redirect(new URL('/auth/sign-in?sessionExp=true', req.url));
+  if (sessionState.isAuthenticated) {
+    return NextResponse.next();
   }
+
+  const response = NextResponse.redirect(
+    new URL(
+      `/auth/${hostname === 'codexchristi.shop' ? 'login' : 'sign-in'}?sessionExp=true`,
+      req.url,
+    ),
+  );
+
+  if (sessionState.shouldClearCookies) {
+    return clearAuthCookies(response);
+  }
+
+  return response;
 };

@@ -5,7 +5,8 @@ import { ReactNode, useEffect } from 'react';
 // Main Provider Component
 function LoggedinProvider({ children }: { children: ReactNode }) {
   // Hooks
-  const { autoUpDateSession, isAuthenticated } = useAuthStore((state) => state);
+  const autoUpDateSession = useAuthStore((state) => state.autoUpDateSession);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   // useEffects
   useEffect(() => {

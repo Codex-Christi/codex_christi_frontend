@@ -26,17 +26,11 @@ import {
   ShippingAddressFormData,
   shippingAddressSchema,
 } from '@/lib/types/shipping-address-schema';
-import { getCookie, decrypt } from '@/lib/session/main-session';
+import { getServerAccessToken } from '@/lib/session/server-session';
 import { IUserShopProfile } from '@/lib/types/user-shop-interface';
 
 const updateShippingAddress = async (formData: ShippingAddressFormData) => {
-  const sessionCookie = await getCookie('session');
-
-  const decryptedSessionCookie = await decrypt(sessionCookie?.value);
-
-  const mainAccessToken = decryptedSessionCookie
-    ? (decryptedSessionCookie.mainAccessToken as string)
-    : ('' as string);
+  const mainAccessToken = (await getServerAccessToken()) ?? '';
 
   const client = axios.create({
     baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,

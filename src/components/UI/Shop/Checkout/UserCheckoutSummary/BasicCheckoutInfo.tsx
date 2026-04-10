@@ -41,9 +41,7 @@ const deliveryAddressSchema = billingAddressSchema.pick({
 
 const BasicCheckoutInfoFormSchema = z
   .object({
-    country: z.string({
-      required_error: 'Please select a country',
-    }),
+    country: z.string().min(1, { message: 'Please select a country' }),
   })
   .merge(signupExtSchema)
   .merge(deliveryAddressSchema);

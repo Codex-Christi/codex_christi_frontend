@@ -17,7 +17,7 @@ const EditPhoneNumber = ({
 		value ? String(value) : undefined,
 	);
 
-	const lastCountryCodeRef = useRef<string | undefined>();
+	const lastCountryCodeRef = useRef<string | undefined>(undefined);
 
 	useEffect(() => {
 		if (phoneValue) {

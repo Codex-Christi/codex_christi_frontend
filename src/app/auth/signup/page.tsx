@@ -1,7 +1,6 @@
 import { FC } from 'react';
 import SignUpMainComponent from '@/components/UI/Auth/SignUp';
 import { Metadata } from 'next';
-import LoggedinProvider from '@/components/UI/Providers/LoggedinProvider';
 
 export const metadata: Metadata = {
   title: 'Sign Up | Codex Christi',
@@ -9,11 +8,7 @@ export const metadata: Metadata = {
 };
 
 const SignUpPage: FC = () => {
-  return (
-    <LoggedinProvider>
-      <SignUpMainComponent />
-    </LoggedinProvider>
-  );
+  return <SignUpMainComponent />;
 };
 
 export default SignUpPage;

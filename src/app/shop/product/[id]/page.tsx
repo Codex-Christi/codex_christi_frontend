@@ -5,26 +5,31 @@ import { Metadata } from 'next';
 import { getProductDetailsSSR } from './productDetailsSSR';
 import { notFound } from 'next/navigation';
 import serialize from 'serialize-javascript';
+import { extractProductMetaDescriptionFromHtml } from '@/lib/utils/extract-plain-text-from-html';
 
 type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-// Once we started consuming the API this would be replaced wuth `generateMetadata`
-// ✅ 1. Generate metadata dynamically
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   try {
     const { id } = await params;
     const { productMetaData, productVariants } = await getProductDetailsSSR(id);
+
     const firstImage = productVariants[0].image_uris[0];
     const firstImageUrl = `https://d2dytk4tvgwhb4.cloudfront.net/${firstImage}`;
 
     const title = `${productMetaData.title} | Codex Christi Shop`;
-    const description = productMetaData.description.split('.')[0].replace(/<[^>]*>/g, '');
+    const description = extractProductMetaDescriptionFromHtml(
+      productMetaData.description,
+      productMetaData.title,
+    );
+
+    console.log(description);
 
     return {
       title: title,
-      description: `Buy ${productMetaData.title} now. Limited edition.`,
+      description: description,
       openGraph: {
         title: title,
         description: description,
@@ -72,9 +77,7 @@ const ProductDetails = async ({ params }: PageProps) => {
   } = productData;
 
   const LDImageURL = `https://d2dytk4tvgwhb4.cloudfront.net/${productVariants[0].image_uris[0]}`;
-  const trimmedDescription = description
-    ? description.split('.')[0].replace(/<[^>]*>/g, '')
-    : `Buy the limited ${title} `;
+  const trimmedDescription = extractProductMetaDescriptionFromHtml(description, title);
 
   const JSON_LD_Data = serialize({
     '@context': 'https://schema.org/',

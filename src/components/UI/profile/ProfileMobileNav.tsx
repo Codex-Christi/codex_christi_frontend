@@ -24,20 +24,26 @@ const ProfileMobileNav: FC<SideDrawerInterface> = ({ openState, openCloseControl
   // Main JSX
   return (
     <Drawer direction='left' open={openState} onOpenChange={openCloseController}>
-      <DrawerOverlay className='bg-black/90 !backdrop-blur-[2px] lg:hidden'>
-        <DrawerContent
-          className='!rounded-none h-full bg-black bg-opacity-95 !border-none !fixed !bottom-0 !left-0
-				!z-[500] w-full overflow-y-auto md:w-1/2 lg:hidden min-h-screen'
-        >
-          <DrawerTitle className='!invisible'>
-            <DrawerDescription>Mobile Navigation Sidebar</DrawerDescription>
-          </DrawerTitle>
+      <DrawerOverlay className='bg-black/90 !backdrop-blur-[2px] lg:hidden' />
+      <DrawerContent
+        className='!rounded-none min-h-[100svh] h-[100svh] bg-black/95 !border-none !fixed !bottom-0 !left-0
+				!z-[500] w-full overflow-hidden md:w-1/2 lg:hidden'
+      >
+        <DrawerTitle className='!invisible'>
+          <DrawerDescription>Mobile Navigation Sidebar</DrawerDescription>
+        </DrawerTitle>
 
-          <DrawerClose className='mx-6 mt-2'>
+        <div className='absolute inset-x-0 top-0 z-10 px-6 pt-[max(env(safe-area-inset-top),0.75rem)]'>
+          <DrawerClose className='inline-flex'>
             <CloseButtonSVG className='w-7 h-7' />
           </DrawerClose>
+        </div>
 
-          <div className='flex flex-col text-white gap-10 px-6 pb-10 mt-12'>
+        <div
+          className='min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 text-white
+            pt-[calc(env(safe-area-inset-top)+4.75rem)] pb-[calc(env(safe-area-inset-bottom)+5rem)]'
+        >
+          <div className='flex flex-col gap-10'>
             <form>
               <label
                 className='flex items-center border border-white p-4 py-1 rounded-full'
@@ -229,8 +235,8 @@ const ProfileMobileNav: FC<SideDrawerInterface> = ({ openState, openCloseControl
               </Link>
             </div>
           </div>
-        </DrawerContent>
-      </DrawerOverlay>
+        </div>
+      </DrawerContent>
     </Drawer>
   );
 };

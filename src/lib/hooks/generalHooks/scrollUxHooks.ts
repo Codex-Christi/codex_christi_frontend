@@ -10,10 +10,10 @@ type FadeOpts = {
    * Kept for API compatibility.
    * In the current IntersectionObserver (visibility-based) implementation, this ref is not used.
    */
-  sourceRef: React.RefObject<HTMLElement>;
+  sourceRef: React.RefObject<HTMLElement | null>;
 
   /** In-flow element you’re scrolling toward (usually the full summary wrapper). */
-  targetRef: React.RefObject<HTMLElement>;
+  targetRef: React.RefObject<HTMLElement | null>;
 
   enabled?: boolean;
 
@@ -144,10 +144,10 @@ type SmartPinOpts = {
   enabled?: boolean;
 
   /** A small marker placed where the element “belongs” in flow. */
-  sentinelRef: React.RefObject<HTMLElement>;
+  sentinelRef: React.RefObject<HTMLElement | null>;
 
   /** Optional: the element you’re visually pinning (only used to report placeholder height). */
-  elementRef?: React.RefObject<HTMLElement>;
+  elementRef?: React.RefObject<HTMLElement | null>;
 
   /** Pin when sentinel top crosses this (px from viewport top). Default 24. */
   thresholdTopPx?: number;

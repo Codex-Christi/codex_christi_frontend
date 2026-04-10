@@ -5,6 +5,7 @@ import {
   OrderRequest,
   ItemCategory,
   Item,
+  Order,
 } from '@paypal/paypal-server-sdk';
 import { paypalClient } from '@/lib/paymentClients/paypalClient';
 import { getOrderFinalDetails } from '@/actions/shop/checkout/getOrderFinalDetails';
@@ -44,7 +45,7 @@ const shippingPreferenceForPaymentContext = {
   },
 };
 
-export async function createPayPalOrder(body: CreateOrderActionInterface) {
+export async function createPayPalOrder(body: CreateOrderActionInterface): Promise<Order> {
   const { cart, customer, country, country_iso_3, initialCurrency, delivery_address } = body;
 
   if (!cart) {
@@ -204,9 +205,9 @@ export async function createPayPalOrder(body: CreateOrderActionInterface) {
     };
 
     // Order Creation time...
-    const { body: resBody } = await orders.createOrder(payload);
+    const { result } = await orders.createOrder(payload);
 
-    return resBody;
+    return result;
   } else {
     throw new Error('Invalid Price!! Aborting...');
   }

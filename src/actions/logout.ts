@@ -2,8 +2,8 @@
 import loadingToast from '@/lib/loading-toast';
 import errorToast from '@/lib/error-toast';
 import successToast from '@/lib/success-toast';
-import { decrypt, deleteSession } from '@/lib/session/main-session';
-import { getCookie } from '@/lib/session/main-session';
+import { deleteSession } from '@/lib/session/main-session';
+import { getServerRefreshToken } from '@/lib/session/server-session';
 import { clearUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { toast } from 'sonner';
 
@@ -18,20 +18,10 @@ export const logoutUser = async (): Promise<boolean | LogoutResult> => {
   });
 
   try {
-    // Get refresh token cookie once and short-circuit early if missing
-    const refreshTokenCookie = await getCookie('refreshToken');
-    const encryptedRefreshToken = refreshTokenCookie?.value;
-
-    if (!encryptedRefreshToken) {
-      throw new Error('No refresh token found');
-    }
-
-    // Decrypt once and safely access mainRefreshToken
-    const decrypted = await decrypt(encryptedRefreshToken);
-    const mainRefreshToken = (decrypted as any)?.mainRefreshToken as string | undefined;
+    const mainRefreshToken = await getServerRefreshToken();
 
     if (!mainRefreshToken) {
-      throw new Error('Invalid refresh token');
+      throw new Error('No refresh token found');
     }
 
     const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/auth/user-logout`, {

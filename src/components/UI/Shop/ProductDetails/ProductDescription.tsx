@@ -1,3 +1,5 @@
+'use client';
+
 import { useProductDetailsContext } from '.';
 import DOMPurify from 'isomorphic-dompurify';
 export const ProductDescription = () => {

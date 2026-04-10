@@ -1,35 +1,14 @@
 'use server';
 
-import { decrypt } from '@/lib/session/main-session';
+import { getServerAccessToken } from '@/lib/session/server-session';
 import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
-import { JWTPayload } from 'jose';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
 
 export const getUser = cache(async (): Promise<UserProfileDataInterface | undefined> => {
-  // Read session cookie once
-  const cookieStore = cookies();
-  const encryptedSession = (await cookieStore).get('session')?.value;
-
-  if (!encryptedSession) {
-    // No session at all – treat as unauthenticated
-    return;
-  }
-
-  // Decrypt session and safely access access token
-  let decryptedSession: JWTPayload | undefined;
-  try {
-    decryptedSession = await decrypt(encryptedSession);
-  } catch (err) {
-    console.error('Failed to decrypt session cookie:', err);
-    return;
-  }
-
-  const mainAccessToken = decryptedSession?.mainAccessToken as string | undefined;
+  const mainAccessToken = await getServerAccessToken();
 
   if (!mainAccessToken) {
-    // Missing access token – treat as unauthenticated
     return;
   }
 

@@ -6,10 +6,8 @@ export const metadata: Metadata = {
     description: 'Enter your email to reset your password',
 };
 
-const Index = (): JSX.Element => {
-    return (
-        <ForgotPassword />
-    );
+const Index = () => {
+  return <ForgotPassword />;
 };
 
 export default Index;

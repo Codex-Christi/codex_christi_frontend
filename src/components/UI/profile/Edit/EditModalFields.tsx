@@ -81,9 +81,8 @@ const EditModalFields: FC<EditModalFieldsProps> = ({ isOpen, onRequestClose }) =
   }, [countryCode, currentCurrency, setFormValues]);
 
   const handleClose = useCallback(() => {
-    clearEditData();
     onRequestClose();
-  }, [clearEditData, onRequestClose]);
+  }, [onRequestClose]);
 
   return (
     <section className='flex h-full w-full flex-col bg-[#050505]/80 text-white'>

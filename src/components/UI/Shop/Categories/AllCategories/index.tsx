@@ -1,5 +1,5 @@
 'use client';
-import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useEffect, useMemo, useRef } from 'react';
 import { categories as subNavCategoriesWithIcons } from '@/components/UI/Shop/ShopSubNav/SubNavObj';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 import styles from '@/app/shop/categories/styles.module.css';
@@ -26,18 +26,17 @@ const AllCategoriesClientComponent = () => {
     [],
   );
   const categoriesGridRef = useRef<HTMLElement>(null);
-  const [numOfGridChildren, setNumOfGridChildren] = useState<number | null>(null);
 
   const existingCategoriesWithIconsandHrefs = subNavCategoriesWithIcons.filter((cat) =>
     existingCategories.includes(cat.textValue.toLowerCase()),
   );
+  const numOfGridChildren = existingCategoriesWithIconsandHrefs.length + 1;
 
   useEffect(() => {
     const categoriesGridChildren = Array.from(
       categoriesGridRef!.current!.children ?? [],
     ) as HTMLAnchorElement[];
     const numofChildren = categoriesGridChildren?.length;
-    setNumOfGridChildren(numofChildren);
 
     if (numofChildren && categoriesGridChildren && numofChildren > 3) {
       const remainder = numofChildren % 3;
@@ -57,7 +56,7 @@ const AllCategoriesClientComponent = () => {
 
       return () => clearTimeout(clearer);
     }
-  }, [setNumOfGridChildren]);
+  }, []);
 
   //   Main JSX
   return (
@@ -105,10 +104,12 @@ export default AllCategoriesClientComponent;
 
 interface ShopLinkWithIconInterface {
   textValue: string;
-  SvgElem:
-    | ((props: React.SVGProps<SVGSVGElement>) => JSX.Element)
-    | ((props: React.SVGProps<SVGSVGElement>) => JSX.Element)
-    | IconType;
+  SvgElem: React.ComponentType<{
+    className?: string;
+    width?: string | number;
+    height?: string | number;
+    size?: string | number;
+  }> | IconType;
   href: string;
   numOfGridChildren?: number | null;
 }

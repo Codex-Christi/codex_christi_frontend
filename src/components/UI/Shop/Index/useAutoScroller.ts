@@ -18,7 +18,7 @@ type Options = {
 };
 
 export function useAutoScroller(
-  containerRef: React.RefObject<HTMLElement>,
+  containerRef: React.RefObject<HTMLElement | null>,
   device: { isMobileAndTablet: boolean; isMobile: boolean; isTabletOnly: boolean },
   opts: Options = {},
 ) {

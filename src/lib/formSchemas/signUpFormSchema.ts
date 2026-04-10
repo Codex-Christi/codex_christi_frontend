@@ -1,37 +1,29 @@
 import { z } from 'zod';
 
+const stringField = (requiredMessage: string, invalidTypeMessage = requiredMessage) =>
+  z.string({
+    error: (issue) => (issue.input === undefined ? requiredMessage : invalidTypeMessage),
+  });
+
 export const SignUpFormSchema = z.object({
-  firstname: z
-    .string({
-      required_error: 'First name is required',
-      invalid_type_error: 'First name must be a string',
-    })
+  firstname: stringField('First name is required', 'First name must be a string')
     .min(3, { message: 'Must be 3 or more characters long' })
     .trim()
     .regex(/^[A-Za-zÀ-ÖØ-öø-ÿ'\- ]{1,50}( [A-Za-zÀ-ÖØ-öø-ÿ'\- ]{1,50})?$/gm, {
       message: 'Invalid first name format.',
     }),
-  lastname: z
-    .string({
-      required_error: 'Last name is required',
-      invalid_type_error: 'Last name must be a string',
-    })
+  lastname: stringField('Last name is required', 'Last name must be a string')
     .min(3, { message: 'Must be 3 or more characters long' })
     .trim()
     .regex(/^[A-Za-zÀ-ÖØ-öø-ÿ'\- ]{1,50}( [A-Za-zÀ-ÖØ-öø-ÿ'\- ]{1,50})?$/gm, {
       message: 'Invalid last name format.',
     }),
-  email: z
-    .string({ required_error: 'Email is required' })
+  email: stringField('Email is required')
     .email({
       message: 'Invalid email address.',
     })
     .trim(),
-  password: z
-    .string({
-      required_error: 'Password is required',
-      invalid_type_error: 'Password must be a string',
-    })
+  password: stringField('Password is required', 'Password must be a string')
     .min(8, {
       message: `Must be at least 8 characters`,
     })
@@ -39,11 +31,7 @@ export const SignUpFormSchema = z.object({
     .regex(/^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$/, {
       message: 'Must also contain an uppercase letter, a number, and a symbol',
     }),
-  confirm_password: z
-    .string({
-      required_error: 'Please repeat passowrd',
-      invalid_type_error: 'Password must be a string',
-    })
+  confirm_password: stringField('Please repeat passowrd', 'Password must be a string')
     .min(8, {
       message: `Must be at least 8 characters`,
     })

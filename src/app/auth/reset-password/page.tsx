@@ -7,12 +7,12 @@ export const metadata: Metadata = {
 	description: 'Createa new password and access your account.',
 };
 
-const Index = (): JSX.Element => {
-	return (
-        <Suspense>
-            <ResetPassword />
-        </Suspense>
-    );
+const Index = () => {
+  return (
+    <Suspense>
+      <ResetPassword />
+    </Suspense>
+  );
 };
 
 export default Index;

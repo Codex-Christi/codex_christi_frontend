@@ -1,4 +1,4 @@
-const PasswordResetLogo = (): JSX.Element => {
+const PasswordResetLogo = () => {
     return (
         <div className="grid place-content-center mb-8">
             <svg
@@ -56,7 +56,7 @@ const PasswordResetLogo = (): JSX.Element => {
 	);
 };
 
-const ResetPasswordLogo = (): JSX.Element => {
+const ResetPasswordLogo = () => {
     return (
         <div className="grid place-content-center mb-8">
             <svg width="140" height="170" viewBox="0 0 140 170" fill="none">
