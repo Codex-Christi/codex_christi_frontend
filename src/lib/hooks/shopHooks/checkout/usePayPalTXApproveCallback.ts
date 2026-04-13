@@ -136,6 +136,21 @@ export const usePayPalTXApproveCallback = () => {
   // 💳 Main PayPal Approve Callback
   const mainPayPalApproveCallback = useCallback(
     async (data: OnApproveData) => {
+      const readRouteErrorMessage = async (res: Response, fallback: string) => {
+        try {
+          const payload = (await res.json()) as {
+            error?: { message?: string; code?: string; stage?: string; requestId?: string };
+          };
+
+          if (!payload?.error) return fallback;
+
+          const { code, stage, requestId, message } = payload.error;
+          return `[${stage ?? 'unknown_stage'}] ${code ?? 'UNKNOWN_ERROR'} (${requestId ?? 'no_request_id'}): ${message ?? fallback}`;
+        } catch {
+          return fallback;
+        }
+      };
+
       try {
         if (!orderToken) throw new Error('Missing PayPal order token');
 
@@ -146,7 +161,11 @@ export const usePayPalTXApproveCallback = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ orderToken, orderID: data.orderID }),
         });
-        if (!authRes.ok) throw new Error(`Authorization failed: ${authRes.statusText}`);
+        if (!authRes.ok) {
+          throw new Error(
+            await readRouteErrorMessage(authRes, `Authorization failed: ${authRes.statusText}`),
+          );
+        }
 
         const authData = (await authRes.json()) as OrderAuthorizeResponse;
         const authorizationId = authData?.purchaseUnits?.[0]?.payments?.authorizations?.[0]?.id;

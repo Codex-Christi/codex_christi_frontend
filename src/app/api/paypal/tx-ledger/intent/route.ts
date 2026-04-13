@@ -1,11 +1,70 @@
-import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import type { Order } from '@paypal/paypal-server-sdk';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { createPayPalOrder } from '@/lib/paypal/createPayPalOrder';
+import { paypalRouteError, paypalRouteSuccess } from '@/lib/paypal/txLedger/routeResponses';
 
 export async function POST(req: Request) {
+  const requestId = randomUUID();
+  let orderToken: string | undefined;
+  const validationError = (code: string, message: string) =>
+    paypalRouteError({
+      status: 400,
+      code,
+      stage: 'validate_request',
+      message,
+      requestId,
+    });
+
+  const logRouteError = (stage: string, code: string, err: unknown) => {
+    console.error(`[paypal.intent.${stage}]`, {
+      requestId,
+      orderToken,
+      code,
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+  };
+
+  const fail = async ({
+    code,
+    stage,
+    message,
+    err,
+    status = 500,
+    persistToLedger = true,
+  }: {
+    code: string;
+    stage: string;
+    message: string;
+    err: unknown;
+    status?: number;
+    persistToLedger?: boolean;
+  }) => {
+    logRouteError(stage, code, err);
+
+    if (persistToLedger && orderToken) {
+      await paypalTxLedger.paypalIntent.update({
+        where: { orderToken },
+        data: {
+          status: PAYPAL_LEDGER_STATUS.ERROR,
+          lastErrorCode: code,
+          lastErrorMessage: err instanceof Error ? err.message : String(err),
+        },
+      });
+    }
+
+    return paypalRouteError({
+      status,
+      code,
+      stage,
+      message,
+      requestId,
+      orderToken,
+    });
+  };
+
   try {
     const body = await req.json();
     const {
@@ -18,16 +77,19 @@ export async function POST(req: Request) {
       userId,
       otpOrderId,
     } = body;
+
     if (!Array.isArray(cart) || cart.length === 0) {
-      return NextResponse.json({ error: 'Cart required' }, { status: 400 });
+      return validationError('INVALID_CART', 'Cart required');
     }
     if (!customer?.name || !customer?.email) {
-      return NextResponse.json({ error: 'Customer required' }, { status: 400 });
+      return validationError('INVALID_CUSTOMER', 'Customer required');
     }
     if (!delivery_address) {
-      return NextResponse.json({ error: 'Delivery address required' }, { status: 400 });
+      return validationError('INVALID_DELIVERY_ADDRESS', 'Delivery address required');
     }
-    const orderToken = randomUUID();
+
+    orderToken = randomUUID();
+
     await paypalTxLedger.paypalIntent.create({
       data: {
         orderToken,
@@ -43,6 +105,7 @@ export async function POST(req: Request) {
         shippingSnapshot: delivery_address,
       },
     });
+
     let paypalOrder: Order;
     try {
       paypalOrder = await createPayPalOrder({
@@ -54,39 +117,53 @@ export async function POST(req: Request) {
         delivery_address,
       });
     } catch (createErr) {
-      await paypalTxLedger.paypalIntent.update({
-        where: { orderToken },
-        data: {
-          status: PAYPAL_LEDGER_STATUS.ERROR,
-          lastErrorCode: 'CREATE_ORDER_FAILED',
-          lastErrorMessage: createErr instanceof Error ? createErr.message : String(createErr),
-        },
+      return fail({
+        code: 'CREATE_ORDER_FAILED',
+        stage: 'create_paypal_order',
+        message: 'Failed to create PayPal order',
+        err: createErr,
       });
-      return NextResponse.json({ error: 'Create order failed' }, { status: 500 });
     }
+
     if (!paypalOrder?.id) {
+      return fail({
+        code: 'MISSING_PAYPAL_ORDER_ID',
+        stage: 'persist_paypal_order_id',
+        message: 'Missing PayPal order ID',
+        err: new Error('createPayPalOrder returned no id'),
+      });
+    }
+
+    try {
       await paypalTxLedger.paypalIntent.update({
         where: { orderToken },
         data: {
-          status: PAYPAL_LEDGER_STATUS.ERROR,
-          lastErrorCode: 'MISSING_PAYPAL_ORDER_ID',
-          lastErrorMessage: 'createPayPalOrder returned no id',
+          paypalOrderId: paypalOrder.id,
+          status: PAYPAL_LEDGER_STATUS.INTENT_CREATED,
         },
       });
-      return NextResponse.json({ error: 'Missing PayPal order ID' }, { status: 500 });
+    } catch (persistErr) {
+      return fail({
+        code: 'LEDGER_UPDATE_FAILED',
+        stage: 'persist_paypal_order_id',
+        message: 'Failed to persist PayPal order details',
+        err: persistErr,
+      });
     }
-    await paypalTxLedger.paypalIntent.update({
-      where: { orderToken },
+
+    return paypalRouteSuccess({
+      requestId,
       data: {
+        orderToken,
         paypalOrderId: paypalOrder.id,
-        status: PAYPAL_LEDGER_STATUS.INTENT_CREATED,
       },
     });
-    return NextResponse.json({
-      orderToken,
-      paypalOrderId: paypalOrder.id,
+  } catch (err) {
+    return fail({
+      code: 'INTENT_FAILED',
+      stage: 'intent_route',
+      message: 'Failed to create PayPal intent',
+      err,
     });
-  } catch {
-    return NextResponse.json({ error: 'Intent failed' }, { status: 500 });
   }
 }

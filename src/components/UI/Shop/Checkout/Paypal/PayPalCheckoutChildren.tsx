@@ -30,6 +30,24 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
 
   // Create order async function
   const createOrder = useCallback(async (): Promise<string> => {
+    type IntentResponse =
+      | {
+          data: {
+            orderToken: string;
+            paypalOrderId: string;
+          };
+          requestId: string;
+        }
+      | {
+          error: {
+            code: string;
+            stage: string;
+            message: string;
+            requestId: string;
+            orderToken?: string;
+          };
+        };
+
     try {
       const response = await fetch('/next-api/paypal/tx-ledger/intent', {
         method: 'POST',
@@ -49,43 +67,25 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
         }),
       });
 
-      const orderData = await response.json();
+      const payload = (await response.json()) as IntentResponse;
 
-      if (response.ok && orderData?.orderToken && orderData?.paypalOrderId) {
-        setIntent({ orderToken: orderData.orderToken });
+      if (!response.ok || !('data' in payload)) {
+        const routeError =
+          'error' in payload
+            ? payload.error
+            : {
+                code: 'UNKNOWN_INTENT_ERROR',
+                stage: 'intent_response',
+                message: 'Failed to create PayPal intent',
+                requestId: 'unknown_request_id',
+              };
 
-        return orderData.paypalOrderId as string;
-      } else {
-        type PaypalErrorDetail = { description: string; issue: string };
-        type PaypalErrorResponse = {
-          details: PaypalErrorDetail[];
-          links: { href: string }[];
-          debug_id: string;
-        };
-
-        const statCode = orderData.statusCode as number;
-
-        if (typeof orderData === 'object' && statCode >= 400 && statCode <= 499) {
-          const {
-            details: [errorDetail, ,] = [{ description: 'Unable to create PayPal order', issue: 'PayPal Error' }],
-            links: [{ href } = { href: '' }] = [],
-            debug_id,
-          } = orderData as PaypalErrorResponse;
-
-          const { description, issue } = errorDetail;
-
-          const errorMessage = errorDetail
-            ? ` ${description} Debug ID: (${(debug_id as string) ?? ''})
-            Learn more at ${href}`
-            : JSON.stringify(orderData);
-
-          errorToast({ header: issue, message: errorMessage });
-
-          return errorMessage;
-        } else {
-          throw new Error(orderData);
-        }
+        throw new Error(`[${routeError.stage}] ${routeError.code} (${routeError.requestId})`);
       }
+
+      setIntent({ orderToken: payload.data.orderToken });
+
+      return payload.data.paypalOrderId;
     } catch (err: unknown) {
       console.log(err);
 

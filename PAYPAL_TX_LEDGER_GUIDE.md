@@ -121,7 +121,7 @@ Current state:
 - Add PayPal ledger database tables (Neon/Postgres via Prisma).
 - Extract create-order business logic into `src/lib/paypal/createPayPalOrder.ts` (shared function).
 - Refactor `create-order` route to be a thin wrapper around the shared function.
-- Add a new `/next-api/paypal/intent` route that calls the shared function directly (no self-referential HTTP fetch).
+- Add a new `/next-api/paypal/tx-ledger/intent` route that calls the shared function directly (no self-referential HTTP fetch).
 - Write ledger state during authorize/capture.
 - Make webhook idempotent and trigger server post-processing.
 - Add `/next-api/order-status` polling route.
@@ -141,16 +141,16 @@ Current state:
 ```mermaid
 flowchart TD
   A["Checkout Form + OTP"] --> B["PayPalCheckoutChildren"]
-  B --> C["POST /next-api/paypal/intent"]
+  B --> C["POST /next-api/paypal/tx-ledger/intent"]
   C --> D["Ledger row created (intent_creating)"]
   D --> E["Call createPayPalOrder() directly"]
-  E --> F["Save paypalOrderId + return orderToken"]
+  E --> F["Save paypalOrderId in ledger; return orderToken + paypalOrderId to createOrder()"]
   F --> G["PayPal approve UI"]
   G --> H["POST /next-api/paypal/orders/authorize (with orderToken)"]
   H --> I["Ledger: authorized + authorizePayload"]
   I --> J["POST /next-api/paypal/orders/capture (with orderToken)"]
   J --> K["Ledger: captured + capturePayload"]
-  K --> L["Frontend starts polling /next-api/order-status"]
+  K --> L["Frontend becomes a status consumer and starts polling /next-api/order-status"]
   M["PayPal Webhook PAYMENT.CAPTURE.COMPLETED"] --> N["Webhook dedupe + ledger lookup"]
   N --> |"200 OK immediately"| N2["after() callback"]
   N2 --> O["runPostProcessing(orderToken)"]
@@ -170,7 +170,7 @@ Implement in this order to avoid half-migrated behavior:
 3. Add ledger client wrapper.
 4. Add intent store (client).
 5. Extract create-order logic into `src/lib/paypal/createPayPalOrder.ts` and refactor `create-order` route to use it.
-6. Add `/next-api/paypal/intent` (calls `createPayPalOrder` directly, no self-referential fetch).
+6. Add `/next-api/paypal/tx-ledger/intent` (calls `createPayPalOrder` directly, no self-referential fetch).
 7. Update `PayPalCheckoutChildren` to use intent route.
 8. Update authorize route to persist ledger.
 9. Update capture route to persist ledger.
@@ -383,7 +383,7 @@ Why this wrapper:
 Decision default is string statuses (centralized constants), with Prisma enum conversion deferred.
 
 File:
-- `src/lib/paypal/ledger/status.ts`
+- `src/lib/paypal/txLedger/status.ts`
 
 ```ts
 export const PAYPAL_LEDGER_STATUS = {
@@ -413,7 +413,7 @@ Why this matters:
 Store raw JSON in DB, but type it at read boundaries.
 
 File:
-- `src/lib/paypal/ledger/types.ts`
+- `src/lib/paypal/txLedger/types.ts`
 
 ```ts
 import type { OrderResponseBody } from '@paypal/paypal-js';
@@ -448,20 +448,23 @@ import { create } from 'zustand';
 
 type PayPalIntentState = {
   orderToken?: string;
-  paypalOrderId?: string;
-  setIntent: (payload: { orderToken: string; paypalOrderId: string }) => void;
+  setIntent: (payload: { orderToken: string }) => void;
   clearIntent: () => void;
 };
 
 export const usePayPalIntentStore = create<PayPalIntentState>((set) => ({
   orderToken: undefined,
-  paypalOrderId: undefined,
-  setIntent: ({ orderToken, paypalOrderId }) => set({ orderToken, paypalOrderId }),
-  clearIntent: () => set({ orderToken: undefined, paypalOrderId: undefined }),
+  setIntent: ({ orderToken }) => set({ orderToken }),
+  clearIntent: () => set({ orderToken: undefined }),
 }));
 ```
 
 This is intentionally small and separate from your existing checkout store.
+
+Design note:
+- Keep only `orderToken` in browser app state.
+- Keep `paypalOrderId` as a server-side ledger correlation value.
+- The browser still briefly receives `paypalOrderId` because PayPal's SDK requires `createOrder()` to return it, but your own client state should not retain it after that callback returns.
 
 ---
 
@@ -663,18 +666,23 @@ export async function POST(req: Request) {
 ## 13b) Intent endpoint (calls `createPayPalOrder` directly)
 
 New file:
-- `src/app/api/paypal/intent/route.ts`
+- `src/app/api/paypal/tx-ledger/intent/route.ts`
 
 Purpose:
 - Create ledger row first.
 - Call `createPayPalOrder(...)` directly (no self-referential HTTP fetch).
 - Return `orderToken + paypalOrderId`.
 
+Important ownership note:
+- Store only `orderToken` in browser state.
+- Return `paypalOrderId` only so `createOrder()` can hand it to the PayPal SDK.
+- After capture succeeds, the client should act only as a status consumer. Durable completion belongs to webhook + server runner.
+
 ```ts
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
-import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/ledger/status';
+import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { createPayPalOrder } from '@/lib/paypal/createPayPalOrder';
 
 export async function POST(req: Request) {
@@ -778,7 +786,13 @@ export async function POST(req: Request) {
 Current file:
 - `src/components/UI/Shop/Checkout/Paypal/PayPalCheckoutChildren.tsx`
 
-Replace the `createOrder` callback to call `/next-api/paypal/intent`.
+Replace the `createOrder` callback to call `/next-api/paypal/tx-ledger/intent`.
+
+Important behavior:
+- The intent route returns both `orderToken` and `paypalOrderId`.
+- Store only `orderToken` in `paypalIntentStore`.
+- Return `paypalOrderId` directly to the PayPal SDK.
+- Do not persist `paypalOrderId` in your own client app state after `createOrder()` returns.
 
 ## Required payload sources (codebase-verified)
 
@@ -811,7 +825,7 @@ const createOrder = useCallback(async (): Promise<string> => {
     otpOrderId: otpOrderId || undefined,
   };
 
-  const res = await fetch('/next-api/paypal/intent', {
+  const res = await fetch('/next-api/paypal/tx-ledger/intent', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -827,7 +841,7 @@ const createOrder = useCallback(async (): Promise<string> => {
     throw new Error('Invalid intent response');
   }
 
-  setIntent({ orderToken: data.orderToken, paypalOrderId: data.paypalOrderId });
+  setIntent({ orderToken: data.orderToken });
   return data.paypalOrderId as string;
 }, [
   cart,
@@ -864,7 +878,7 @@ import { NextResponse } from 'next/server';
 import { OrdersController } from '@paypal/paypal-server-sdk';
 import { paypalClient } from '@/lib/paymentClients/paypalClient';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
-import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/ledger/status';
+import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 
 const orders = new OrdersController(paypalClient);
 
@@ -916,54 +930,201 @@ export async function POST(req: Request) {
 Current file:
 - `src/app/api/paypal/orders/capture/route.ts`
 
-Add `orderToken` support and persist:
-- `capturePayload`
-- `status`
+This section needs the same hardening mindset as Section 15. The minimal "call PayPal, then write the DB row" shape is not enough on its own, because PayPal capture can succeed while ledger persistence fails afterward.
+
+Required outcomes:
+- accept `orderToken` plus `authorizationId`
+- persist `capturePayload`
+- persist `status`
+- reject invalid state transitions
+- avoid double-capturing on retries
+- return structured client-safe errors
+
+Recommended defaults:
+- use `PayPal-Request-Id` so repeated capture attempts are idempotent at PayPal's side
+- if the row is already `captured` and `capturePayload` exists, return the stored payload
+- if the row is `error`, only retry with the same deterministic `PayPal-Request-Id`
+- if capture succeeds but ledger persistence fails, return a specific persistence error instead of pretending the whole capture failed normally
 
 ```ts
+import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
-import { PaymentsController } from '@paypal/paypal-server-sdk';
+import { PaymentsController, type CapturedPayment } from '@paypal/paypal-server-sdk';
 import { paypalClient } from '@/lib/paymentClients/paypalClient';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
-import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/ledger/status';
+import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
+import { createPayPalRouteResponders } from '@/lib/paypal/txLedger/routeResponses';
 
 const payments = new PaymentsController(paypalClient);
 
 export async function POST(req: Request) {
-  const { authorizationId, orderToken } = await req.json();
-  if (!authorizationId || !orderToken) {
-    return NextResponse.json({ error: 'authorizationId and orderToken required' }, { status: 400 });
-  }
+  const requestId = randomUUID();
+  let orderToken: string | undefined;
+
+  const { error: routeError } = createPayPalRouteResponders({
+    requestId,
+    getOrderToken: () => orderToken,
+  });
+
+  const validationError = (code: string, message: string, status = 400) =>
+    routeError({
+      status,
+      code,
+      stage: 'validate_request',
+      message,
+    });
+
+  const fail = async ({
+    code,
+    stage,
+    message,
+    err,
+    status = 500,
+    persistToLedger = true,
+  }: {
+    code: string;
+    stage: string;
+    message: string;
+    err: unknown;
+    status?: number;
+    persistToLedger?: boolean;
+  }) => {
+    console.error(`[paypal.capture.${stage}]`, {
+      requestId,
+      orderToken,
+      code,
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+
+    if (persistToLedger && orderToken) {
+      await paypalTxLedger.paypalIntent.update({
+        where: { orderToken },
+        data: {
+          status: PAYPAL_LEDGER_STATUS.ERROR,
+          lastErrorCode: code,
+          lastErrorMessage: err instanceof Error ? err.message : String(err),
+        },
+      }).catch(() => undefined);
+    }
+
+    return routeError({
+      status,
+      code,
+      stage,
+      message,
+    });
+  };
+
+  const persistCapturedResult = async (payload: CapturedPayment) => {
+    await paypalTxLedger.paypalIntent.update({
+      where: { orderToken },
+      data: {
+        status: PAYPAL_LEDGER_STATUS.CAPTURED,
+        capturePayload: JSON.parse(JSON.stringify(payload)),
+        lastErrorCode: null,
+        lastErrorMessage: null,
+      },
+    });
+  };
 
   try {
-    const { body: resBody } = await payments.captureAuthorizedPayment({
+    const { authorizationId, orderToken: requestOrderToken } = await req.json();
+    orderToken = requestOrderToken;
+
+    if (!authorizationId || !orderToken) {
+      return validationError(
+        'INVALID_CAPTURE_REQUEST',
+        'authorizationId and orderToken are required',
+      );
+    }
+
+    const intent = await paypalTxLedger.paypalIntent.findUnique({
+      where: { orderToken },
+    });
+
+    if (!intent) {
+      return routeError({
+        status: 404,
+        code: 'INTENT_NOT_FOUND',
+        stage: 'load_intent',
+        message: 'Intent not found',
+      });
+    }
+
+    if (intent.paypalAuthorizationId && intent.paypalAuthorizationId !== authorizationId) {
+      return routeError({
+        status: 409,
+        code: 'AUTHORIZATION_MISMATCH',
+        stage: 'validate_intent',
+        message: 'Authorization mismatch',
+      });
+    }
+
+    if (intent.status === PAYPAL_LEDGER_STATUS.CAPTURED && intent.capturePayload) {
+      return Response.json(intent.capturePayload);
+    }
+
+    if (
+      intent.status === PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED ||
+      intent.status === PAYPAL_LEDGER_STATUS.PAYMENT_SAVED ||
+      intent.status === PAYPAL_LEDGER_STATUS.COMPLETED ||
+      intent.status === PAYPAL_LEDGER_STATUS.REFUNDED
+    ) {
+      return routeError({
+        status: 409,
+        code: 'CAPTURE_STATE_CONFLICT',
+        stage: 'validate_intent',
+        message: `Cannot capture intent from status "${intent.status}"`,
+      });
+    }
+
+    if (
+      intent.status !== PAYPAL_LEDGER_STATUS.AUTHORIZED &&
+      intent.status !== PAYPAL_LEDGER_STATUS.ERROR
+    ) {
+      return routeError({
+        status: 409,
+        code: 'CAPTURE_STATE_INVALID',
+        stage: 'validate_intent',
+        message: `Unexpected intent status "${intent.status}" before capture`,
+      });
+    }
+
+    const { result } = await payments.captureAuthorizedPayment({
       authorizationId,
+      paypalRequestId: `capture:${orderToken}`,
+      prefer: 'return=representation',
       body: { finalCapture: true },
     });
 
-    await paypalTxLedger.paypalIntent.update({
-      where: { orderToken },
-      data: {
-        capturePayload: resBody as unknown as object,
-        status: PAYPAL_LEDGER_STATUS.CAPTURED,
-      },
-    });
+    try {
+      await persistCapturedResult(result);
+    } catch (persistErr) {
+      return fail({
+        code: 'CAPTURE_PERSIST_FAILED',
+        stage: 'persist_capture_payload',
+        message: 'PayPal capture succeeded but ledger persistence failed',
+        err: persistErr,
+        persistToLedger: false,
+      });
+    }
 
-    return NextResponse.json(resBody);
+    return Response.json(result);
   } catch (err: unknown) {
-    await paypalTxLedger.paypalIntent.update({
-      where: { orderToken },
-      data: {
-        status: PAYPAL_LEDGER_STATUS.ERROR,
-        lastErrorCode: 'CAPTURE_FAILED',
-        lastErrorMessage: err instanceof Error ? err.message : String(err),
-      },
-    }).catch(() => undefined);
-
-    return NextResponse.json({ error: 'Failed to capture' }, { status: 500 });
+    return fail({
+      code: 'CAPTURE_FAILED',
+      stage: 'capture_payment',
+      message: 'Failed to capture PayPal authorization',
+      err,
+    });
   }
 }
 ```
+
+Notes:
+- Capture recovery differs slightly from authorize: the safe default here is provider-side idempotency via a stable `paypalRequestId`, plus returning cached `capturePayload` when the ledger already has it.
+- If you retry capture with a new request id after an ambiguous failure, you are accepting the risk of a second provider-side capture attempt.
 
 ---
 
@@ -983,6 +1144,12 @@ Current file:
 
 4. Start polling `/next-api/order-status`.
 
+5. Treat the client as a status viewer after capture.
+- Capture still happens through your API route.
+- Durable completion happens later through webhook + server runner.
+- Local client state is convenience only, never the source of truth for completion.
+- The canonical recovery handle is `orderToken` in the URL, not long-lived client store state.
+
 ## Template fragment (core changes)
 
 ```ts
@@ -996,6 +1163,9 @@ const authRes = await fetch('/next-api/paypal/orders/authorize', {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ orderID: data.orderID, orderToken }),
 });
+if (!authRes.ok) {
+  throw new Error(await readRouteErrorMessage(authRes, 'Authorization failed'));
+}
 const authData = (await authRes.json()) as OrderResponseBody;
 
 // capture
@@ -1004,11 +1174,33 @@ const capRes = await fetch('/next-api/paypal/orders/capture', {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ authorizationId, orderToken }),
 });
+if (!capRes.ok) {
+  throw new Error(await readRouteErrorMessage(capRes, 'Capture failed'));
+}
 const capturedOrder = (await capRes.json()) as OrdersCapture;
 
 // start UI and polling, no client post-processing
 startProcessingUI(capturedOrder.id);
 startLedgerPolling(orderToken);
+```
+
+Minimal shared error reader:
+
+```ts
+async function readRouteErrorMessage(res: Response, fallback: string) {
+  try {
+    const payload = (await res.json()) as {
+      error?: { message?: string; code?: string; stage?: string; requestId?: string };
+    };
+
+    if (!payload?.error) return fallback;
+
+    const { code, stage, requestId, message } = payload.error;
+    return `[${stage ?? 'unknown_stage'}] ${code ?? 'UNKNOWN_ERROR'} (${requestId ?? 'no_request_id'}): ${message ?? fallback}`;
+  } catch {
+    return fallback;
+  }
+}
 ```
 
 ## Important cleanup in this hook
@@ -1024,6 +1216,14 @@ Keep:
 - error toasts
 - authorize/capture orchestration
 
+Keep the hook thin:
+- read the structured route error
+- initialize the processing UI
+- push the user to a confirmation surface carrying `orderToken`
+- let polling reflect ledger truth
+
+Do not make this hook responsible for receipt upload, backend save, or fulfillment retries.
+
 ---
 
 # 18) Order Status Endpoint
@@ -1032,6 +1232,12 @@ New file:
 - `src/app/api/order-status/route.ts`
 
 Returns ledger truth for polling.
+
+This endpoint should be intentionally small and browser-safe:
+- use `orderToken` as the lookup key
+- do not treat client state as authoritative
+- do not expose `paypalOrderId` unless you have a concrete browser-side need for it
+- return only the fields the confirmation UI actually needs
 
 ```ts
 import { NextResponse } from 'next/server';
@@ -1052,18 +1258,21 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     orderToken: row.orderToken,
-    paypalOrderId: row.paypalOrderId,
     status: row.status,
     lastEventType: row.lastEventType,
     receiptLink: row.receiptLink,
     receiptFile: row.receiptFile,
     backendCustomId: row.backendCustomId,
+    processingCompletedAt: row.processingCompletedAt,
     error: row.lastErrorMessage
       ? { code: row.lastErrorCode, message: row.lastErrorMessage }
       : null,
   });
 }
 ```
+
+Optional hardening:
+- If you later want to keep support correlation available, add a separate admin endpoint that can expose `paypalOrderId` server-side instead of returning it to the browser here.
 
 ---
 
@@ -1080,6 +1289,15 @@ This section fills a missing piece from earlier versions: concrete polling behav
   - `error`
   - `refunded`
 - Also stop on unmount.
+- Prefer `orderToken` from the URL if available. Treat the store as a short-lived bridge, not the recovery source.
+- If the UI thinks it is "processing" but there is no `orderToken`, clear the stale local processing state instead of hanging indefinitely.
+
+Why polling is still the default here:
+- This guide assumes polling first because it is the simplest correct rollout for your current architecture.
+- The confirmation client only needs occasional status changes, not a high-frequency stream.
+- A 2-3 second interval is operationally cheap at low to moderate concurrency and keeps failure recovery simple.
+- If you later outgrow polling, upgrade to SSE while keeping `/next-api/order-status` as fallback.
+- Do not choose gRPC for browser status updates in this flow. Browser support is not a good fit for a simple one-way status channel, and SSE is operationally simpler for confirmation-page style updates.
 
 ## Example polling helper (hook-local)
 
@@ -1118,10 +1336,15 @@ const startLedgerPolling = (orderToken?: string) => {
 };
 ```
 
+Practical rule:
+- the modal can use persisted UI state for continuity
+- the confirmation page must reconcile that state against the ledger on mount
+- ledger truth wins after refresh, reconnect, or browser restart
+
 ## UI mapping adapter template
 
 File:
-- `src/lib/paypal/ledger/mapLedgerToProcessingState.ts`
+- `src/lib/paypal/txLedger/mapLedgerToProcessingState.ts`
 
 ```ts
 type LedgerStatusResponse = {
@@ -1192,6 +1415,11 @@ Current file:
 
 The existing confirmation page uses `[orderId]` as a route param. In the ledger flow, pass `orderToken` as a query param so the page can poll.
 
+This is the preferred recovery model:
+- path segment can still use a PayPal-facing identifier or your existing route shape
+- `orderToken` in the query string is the ledger lookup key
+- if the user refreshes, the page can resume from ledger truth without depending on in-memory client state
+
 ### How `orderToken` reaches the confirmation page
 
 In the approve hook (`usePayPalTXApproveCallback`), after capture succeeds, redirect with `orderToken`:
@@ -1210,7 +1438,7 @@ router.push(
 
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { mapLedgerToProcessingState } from '@/lib/paypal/ledger/mapLedgerToProcessingState';
+import { mapLedgerToProcessingState } from '@/lib/paypal/txLedger/mapLedgerToProcessingState';
 
 export function useLedgerPolling() {
   const searchParams = useSearchParams();
@@ -1284,6 +1512,7 @@ Keep your existing signature verification and raw-body handling.
 2. Robust PayPal order id extraction
 3. Retry when the ledger row is not yet correlated
 4. `runPostProcessing(orderToken)` trigger on `PAYMENT.CAPTURE.COMPLETED`
+5. ACK fast; do not let the webhook route become the place where long receipt/backend/fulfillment work blocks the provider response
 
 ## Why `after()` for post-processing (Next.js 15+)
 
@@ -1313,8 +1542,8 @@ PayPal event shapes vary. Use fallback extraction:
 function getWebhookPaypalOrderId(event: any): string | undefined {
   return (
     event?.resource?.supplementary_data?.related_ids?.order_id ||
-    event?.resource?.seller_protection?.dispute_categories?.[0] || // unlikely fallback, mostly placeholder
-    event?.resource?.invoice_id || // if you later use invoice correlation
+    event?.resource?.custom_id ||
+    event?.resource?.invoice_id ||
     undefined
   );
 }
@@ -1322,20 +1551,21 @@ function getWebhookPaypalOrderId(event: any): string | undefined {
 
 Note:
 - For your flow, primary path is still `supplementary_data.related_ids.order_id`.
-- If needed, prefer adding `custom_id`/invoice-based fallback later.
+- `custom_id` / `invoice_id` are reasonable fallbacks if you later set them explicitly during create-order.
+- Do not use unrelated fields as fake fallbacks just to avoid `undefined`. If correlation fails, record that explicitly and let the webhook retry or recovery path handle it.
 
 ## Default idempotent webhook core template (merge into your route)
 
 ```ts
 import { after } from 'next/server';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
-import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/ledger/status';
-import { runPostProcessing } from '@/lib/paypal/ledger/runPostProcessing';
+import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
+import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
 
 // after verification + parsed `event`
 const eventId = event.id;
 const eventType = event.event_type;
-const paypalOrderId = event?.resource?.supplementary_data?.related_ids?.order_id;
+const paypalOrderId = getWebhookPaypalOrderId(event);
 
 if (!eventId) return new Response('Missing event id', { status: 400 });
 
@@ -1536,6 +1766,11 @@ try {
 return new Response('OK', { status: 200 });
 ```
 
+Operational rule:
+- the webhook is the durable completion trigger
+- the browser is not part of that trust boundary
+- if the client disappears entirely after capture, the webhook path must still be sufficient to complete the order
+
 ---
 
 # 21) Server Post-Processing Runner (ledger-driven)
@@ -1543,11 +1778,13 @@ return new Response('OK', { status: 200 });
 This is the core server-only replacement for client post-processing.
 
 New file:
-- `src/lib/paypal/ledger/runPostProcessing.ts`
+- `src/lib/paypal/txLedger/runPostProcessing.ts`
 
 Important:
 - This section is ledger-focused.
 - Provider-specific fulfillment logic is delegated (see Section 22).
+- The runner must be restart-safe and retry-safe.
+- The runner must be able to finish the order from ledger state alone, without any browser-only context.
 
 **Important: server-only crypto**
 
@@ -1581,10 +1818,10 @@ Update the decrypt side of `savePaymentReceiptToCloud`, `savePaymentDataToBacken
 import { randomUUID } from 'crypto';
 import { encryptForServerAction } from '@/lib/utils/serverActionCrypto';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
-import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/ledger/status';
+import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { savePaymentReceiptToCloud } from '@/actions/shop/paypal/processAndUploadCompletedTx/savePaymentReceiptToCloud';
 import { savePaymentDataToBackend } from '@/actions/shop/paypal/processAndUploadCompletedTx/savePaymentDataToBackend';
-import { sendFulfillmentOrder } from '@/lib/paypal/ledger/providers/fulfillmentAdapter';
+import { sendFulfillmentOrder } from '@/lib/paypal/txLedger/providers/fulfillmentAdapter';
 
 const POST_PROCESSING_LEASE_MS = 5 * 60_000;
 
@@ -1739,6 +1976,8 @@ export async function runPostProcessing(orderToken: string) {
 Operational note:
 - If receipt upload, payment save, or fulfillment can exceed the lease duration, renew `postProcessingLockExpiresAt` between steps.
 - Pass `orderToken` as the downstream idempotency key wherever the target API supports it.
+- Treat the ledger row as the single source of truth for what still needs to run. Do not rebuild required inputs from client stores at this stage.
+- Each step should be safely skippable if its success artifact already exists in the ledger row.
 
 ---
 
@@ -1747,13 +1986,13 @@ Operational note:
 This section isolates non-ledger fulfillment concerns from the main ledger flow.
 
 New files:
-- `src/lib/paypal/ledger/providers/fulfillmentAdapter.ts`
-- `src/lib/paypal/ledger/providers/merchizeFulfillmentAdapter.ts`
+- `src/lib/paypal/txLedger/providers/fulfillmentAdapter.ts`
+- `src/lib/paypal/txLedger/providers/merchizeFulfillmentAdapter.ts`
 
 ## Adapter interface (ledger-facing)
 
 ```ts
-// src/lib/paypal/ledger/providers/fulfillmentAdapter.ts
+// src/lib/paypal/txLedger/providers/fulfillmentAdapter.ts
 import { sendMerchizeFulfillmentOrder } from './merchizeFulfillmentAdapter';
 
 type FulfillmentArgs = {
@@ -1774,7 +2013,7 @@ export async function sendFulfillmentOrder(args: FulfillmentArgs) {
 ## Merchize adapter (provider-specific code isolated here)
 
 ```ts
-// src/lib/paypal/ledger/providers/merchizeFulfillmentAdapter.ts
+// src/lib/paypal/txLedger/providers/merchizeFulfillmentAdapter.ts
 import { sendMerchizeOrderDetailsToBackend } from '@/actions/shop/checkout/createMerchizeOrder/sendMerchizeOrderDetailsToBackend';
 import { encryptForServerAction } from '@/lib/utils/serverActionCrypto';
 
@@ -1874,7 +2113,7 @@ New files:
 'use server';
 
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
-import { runPostProcessing } from '@/lib/paypal/ledger/runPostProcessing';
+import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
 
 export async function retryPostProcessing(orderToken: string) {
   const row = await paypalTxLedger.paypalIntent.findUnique({ where: { orderToken } });
@@ -2222,7 +2461,7 @@ New file:
 ```ts
 import { NextResponse } from 'next/server';
 import { assertAdminSecret } from '@/lib/utils/adminAuth';
-import { runPostProcessing } from '@/lib/paypal/ledger/runPostProcessing';
+import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
 
 export async function POST(req: Request) {
   if (process.env.NODE_ENV === 'production') {
@@ -2269,7 +2508,10 @@ This is the missing operational sequence from earlier drafts.
 5. Update authorize/capture routes to write ledger payloads and statuses.
 
 At this point:
-- Existing checkout behavior should still work (except client post-processing remains disabled as currently coded).
+- Existing checkout behavior should still work.
+- Authorize/capture still happen synchronously through your existing API routes.
+- The client is not the durable owner of completion after capture.
+- Client post-processing remains disabled as currently coded.
 
 ## Step 3: Read path + UI sync
 
@@ -2397,13 +2639,16 @@ These defaults are implemented in this guide’s templates. Items marked **(defe
 5. Capture/authorize operation ownership
 - Keep existing authorize/capture API routes as ownership point
 - Webhook is for confirmation, retries, and durable completion
+- Capture writes the immediate `captured` state; webhook + server runner own everything after that
 
 6. Post-processing execution location
 - Server-only (webhook + runner)
 - Client does polling + UI only
+- Client state is convenience only; ledger truth wins after refresh/reconnect
 
 7. Error handling policy
 - Persist `lastErrorCode` + `lastErrorMessage` on ledger row
+- Prefer structured route errors with stable `code`, `stage`, and `requestId`
 
 8. Idempotency policy
 - Track webhook delivery by `eventId`, but only mark it processed after business work succeeds
@@ -2439,9 +2684,15 @@ Use this section only if you intentionally want to diverge from Section 30.
 
 ---
 
-# 32) Future: Real-Time Notifications at Scale (SSE + Pub/Sub)
+# 32) Future: Real-Time Notifications at Scale (SSE + Pub/Sub, not gRPC)
 
 This section does not need to be implemented now. The polling approach in Section 19 is correct and sufficient. Read this when you are ready to replace polling with push-based real-time updates.
+
+Decision default for this codebase:
+- Polling first.
+- SSE second when polling volume becomes wasteful.
+- Keep `/next-api/order-status` as the source of truth either way.
+- Do not use gRPC for browser-facing order-status delivery. If you ever introduce gRPC, reserve it for internal service-to-service boundaries, not confirmation-page client updates.
 
 ## Why polling is fine for now
 

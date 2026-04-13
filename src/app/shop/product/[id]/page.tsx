@@ -25,8 +25,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       productMetaData.title,
     );
 
-    console.log(description);
-
     return {
       title: title,
       description: description,
