@@ -13,10 +13,10 @@
     "merchize:setup-catalog": "bash ./scripts/setup_merchize_catalog.sh",
     "merchize-catalog:db:push": "prisma db push --schema prisma/shop/merchize/priceCatalog.prisma",
     "merchize-catalog:generate": "prisma generate --schema prisma/shop/merchize/priceCatalog.prisma",
-    "prisma:paypalTxLedger:generate:dev": "PAYPAL_TX_LEDGER_TARGET=dev prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
-    "prisma:paypalTxLedger:generate:prod": "PAYPAL_TX_LEDGER_TARGET=prod prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
-    "prisma:paypalTxLedger:migrate:dev": "PAYPAL_TX_LEDGER_TARGET=dev prisma migrate dev --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
-    "prisma:paypalTxLedger:migrate:deploy:prod": "PAYPAL_TX_LEDGER_TARGET=prod prisma migrate deploy --schema prisma/shop/paypal/paypalTXLedger.schema.prisma"
+    "prisma:paypalTxLedger:generate:dev": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
+    "prisma:paypalTxLedger:generate:prod": "PAYPAL_TX_LEDGER_NEON_BRANCH=prod prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
+    "prisma:paypalTxLedger:migrate:dev": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev prisma migrate dev --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
+    "prisma:paypalTxLedger:migrate:deploy:prod": "PAYPAL_TX_LEDGER_NEON_BRANCH=prod prisma migrate deploy --schema prisma/shop/paypal/paypalTXLedger.schema.prisma"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1026.0",

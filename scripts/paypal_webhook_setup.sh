@@ -104,11 +104,11 @@ build_webhook_url() {
   local normalized="${raw%/}"
 
   if [[ "$normalized" == http://* || "$normalized" == https://* ]]; then
-    printf '%s/next-api/paypal/webhook/payment-capture' "$normalized"
+    printf '%s/next-api/paypal/webhooks/ledger-transaction-events' "$normalized"
     return
   fi
 
-  printf 'https://%s.ngrok-free.app/next-api/paypal/webhook/payment-capture' "$normalized"
+  printf 'https://%s.ngrok-free.app/next-api/paypal/webhooks/ledger-transaction-events' "$normalized"
 }
 
 require_command curl
@@ -141,6 +141,18 @@ client_secret="$(prompt_secret_with_mode "PayPal client secret")"
 
 # Let the caller choose the exact listener URL target.
 # For sandbox this can be ngrok; for live this can be your production domain.
+echo
+echo "Webhook base URL input examples:"
+echo "- Full base URL: https://codexchristi.org"
+echo "- Full shop URL: https://codexchristi.shop"
+echo "- Ngrok subdomain only: my-paypal-dev-tunnel"
+echo "- Full ngrok URL: https://my-paypal-dev-tunnel.ngrok-free.app"
+echo
+echo "Do not include the webhook path itself; the script appends:"
+echo "- /next-api/paypal/webhooks/ledger-transaction-events"
+echo
+echo "Spaces before or after your input are trimmed automatically."
+echo
 read -r -p "Webhook base URL or ngrok subdomain: " webhook_target
 webhook_target="$(trim "$webhook_target")"
 

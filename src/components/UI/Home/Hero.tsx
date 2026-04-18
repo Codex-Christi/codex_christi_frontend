@@ -21,13 +21,11 @@ const Hero = () => {
       </section>
 
       <Image
-        fill
         priority
         fetchPriority='high'
-        style={{ objectFit: 'cover' }}
         alt='Hero Logo Image'
         src={HeroImage}
-        className={`!w-[12rem] md:!w-[18rem] lg:!w-[22rem] !left-[unset] !r-0`}
+        className='pointer-events-none absolute left-auto right-0 h-auto w-[12rem] md:w-[18rem] lg:w-[22rem]'
       />
     </div>
   );

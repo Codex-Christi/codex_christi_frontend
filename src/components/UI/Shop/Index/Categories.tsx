@@ -25,7 +25,7 @@ const Categories = () => {
 
               <div className='grid gap-8 grid-cols-2 md:grid-cols-1'>
                 {/* Map through  */}
-                {products.content.map(async (product) => {
+                {products.content.map(async (product, productIndex) => {
                   const { ssrText, usdCentsBase } = await formatServerPriceForId(product.productId);
                   return (
                     <div className='grid gap-4 p-4' key={product.productId}>
@@ -34,11 +34,15 @@ const Categories = () => {
                         href={`/shop/product/${product.productId}`}
                       >
                         <Image
-                          className='w-git merge dev h-[250px] mx-auto object-contain object-center md:h-[120px] xl:h-[150px] 2xl:h-[200px]'
+                          className='mx-auto h-[250px] object-contain object-center md:h-[120px] xl:h-[150px] 2xl:h-[200px]'
+                          style={{ width: 'auto' }}
                           src={`/${product.image_name}`}
                           alt={product.img_alt}
                           width={200}
                           height={200}
+                          fetchPriority={productIndex === 0 ? 'high' : 'auto'}
+                          // loading={productIndex === 0 ? 'eager' : 'lazy'}
+                          loading='eager'
                           quality={100}
                           sizes='(max-width: 412px) 120px, (max-width: 640px) 120px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 200px'
                         />

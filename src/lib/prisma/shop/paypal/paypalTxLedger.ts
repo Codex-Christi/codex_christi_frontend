@@ -4,7 +4,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from './txLedger/generated/paypalTxLedger/client';
 
 function getPaypalLedgerConnectionString(): string {
-  const explicitTarget = process.env.PAYPAL_TX_LEDGER_TARGET;
+  const explicitTarget = process.env.PAYPAL_TX_LEDGER_NEON_BRANCH;
   const prodUrl = process.env.PAYPAL_TX_LEDGER_NEON_POOLED_DB_STRING;
   const devUrl = process.env.PAYPAL_TX_LEDGER_NEON_POOLED_DB_DEV_STRING;
 

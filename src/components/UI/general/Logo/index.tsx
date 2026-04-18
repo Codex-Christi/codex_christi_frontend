@@ -21,7 +21,8 @@ const Logo: FC<LogoInterface> = ({ className }) => {
         priority
         width={100}
         height={100}
-        className={`h-auto relative ${className}`}
+        className={`relative block ${className ?? ''}`}
+        style={{ height: 'auto' }}
         alt='Codex Christi Main Logo'
         src='/media/img/general/logo.svg'
         onContextMenu={(event: MouseEvent<HTMLImageElement>) => {

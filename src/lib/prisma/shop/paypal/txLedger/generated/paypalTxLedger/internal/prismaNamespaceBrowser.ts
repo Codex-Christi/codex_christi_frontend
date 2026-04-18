@@ -87,6 +87,8 @@ export const PaypalIntentScalarFieldEnum = {
   shippingSnapshot: 'shippingSnapshot',
   authorizePayload: 'authorizePayload',
   capturePayload: 'capturePayload',
+  paymentSaveResponsePayload: 'paymentSaveResponsePayload',
+  fulfillmentSendResponsePayload: 'fulfillmentSendResponsePayload',
   backendCustomId: 'backendCustomId',
   receiptLink: 'receiptLink',
   receiptFile: 'receiptFile',

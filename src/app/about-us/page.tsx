@@ -27,7 +27,7 @@ const AboutUsPage = () => {
           alt='About Us'
           fill={true}
           src='/media/img/about-hero.svg'
-          className={`!w-full relative -z-50 object-cover object-center`}
+          className='size-full object-cover object-center -z-50'
         />
       </div>
 

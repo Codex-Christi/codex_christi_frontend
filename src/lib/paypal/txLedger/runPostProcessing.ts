@@ -151,17 +151,22 @@ export async function runPostProcessing(orderToken: string) {
         throw new Error(paymentSave.error?.message ?? 'Payment save failed');
       }
 
-      await updateLockedRow(orderToken, lockId, {
-        status: PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
-        backendCustomId: paymentSave.data?.custom_id ?? null,
-        lastErrorCode: null,
-        lastErrorMessage: null,
-      });
+      await updateLockedRow(
+        orderToken,
+        lockId,
+        {
+          status: PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
+          backendCustomId: paymentSave.data?.custom_id ?? null,
+          paymentSaveResponsePayload: JSON.parse(JSON.stringify(paymentSave)),
+          lastErrorCode: null,
+          lastErrorMessage: null,
+        } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
+      );
 
       row.backendCustomId = paymentSave.data?.custom_id ?? null;
     }
 
-    await sendMerchizeFulfillmentOrder({
+    const fulfillmentSend = await sendMerchizeFulfillmentOrder({
       orderVariants: row.cartSnapshot as {
         variantId: string;
         quantity: number;
@@ -172,15 +177,20 @@ export async function runPostProcessing(orderToken: string) {
       orderCustomId: row.backendCustomId ?? row.paypalOrderId ?? row.orderToken,
     });
 
-    await updateLockedRow(orderToken, lockId, {
-      status: PAYPAL_LEDGER_STATUS.COMPLETED,
-      processingCompletedAt: new Date(),
-      postProcessingLockId: null,
-      postProcessingLockedAt: null,
-      postProcessingLockExpiresAt: null,
-      lastErrorCode: null,
-      lastErrorMessage: null,
-    });
+    await updateLockedRow(
+      orderToken,
+      lockId,
+      {
+        status: PAYPAL_LEDGER_STATUS.COMPLETED,
+        fulfillmentSendResponsePayload: JSON.parse(JSON.stringify(fulfillmentSend)),
+        processingCompletedAt: new Date(),
+        postProcessingLockId: null,
+        postProcessingLockedAt: null,
+        postProcessingLockExpiresAt: null,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+      } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 

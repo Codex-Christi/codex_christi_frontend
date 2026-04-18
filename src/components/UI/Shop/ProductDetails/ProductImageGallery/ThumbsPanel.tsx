@@ -42,7 +42,7 @@ function ThumbsPanel({
             <Image
               {...imagePreventDefaults}
               alt={metaTitle || 'Product image'}
-              className='rounded-[20px] transition-all !object-cover w-full object-top bg-top'
+              className='rounded-[20px] size-full transition-all !object-cover object-top bg-top'
               src={loader.srcWithRetry(image, index)}
               width={width}
               height={width}

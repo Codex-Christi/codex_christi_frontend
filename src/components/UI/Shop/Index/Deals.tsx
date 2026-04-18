@@ -13,6 +13,7 @@ import { useAutoScroller } from './useAutoScroller';
 const Deals = () => {
   const slideContainerRef = useRef<HTMLDivElement | null>(null);
   const { isMobileAndTablet, isMobile, isTabletOnly } = useResponsiveSSRValue();
+  const eagerImageCount = isMobileAndTablet ? 2 : 4;
 
   const { nudgeScroll } = useAutoScroller(
     slideContainerRef,
@@ -72,11 +73,12 @@ const Deals = () => {
              md:!w-[10rem] md:!h-[150px] scale-[0.7] md:scale-[1.0]'
               src={`/${merch.image_name}`}
               fill
-              fetchPriority={i === 0 ? 'high' : 'auto'}
+              fetchPriority={i < eagerImageCount ? 'high' : 'auto'}
               alt={merch.img_alt}
               draggable={false}
               onDragStart={(e) => e.preventDefault()} // prevent ghost drag only
-              priority
+              loading={i < eagerImageCount ? 'eager' : 'lazy'}
+              priority={i < eagerImageCount}
               quality={100}
               sizes='(max-width: 412px) 120px, (max-width: 640px) 120px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 200px'
             />

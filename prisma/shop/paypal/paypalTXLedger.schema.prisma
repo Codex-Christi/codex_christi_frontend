@@ -24,6 +24,8 @@ model PaypalIntent {
   // Raw payloads needed to reuse your existing server actions
   authorizePayload      Json?
   capturePayload        Json?
+  paymentSaveResponsePayload Json?
+  fulfillmentSendResponsePayload Json?
   backendCustomId       String?
   receiptLink           String?
   receiptFile           String?

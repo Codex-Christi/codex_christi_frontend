@@ -98,6 +98,7 @@ export async function POST(req: Request) {
 
   try {
     const config = getServerPayPalConfig();
+
     const shouldVerify =
       (process.env.PAYPAL_WEBHOOK_VERIFY ??
         (process.env.NODE_ENV === 'production' ? 'true' : 'false')) === 'true';
@@ -133,6 +134,7 @@ export async function POST(req: Request) {
     }
 
     const paypalOrderId = getWebhookPaypalOrderId(event);
+
     const delivery = await ensureWebhookDeliveryRecord({
       eventId: event.id,
       eventType: event.event_type,
@@ -192,6 +194,7 @@ export async function POST(req: Request) {
     }
 
     await markWebhookProcessed(event.id);
+
     return new Response('OK', { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

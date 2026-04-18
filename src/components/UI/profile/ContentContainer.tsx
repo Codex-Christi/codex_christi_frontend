@@ -167,7 +167,7 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 
           <div>
             <Image
-              className='rounded-t-[10px] h-56 md:h-44 xl:h-60 object-cover object-center'
+              className='rounded-t-[10px] w-full h-56 md:h-44 xl:h-60 object-cover object-center'
               src={AdsImage}
               alt='Ads Image'
             />
@@ -190,7 +190,7 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 
           <div className='border border-white rounded-[10px]'>
             <Image
-              className='rounded-t-[10px] h-40 md:h-32 xl:h-56 object-cover object-center'
+              className='rounded-t-[10px] w-full h-40 md:h-32 xl:h-56 object-cover object-center'
               src={SponsoredAd}
               alt='Sponsored ad'
             />

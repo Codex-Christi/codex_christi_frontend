@@ -8,7 +8,7 @@ const TopHomeBanner = () => {
         priority
         width={1500}
         height={100}
-        className={`!max-w-[107vw] lg:!w-[120vw]`}
+        className='h-auto !max-w-[107vw] lg:!w-[120vw]'
         src='/media/img/shop/ShopHome/TopHomeBanner.png'
         alt='Top Home Banner'
       />

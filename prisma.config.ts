@@ -24,7 +24,7 @@ function getSchemaArg(): string {
   }
   throw new Error(
     'Prisma schema must be passed explicitly with --schema.\n' +
-    '  e.g. yarn prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma',
+      '  e.g. yarn prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma',
   );
 }
 
@@ -44,13 +44,14 @@ function resolve(): { schema: string; url: string } {
   }
 
   if (schemaPath === schemas.paypal) {
-    const target = process.env.PAYPAL_TX_LEDGER_TARGET;
+    const target = process.env.PAYPAL_TX_LEDGER_NEON_BRANCH;
     if (target !== 'dev' && target !== 'prod') {
-      throw new Error('PAYPAL_TX_LEDGER_TARGET must be "dev" or "prod".');
+      throw new Error('PAYPAL_TX_LEDGER_NEON_BRANCH must be "dev" or "prod".');
     }
-    const url = target === 'prod'
-      ? process.env.PAYPAL_TX_LEDGER_NEON_DB_STRING
-      : process.env.PAYPAL_TX_LEDGER_NEON_DB_DEV_STRING;
+    const url =
+      target === 'prod'
+        ? process.env.PAYPAL_TX_LEDGER_NEON_DB_STRING
+        : process.env.PAYPAL_TX_LEDGER_NEON_DB_DEV_STRING;
     if (!url) throw new Error(`Missing Neon DB string for PayPal ${target} branch.`);
     return { schema: './prisma/shop/paypal/paypalTXLedger.schema.prisma', url };
   }

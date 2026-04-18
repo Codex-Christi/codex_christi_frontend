@@ -107,7 +107,7 @@ Current state:
 
 ## 2.5 Webhook
 
-- `src/app/api/paypal/webhook/payment-capture/route.ts` already includes:
+- `src/app/api/paypal/webhooks/ledger-transaction-events/route.ts` already includes:
   - raw-body parsing pattern (`req.text()`)
   - optional signature verification
 - Business processing in webhook is still placeholder comments.
@@ -1534,7 +1534,7 @@ No separate "check my order" page is required. The webhook guarantees completion
 # 20) Webhook Route Upgrade (idempotent + post-processing trigger)
 
 Current file:
-- `src/app/api/paypal/webhook/payment-capture/route.ts`
+- `src/app/api/paypal/webhooks/ledger-transaction-events/route.ts`
 
 Keep your existing signature verification and raw-body handling.
 

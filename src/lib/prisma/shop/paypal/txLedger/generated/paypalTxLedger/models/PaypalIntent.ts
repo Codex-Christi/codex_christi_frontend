@@ -106,6 +106,8 @@ export type PaypalIntentCountAggregateOutputType = {
   shippingSnapshot: number
   authorizePayload: number
   capturePayload: number
+  paymentSaveResponsePayload: number
+  fulfillmentSendResponsePayload: number
   backendCustomId: number
   receiptLink: number
   receiptFile: number
@@ -204,6 +206,8 @@ export type PaypalIntentCountAggregateInputType = {
   shippingSnapshot?: true
   authorizePayload?: true
   capturePayload?: true
+  paymentSaveResponsePayload?: true
+  fulfillmentSendResponsePayload?: true
   backendCustomId?: true
   receiptLink?: true
   receiptFile?: true
@@ -323,6 +327,8 @@ export type PaypalIntentGroupByOutputType = {
   shippingSnapshot: runtime.JsonValue
   authorizePayload: runtime.JsonValue | null
   capturePayload: runtime.JsonValue | null
+  paymentSaveResponsePayload: runtime.JsonValue | null
+  fulfillmentSendResponsePayload: runtime.JsonValue | null
   backendCustomId: string | null
   receiptLink: string | null
   receiptFile: string | null
@@ -378,6 +384,8 @@ export type PaypalIntentWhereInput = {
   shippingSnapshot?: Prisma.JsonFilter<"PaypalIntent">
   authorizePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
   capturePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
+  paymentSaveResponsePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
+  fulfillmentSendResponsePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
   backendCustomId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   receiptLink?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   receiptFile?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
@@ -410,6 +418,8 @@ export type PaypalIntentOrderByWithRelationInput = {
   shippingSnapshot?: Prisma.SortOrder
   authorizePayload?: Prisma.SortOrderInput | Prisma.SortOrder
   capturePayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  paymentSaveResponsePayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  fulfillmentSendResponsePayload?: Prisma.SortOrderInput | Prisma.SortOrder
   backendCustomId?: Prisma.SortOrderInput | Prisma.SortOrder
   receiptLink?: Prisma.SortOrderInput | Prisma.SortOrder
   receiptFile?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -445,6 +455,8 @@ export type PaypalIntentWhereUniqueInput = Prisma.AtLeast<{
   shippingSnapshot?: Prisma.JsonFilter<"PaypalIntent">
   authorizePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
   capturePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
+  paymentSaveResponsePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
+  fulfillmentSendResponsePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
   backendCustomId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   receiptLink?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   receiptFile?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
@@ -477,6 +489,8 @@ export type PaypalIntentOrderByWithAggregationInput = {
   shippingSnapshot?: Prisma.SortOrder
   authorizePayload?: Prisma.SortOrderInput | Prisma.SortOrder
   capturePayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  paymentSaveResponsePayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  fulfillmentSendResponsePayload?: Prisma.SortOrderInput | Prisma.SortOrder
   backendCustomId?: Prisma.SortOrderInput | Prisma.SortOrder
   receiptLink?: Prisma.SortOrderInput | Prisma.SortOrder
   receiptFile?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -517,6 +531,8 @@ export type PaypalIntentScalarWhereWithAggregatesInput = {
   shippingSnapshot?: Prisma.JsonWithAggregatesFilter<"PaypalIntent">
   authorizePayload?: Prisma.JsonNullableWithAggregatesFilter<"PaypalIntent">
   capturePayload?: Prisma.JsonNullableWithAggregatesFilter<"PaypalIntent">
+  paymentSaveResponsePayload?: Prisma.JsonNullableWithAggregatesFilter<"PaypalIntent">
+  fulfillmentSendResponsePayload?: Prisma.JsonNullableWithAggregatesFilter<"PaypalIntent">
   backendCustomId?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
   receiptLink?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
   receiptFile?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
@@ -549,6 +565,8 @@ export type PaypalIntentCreateInput = {
   shippingSnapshot: Prisma.JsonNullValueInput | runtime.InputJsonValue
   authorizePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   capturePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  paymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fulfillmentSendResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   backendCustomId?: string | null
   receiptLink?: string | null
   receiptFile?: string | null
@@ -581,6 +599,8 @@ export type PaypalIntentUncheckedCreateInput = {
   shippingSnapshot: Prisma.JsonNullValueInput | runtime.InputJsonValue
   authorizePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   capturePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  paymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fulfillmentSendResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   backendCustomId?: string | null
   receiptLink?: string | null
   receiptFile?: string | null
@@ -613,6 +633,8 @@ export type PaypalIntentUpdateInput = {
   shippingSnapshot?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   authorizePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   capturePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  paymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fulfillmentSendResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   backendCustomId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptLink?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptFile?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -645,6 +667,8 @@ export type PaypalIntentUncheckedUpdateInput = {
   shippingSnapshot?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   authorizePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   capturePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  paymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fulfillmentSendResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   backendCustomId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptLink?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptFile?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -677,6 +701,8 @@ export type PaypalIntentCreateManyInput = {
   shippingSnapshot: Prisma.JsonNullValueInput | runtime.InputJsonValue
   authorizePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   capturePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  paymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fulfillmentSendResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   backendCustomId?: string | null
   receiptLink?: string | null
   receiptFile?: string | null
@@ -709,6 +735,8 @@ export type PaypalIntentUpdateManyMutationInput = {
   shippingSnapshot?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   authorizePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   capturePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  paymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fulfillmentSendResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   backendCustomId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptLink?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptFile?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -741,6 +769,8 @@ export type PaypalIntentUncheckedUpdateManyInput = {
   shippingSnapshot?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   authorizePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   capturePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  paymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fulfillmentSendResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   backendCustomId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptLink?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptFile?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -773,6 +803,8 @@ export type PaypalIntentCountOrderByAggregateInput = {
   shippingSnapshot?: Prisma.SortOrder
   authorizePayload?: Prisma.SortOrder
   capturePayload?: Prisma.SortOrder
+  paymentSaveResponsePayload?: Prisma.SortOrder
+  fulfillmentSendResponsePayload?: Prisma.SortOrder
   backendCustomId?: Prisma.SortOrder
   receiptLink?: Prisma.SortOrder
   receiptFile?: Prisma.SortOrder
@@ -895,6 +927,8 @@ export type PaypalIntentSelect<ExtArgs extends runtime.Types.Extensions.Internal
   shippingSnapshot?: boolean
   authorizePayload?: boolean
   capturePayload?: boolean
+  paymentSaveResponsePayload?: boolean
+  fulfillmentSendResponsePayload?: boolean
   backendCustomId?: boolean
   receiptLink?: boolean
   receiptFile?: boolean
@@ -927,6 +961,8 @@ export type PaypalIntentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   shippingSnapshot?: boolean
   authorizePayload?: boolean
   capturePayload?: boolean
+  paymentSaveResponsePayload?: boolean
+  fulfillmentSendResponsePayload?: boolean
   backendCustomId?: boolean
   receiptLink?: boolean
   receiptFile?: boolean
@@ -959,6 +995,8 @@ export type PaypalIntentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   shippingSnapshot?: boolean
   authorizePayload?: boolean
   capturePayload?: boolean
+  paymentSaveResponsePayload?: boolean
+  fulfillmentSendResponsePayload?: boolean
   backendCustomId?: boolean
   receiptLink?: boolean
   receiptFile?: boolean
@@ -991,6 +1029,8 @@ export type PaypalIntentSelectScalar = {
   shippingSnapshot?: boolean
   authorizePayload?: boolean
   capturePayload?: boolean
+  paymentSaveResponsePayload?: boolean
+  fulfillmentSendResponsePayload?: boolean
   backendCustomId?: boolean
   receiptLink?: boolean
   receiptFile?: boolean
@@ -1007,7 +1047,7 @@ export type PaypalIntentSelectScalar = {
   updatedAt?: boolean
 }
 
-export type PaypalIntentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderToken" | "paypalOrderId" | "paypalAuthorizationId" | "otpOrderId" | "customerName" | "customerEmail" | "userId" | "countryIso2" | "countryIso3" | "initialCurrency" | "cartSnapshot" | "shippingSnapshot" | "authorizePayload" | "capturePayload" | "backendCustomId" | "receiptLink" | "receiptFile" | "status" | "lastEventType" | "lastErrorCode" | "lastErrorMessage" | "retryCount" | "postProcessingLockId" | "postProcessingLockedAt" | "postProcessingLockExpiresAt" | "processingCompletedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["paypalIntent"]>
+export type PaypalIntentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderToken" | "paypalOrderId" | "paypalAuthorizationId" | "otpOrderId" | "customerName" | "customerEmail" | "userId" | "countryIso2" | "countryIso3" | "initialCurrency" | "cartSnapshot" | "shippingSnapshot" | "authorizePayload" | "capturePayload" | "paymentSaveResponsePayload" | "fulfillmentSendResponsePayload" | "backendCustomId" | "receiptLink" | "receiptFile" | "status" | "lastEventType" | "lastErrorCode" | "lastErrorMessage" | "retryCount" | "postProcessingLockId" | "postProcessingLockedAt" | "postProcessingLockExpiresAt" | "processingCompletedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["paypalIntent"]>
 
 export type $PaypalIntentPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "PaypalIntent"
@@ -1028,6 +1068,8 @@ export type $PaypalIntentPayload<ExtArgs extends runtime.Types.Extensions.Intern
     shippingSnapshot: runtime.JsonValue
     authorizePayload: runtime.JsonValue | null
     capturePayload: runtime.JsonValue | null
+    paymentSaveResponsePayload: runtime.JsonValue | null
+    fulfillmentSendResponsePayload: runtime.JsonValue | null
     backendCustomId: string | null
     receiptLink: string | null
     receiptFile: string | null
@@ -1480,6 +1522,8 @@ export interface PaypalIntentFieldRefs {
   readonly shippingSnapshot: Prisma.FieldRef<"PaypalIntent", 'Json'>
   readonly authorizePayload: Prisma.FieldRef<"PaypalIntent", 'Json'>
   readonly capturePayload: Prisma.FieldRef<"PaypalIntent", 'Json'>
+  readonly paymentSaveResponsePayload: Prisma.FieldRef<"PaypalIntent", 'Json'>
+  readonly fulfillmentSendResponsePayload: Prisma.FieldRef<"PaypalIntent", 'Json'>
   readonly backendCustomId: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly receiptLink: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly receiptFile: Prisma.FieldRef<"PaypalIntent", 'String'>
