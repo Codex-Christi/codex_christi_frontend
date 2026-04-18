@@ -152,8 +152,9 @@ export const createPaypalShopInvoicePDF = async (authData: OrderResponseBody) =>
     // Table rows
     let y = startY + 25;
     items.forEach((item) => {
-      const unitAmount = item.unitAmount ?? item.unit_amount;
-      const currencyCode = unitAmount?.currencyCode ?? unitAmount?.currency_code ?? '';
+      const unitAmount = item.unitAmount ?? item.unit_amount ?? null;
+      const currencyCode =
+        item.unitAmount?.currencyCode ?? item.unit_amount?.currency_code ?? '';
       const quantity = parseInt(item.quantity || '0');
       const price = parseFloat(unitAmount?.value || '0');
       const total = quantity * price;

@@ -75,11 +75,11 @@ export const savePaymentDataToBackend = cache(async (encProps: string) => {
   // Keep snake_case fallbacks so older browser-shaped payloads still deserialize safely.
   const purchaseUnits =
     (authData as OrderResponseBody & {
-      purchaseUnits?: PaymentJSONData['purchaseUnits'];
-      purchase_units?: PaymentJSONData['purchaseUnits'];
+      purchaseUnits?: unknown[];
+      purchase_units?: unknown[];
     }).purchaseUnits ??
     (authData as OrderResponseBody & {
-      purchase_units?: PaymentJSONData['purchaseUnits'];
+      purchase_units?: unknown[];
     }).purchase_units ??
     [];
 
