@@ -10,11 +10,12 @@ import {
   PaymentReceiptProps,
   savePaymentReceiptToCloud,
 } from '@/actions/shop/paypal/processAndUploadCompletedTx/savePaymentReceiptToCloud';
-import { CartVariant, decrypt } from '@/stores/shop_stores/cartStore';
+import { CartVariant } from '@/stores/shop_stores/cartStore';
 import { OrderResponseBody } from '@paypal/paypal-js';
 import { OrdersCapture } from '@paypal/paypal-server-sdk';
 import { useCallback } from 'react';
 import type { CreateOrderActionInterface } from '@/lib/paypal/createPayPalOrder';
+import { decryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
 
 export interface CompletedTxInterface {
   authData: OrderResponseBody;
@@ -47,7 +48,9 @@ export const usePost_PaymentProcessors = () => {
    */
   const uploadPaymentReceipt = useCallback(async (encProps: string) => {
     try {
-      const paymentProps: PaymentReceiptProps = JSON.parse(decrypt(encProps));
+      const paymentProps: PaymentReceiptProps = JSON.parse(
+        decryptForPostProcessingServerAction(encProps),
+      );
 
       const requiredKeys = ['authData', 'customer', 'ORD_string'] as (keyof PaymentReceiptProps)[];
 
@@ -80,7 +83,9 @@ export const usePost_PaymentProcessors = () => {
    */
   const savePaymentTXToBackend = useCallback(async (encProps: string) => {
     try {
-      const paymentSavingActionProps: PaymentSavingActionProps = JSON.parse(decrypt(encProps));
+      const paymentSavingActionProps: PaymentSavingActionProps = JSON.parse(
+        decryptForPostProcessingServerAction(encProps),
+      );
       const requiredKeys = [
         'authData',
         'finalCapturedOrder',
@@ -121,7 +126,9 @@ export const usePost_PaymentProcessors = () => {
    */
   const pushOrderToMerchize = useCallback(async (encProps: string) => {
     try {
-      const merchizeOrderPushProps: MerchizeBackendOrderProps = JSON.parse(decrypt(encProps));
+      const merchizeOrderPushProps: MerchizeBackendOrderProps = JSON.parse(
+        decryptForPostProcessingServerAction(encProps),
+      );
       const reqKeys = [
         'orderVariants',
         'orderRecipientInfo',

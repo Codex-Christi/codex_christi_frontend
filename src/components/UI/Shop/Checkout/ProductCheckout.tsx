@@ -22,11 +22,6 @@ const BasicCheckoutInfo = dynamic(
   () => import('./UserCheckoutSummary/BasicCheckoutInfo').then((comp) => comp.BasicCheckoutInfo),
   { ssr: false },
 );
-const ProcessingStatusModal = dynamic(
-  () => import('./ProcessingStatusModal').then((comp) => comp.default),
-  { ssr: false },
-);
-
 export const CheckoutAccordionContext = createContext<{
   handleOpenItem: (itemValue: 'basic-checkout-info' | 'payment-section') => void;
   handleCloseAccordion: () => void;
@@ -105,7 +100,6 @@ const CheckoutPage = () => {
   return (
     <ServerOrderDetailsComponent>
       <CheckoutAccordionContext.Provider value={{ handleCloseAccordion, handleOpenItem }}>
-        <ProcessingStatusModal />
         <div className='grid grid-cols-1 gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] min-h-dvh lg:grid-cols-12'>
           <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] pt-10 !px-2 rounded-[10px] md:p-10 space-y-8 lg:col-span-7'>
             {hasMounted ? (

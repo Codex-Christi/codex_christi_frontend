@@ -1,17 +1,20 @@
 // lib/paypalClient.ts
 import { Client, Environment, LogLevel } from '@paypal/paypal-server-sdk';
+import { getServerPayPalConfig } from '@/lib/paypal/serverPayPalConfig';
 
 /**
  * PayPal client instance configured with credentials from environment variables.
  */
 
+const config = getServerPayPalConfig();
+
 export const paypalClient = new Client({
   clientCredentialsAuthCredentials: {
-    oAuthClientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
-    oAuthClientSecret: process.env.PAYPAL_CLIENT_SECRET!,
+    oAuthClientId: config.clientId,
+    oAuthClientSecret: config.clientSecret,
   },
   timeout: 0,
-  environment: Environment.Sandbox, // Use Environment.Live for production
+  environment: config.environment === 'live' ? Environment.Production : Environment.Sandbox,
   logging: {
     logLevel: LogLevel.Debug,
     logRequest: { logBody: true },

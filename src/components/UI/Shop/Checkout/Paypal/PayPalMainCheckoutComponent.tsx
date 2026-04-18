@@ -6,6 +6,7 @@ import { CheckoutOptions } from '../PaymentSection';
 import dynamic from 'next/dynamic';
 import { ServerOrderDetailsContext } from '../ServerOrderDetailsComponent';
 import { PAYPAL_CURRENCY_CODES } from '@/datasets/shop_general/paypal_currency_specifics';
+import { getPublicPayPalClientId } from '@/lib/paypal/publicPayPalConfig';
 
 // Dynamic components
 
@@ -18,7 +19,7 @@ const PayPalCheckoutChildren = dynamic(() =>
 
 // Provider Script Initializer Options - MADE STATIC
 const initialOptions = {
-  clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
+  clientId: getPublicPayPalClientId(),
   'enable-funding': 'venmo',
   'buyer-country': 'US',
   // currency: 'USD',

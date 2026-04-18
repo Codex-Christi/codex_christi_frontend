@@ -5,7 +5,7 @@ import path from 'path';
 import { uploadPaymentReceiptToR2 } from '../../checkout/transactions/uploadPaymentReceipt';
 import { createPaypalShopInvoicePDF } from '../createShopInvoicePDF';
 import { CompletedTxInterface } from '@/lib/hooks/shopHooks/checkout/usePost-PaymentProcessors';
-import { decrypt } from '@/stores/shop_stores/cartStore';
+import { decryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
 
 export interface PaymentReceiptProps {
   authData: CompletedTxInterface['authData'];
@@ -17,7 +17,7 @@ export const savePaymentReceiptToCloud = async (encodedProps: string) => {
   try {
     // Decrypt and parse data
     const { authData, customer, ORD_string } = JSON.parse(
-      decrypt(encodedProps),
+      decryptForPostProcessingServerAction(encodedProps),
     ) as PaymentReceiptProps;
     const { email: customerEmail, name: customerName } = customer || {};
 

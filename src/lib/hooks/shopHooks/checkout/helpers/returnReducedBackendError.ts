@@ -2,13 +2,30 @@ import { FetcherError } from '@/lib/utils/SWRfetcherAdvanced';
 
 export const returnReducedBackendError = (err: FetcherError) => {
   if (err instanceof FetcherError) {
-    // console.log(`Error info from save Action:`, err.info!.errors);
-    const allBackendErrorsArr = err.info!.errors as {
-      type: string;
-      code: string;
-      message: string;
-      field_name: string | null;
-    }[];
+    const allBackendErrorsArr = (err.info &&
+    typeof err.info === 'object' &&
+    'errors' in err.info &&
+    Array.isArray((err.info as { errors?: unknown }).errors)
+      ? (err.info as { errors: unknown[] }).errors
+      : null) as
+      | {
+          type: string;
+          code: string;
+          message: string;
+          field_name: string | null;
+        }[]
+      | null;
+
+    if (!allBackendErrorsArr || allBackendErrorsArr.length === 0) {
+      return {
+        message:
+          err.info && typeof err.info === 'object' && 'message' in err.info
+            ? String((err.info as { message?: unknown }).message ?? err.message)
+            : err.message,
+        status: err.status,
+        info: err.info,
+      };
+    }
 
     const reducedErr = allBackendErrorsArr.reduce(
       (acc, currErrObj) => {

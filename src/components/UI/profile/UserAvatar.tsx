@@ -4,7 +4,7 @@
 
 import type { FC } from 'react';
 import Image, { StaticImageData } from 'next/image';
-import ProfileImage from '@/assets/img/profile-img.png';
+import { User } from 'lucide-react';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { cn } from '@/lib/utils';
 
@@ -13,30 +13,38 @@ const UserAvatar: FC<{
   width?: number;
   className?: string;
   src?: string | StaticImageData;
+  alt?: string;
   [key: string]: any;
-}> = ({ height = 50, width = 50, className, src, ...rest }) => {
-  // ⚠️ IMPORTANT: use separate selectors to avoid returning a new object every time
+}> = ({ height = 50, width = 50, className, src, alt, ...rest }) => {
   const userMainProfile = useUserMainProfileStore((state) => state.userMainProfile);
+  const imageSrc =
+    src ??
+    (userMainProfile?.profile_pic && typeof userMainProfile.profile_pic === 'string'
+      ? userMainProfile.profile_pic
+      : undefined);
+  const altText =
+    alt ||
+    (userMainProfile
+      ? `${userMainProfile.first_name ?? ''} ${userMainProfile.last_name ?? ''}`.trim() ||
+        'User Avatar'
+      : 'User Avatar');
 
-  // While store is still hydrating from sessionStorage, show skeleton
-  if (!userMainProfile) {
+  if (!imageSrc) {
     return (
       <div
-        className={cn('size-12 rounded-full bg-gray-200 animate-pulse', className)}
+        className={cn(
+          'flex items-center justify-center rounded-full bg-muted text-muted-foreground',
+          className,
+        )}
         style={{ width, height }}
-      />
+        role='img'
+        aria-label={altText}
+        {...rest}
+      >
+        <User className='size-[55%]' strokeWidth={1.75} />
+      </div>
     );
   }
-
-  // After hydration:
-  // - If userMainProfile is null → use static fallback image
-  // - If profile_pic is a string → use that
-  const fallbackSrc =
-    userMainProfile?.profile_pic && typeof userMainProfile.profile_pic === 'string'
-      ? userMainProfile.profile_pic
-      : ProfileImage;
-
-  const imageSrc = src ?? fallbackSrc;
 
   return (
     <Image
@@ -45,11 +53,7 @@ const UserAvatar: FC<{
       width={width}
       height={height}
       quality={100}
-      alt={
-        userMainProfile
-          ? `${userMainProfile.first_name ?? ''} ${userMainProfile.last_name ?? ''}`
-          : 'User Avatar'
-      }
+      alt={altText}
       priority
       {...rest}
     />

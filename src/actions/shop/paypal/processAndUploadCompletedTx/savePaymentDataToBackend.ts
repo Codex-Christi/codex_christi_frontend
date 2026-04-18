@@ -5,9 +5,9 @@ import { generateSignatureHeaders } from '@/lib/hooks/shopHooks/checkout/helpers
 import { cache } from 'react';
 import { CompletedTxInterface } from '@/lib/hooks/shopHooks/checkout/usePost-PaymentProcessors';
 import { OrderResponseBody } from '@paypal/paypal-js';
-import { decrypt } from '@/stores/shop_stores/cartStore';
 import { OrdersCapture } from '@paypal/paypal-server-sdk';
 import { returnReducedBackendError } from '@/lib/hooks/shopHooks/checkout/helpers/returnReducedBackendError';
+import { decryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
 
 const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
 
@@ -68,18 +68,58 @@ export const savePaymentDataToBackend = cache(async (encProps: string) => {
     pdfReceiptLink,
     receiptFileName,
     finalCapturedOrder,
-  } = JSON.parse(decrypt(encProps)) as PaymentSavingActionProps;
+  } = JSON.parse(decryptForPostProcessingServerAction(encProps)) as PaymentSavingActionProps;
 
   // Sub-destructuring (original comment)
-  const { purchase_units, payer } = authData;
-  const { email_address: payerEmail, name: payerName } = payer || {};
+  // The ledger stores PayPal server-SDK payloads, which use camelCase.
+  // Keep snake_case fallbacks so older browser-shaped payloads still deserialize safely.
+  const purchaseUnits =
+    (authData as OrderResponseBody & {
+      purchaseUnits?: PaymentJSONData['purchaseUnits'];
+      purchase_units?: PaymentJSONData['purchaseUnits'];
+    }).purchaseUnits ??
+    (authData as OrderResponseBody & {
+      purchase_units?: PaymentJSONData['purchaseUnits'];
+    }).purchase_units ??
+    [];
+
+  const payer =
+    (authData as OrderResponseBody & {
+      payer?: OrderResponseBody['payer'];
+    }).payer ?? null;
+
+  const payerEmail =
+    (payer as { emailAddress?: string; email_address?: string } | null)?.emailAddress ??
+    (payer as { emailAddress?: string; email_address?: string } | null)?.email_address ??
+    null;
+  const payerName =
+    (payer as { name?: { givenName?: string; surname?: string; given_name?: string } } | null)
+      ?.name ?? null;
 
   // Safe array access with defaults (DeepSeek's improvement)
-  const [firstPurchaseUnit = {}] = purchase_units || [];
-  const { amount, custom_id, shipping } = firstPurchaseUnit;
-  const { name: recepientName } = shipping || {};
+  const [firstPurchaseUnit = {}] = purchaseUnits;
+  const amount =
+    (firstPurchaseUnit as {
+      amount?: { currencyCode?: string; currency_code?: string; value?: string };
+    }).amount ?? null;
+  const customId =
+    (firstPurchaseUnit as { customId?: string; custom_id?: string }).customId ??
+    (firstPurchaseUnit as { customId?: string; custom_id?: string }).custom_id ??
+    null;
+  const shipping =
+    (firstPurchaseUnit as {
+      shipping?: {
+        name?: { fullName?: string; full_name?: string };
+      };
+    }).shipping ?? null;
+  const recepientName = shipping?.name ?? null;
   const recepientEmail = customer?.email;
-  const { currency_code, value } = amount || {};
+  const currencyCode = amount?.currencyCode ?? amount?.currency_code ?? null;
+  const amountValue = amount?.value ?? null;
+
+  if (!customId) {
+    throw new Error('Missing PayPal customId/custom_id in authorize payload');
+  }
 
   const body = {
     paypal_payload: {
@@ -88,16 +128,16 @@ export const savePaymentDataToBackend = cache(async (encProps: string) => {
         timestamp: new Date().toISOString(),
         capturedOrderPaypalID,
         paymentAuthID: authData.id,
-        custom_id: custom_id!,
-        amountReceived: amount ? `${value} ${currency_code}` : null,
+        custom_id: customId,
+        amountReceived: amount ? `${amountValue} ${currencyCode}` : null,
         payer: payer
           ? {
               payerEmail: payerEmail!,
-              payerName: `${payerName?.given_name} ${payerName?.surname}`,
+              payerName: `${payerName?.givenName ?? payerName?.given_name ?? ''} ${payerName?.surname ?? ''}`.trim(),
             }
           : null,
         orderReceipient: {
-          name: recepientName?.full_name,
+          name: recepientName?.fullName ?? recepientName?.full_name,
           recepientEmail: recepientEmail,
           orderID: ORD_string,
         },

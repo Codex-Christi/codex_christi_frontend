@@ -1,10 +1,11 @@
 import successToast from '@/lib/success-toast';
 import errorToast from '@/lib/error-toast';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
-import { encrypt, CartVariant } from '@/stores/shop_stores/cartStore';
+import { CartVariant } from '@/stores/shop_stores/cartStore';
 import { ProcessingStepKey } from '@/stores/shop_stores/checkoutStore/orderProcessingStore';
 import { OrdersCapture } from '@paypal/paypal-server-sdk';
 import { OrderResponseBody } from '@paypal/paypal-js';
+import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
 
 type ServerPostProcessingDeps = {
   ORD_string: string;
@@ -106,7 +107,7 @@ export const buildServerPostProcessingFunc = ({
     const customerEmail = checkoutSnapshot.email ?? 'john@example.com';
     const latestDeliveryAddress = checkoutSnapshot.delivery_address;
 
-    const receiptPayload = encrypt(
+    const receiptPayload = encryptForPostProcessingServerAction(
       JSON.stringify({
         authData,
         customer: { name: customerName, email: customerEmail },
@@ -150,7 +151,7 @@ export const buildServerPostProcessingFunc = ({
     }
     const { pdfReceiptLink, receiptFileName } = receiptResp;
 
-    const paymentSavePayload = encrypt(
+    const paymentSavePayload = encryptForPostProcessingServerAction(
       JSON.stringify({
         authData,
         finalCapturedOrder: capturedOrder,
@@ -191,7 +192,7 @@ export const buildServerPostProcessingFunc = ({
       delivery_address: latestDeliveryAddress,
       customer: { name: customerName, email: customerEmail },
     };
-    const merchizePayload = encrypt(
+    const merchizePayload = encryptForPostProcessingServerAction(
       JSON.stringify({
         orderVariants,
         orderRecipientInfo,

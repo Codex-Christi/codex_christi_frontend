@@ -3,9 +3,10 @@
 import { FetcherError, FetcherOptions, universalFetcher } from '@/lib/utils/SWRfetcherAdvanced';
 import { generateSignatureHeaders } from '@/lib/hooks/shopHooks/checkout/helpers/generateSignatureHeaders';
 import { cache } from 'react';
-import { CartVariant, decrypt } from '@/stores/shop_stores/cartStore';
+import { CartVariant } from '@/stores/shop_stores/cartStore';
 import { CompletedTxInterface } from '@/lib/hooks/shopHooks/checkout/usePost-PaymentProcessors';
 import { returnReducedBackendError } from '@/lib/hooks/shopHooks/checkout/helpers/returnReducedBackendError';
+import { decryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
 
 const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
 
@@ -43,7 +44,7 @@ export interface OrderProcessingResponse {
 // Main Async func
 export const sendMerchizeOrderDetailsToBackend = cache(async (encProps: string) => {
   const { orderRecipientInfo, orderVariants, country_iso2, order_custom_id } = JSON.parse(
-    decrypt(encProps),
+    decryptForPostProcessingServerAction(encProps),
   ) as MerchizeBackendOrderProps;
 
   const {

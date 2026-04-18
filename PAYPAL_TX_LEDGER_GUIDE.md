@@ -124,7 +124,7 @@ Current state:
 - Add a new `/next-api/paypal/tx-ledger/intent` route that calls the shared function directly (no self-referential HTTP fetch).
 - Write ledger state during authorize/capture.
 - Make webhook idempotent and trigger server post-processing.
-- Add `/next-api/order-status` polling route.
+- Add `/next-api/paypal/tx-ledger/payments/[orderToken]/status` polling route.
 - Add admin ledger retry UI/actions.
 
 ## We are not changing
@@ -150,7 +150,7 @@ flowchart TD
   H --> I["Ledger: authorized + authorizePayload"]
   I --> J["POST /next-api/paypal/orders/capture (with orderToken)"]
   J --> K["Ledger: captured + capturePayload"]
-  K --> L["Frontend becomes a status consumer and starts polling /next-api/order-status"]
+  K --> L["Frontend becomes a status consumer and starts polling /next-api/paypal/tx-ledger/payments/[orderToken]/status"]
   M["PayPal Webhook PAYMENT.CAPTURE.COMPLETED"] --> N["Webhook dedupe + ledger lookup"]
   N --> |"200 OK immediately"| N2["after() callback"]
   N2 --> O["runPostProcessing(orderToken)"]
@@ -174,14 +174,20 @@ Implement in this order to avoid half-migrated behavior:
 7. Update `PayPalCheckoutChildren` to use intent route.
 8. Update authorize route to persist ledger.
 9. Update capture route to persist ledger.
-10. Update approve hook to pass `orderToken` and remove client post-processing.
-11. Add `/next-api/order-status`.
+10. Update approve hook to pass `orderToken`, remove client post-processing, and redirect into the confirmation/status flow.
+11. Add `/next-api/paypal/tx-ledger/payments/[orderToken]/status`.
 12. Add polling + UI mapping.
 13. Upgrade webhook (idempotency + ledger updates + post-processing trigger).
 14. Add server post-processing runner + fulfillment adapter.
 15. Add admin auth + admin UI/actions.
 16. Add dev fallback trigger endpoint.
 17. Retire client-side post-processing from checkout runtime.
+
+Important transition note:
+- After Step 10, the old browser-owned completion path is intentionally gone.
+- Step 11 and Step 12 restore the frontend read path.
+- Step 13 and Step 14 restore durable backend completion.
+- So if you adopt the thin approve hook early, do not expect receipt upload / payment save / fulfillment to run again until Steps 13 and 14 are implemented.
 
 ---
 
@@ -190,11 +196,27 @@ Implement in this order to avoid half-migrated behavior:
 ```env
 # Existing (already in project)
 DATABASE_URL="file:./dev.db"
-NEXT_PUBLIC_PAYPAL_CLIENT_ID="..."
-PAYPAL_CLIENT_SECRET="..."
-PAYPAL_WEBHOOK_ID="..."
 PAYPAL_WEBHOOK_VERIFY="true"
 PAYPAL_ENV="sandbox"
+NEXT_PUBLIC_PAYPAL_ENV="sandbox"
+
+# Preferred PayPal browser vars
+NEXT_PUBLIC_PAYPAL_CLIENT_ID_SANDBOX="..."
+NEXT_PUBLIC_PAYPAL_CLIENT_ID_LIVE="..."
+
+# Preferred PayPal server vars
+PAYPAL_CLIENT_ID_SANDBOX="..."
+PAYPAL_CLIENT_ID_LIVE="..."
+PAYPAL_CLIENT_SECRET_SANDBOX="..."
+PAYPAL_CLIENT_SECRET_LIVE="..."
+PAYPAL_WEBHOOK_ID_SANDBOX="..."
+PAYPAL_WEBHOOK_ID_LIVE="..."
+
+# Backward-compatible fallback vars (supported, but no longer preferred)
+NEXT_PUBLIC_PAYPAL_CLIENT_ID="..."
+PAYPAL_CLIENT_ID="..."
+PAYPAL_CLIENT_SECRET="..."
+PAYPAL_WEBHOOK_ID="..."
 
 # Existing (OTP / backend integrations - keep as-is)
 NEXT_PUBLIC_BASE_URL="..."
@@ -207,6 +229,14 @@ SHOP_SERVER_ACTIONS_CRYPTO_SECRET="long-random-secret"
 ```
 
 Notes:
+- Browser PayPal config is resolved from:
+  - `src/lib/paypal/publicPayPalConfig.ts`
+- Server PayPal config is resolved from:
+  - `src/lib/paypal/serverPayPalConfig.ts`
+- `NEXT_PUBLIC_PAYPAL_CLIENT_ID_*` values are public by design. They are not secrets.
+- `PAYPAL_CLIENT_SECRET_*` and `PAYPAL_WEBHOOK_ID_*` stay server-only.
+- The current code supports both the new split variables and the old single-name fallbacks during migration.
+- For clean deployments, keep `PAYPAL_ENV` and `NEXT_PUBLIC_PAYPAL_ENV` aligned.
 - Merchize SQLite continues to use your existing `prisma.config.ts`.
 - PayPal ledger schema also gets its datasource URL from `prisma.config.ts` in Prisma 7.
 - The root `prisma.config.ts` should switch datasource URLs based on the `--schema` target.
@@ -1142,7 +1172,7 @@ Current file:
 
 3. Do not call client post-processing functions in this flow.
 
-4. Start polling `/next-api/order-status`.
+4. Redirect to the confirmation route, where polling becomes the read path.
 
 5. Treat the client as a status viewer after capture.
 - Capture still happens through your API route.
@@ -1179,9 +1209,9 @@ if (!capRes.ok) {
 }
 const capturedOrder = (await capRes.json()) as OrdersCapture;
 
-// start UI and polling, no client post-processing
+// start UI, then move the browser into confirmation/status-view mode
 startProcessingUI(capturedOrder.id);
-startLedgerPolling(orderToken);
+router.push(`/shop/checkout/confirmation/${encodeURIComponent(orderToken)}`);
 ```
 
 Minimal shared error reader:
@@ -1219,17 +1249,19 @@ Keep:
 Keep the hook thin:
 - read the structured route error
 - initialize the processing UI
-- push the user to a confirmation surface carrying `orderToken`
-- let polling reflect ledger truth
+- push the user to the confirmation route carrying `orderToken`
+- let the confirmation page poll ledger truth
 
 Do not make this hook responsible for receipt upload, backend save, or fulfillment retries.
 
+If your shop runs on a dedicated domain with path normalization, use your shop-specific router abstraction here instead of raw `next/navigation` routing. The redirect target stays `/shop/checkout/confirmation/[orderToken]`, but the push helper should normalize it correctly for both the parent domain and the dedicated shop domain.
+
 ---
 
-# 18) Order Status Endpoint
+# 18) PayPal TX Payment Status Endpoint
 
 New file:
-- `src/app/api/order-status/route.ts`
+- `src/app/api/paypal/tx-ledger/payments/[orderToken]/status/route.ts`
 
 Returns ledger truth for polling.
 
@@ -1243,13 +1275,12 @@ This endpoint should be intentionally small and browser-safe:
 import { NextResponse } from 'next/server';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const orderToken = url.searchParams.get('orderToken');
+type PageProps = {
+  params: Promise<{ orderToken: string }>;
+};
 
-  if (!orderToken) {
-    return NextResponse.json({ error: 'Missing orderToken' }, { status: 400 });
-  }
+export async function GET(_req: Request, { params }: PageProps) {
+  const { orderToken } = await params;
 
   const row = await paypalTxLedger.paypalIntent.findUnique({ where: { orderToken } });
   if (!row) {
@@ -1282,7 +1313,7 @@ This section fills a missing piece from earlier versions: concrete polling behav
 
 ## Polling rules
 
-- Start polling after successful capture response in `usePayPalTXApproveCallback`.
+- Start polling on the confirmation page after redirect from `usePayPalTXApproveCallback`.
 - Poll every 2-3 seconds.
 - Stop polling when status is one of:
   - `completed`
@@ -1296,10 +1327,10 @@ Why polling is still the default here:
 - This guide assumes polling first because it is the simplest correct rollout for your current architecture.
 - The confirmation client only needs occasional status changes, not a high-frequency stream.
 - A 2-3 second interval is operationally cheap at low to moderate concurrency and keeps failure recovery simple.
-- If you later outgrow polling, upgrade to SSE while keeping `/next-api/order-status` as fallback.
+- If you later outgrow polling, upgrade to SSE while keeping the payment-status endpoint as fallback.
 - Do not choose gRPC for browser status updates in this flow. Browser support is not a good fit for a simple one-way status channel, and SSE is operationally simpler for confirmation-page style updates.
 
-## Example polling helper (hook-local)
+## Example polling helper (confirmation-page local)
 
 ```ts
 const startLedgerPolling = (orderToken?: string) => {
@@ -1308,12 +1339,13 @@ const startLedgerPolling = (orderToken?: string) => {
   let cancelled = false;
   const interval = 2500;
 
-  const tick = async () => {
-    if (cancelled) return;
-    try {
-      const res = await fetch(`/next-api/order-status?orderToken=${encodeURIComponent(orderToken)}`, {
-        cache: 'no-store',
-      });
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+      const res = await fetch(
+        `/next-api/paypal/tx-ledger/payments/${encodeURIComponent(orderToken)}/status`,
+        { cache: 'no-store' },
+      );
       if (!res.ok) return;
       const data = await res.json();
       applyLedgerStatusToUI(data);
@@ -1411,13 +1443,12 @@ export function mapLedgerToProcessingState(data: LedgerStatusResponse) {
 ## Confirmation page integration
 
 Current file:
-- `src/app/shop/checkout/confirmation/[orderId]/page.tsx`
+- `src/app/shop/checkout/confirmation/[orderToken]/page.tsx`
 
-The existing confirmation page uses `[orderId]` as a route param. In the ledger flow, pass `orderToken` as a query param so the page can poll.
+The confirmation page should use `orderToken` as the route param. This keeps the browser-facing identifier aligned with the ledger key and avoids exposing `paypalOrderId` in the URL.
 
 This is the preferred recovery model:
-- path segment can still use a PayPal-facing identifier or your existing route shape
-- `orderToken` in the query string is the ledger lookup key
+- the path segment is the ledger lookup key
 - if the user refreshes, the page can resume from ledger truth without depending on in-memory client state
 
 ### How `orderToken` reaches the confirmation page
@@ -1426,9 +1457,7 @@ In the approve hook (`usePayPalTXApproveCallback`), after capture succeeds, redi
 
 ```ts
 // after successful capture in the approve hook
-router.push(
-  `/shop/checkout/confirmation/${paypalOrderId}?orderToken=${encodeURIComponent(orderToken)}`
-);
+push(`/shop/checkout/confirmation/${encodeURIComponent(orderToken)}`);
 ```
 
 ### Confirmation page polling template (add to existing page)
@@ -1436,13 +1465,16 @@ router.push(
 ```tsx
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { use } from 'react';
 import { useEffect, useState } from 'react';
 import { mapLedgerToProcessingState } from '@/lib/paypal/txLedger/mapLedgerToProcessingState';
 
-export function useLedgerPolling() {
-  const searchParams = useSearchParams();
-  const orderToken = searchParams?.get('orderToken') ?? undefined;
+export function useLedgerPolling({
+  params,
+}: {
+  params: Promise<{ orderToken: string }>;
+}) {
+  const orderToken = use(params).orderToken;
   const [processingState, setProcessingState] = useState<ReturnType<typeof mapLedgerToProcessingState> | null>(null);
 
   useEffect(() => {
@@ -1455,7 +1487,7 @@ export function useLedgerPolling() {
       if (cancelled) return;
       try {
         const res = await fetch(
-          `/next-api/order-status?orderToken=${encodeURIComponent(orderToken)}`,
+          `/next-api/paypal/tx-ledger/payments/${encodeURIComponent(orderToken)}/status`,
           { cache: 'no-store' },
         );
         if (!res.ok) return;
@@ -1492,7 +1524,7 @@ If the user's browser closes after capture but before `completed`:
 
 1. The ledger row already exists with status `captured` (or later).
 2. The webhook will still fire and trigger `runPostProcessing`.
-3. If the user returns, the confirmation page URL (bookmarked or in history) still has `orderToken` in the query string — polling resumes automatically.
+3. If the user returns, the confirmation page URL (bookmarked or in history) still has `orderToken` in the path — polling resumes automatically.
 4. If the user lost the URL entirely, admin can look up by `customerEmail` and share status or receipt link.
 
 No separate "check my order" page is required. The webhook guarantees completion regardless of browser state.
@@ -2691,12 +2723,12 @@ This section does not need to be implemented now. The polling approach in Sectio
 Decision default for this codebase:
 - Polling first.
 - SSE second when polling volume becomes wasteful.
-- Keep `/next-api/order-status` as the source of truth either way.
-- Do not use gRPC for browser-facing order-status delivery. If you ever introduce gRPC, reserve it for internal service-to-service boundaries, not confirmation-page client updates.
+- Keep the PayPal TX payment-status endpoint as the source of truth either way.
+- Do not use gRPC for browser-facing payment-status delivery. If you ever introduce gRPC, reserve it for internal service-to-service boundaries, not confirmation-page client updates.
 
 ## Why polling is fine for now
 
-Polling `/next-api/order-status` every 2–3 seconds works well when:
+Polling the payment-status endpoint every 2–3 seconds works well when:
 - You have fewer than ~500 concurrent users waiting on the confirmation page.
 - Post-processing typically completes in under 30 seconds.
 - Your VPS can absorb the request volume (500 users × 1 req/2.5s = 200 req/s — manageable).
@@ -2715,10 +2747,10 @@ import { EventEmitter } from 'events';
 const emitter = new EventEmitter();
 
 // Webhook writes to DB, then:
-emitter.emit(`order:${orderToken}`, { status: 'completed' });
+emitter.emit(`paypal-tx-payment-status:${orderToken}`, { status: 'completed' });
 
 // SSE endpoint listens:
-emitter.on(`order:${orderToken}`, (data) => {
+emitter.on(`paypal-tx-payment-status:${orderToken}`, (data) => {
   controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
 });
 ```
@@ -2748,7 +2780,7 @@ const redisPub = new Redis(process.env.REDIS_URL!);
 
 // After updating ledger status to 'completed':
 await redisPub.publish(
-  `order-status:${orderToken}`,
+  `paypal-tx-payment-status:${orderToken}`,
   JSON.stringify({ status: 'completed', completedAt: new Date().toISOString() }),
 );
 ```
@@ -2764,7 +2796,7 @@ export async function GET(req: Request) {
   if (!orderToken) return new Response('Missing orderToken', { status: 400 });
 
   const redisSub = new Redis(process.env.REDIS_URL!);
-  const channel = `order-status:${orderToken}`;
+  const channel = `paypal-tx-payment-status:${orderToken}`;
 
   const stream = new ReadableStream({
     start(controller) {
@@ -2883,7 +2915,7 @@ Postgres LISTEN/NOTIFY limitations:
 
 ## Keep polling as fallback
 
-Regardless of which push mechanism you choose, **keep the `/next-api/order-status` polling endpoint**. SSE connections can drop due to proxies, network changes, or browser throttling (background tabs). The client should:
+Regardless of which push mechanism you choose, **keep the payment-status polling endpoint**. SSE connections can drop due to proxies, network changes, or browser throttling (background tabs). The client should:
 
 1. Open SSE connection on mount.
 2. If SSE delivers the terminal status, done.
@@ -2896,7 +2928,7 @@ Reverse proxies buffer responses by default, which breaks SSE. Add these headers
 
 Nginx:
 ```nginx
-location /next-api/order-status/stream {
+location /next-api/paypal/tx-ledger/payments/<orderToken>/status/stream {
     proxy_pass http://localhost:3000;
     proxy_http_version 1.1;
     proxy_set_header Connection '';

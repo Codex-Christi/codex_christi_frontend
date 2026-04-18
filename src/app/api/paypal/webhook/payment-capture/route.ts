@@ -1,185 +1,214 @@
-// app/api/paypal/webhook/route.ts
-export const runtime = 'nodejs'; // keep server-side
+import { after } from 'next/server';
+
+import { getServerPayPalConfig } from '@/lib/paypal/serverPayPalConfig';
+import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
+import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
+import {
+  ensureWebhookDeliveryRecord,
+  getWebhookPaypalOrderId,
+  markWebhookFailed,
+  markWebhookIgnored,
+  markWebhookProcessed,
+  markWebhookRetry,
+  requiredHeader,
+  type PayPalWebhookEvent,
+  verifyWebhookSignature,
+} from '@/lib/paypal/txLedger/webhookHelpers';
+import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type PayPalWebhookEvent = {
-  id: string;
-  event_type: string;
-  resource_type: string;
-  event_version: string;
-  summary: string;
-  resource: {
-    id: string;
-    create_time: string;
-    update_time?: string;
-    state?: string;
-    amount?: {
-      total: string;
-      currency: string;
-      details: {
-        subtotal: string;
-      };
-    };
-    parent_payment?: string;
-    valid_until?: string;
-    links?: Array<{
-      href: string;
-      rel: string;
-      method: string;
-    }>;
-  };
-  links?: Array<{
-    href: string;
-    rel: string;
-    method: string;
-  }>;
-};
+const POST_CAPTURE_LEDGER_STATUSES = new Set<string>([
+  PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED,
+  PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
+  PAYPAL_LEDGER_STATUS.COMPLETED,
+]);
 
-function requiredHeader(req: Request, name: string) {
-  const v = req.headers.get(name);
-  if (!v) throw new Error(`Missing header: ${name}`);
-  return v;
-}
-
-async function getPayPalAccessToken() {
-  const env = process.env.PAYPAL_ENV ?? 'sandbox';
-  const base = env === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
-
-  const clientId = process.env.PAYPAL_CLIENT_ID!;
-  const secret = process.env.PAYPAL_CLIENT_SECRET!;
-  if (!clientId || !secret) throw new Error('Missing PAYPAL_CLIENT_ID or PAYPAL_CLIENT_SECRET');
-
-  const auth = Buffer.from(`${clientId}:${secret}`).toString('base64');
-
-  const res = await fetch(`${base}/v1/oauth2/token`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${auth}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: 'grant_type=client_credentials',
-  });
-
-  if (!res.ok) throw new Error(`PayPal token error: ${res.status} ${await res.text()}`);
-  const data = await res.json();
-  return { base, accessToken: data.access_token as string };
-}
-
-async function verifyWebhookSignature(args: {
-  event: PayPalWebhookEvent;
-  webhookId: string;
-  paypalAuthAlgo: string;
-  paypalCertUrl: string;
-  paypalTransmissionId: string;
-  paypalTransmissionSig: string;
-  paypalTransmissionTime: string;
+async function updateLedgerFromWebhook(args: {
+  paypalOrderId: string;
+  eventType: string;
+  currentStatus: string;
 }) {
-  const { base, accessToken } = await getPayPalAccessToken();
+  const { paypalOrderId, eventType, currentStatus } = args;
 
-  // Fields required by PayPal for verification:
-  // auth_algo, cert_url, transmission_id, transmission_sig, transmission_time, webhook_id, webhook_event  [oai_citation:9‡docs.paypal.ai](https://docs.paypal.ai/reference/api/rest/verify-webhook-signature/verify-webhook-signature)
-  const res = await fetch(`${base}/v1/notifications/verify-webhook-signature`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      auth_algo: args.paypalAuthAlgo,
-      cert_url: args.paypalCertUrl,
-      transmission_id: args.paypalTransmissionId,
-      transmission_sig: args.paypalTransmissionSig,
-      transmission_time: args.paypalTransmissionTime,
-      webhook_id: args.webhookId,
-      webhook_event: args.event,
-    }),
-  });
+  switch (eventType) {
+    case 'PAYMENT.AUTHORIZATION.CREATED':
+      await paypalTxLedger.paypalIntent.update({
+        where: { paypalOrderId },
+        data: {
+          status: PAYPAL_LEDGER_STATUS.AUTHORIZED,
+          lastEventType: eventType,
+        },
+      });
+      return;
 
-  if (!res.ok) throw new Error(`Verify signature error: ${res.status} ${await res.text()}`);
-  const data = await res.json();
-  return data.verification_status === 'SUCCESS';
+    case 'PAYMENT.CAPTURE.PENDING':
+      await paypalTxLedger.paypalIntent.update({
+        where: { paypalOrderId },
+        data: {
+          status: PAYPAL_LEDGER_STATUS.PENDING,
+          lastEventType: eventType,
+        },
+      });
+      return;
+
+    case 'PAYMENT.CAPTURE.DENIED':
+      await paypalTxLedger.paypalIntent.update({
+        where: { paypalOrderId },
+        data: {
+          status: PAYPAL_LEDGER_STATUS.ERROR,
+          lastEventType: eventType,
+          lastErrorCode: 'CAPTURE_DENIED',
+          lastErrorMessage: 'PayPal capture denied',
+        },
+      });
+      return;
+
+    case 'PAYMENT.CAPTURE.REFUNDED':
+      await paypalTxLedger.paypalIntent.update({
+        where: { paypalOrderId },
+        data: {
+          status: PAYPAL_LEDGER_STATUS.REFUNDED,
+          lastEventType: eventType,
+        },
+      });
+      return;
+
+    case 'PAYMENT.CAPTURE.COMPLETED':
+      // Do not move the row backward if post-processing already advanced it.
+      if (!POST_CAPTURE_LEDGER_STATUSES.has(currentStatus)) {
+        await paypalTxLedger.paypalIntent.update({
+          where: { paypalOrderId },
+          data: {
+            status: PAYPAL_LEDGER_STATUS.CAPTURED,
+            lastEventType: eventType,
+          },
+        });
+      }
+      return;
+
+    default:
+      return;
+  }
 }
 
 export async function POST(req: Request) {
+  let eventId: string | undefined;
+
   try {
-    // Signature verification toggle:
-    // - Defaults to ON in production and OFF in development.
-    // - The PayPal Webhook Simulator sends mock events that are not verifiable.
-    // - For real sandbox/live webhooks, set PAYPAL_WEBHOOK_VERIFY=true and provide PAYPAL_WEBHOOK_ID.
+    const config = getServerPayPalConfig();
     const shouldVerify =
       (process.env.PAYPAL_WEBHOOK_VERIFY ??
         (process.env.NODE_ENV === 'production' ? 'true' : 'false')) === 'true';
 
-    // This is the ID of the webhook subscription you created for this app/environment.
-    // (Sandbox and Live each have their own webhook IDs.)
-    const webhookId = process.env.PAYPAL_WEBHOOK_ID ?? '';
-
-    // Read raw body once
     const raw = await req.text();
     const event = JSON.parse(raw) as PayPalWebhookEvent;
+    eventId = event.id;
 
     if (shouldVerify) {
-      if (!webhookId) {
-        throw new Error(
-          "Missing PAYPAL_WEBHOOK_ID. This is the ID of the webhook subscription you created under your app's Webhooks section (Sandbox and Live have different IDs).",
-        );
+      if (!config.webhookId) {
+        throw new Error('Missing PayPal webhook ID for the selected environment.');
       }
 
-      // PayPal headers used for verification
-      const paypalAuthAlgo = requiredHeader(req, 'paypal-auth-algo');
-      const paypalCertUrl = requiredHeader(req, 'paypal-cert-url');
-      const paypalTransmissionId = requiredHeader(req, 'paypal-transmission-id');
-      const paypalTransmissionSig = requiredHeader(req, 'paypal-transmission-sig');
-      const paypalTransmissionTime = requiredHeader(req, 'paypal-transmission-time');
-
-      // Verify authenticity (for real webhooks; simulator has limitations)
       const ok = await verifyWebhookSignature({
         event,
-        webhookId,
-        paypalAuthAlgo,
-        paypalCertUrl,
-        paypalTransmissionId,
-        paypalTransmissionSig,
-        paypalTransmissionTime,
+        webhookId: config.webhookId,
+        paypalAuthAlgo: requiredHeader(req, 'paypal-auth-algo'),
+        paypalCertUrl: requiredHeader(req, 'paypal-cert-url'),
+        paypalTransmissionId: requiredHeader(req, 'paypal-transmission-id'),
+        paypalTransmissionSig: requiredHeader(req, 'paypal-transmission-sig'),
+        paypalTransmissionTime: requiredHeader(req, 'paypal-transmission-time'),
       });
 
       if (!ok) {
         return new Response('Invalid signature', { status: 400 });
       }
     } else {
-      // Dev/simulator mode: the PayPal Webhook Simulator sends mock events that are not verifiable.
-      // Do NOT use this mode in production.
-      console.warn(
-        '[PayPal Webhook] Signature verification skipped (dev/simulator mode). Do NOT use this in production.',
-      );
+      console.warn('[PayPal Webhook] Signature verification skipped (dev/simulator mode).');
     }
 
-    console.log(event);
-
-    // Handle event types you care about
-    // Common ones for capture-based checkouts:
-    // PAYMENT.CAPTURE.COMPLETED / PENDING / DENIED  [oai_citation:12‡PayPal Developer](https://developer.paypal.com/beta/apm-beta/additional-information/subscribe-to-webhooks/)
-    switch (event.event_type) {
-      case 'PAYMENT.CAPTURE.COMPLETED':
-        // fulfill order
-        break;
-      case 'PAYMENT.CAPTURE.DENIED':
-        // mark as failed/cancel
-        break;
-      case 'PAYMENT.CAPTURE.PENDING':
-        // wait, don’t fulfill yet
-        break;
-      default:
-        // ignore or log
-        break;
+    if (!event.id || !event.event_type) {
+      return new Response('Missing event metadata', { status: 400 });
     }
 
-    // Must return 2xx for success or PayPal will retry  [oai_citation:13‡PayPal Developer](https://developer.paypal.com/api/rest/webhooks/)
+    const paypalOrderId = getWebhookPaypalOrderId(event);
+    const delivery = await ensureWebhookDeliveryRecord({
+      eventId: event.id,
+      eventType: event.event_type,
+      paypalOrderId,
+      payload: event,
+    });
+
+    if (delivery.processedAt) {
+      return new Response('OK', { status: 200 });
+    }
+
+    if (!paypalOrderId) {
+      await markWebhookIgnored(event.id, 'No correlatable PayPal order id in webhook payload');
+      return new Response('OK', { status: 200 });
+    }
+
+    const row = await paypalTxLedger.paypalIntent.findUnique({
+      where: { paypalOrderId },
+    });
+
+    // Ask PayPal to retry if the webhook beats ledger correlation.
+    if (!row) {
+      await markWebhookRetry(event.id, 'Ledger row not correlated yet');
+      return new Response('Retry later', { status: 500 });
+    }
+
+    if (row.status === PAYPAL_LEDGER_STATUS.COMPLETED) {
+      await markWebhookProcessed(event.id);
+      return new Response('OK', { status: 200 });
+    }
+
+    await updateLedgerFromWebhook({
+      paypalOrderId,
+      eventType: event.event_type,
+      currentStatus: row.status,
+    });
+
+    if (event.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
+      // ACK fast so provider retries are driven by our DB state, not route latency.
+      after(async () => {
+        try {
+          await runPostProcessing(row.orderToken);
+          await markWebhookProcessed(event.id);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+
+          await markWebhookFailed(event.id, message);
+          console.error('[PayPal Webhook] post-processing failed', {
+            eventId: event.id,
+            orderToken: row.orderToken,
+            error: message,
+          });
+        }
+      });
+
+      return new Response('OK', { status: 200 });
+    }
+
+    await markWebhookProcessed(event.id);
     return new Response('OK', { status: 200 });
-  } catch (e: Error | unknown) {
-    // Log safely
-    const message = e instanceof Error ? e.message : String(e);
-    console.error('PayPal webhook error:', message);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (eventId) {
+      try {
+        await markWebhookFailed(eventId, message);
+      } catch {
+        // Do not hide the original webhook failure if the event record update also fails.
+      }
+    }
+
+    console.error('[PayPal Webhook] handler failed', {
+      eventId,
+      error: message,
+    });
+
     return new Response('Webhook error', { status: 500 });
   }
 }
