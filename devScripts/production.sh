@@ -55,14 +55,20 @@ docker buildx inspect --bootstrap >/dev/null
 echo "Building services (parallel)…"
 docker compose --progress=plain -f "$COMPOSE_FILE" build --parallel
 
-echo "Starting services…"
-docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
+# The migrate service is a one-shot container.
+# Remove/recreate it so the SQLite schema setup and volume permission repair always run.
+echo "Running one-off catalog migration/volume permission repair…"
+docker compose -f "$COMPOSE_FILE" rm -fsv migrate
+docker compose -f "$COMPOSE_FILE" up --force-recreate --no-deps migrate
 
-# Light cleanup of dangling images unless explicitly skipped
-# Set SKIP_DOCKER_PRUNE=1 in the environment to disable this step.
+# Recreate the two runtime containers after the shared catalog volume is repaired.
+echo "Starting runtime services…"
+docker compose -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans app app_shop
+
+# Aggressively clean unused Docker objects after deploy to protect small VPS disks.
+# Set SKIP_DOCKER_PRUNE=1 only when you intentionally want to keep old images/cache.
 if [ "${SKIP_DOCKER_PRUNE:-0}" != "1" ]; then
-  # Use a conservative prune; adjust flags if you want more aggressive cleanup
-  docker system prune --force >/dev/null 2>&1 || true
+  docker system prune --all --force >/dev/null 2>&1 || true
 fi
 
 echo "== deploy finished $(date -u +%FT%TZ) =="

@@ -95,6 +95,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY prisma /app/prisma
 COPY prisma.config.* /app/
 
-# The runtime app runs as `node`, so the mounted SQLite volume must be node-writable.
-# SQLite also writes journal/WAL files beside the DB, so chown the whole /app/data tree.
-CMD ["sh", "-c", "mkdir -p /app/data/db/shop && RUST_LOG=info yarn prisma db push --schema prisma/shop/merchize/priceCatalog.prisma && chown -R node:node /app/data"]
+# The runtime app runs as `node`, and SQLite writes journal/WAL files beside the DB.
+# Repair ownership/permissions after schema sync so existing named volumes stay writable.
+CMD ["sh", "-c", "mkdir -p /app/data/db/shop && RUST_LOG=info yarn prisma db push --schema prisma/shop/merchize/priceCatalog.prisma && chown -R node:node /app/data && chmod -R u+rwX,g+rwX /app/data"]
