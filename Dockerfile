@@ -75,6 +75,11 @@ COPY --from=builder /app/next.config.* ./
 # Runtime-read datasets / resources (if your app imports these at runtime)
 COPY --from=builder /app/src/datasets /app/src/datasets
 
+# Next may write prerender/image/cache files at runtime.
+# The app runs as `node`, so prepare writable cache folders before dropping privileges.
+RUN mkdir -p /app/.next/cache \
+  && chown -R node:node /app/.next
+
 EXPOSE 3000
 
 # Use the built-in non-root user provided by the official node image
