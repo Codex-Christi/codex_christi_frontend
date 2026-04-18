@@ -95,6 +95,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY prisma /app/prisma
 COPY prisma.config.* /app/
 
-# The Merchize catalog is a local SQLite cache without committed SQL migrations.
-# `db push` creates/syncs the tables in the mounted /app/data volume before app start.
-CMD ["sh", "-c", "RUST_LOG=info yarn prisma db push --schema prisma/shop/merchize/priceCatalog.prisma"]
+# The runtime app runs as `node`, so the mounted SQLite volume must be node-writable.
+# SQLite also writes journal/WAL files beside the DB, so chown the whole /app/data tree.
+CMD ["sh", "-c", "mkdir -p /app/data/db/shop && RUST_LOG=info yarn prisma db push --schema prisma/shop/merchize/priceCatalog.prisma && chown -R node:node /app/data"]
