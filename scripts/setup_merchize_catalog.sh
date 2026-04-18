@@ -14,7 +14,7 @@ echo "→ Running setup_merchize_catalog.sh from project root: $ROOT_DIR"
 WITH_CRON=0
 RUN_BUILD=1
 RUN_DEPS=1
-FORCE_MIGRATE=0
+FORCE_PUSH=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -31,7 +31,8 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --force-migrate)
-      FORCE_MIGRATE=1
+      # Backwards-compatible alias. This catalog is synced with db push, not SQL migrations.
+      FORCE_PUSH=1
       shift
       ;;
     *)
@@ -65,8 +66,8 @@ else
   OLD_HASH=""
 fi
 
-if [ "$FORCE_MIGRATE" -eq 1 ]; then
-  echo "→ --force-migrate set: forcing migrate dev regardless of schema hash."
+if [ "$FORCE_PUSH" -eq 1 ]; then
+  echo "→ --force-migrate set: forcing db push regardless of schema hash."
   MERCHIZE_PRICE_CATALOG_SCHEMA_CHANGED=1
 elif [ "$NEW_HASH" != "$OLD_HASH" ]; then
   echo "→ Schema hash changed:"
@@ -81,35 +82,35 @@ fi
 # Persist the new hash (this is where the permission issue was before).
 echo "$NEW_HASH" > "$SCHEMA_HASH_FILE"
 
-echo "→ Ensuring data directory exists at $ROOT_DIR/data"
-mkdir -p "$ROOT_DIR/data"
+echo "→ Ensuring data directory exists at $ROOT_DIR/data/db/shop"
+mkdir -p "$ROOT_DIR/data/db/shop"
 
-# Prefer .env.production if present (prod container), otherwise .env
+# Prefer .env.production in prod, then .env.local for local dev, then .env.
 ENV_FILE=""
 if [ -f "$ROOT_DIR/.env.production" ]; then
   ENV_FILE="$ROOT_DIR/.env.production"
+elif [ -f "$ROOT_DIR/.env.local" ]; then
+  ENV_FILE="$ROOT_DIR/.env.local"
 elif [ -f "$ROOT_DIR/.env" ]; then
   ENV_FILE="$ROOT_DIR/.env"
 fi
 
 if [ -z "$ENV_FILE" ]; then
   cat <<'EOF'
-⚠️  .env/.env.production missing. Create one with at least:
+⚠️  .env/.env.local/.env.production missing. Continuing with the default catalog DB path:
 
-MERCHIZE_PRICE_CATALOG_DATABASE_URL="file:./data/merchize_price_catalog.db"
-
-For example, in .env.local for development:
-
-MERCHIZE_PRICE_CATALOG_DATABASE_URL="file:./data/merchize_price_catalog.db"
+MERCHIZE_PRICE_CATALOG_DATABASE_URL="file:./data/db/shop/merchizeCatalog.db"
 EOF
-  exit 1
+else
+  echo "→ Using env file: $ENV_FILE"
+  set -a
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+  set +a
 fi
 
-echo "→ Using env file: $ENV_FILE"
-set -a
-# shellcheck disable=SC1090
-. "$ENV_FILE"
-set +a
+export MERCHIZE_PRICE_CATALOG_DATABASE_URL="${MERCHIZE_PRICE_CATALOG_DATABASE_URL:-file:${ROOT_DIR}/data/db/shop/merchizeCatalog.db}"
+echo "→ Using catalog DB URL: $MERCHIZE_PRICE_CATALOG_DATABASE_URL"
 
 if [ "$RUN_DEPS" -eq 1 ]; then
   echo "→ Installing dependencies with Yarn (if needed)"
@@ -122,16 +123,9 @@ echo "→ Generate Prisma client (Merchize catalog schema)"
 yarn prisma generate \
   --schema "$SCHEMA_PATH"
 
-if [ "${MERCHIZE_PRICE_CATALOG_SCHEMA_CHANGED:-1}" = "1" ]; then
-  echo "→ Schema changed (or unknown): running Prisma migrate dev for Merchize catalog DB"
-  yarn prisma migrate dev \
-    --schema "$SCHEMA_PATH" \
-    -n bootstrap_merchize_catalog
-else
-  echo "→ Schema unchanged: skipping migrate dev, ensuring DB is in sync with db push"
-  yarn prisma db push \
-    --schema "$SCHEMA_PATH"
-fi
+echo "→ Syncing Merchize catalog DB schema with Prisma db push"
+RUST_LOG=info yarn prisma db push \
+  --schema "$SCHEMA_PATH"
 
 if [ "$RUN_BUILD" -eq 1 ]; then
   echo "→ Building Next.js app"

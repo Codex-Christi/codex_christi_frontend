@@ -9,6 +9,8 @@ services:
     container_name: codex-con-app-migrate
     env_file:
       - .env.production
+    environment:
+      MERCHIZE_PRICE_CATALOG_DATABASE_URL: file:/app/data/db/shop/merchizeCatalog.db
     restart: 'no'
     networks:
       - webserver-network
@@ -24,6 +26,8 @@ services:
     container_name: codex-con-app-start
     env_file:
       - .env.production
+    environment:
+      MERCHIZE_PRICE_CATALOG_DATABASE_URL: file:/app/data/db/shop/merchizeCatalog.db
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -44,6 +48,8 @@ services:
     container_name: codex-con-app-shop
     env_file:
       - .env.production
+    environment:
+      MERCHIZE_PRICE_CATALOG_DATABASE_URL: file:/app/data/db/shop/merchizeCatalog.db
     depends_on:
       migrate:
         condition: service_completed_successfully

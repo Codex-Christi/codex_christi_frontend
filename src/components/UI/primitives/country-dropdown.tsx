@@ -1,5 +1,5 @@
 'use client';
-import React, { useCallback, useState, forwardRef, useEffect, useMemo } from 'react';
+import React, { useCallback, useState, forwardRef, useMemo, useSyncExternalStore } from 'react';
 
 // shadcn
 import {
@@ -21,6 +21,27 @@ import { CircleFlag } from 'react-circle-flags';
 
 // data
 import { countries } from 'country-data-list';
+
+const subscribeToHydration = (onStoreChange: () => void) => {
+  const timeoutId = window.setTimeout(onStoreChange, 0);
+  return () => window.clearTimeout(timeoutId);
+};
+
+const getClientMountedSnapshot = () => true;
+const getServerMountedSnapshot = () => false;
+
+function useClientMounted() {
+  return useSyncExternalStore(
+    subscribeToHydration,
+    getClientMountedSnapshot,
+    getServerMountedSnapshot,
+  );
+}
+
+function isMobileUserAgent() {
+  if (typeof navigator === 'undefined') return false;
+  return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+}
 
 // Country interface
 export interface Country {
@@ -127,29 +148,11 @@ const CountryDropdownComponent = (
   ref: React.ForwardedRef<HTMLButtonElement>,
 ) => {
   const [open, setOpen] = useState(false);
-
-  // Initialize selection deterministically on first render (server + client)
-  // to keep markup stable and avoid hydration issues.
-  const [selectedCountry, setSelectedCountry] = useState<Country | undefined>(() => {
-    if (!defaultValue) return undefined;
-    const wanted = defaultValue.toUpperCase();
-    return options.find((c) => (c.alpha3 || '').toUpperCase() === wanted);
-  });
-
   const [searchRO, setSearchRO] = useState<boolean>(searchReadOnlyUntilInteract);
 
   // Prevent Radix (Popover) auto-generated IDs from being rendered on the server,
   // which can cause hydration mismatches when the overall tree ordering differs.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  const [isMobile, setIsMobile] = useState<boolean>(false);
-  useEffect(() => {
-    if (typeof navigator !== 'undefined') {
-      const ua = navigator.userAgent || '';
-      setIsMobile(/Mobi|Android|iPhone|iPad|iPod/i.test(ua));
-    }
-  }, []);
+  const mounted = useClientMounted();
 
   // fast lookup for defaultValue selection
   const optionsMapAlpha3 = useMemo(() => {
@@ -158,18 +161,18 @@ const CountryDropdownComponent = (
     return m;
   }, [options]);
 
-  useEffect(() => {
-    if (!defaultValue) {
-      setSelectedCountry(undefined);
-      return;
-    }
-    const initial = optionsMapAlpha3.get(defaultValue.toUpperCase());
-    setSelectedCountry(initial);
-  }, [defaultValue, optionsMapAlpha3]);
+  const [selectedAlpha3, setSelectedAlpha3] = useState<string | undefined>(() =>
+    defaultValue?.toUpperCase(),
+  );
+
+  const selectedCountry = useMemo(() => {
+    const alpha3 = selectedAlpha3 ?? defaultValue?.toUpperCase();
+    return alpha3 ? optionsMapAlpha3.get(alpha3) : undefined;
+  }, [defaultValue, optionsMapAlpha3, selectedAlpha3]);
 
   const handleSelect = useCallback(
     (country: Country) => {
-      setSelectedCountry(country);
+      setSelectedAlpha3(country.alpha3?.toUpperCase());
       onChange?.(country);
       setOpen(false);
     },
@@ -221,24 +224,21 @@ const CountryDropdownComponent = (
 
   const emptyClasses = cn('', classNames?.empty);
 
-  // Helper UI for trigger content
-  const TriggerContent = () => {
-    if (selectedCountry) {
-      return (
-        <div
-          className={cn('flex items-center gap-2 overflow-hidden', !slim && 'flex-grow min-w-0')}
-        >
-          {/* fixed-size flag */}
-          <div className={flagWrapperClasses}>
-            <CircleFlag countryCode={selectedCountry.alpha2.toLowerCase()} height={20} />
-          </div>
-          {/* show name only when not slim */}
-          {slim === false && <span className={nameClasses}>{selectedCountry.name}</span>}
-        </div>
-      );
-    }
-    return <span>{slim === false ? placeholder : <Globe size={20} />}</span>;
-  };
+  const triggerContent = selectedCountry ? (
+    <div className={cn('flex items-center gap-2 overflow-hidden', !slim && 'flex-grow min-w-0')}>
+      {/* fixed-size flag */}
+      <div className={flagWrapperClasses}>
+        <CircleFlag countryCode={selectedCountry.alpha2.toLowerCase()} height={20} />
+      </div>
+      {/* show name only when not slim */}
+      {slim === false && <span className={nameClasses}>{selectedCountry.name}</span>}
+    </div>
+  ) : (
+    <span>{slim === false ? placeholder : <Globe size={20} />}</span>
+  );
+
+  const mobileBool =
+    typeof isMobileOverride === 'boolean' ? isMobileOverride : mounted && isMobileUserAgent();
 
   // SSR-safe placeholder: render a simple button until mounted,
   // then swap in the Radix Popover UI on the client.
@@ -254,7 +254,7 @@ const CountryDropdownComponent = (
           aria-expanded={false}
           {...restTriggerProps}
         >
-          <TriggerContent />
+          {triggerContent}
           <ChevronDown size={25} className={chevronClasses} />
         </button>
       </div>
@@ -272,7 +272,7 @@ const CountryDropdownComponent = (
           aria-expanded={open}
           {...restTriggerProps}
         >
-          <TriggerContent />
+          {triggerContent}
           <ChevronDown size={25} className={chevronClasses} />
         </PopoverTrigger>
 
@@ -282,7 +282,6 @@ const CountryDropdownComponent = (
           className={popoverClasses}
           {...(portalContainer ? { container: portalContainer } : {})}
           onOpenAutoFocus={(e) => {
-            const mobileBool = typeof isMobileOverride === 'boolean' ? isMobileOverride : isMobile;
             const shouldBlock =
               // legacy prop still blocks on all platforms if set
               disableAutoFocusOnOpen ||

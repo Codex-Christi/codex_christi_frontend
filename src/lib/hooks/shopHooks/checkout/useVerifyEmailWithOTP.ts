@@ -4,7 +4,7 @@
 
 import successToast from '@/lib/success-toast';
 import { useVerifiedEmailsStore } from '@/stores/shop_stores/checkoutStore/useVerifiedEmailsStore';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import errorToast from '@/lib/error-toast';
 import {
   useSendFirstCheckoutEmailOTPMutation,
@@ -30,13 +30,8 @@ export const useVerifyEmailWithOTP = (email: string | undefined, openOTPModal: (
   const addEmailToVerifiedList = useVerifiedEmailsStore((s) => s.addEmailToVerifiedList);
   // Derive verified status from store
   const storeVerified = email ? getEmailStatus(email) === true : false;
-  // Local state, initially from store
-  const [isEmailVerified, setIsEmailVerified] = useState<boolean>(storeVerified);
-
-  // Sync local state if store changes
-  useEffect(() => {
-    setIsEmailVerified(storeVerified);
-  }, [storeVerified]);
+  const [locallyVerifiedEmail, setLocallyVerifiedEmail] = useState<string | null>(null);
+  const isEmailVerified = storeVerified || (email ? locallyVerifiedEmail === email : false);
 
   //  first mutation to send OTP to email
   const sendInitialOTPToEmail = useCallback(
@@ -53,13 +48,12 @@ export const useVerifyEmailWithOTP = (email: string | undefined, openOTPModal: (
 
       if (isEmailVerified) {
         successToast({ header: 'Good news!', message: 'Email already verified...' });
-        setIsEmailVerified(true);
         return;
       }
 
       // Open the popover first so the user sees the OTP UI immediately
       try {
-        setIsEmailVerified(false);
+        setLocallyVerifiedEmail(null);
         openOTPModal();
 
         const resp = await trigger({ email, headers: extraHeaders });
@@ -145,7 +139,7 @@ export const useVerifyEmailWithOTP = (email: string | undefined, openOTPModal: (
             header: 'Email verified',
             message: resp.message ?? 'Email successfully verified. Proceeding to payment...',
           });
-          setIsEmailVerified(true);
+          setLocallyVerifiedEmail(email);
           addEmailToVerifiedList(email);
           return resp;
         } else {

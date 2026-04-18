@@ -4,18 +4,26 @@ import { PrismaClient } from './generated/merchizeCatalog/client';
 import fs from 'fs';
 import path from 'path';
 
-// Keep this in sync with prisma.config.ts / MERCHIZE_PRICE_CATALOG_DATABASE_URL
-const DEFAULT_DB_URL = 'file:/data/db/shop/merchizeCatalog.db';
+// Keep this default in sync with prisma.config.ts and the Docker /app/data volume.
+const DEFAULT_DB_URL = `file:${path.join(process.cwd(), 'data', 'db', 'shop', 'merchizeCatalog.db')}`;
 
-// Prisma's adapter expects ':memory:' | (string & {}), so we narrow the type here
-const dbUrl = (process.env.MERCHIZE_PRICE_CATALOG_DATABASE_URL ?? DEFAULT_DB_URL) as
-  | ':memory:'
-  | (string & {});
+function resolveDbUrl(): ':memory:' | (string & {}) {
+  const url = process.env.MERCHIZE_PRICE_CATALOG_DATABASE_URL ?? DEFAULT_DB_URL;
+  if (url === ':memory:' || url === 'file::memory:') return url as ':memory:' | (string & {});
+  if (!url.startsWith('file:')) {
+    throw new Error('MERCHIZE_PRICE_CATALOG_DATABASE_URL must be a SQLite file: URL.');
+  }
 
-// If we're using a file: URL, make sure the folder exists so SQLite can create the file
-if (dbUrl.startsWith('file:')) {
-  const filePath = dbUrl.slice('file:'.length); // e.g. "/data/db/shop/merchizeCatalog.db"
-  const dir = path.dirname(filePath);
+  const filePath = url.slice('file:'.length);
+  return (path.isAbsolute(filePath) ? url : `file:${path.resolve(process.cwd(), filePath)}`) as string & {};
+}
+
+// Prisma's adapter expects ':memory:' | (string & {}), so we narrow the type here.
+const dbUrl = resolveDbUrl();
+
+// Ensure the parent folder exists so SQLite can create or open the catalog file.
+if (dbUrl.startsWith('file:') && dbUrl !== 'file::memory:') {
+  const dir = path.dirname(dbUrl.slice('file:'.length));
   try {
     fs.mkdirSync(dir, { recursive: true });
   } catch (err) {

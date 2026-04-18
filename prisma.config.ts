@@ -31,15 +31,31 @@ function getSchemaArg(): string {
 // ── Resolve datasource URL per schema ─────────────────────────
 const schemaPath = getSchemaArg();
 
-const catalogDbPath = path.join(root, 'data', 'db', 'shop', 'merchizeCatalog.db');
+const defaultCatalogDbPath = path.join(root, 'data', 'db', 'shop', 'merchizeCatalog.db');
+
+function resolveCatalogDbUrl(): string {
+  const envUrl = process.env.MERCHIZE_PRICE_CATALOG_DATABASE_URL;
+  if (!envUrl) return `file:${defaultCatalogDbPath}`;
+  if (!envUrl.startsWith('file:')) {
+    throw new Error('MERCHIZE_PRICE_CATALOG_DATABASE_URL must be a SQLite file: URL.');
+  }
+
+  const sqlitePath = envUrl.slice('file:'.length);
+  if (sqlitePath === ':memory:' || path.isAbsolute(sqlitePath)) return envUrl;
+
+  // Prisma CLI and runtime must resolve relative SQLite paths from the project root.
+  return `file:${path.resolve(root, sqlitePath)}`;
+}
 
 function resolve(): { schema: string; url: string } {
   if (schemaPath === schemas.merchize) {
-    fs.mkdirSync(path.dirname(catalogDbPath), { recursive: true });
-    const envUrl = process.env.MERCHIZE_PRICE_CATALOG_DATABASE_URL;
+    const url = resolveCatalogDbUrl();
+    if (url !== 'file::memory:') {
+      fs.mkdirSync(path.dirname(url.slice('file:'.length)), { recursive: true });
+    }
     return {
       schema: './prisma/shop/merchize/priceCatalog.prisma',
-      url: envUrl?.startsWith('file:') ? envUrl : `file:${catalogDbPath}`,
+      url,
     };
   }
 

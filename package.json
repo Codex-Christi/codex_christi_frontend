@@ -11,7 +11,7 @@
     "build-with-env": "next build --update-env",
     "build-with-env:webpack": "next build --webpack --update-env",
     "merchize:setup-catalog": "bash ./scripts/setup_merchize_catalog.sh",
-    "merchize-catalog:db:push": "prisma db push --schema prisma/shop/merchize/priceCatalog.prisma",
+    "merchize-catalog:db:push": "RUST_LOG=info prisma db push --schema prisma/shop/merchize/priceCatalog.prisma",
     "merchize-catalog:generate": "prisma generate --schema prisma/shop/merchize/priceCatalog.prisma",
     "prisma:paypalTxLedger:generate:dev": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
     "prisma:paypalTxLedger:generate:prod": "PAYPAL_TX_LEDGER_NEON_BRANCH=prod prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",

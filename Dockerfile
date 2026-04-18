@@ -95,5 +95,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY prisma /app/prisma
 COPY prisma.config.* /app/
 
-# Default command is optional; compose can override
-CMD ["sh", "-c", "yarn prisma migrate deploy --schema prisma/shop/merchize/priceCatalog.prisma"]
+# The Merchize catalog is a local SQLite cache without committed SQL migrations.
+# `db push` creates/syncs the tables in the mounted /app/data volume before app start.
+CMD ["sh", "-c", "RUST_LOG=info yarn prisma db push --schema prisma/shop/merchize/priceCatalog.prisma"]
