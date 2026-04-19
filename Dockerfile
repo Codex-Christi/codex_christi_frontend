@@ -96,10 +96,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Only what Prisma migrate needs
+# Only what production database setup needs.
 COPY prisma /app/prisma
 COPY prisma.config.* /app/
+COPY scripts/prisma_production_setup.sh /app/scripts/prisma_production_setup.sh
 
-# The runtime app runs as `node`, and SQLite writes journal/WAL files beside the DB.
-# Repair ownership/permissions after schema sync so existing named volumes stay writable.
-CMD ["sh", "-c", "mkdir -p /app/data/db/shop && RUST_LOG=info yarn prisma db push --schema prisma/shop/merchize/priceCatalog.prisma && chown -R node:node /app/data && chmod -R u+rwX,g+rwX /app/data"]
+RUN chmod +x /app/scripts/prisma_production_setup.sh
+
+CMD ["bash", "/app/scripts/prisma_production_setup.sh"]
