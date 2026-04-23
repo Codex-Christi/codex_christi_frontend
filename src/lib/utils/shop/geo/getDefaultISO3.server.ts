@@ -25,25 +25,10 @@ export async function getDefaultISO3(): Promise<string> {
   if (profileCountry) return profileCountry;
 
   const h = headers();
-  // Test
-  const xCountryCode = (await h).get('x-country-code');
-  const cfIpCountry = (await h).get('cf-ipcountry');
-
-  console.log('[country-bootstrap] header candidates', {
-    xCountryCode,
-    cfIpCountry,
-  });
-  //
 
   const headerCountry =
     resolveHeaderCountry((await h).get('x-country-code')) ??
     resolveHeaderCountry((await h).get('cf-ipcountry'));
-
-  // Test 2
-  console.log('[country-bootstrap] resolved header country', {
-    headerCountry,
-  });
-  //
 
   if (headerCountry) return headerCountry;
 
