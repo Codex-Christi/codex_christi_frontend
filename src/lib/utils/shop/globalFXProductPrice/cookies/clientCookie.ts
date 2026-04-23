@@ -22,7 +22,7 @@ export function writeCurrencyCookieClient(state: CookieStateV1): void {
       sameSite: 'lax',
       expires: 30,
       path: '/',
-      // secure: true, // enable on HTTPS
+      secure: process.env.NODE_ENV === 'production',
     });
   } catch (e) {
     console.error('[currency] client cookie write failed', e);

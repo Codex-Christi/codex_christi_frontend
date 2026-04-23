@@ -3,7 +3,7 @@
 import { FetcherError, FetcherOptions, universalFetcher } from '@/lib/utils/SWRfetcherAdvanced';
 import { generateSignatureHeaders } from '@/lib/hooks/shopHooks/checkout/helpers/generateSignatureHeaders';
 import { cache } from 'react';
-import { CompletedTxInterface } from '@/lib/hooks/shopHooks/checkout/usePost-PaymentProcessors';
+import type { CompletedTxInterface } from '@/types/shop/paypalCompletedTx';
 import { OrderResponseBody } from '@paypal/paypal-js';
 import { OrdersCapture } from '@paypal/paypal-server-sdk';
 import { returnReducedBackendError } from '@/lib/hooks/shopHooks/checkout/helpers/returnReducedBackendError';

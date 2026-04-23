@@ -12,7 +12,6 @@ import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { useVerifiedEmailsStore } from '@/stores/shop_stores/checkoutStore/useVerifiedEmailsStore';
 import { useOrderStringStore } from '@/stores/shop_stores/checkoutStore/ORD-stringStore';
 import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
-import { useOrderProcessingStore } from '@/stores/shop_stores/checkoutStore/orderProcessingStore';
 import {
   mapLedgerToProcessingState,
   type MappedProcessingState,
@@ -62,7 +61,6 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
   const clearVerifiedEmails = useVerifiedEmailsStore((store) => store.clearStore);
   const setOrderString = useOrderStringStore((store) => store.setOrderString);
   const clearIntent = usePayPalIntentStore((store) => store.clearIntent);
-  const resetProcessingState = useOrderProcessingStore((store) => store.resetProcessingState);
   const flowStatus = processingState?.flowStatus ?? 'processing';
   const steps =
     processingState?.steps ??
@@ -144,7 +142,6 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
 
   const resetCheckoutRelatedStoresAndVars = useCallback(() => {
     clearIntent();
-    resetProcessingState();
     clearVerifiedEmails();
     setOrderString('');
     clearCart();
@@ -154,7 +151,6 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
     clearIntent,
     clearVerifiedEmails,
     resetCheckoutToInitial,
-    resetProcessingState,
     setOrderString,
   ]);
 

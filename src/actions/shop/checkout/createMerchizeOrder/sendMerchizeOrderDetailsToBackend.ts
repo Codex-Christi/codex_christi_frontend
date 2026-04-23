@@ -4,7 +4,7 @@ import { FetcherError, FetcherOptions, universalFetcher } from '@/lib/utils/SWRf
 import { generateSignatureHeaders } from '@/lib/hooks/shopHooks/checkout/helpers/generateSignatureHeaders';
 import { cache } from 'react';
 import { CartVariant } from '@/stores/shop_stores/cartStore';
-import { CompletedTxInterface } from '@/lib/hooks/shopHooks/checkout/usePost-PaymentProcessors';
+import type { CompletedTxInterface } from '@/types/shop/paypalCompletedTx';
 import { returnReducedBackendError } from '@/lib/hooks/shopHooks/checkout/helpers/returnReducedBackendError';
 import { decryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
 

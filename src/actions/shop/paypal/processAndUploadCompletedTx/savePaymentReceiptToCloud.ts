@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'path';
 import { uploadPaymentReceiptToR2 } from '../../checkout/transactions/uploadPaymentReceipt';
 import { createPaypalShopInvoicePDF } from '../createShopInvoicePDF';
-import { CompletedTxInterface } from '@/lib/hooks/shopHooks/checkout/usePost-PaymentProcessors';
+import type { CompletedTxInterface } from '@/types/shop/paypalCompletedTx';
 import { decryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
 
 export interface PaymentReceiptProps {

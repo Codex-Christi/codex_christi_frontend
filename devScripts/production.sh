@@ -68,10 +68,14 @@ docker compose -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans app ap
 # Aggressively clean unused Docker objects after deploy to protect small VPS disks.
 # Set SKIP_DOCKER_PRUNE=1 only when you intentionally want to keep old images/cache.
 if [ "${SKIP_DOCKER_PRUNE:-0}" != "1" ]; then
-  docker system prune --all --force >/dev/null 2>&1 || true
+  echo "Pruning unused Docker images/cache..."
+  docker system prune --all --force || true
 fi
+
 
 echo "== deploy finished $(date -u +%FT%TZ) =="
 
 echo "Services started. Current status:"
 docker compose -f "$COMPOSE_FILE" ps
+
+docker compose 

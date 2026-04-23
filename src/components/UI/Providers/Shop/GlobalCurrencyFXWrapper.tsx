@@ -4,6 +4,8 @@ import { readCurrencyCookieServer } from '@/lib/utils/shop/globalFXProductPrice/
 import { CurrencyCookieProvider } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore'; // ← from the store
 import type { CookieStateV1 } from '@/lib/utils/shop/globalFXProductPrice/cookies/currencyCookie';
 import { getDollarMultiplier } from '@/actions/shop/general/currencyConvert'; // your server action
+import { getDefaultISO3 } from '@/lib/utils/shop/geo/getDefaultISO3.server';
+import { CurrencyCookiePersist } from './CurrencyCookiePersist';
 
 async function warmFX(iso3: string): Promise<CookieStateV1['fx']> {
   try {
@@ -21,17 +23,21 @@ async function warmFX(iso3: string): Promise<CookieStateV1['fx']> {
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const snap = await readCurrencyCookieServer(); // { v, iso3, fx?, updatedAt }
-  const fx = snap.fx ?? (await warmFX(snap.iso3 || 'USA'));
+  const iso3 = snap.updatedAt > 0 ? snap.iso3 : await getDefaultISO3();
+  const fx = snap.fx ?? (await warmFX(iso3 || 'USA'));
 
   // Cookie is tiny now: no usdPrices
   const initialForClient: CookieStateV1 = {
     v: 1,
-    iso3: snap.iso3 || 'USA',
+    iso3: iso3 || 'USA',
     fx,
     updatedAt: snap.updatedAt || fx?.ts || 0,
   };
 
   return (
-    <CurrencyCookieProvider serverSideData={initialForClient}>{children}</CurrencyCookieProvider>
+    <CurrencyCookieProvider serverSideData={initialForClient}>
+      <CurrencyCookiePersist />
+      {children}
+    </CurrencyCookieProvider>
   );
 }

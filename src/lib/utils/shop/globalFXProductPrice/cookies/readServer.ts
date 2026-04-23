@@ -7,7 +7,7 @@ const FALLBACK: CookieStateV1 = { v: 1, iso3: 'USA', updatedAt: 0 };
 export async function readCurrencyCookieServer(): Promise<CookieStateV1> {
   const jar = await cookies();
   const raw = jar.get(CURRENCY_COOKIE)?.value;
-  if (!raw) return { ...FALLBACK, updatedAt: Date.now() };
+  if (!raw) return { ...FALLBACK };
 
   try {
     const parsed = decryptCookieJSON<CookieStateV1>(raw);
@@ -15,5 +15,5 @@ export async function readCurrencyCookieServer(): Promise<CookieStateV1> {
   } catch (e) {
     console.error('[currency] server cookie decrypt failed', e);
   }
-  return { ...FALLBACK, updatedAt: Date.now() };
+  return { ...FALLBACK };
 }

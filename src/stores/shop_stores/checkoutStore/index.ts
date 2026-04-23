@@ -1,5 +1,7 @@
 import { encrypt, decrypt } from '../cartStore';
 import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
+import type { IUserShopProfile } from '@/lib/types/user-shop-interface';
+import { normalizeCountryToIso3 } from '@/lib/utils/shop/checkout/normalizeCountryToIso3';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { create } from 'zustand';
 import { persist, PersistStorage, StorageValue } from 'zustand/middleware';
@@ -32,6 +34,7 @@ export interface ShopCheckoutState extends ShopCheckoutStoreInterface {
   setPaymentMethod: (payment_method: ShopCheckoutStoreInterface['payment_method']) => void;
   setDeliveryAddress: (delivery_address: ShopCheckoutStoreInterface['delivery_address']) => void;
   setShippingCountryISO3: (iso3: string | null) => void; // <-- NEW: single writer for country
+  hydrateFromShopProfile: (profile: IUserShopProfile, fallbackEmail?: string | null) => void;
   clearCheckout: () => void;
   resetCheckoutToInitial: () => void;
 }
@@ -114,6 +117,25 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
               shipping_country: iso3,
             },
           })),
+        hydrateFromShopProfile: (profile, fallbackEmail) => {
+          const data = profile.data;
+          set((state) => ({
+            first_name: data.first_name ?? '',
+            last_name: data.last_name ?? '',
+            email: fallbackEmail ?? '',
+            delivery_address: {
+              shipping_address_line_1: data.shipping_address ?? '',
+              shipping_address_line_2: state.delivery_address.shipping_address_line_2 ?? '',
+              shipping_city: data.shipping_city ?? '',
+              shipping_state: data.shipping_state ?? '',
+              // Preserve the checkout/currency-selected country when it already exists.
+              shipping_country:
+                state.delivery_address.shipping_country ??
+                normalizeCountryToIso3(data.shipping_country),
+              zip_code: state.delivery_address.zip_code ?? '',
+            },
+          }));
+        },
         clearCheckout: () => {
           set({
             ...initialObj,

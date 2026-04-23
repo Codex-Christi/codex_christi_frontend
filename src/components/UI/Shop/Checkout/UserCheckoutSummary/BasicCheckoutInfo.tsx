@@ -17,6 +17,8 @@ import { DeliveryAddressInputFields } from './DeliveryAddressInputFields';
 import errorToast from '@/lib/error-toast';
 import { useVerifyEmailWithOTP } from '@/lib/hooks/shopHooks/checkout/useVerifyEmailWithOTP';
 import { CheckoutOTPModalHandles } from './CheckoutOTPModal';
+import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
+import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 
 //Dynamic component import
 import dynamic from 'next/dynamic';
@@ -56,6 +58,7 @@ export const BasicCheckoutInfo = () => {
 
   // Hooks
   const { handleOpenItem } = useContext(CheckoutAccordionContext);
+  const [checkoutHydrated, setCheckoutHydrated] = useState(false);
   const { delivery_address, first_name, last_name, email } = useShopCheckoutStore(
     useShallow((s) => ({
       delivery_address: s.delivery_address,
@@ -65,6 +68,10 @@ export const BasicCheckoutInfo = () => {
     })),
   );
   const setShippingCountryISO3 = useShopCheckoutStore((s) => s.setShippingCountryISO3);
+  const hydrateFromShopProfile = useShopCheckoutStore((s) => s.hydrateFromShopProfile);
+  const userShopProfile = useUserShopProfile((s) => s.userShopProfile);
+  const fallbackEmail = useUserMainProfileStore((s) => s.userMainProfile?.email);
+  const selectedCountryISO3 = useCurrencyCookie((s) => s.iso3);
   const changeCookieStoreCountry = useCurrencyCookie((s) => s.changeCountry);
   const otpSendHookProps = useVerifyEmailWithOTP(email, () => setIsOtpOpen(true));
   const { isEmailVerified, sendInitialOTPToEmail } = otpSendHookProps;
@@ -83,7 +90,7 @@ export const BasicCheckoutInfo = () => {
     const s = useShopCheckoutStore.getState();
     const da = s.delivery_address || ({} as typeof delivery_address);
     return {
-      country: da?.shipping_country ?? '',
+      country: selectedCountryISO3 ?? da?.shipping_country ?? '',
       firstname: s.first_name ?? '',
       lastname: s.last_name ?? '',
       email: s.email ?? '',
@@ -97,7 +104,7 @@ export const BasicCheckoutInfo = () => {
 
   // Extract Default Values
   const storeValues = {
-    country: shipping_country ?? '',
+    country: selectedCountryISO3 ?? shipping_country ?? '',
     firstname: first_name ?? '',
     lastname: last_name ?? '',
     email: email ?? '',
@@ -115,11 +122,17 @@ export const BasicCheckoutInfo = () => {
     defaultValues: storeValues,
   });
 
+  const isCheckoutMissingSavedProfileDetails = () => {
+    const vals = deriveValuesFromStore();
+    return !vals.addressLine1 && !vals.adminArea1 && !vals.adminArea2;
+  };
+
   // Ensure form is populated after Zustand persist hydration (full reload case)
   useEffect(() => {
     const apply = () => {
       const vals = deriveValuesFromStore();
       basicCheckoutInfoForm.reset(vals);
+      queueMicrotask(() => setCheckoutHydrated(true));
     };
 
     const hasHydrated = useShopCheckoutStore.persist?.hasHydrated?.();
@@ -135,6 +148,33 @@ export const BasicCheckoutInfo = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!userShopProfile?.data) return;
+    if (!checkoutHydrated) return;
+    if (basicCheckoutInfoForm.formState.isDirty) return;
+    if (!isCheckoutMissingSavedProfileDetails()) return;
+
+    hydrateFromShopProfile(userShopProfile, fallbackEmail);
+    const vals = deriveValuesFromStore();
+    basicCheckoutInfoForm.reset(vals);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkoutHydrated, fallbackEmail, hydrateFromShopProfile, userShopProfile]);
+
+  useEffect(() => {
+    if (!checkoutHydrated) return;
+    if (!selectedCountryISO3) return;
+    if (delivery_address?.shipping_country === selectedCountryISO3) return;
+
+    setShippingCountryISO3(selectedCountryISO3);
+    basicCheckoutInfoForm.setValue('country', selectedCountryISO3, { shouldDirty: false });
+  }, [
+    basicCheckoutInfoForm,
+    checkoutHydrated,
+    delivery_address?.shipping_country,
+    selectedCountryISO3,
+    setShippingCountryISO3,
+  ]);
 
   // Handlers
   async function onSubmit(data: z.infer<typeof BasicCheckoutInfoFormSchema>) {

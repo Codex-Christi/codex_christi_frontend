@@ -136,11 +136,14 @@ function isUserShopProfileData(value: IUserShopProfile): value is IUserShopProfi
     'username',
     'favorite_products',
     'payment_methods',
-    'shipping_address',
-    'shipping_city',
-    'shipping_state',
-    'shipping_country',
   ];
 
-  return requiredFields.every((field) => field in value.data);
+  const hasRequiredBaseFields = requiredFields.every((field) => field in value.data);
+  const hasShippingFields =
+    'shipping_address' in value.data &&
+    'shipping_city' in value.data &&
+    'shipping_state' in value.data &&
+    'shipping_country' in value.data;
+
+  return hasRequiredBaseFields && hasShippingFields;
 }
