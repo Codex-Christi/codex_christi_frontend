@@ -39,14 +39,21 @@ export type PaypalIntentMinAggregateOutputType = {
   orderToken: string | null
   paypalOrderId: string | null
   paypalAuthorizationId: string | null
-  otpOrderId: string | null
+  djangoOrderIntentUuid: string | null
+  djangoOrderIntentOrderId: string | null
   customerName: string | null
   customerEmail: string | null
   userId: string | null
   countryIso2: string | null
   countryIso3: string | null
   initialCurrency: string | null
-  backendCustomId: string | null
+  merchizeFulfillmentProcessingId: string | null
+  merchizeProviderOrderId: string | null
+  merchizeProviderOrderCode: string | null
+  fulfillmentAddressOverrideReason: string | null
+  fulfillmentAddressOverriddenBy: string | null
+  fulfillmentAddressOverriddenAt: Date | null
+  djangoPaymentSaveCustomId: string | null
   receiptLink: string | null
   receiptFile: string | null
   status: string | null
@@ -67,14 +74,21 @@ export type PaypalIntentMaxAggregateOutputType = {
   orderToken: string | null
   paypalOrderId: string | null
   paypalAuthorizationId: string | null
-  otpOrderId: string | null
+  djangoOrderIntentUuid: string | null
+  djangoOrderIntentOrderId: string | null
   customerName: string | null
   customerEmail: string | null
   userId: string | null
   countryIso2: string | null
   countryIso3: string | null
   initialCurrency: string | null
-  backendCustomId: string | null
+  merchizeFulfillmentProcessingId: string | null
+  merchizeProviderOrderId: string | null
+  merchizeProviderOrderCode: string | null
+  fulfillmentAddressOverrideReason: string | null
+  fulfillmentAddressOverriddenBy: string | null
+  fulfillmentAddressOverriddenAt: Date | null
+  djangoPaymentSaveCustomId: string | null
   receiptLink: string | null
   receiptFile: string | null
   status: string | null
@@ -95,7 +109,8 @@ export type PaypalIntentCountAggregateOutputType = {
   orderToken: number
   paypalOrderId: number
   paypalAuthorizationId: number
-  otpOrderId: number
+  djangoOrderIntentUuid: number
+  djangoOrderIntentOrderId: number
   customerName: number
   customerEmail: number
   userId: number
@@ -106,9 +121,19 @@ export type PaypalIntentCountAggregateOutputType = {
   shippingSnapshot: number
   authorizePayload: number
   capturePayload: number
-  paymentSaveResponsePayload: number
-  fulfillmentSendResponsePayload: number
-  backendCustomId: number
+  djangoOrderIntentPayload: number
+  djangoOrderIntentVerifyPayload: number
+  djangoPaymentSaveResponsePayload: number
+  merchizeFulfillmentRequestPayload: number
+  merchizeFulfillmentResponsePayload: number
+  merchizeFulfillmentProcessingId: number
+  merchizeProviderOrderId: number
+  merchizeProviderOrderCode: number
+  fulfillmentAddressOverride: number
+  fulfillmentAddressOverrideReason: number
+  fulfillmentAddressOverriddenBy: number
+  fulfillmentAddressOverriddenAt: number
+  djangoPaymentSaveCustomId: number
   receiptLink: number
   receiptFile: number
   status: number
@@ -139,14 +164,21 @@ export type PaypalIntentMinAggregateInputType = {
   orderToken?: true
   paypalOrderId?: true
   paypalAuthorizationId?: true
-  otpOrderId?: true
+  djangoOrderIntentUuid?: true
+  djangoOrderIntentOrderId?: true
   customerName?: true
   customerEmail?: true
   userId?: true
   countryIso2?: true
   countryIso3?: true
   initialCurrency?: true
-  backendCustomId?: true
+  merchizeFulfillmentProcessingId?: true
+  merchizeProviderOrderId?: true
+  merchizeProviderOrderCode?: true
+  fulfillmentAddressOverrideReason?: true
+  fulfillmentAddressOverriddenBy?: true
+  fulfillmentAddressOverriddenAt?: true
+  djangoPaymentSaveCustomId?: true
   receiptLink?: true
   receiptFile?: true
   status?: true
@@ -167,14 +199,21 @@ export type PaypalIntentMaxAggregateInputType = {
   orderToken?: true
   paypalOrderId?: true
   paypalAuthorizationId?: true
-  otpOrderId?: true
+  djangoOrderIntentUuid?: true
+  djangoOrderIntentOrderId?: true
   customerName?: true
   customerEmail?: true
   userId?: true
   countryIso2?: true
   countryIso3?: true
   initialCurrency?: true
-  backendCustomId?: true
+  merchizeFulfillmentProcessingId?: true
+  merchizeProviderOrderId?: true
+  merchizeProviderOrderCode?: true
+  fulfillmentAddressOverrideReason?: true
+  fulfillmentAddressOverriddenBy?: true
+  fulfillmentAddressOverriddenAt?: true
+  djangoPaymentSaveCustomId?: true
   receiptLink?: true
   receiptFile?: true
   status?: true
@@ -195,7 +234,8 @@ export type PaypalIntentCountAggregateInputType = {
   orderToken?: true
   paypalOrderId?: true
   paypalAuthorizationId?: true
-  otpOrderId?: true
+  djangoOrderIntentUuid?: true
+  djangoOrderIntentOrderId?: true
   customerName?: true
   customerEmail?: true
   userId?: true
@@ -206,9 +246,19 @@ export type PaypalIntentCountAggregateInputType = {
   shippingSnapshot?: true
   authorizePayload?: true
   capturePayload?: true
-  paymentSaveResponsePayload?: true
-  fulfillmentSendResponsePayload?: true
-  backendCustomId?: true
+  djangoOrderIntentPayload?: true
+  djangoOrderIntentVerifyPayload?: true
+  djangoPaymentSaveResponsePayload?: true
+  merchizeFulfillmentRequestPayload?: true
+  merchizeFulfillmentResponsePayload?: true
+  merchizeFulfillmentProcessingId?: true
+  merchizeProviderOrderId?: true
+  merchizeProviderOrderCode?: true
+  fulfillmentAddressOverride?: true
+  fulfillmentAddressOverrideReason?: true
+  fulfillmentAddressOverriddenBy?: true
+  fulfillmentAddressOverriddenAt?: true
+  djangoPaymentSaveCustomId?: true
   receiptLink?: true
   receiptFile?: true
   status?: true
@@ -316,7 +366,8 @@ export type PaypalIntentGroupByOutputType = {
   orderToken: string
   paypalOrderId: string | null
   paypalAuthorizationId: string | null
-  otpOrderId: string | null
+  djangoOrderIntentUuid: string | null
+  djangoOrderIntentOrderId: string | null
   customerName: string
   customerEmail: string
   userId: string | null
@@ -327,9 +378,19 @@ export type PaypalIntentGroupByOutputType = {
   shippingSnapshot: runtime.JsonValue
   authorizePayload: runtime.JsonValue | null
   capturePayload: runtime.JsonValue | null
-  paymentSaveResponsePayload: runtime.JsonValue | null
-  fulfillmentSendResponsePayload: runtime.JsonValue | null
-  backendCustomId: string | null
+  djangoOrderIntentPayload: runtime.JsonValue | null
+  djangoOrderIntentVerifyPayload: runtime.JsonValue | null
+  djangoPaymentSaveResponsePayload: runtime.JsonValue | null
+  merchizeFulfillmentRequestPayload: runtime.JsonValue | null
+  merchizeFulfillmentResponsePayload: runtime.JsonValue | null
+  merchizeFulfillmentProcessingId: string | null
+  merchizeProviderOrderId: string | null
+  merchizeProviderOrderCode: string | null
+  fulfillmentAddressOverride: runtime.JsonValue | null
+  fulfillmentAddressOverrideReason: string | null
+  fulfillmentAddressOverriddenBy: string | null
+  fulfillmentAddressOverriddenAt: Date | null
+  djangoPaymentSaveCustomId: string | null
   receiptLink: string | null
   receiptFile: string | null
   status: string
@@ -373,7 +434,8 @@ export type PaypalIntentWhereInput = {
   orderToken?: Prisma.StringFilter<"PaypalIntent"> | string
   paypalOrderId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   paypalAuthorizationId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
-  otpOrderId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  djangoOrderIntentUuid?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  djangoOrderIntentOrderId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   customerName?: Prisma.StringFilter<"PaypalIntent"> | string
   customerEmail?: Prisma.StringFilter<"PaypalIntent"> | string
   userId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
@@ -384,9 +446,19 @@ export type PaypalIntentWhereInput = {
   shippingSnapshot?: Prisma.JsonFilter<"PaypalIntent">
   authorizePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
   capturePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
-  paymentSaveResponsePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
-  fulfillmentSendResponsePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
-  backendCustomId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  djangoOrderIntentPayload?: Prisma.JsonNullableFilter<"PaypalIntent">
+  djangoOrderIntentVerifyPayload?: Prisma.JsonNullableFilter<"PaypalIntent">
+  djangoPaymentSaveResponsePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
+  merchizeFulfillmentRequestPayload?: Prisma.JsonNullableFilter<"PaypalIntent">
+  merchizeFulfillmentResponsePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
+  merchizeFulfillmentProcessingId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  merchizeProviderOrderId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  merchizeProviderOrderCode?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  fulfillmentAddressOverride?: Prisma.JsonNullableFilter<"PaypalIntent">
+  fulfillmentAddressOverrideReason?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  fulfillmentAddressOverriddenBy?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  fulfillmentAddressOverriddenAt?: Prisma.DateTimeNullableFilter<"PaypalIntent"> | Date | string | null
+  djangoPaymentSaveCustomId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   receiptLink?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   receiptFile?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   status?: Prisma.StringFilter<"PaypalIntent"> | string
@@ -407,7 +479,8 @@ export type PaypalIntentOrderByWithRelationInput = {
   orderToken?: Prisma.SortOrder
   paypalOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
   paypalAuthorizationId?: Prisma.SortOrderInput | Prisma.SortOrder
-  otpOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
+  djangoOrderIntentUuid?: Prisma.SortOrderInput | Prisma.SortOrder
+  djangoOrderIntentOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
   customerName?: Prisma.SortOrder
   customerEmail?: Prisma.SortOrder
   userId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -418,9 +491,19 @@ export type PaypalIntentOrderByWithRelationInput = {
   shippingSnapshot?: Prisma.SortOrder
   authorizePayload?: Prisma.SortOrderInput | Prisma.SortOrder
   capturePayload?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentSaveResponsePayload?: Prisma.SortOrderInput | Prisma.SortOrder
-  fulfillmentSendResponsePayload?: Prisma.SortOrderInput | Prisma.SortOrder
-  backendCustomId?: Prisma.SortOrderInput | Prisma.SortOrder
+  djangoOrderIntentPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  djangoOrderIntentVerifyPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  djangoPaymentSaveResponsePayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeFulfillmentRequestPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeFulfillmentResponsePayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeFulfillmentProcessingId?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeProviderOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeProviderOrderCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  fulfillmentAddressOverride?: Prisma.SortOrderInput | Prisma.SortOrder
+  fulfillmentAddressOverrideReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  fulfillmentAddressOverriddenBy?: Prisma.SortOrderInput | Prisma.SortOrder
+  fulfillmentAddressOverriddenAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  djangoPaymentSaveCustomId?: Prisma.SortOrderInput | Prisma.SortOrder
   receiptLink?: Prisma.SortOrderInput | Prisma.SortOrder
   receiptFile?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -444,7 +527,8 @@ export type PaypalIntentWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.PaypalIntentWhereInput[]
   NOT?: Prisma.PaypalIntentWhereInput | Prisma.PaypalIntentWhereInput[]
   paypalAuthorizationId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
-  otpOrderId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  djangoOrderIntentUuid?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  djangoOrderIntentOrderId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   customerName?: Prisma.StringFilter<"PaypalIntent"> | string
   customerEmail?: Prisma.StringFilter<"PaypalIntent"> | string
   userId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
@@ -455,9 +539,19 @@ export type PaypalIntentWhereUniqueInput = Prisma.AtLeast<{
   shippingSnapshot?: Prisma.JsonFilter<"PaypalIntent">
   authorizePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
   capturePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
-  paymentSaveResponsePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
-  fulfillmentSendResponsePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
-  backendCustomId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  djangoOrderIntentPayload?: Prisma.JsonNullableFilter<"PaypalIntent">
+  djangoOrderIntentVerifyPayload?: Prisma.JsonNullableFilter<"PaypalIntent">
+  djangoPaymentSaveResponsePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
+  merchizeFulfillmentRequestPayload?: Prisma.JsonNullableFilter<"PaypalIntent">
+  merchizeFulfillmentResponsePayload?: Prisma.JsonNullableFilter<"PaypalIntent">
+  merchizeFulfillmentProcessingId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  merchizeProviderOrderId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  merchizeProviderOrderCode?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  fulfillmentAddressOverride?: Prisma.JsonNullableFilter<"PaypalIntent">
+  fulfillmentAddressOverrideReason?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  fulfillmentAddressOverriddenBy?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  fulfillmentAddressOverriddenAt?: Prisma.DateTimeNullableFilter<"PaypalIntent"> | Date | string | null
+  djangoPaymentSaveCustomId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   receiptLink?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   receiptFile?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   status?: Prisma.StringFilter<"PaypalIntent"> | string
@@ -478,7 +572,8 @@ export type PaypalIntentOrderByWithAggregationInput = {
   orderToken?: Prisma.SortOrder
   paypalOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
   paypalAuthorizationId?: Prisma.SortOrderInput | Prisma.SortOrder
-  otpOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
+  djangoOrderIntentUuid?: Prisma.SortOrderInput | Prisma.SortOrder
+  djangoOrderIntentOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
   customerName?: Prisma.SortOrder
   customerEmail?: Prisma.SortOrder
   userId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -489,9 +584,19 @@ export type PaypalIntentOrderByWithAggregationInput = {
   shippingSnapshot?: Prisma.SortOrder
   authorizePayload?: Prisma.SortOrderInput | Prisma.SortOrder
   capturePayload?: Prisma.SortOrderInput | Prisma.SortOrder
-  paymentSaveResponsePayload?: Prisma.SortOrderInput | Prisma.SortOrder
-  fulfillmentSendResponsePayload?: Prisma.SortOrderInput | Prisma.SortOrder
-  backendCustomId?: Prisma.SortOrderInput | Prisma.SortOrder
+  djangoOrderIntentPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  djangoOrderIntentVerifyPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  djangoPaymentSaveResponsePayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeFulfillmentRequestPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeFulfillmentResponsePayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeFulfillmentProcessingId?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeProviderOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeProviderOrderCode?: Prisma.SortOrderInput | Prisma.SortOrder
+  fulfillmentAddressOverride?: Prisma.SortOrderInput | Prisma.SortOrder
+  fulfillmentAddressOverrideReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  fulfillmentAddressOverriddenBy?: Prisma.SortOrderInput | Prisma.SortOrder
+  fulfillmentAddressOverriddenAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  djangoPaymentSaveCustomId?: Prisma.SortOrderInput | Prisma.SortOrder
   receiptLink?: Prisma.SortOrderInput | Prisma.SortOrder
   receiptFile?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -520,7 +625,8 @@ export type PaypalIntentScalarWhereWithAggregatesInput = {
   orderToken?: Prisma.StringWithAggregatesFilter<"PaypalIntent"> | string
   paypalOrderId?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
   paypalAuthorizationId?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
-  otpOrderId?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
+  djangoOrderIntentUuid?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
+  djangoOrderIntentOrderId?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
   customerName?: Prisma.StringWithAggregatesFilter<"PaypalIntent"> | string
   customerEmail?: Prisma.StringWithAggregatesFilter<"PaypalIntent"> | string
   userId?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
@@ -531,9 +637,19 @@ export type PaypalIntentScalarWhereWithAggregatesInput = {
   shippingSnapshot?: Prisma.JsonWithAggregatesFilter<"PaypalIntent">
   authorizePayload?: Prisma.JsonNullableWithAggregatesFilter<"PaypalIntent">
   capturePayload?: Prisma.JsonNullableWithAggregatesFilter<"PaypalIntent">
-  paymentSaveResponsePayload?: Prisma.JsonNullableWithAggregatesFilter<"PaypalIntent">
-  fulfillmentSendResponsePayload?: Prisma.JsonNullableWithAggregatesFilter<"PaypalIntent">
-  backendCustomId?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
+  djangoOrderIntentPayload?: Prisma.JsonNullableWithAggregatesFilter<"PaypalIntent">
+  djangoOrderIntentVerifyPayload?: Prisma.JsonNullableWithAggregatesFilter<"PaypalIntent">
+  djangoPaymentSaveResponsePayload?: Prisma.JsonNullableWithAggregatesFilter<"PaypalIntent">
+  merchizeFulfillmentRequestPayload?: Prisma.JsonNullableWithAggregatesFilter<"PaypalIntent">
+  merchizeFulfillmentResponsePayload?: Prisma.JsonNullableWithAggregatesFilter<"PaypalIntent">
+  merchizeFulfillmentProcessingId?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
+  merchizeProviderOrderId?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
+  merchizeProviderOrderCode?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
+  fulfillmentAddressOverride?: Prisma.JsonNullableWithAggregatesFilter<"PaypalIntent">
+  fulfillmentAddressOverrideReason?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
+  fulfillmentAddressOverriddenBy?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
+  fulfillmentAddressOverriddenAt?: Prisma.DateTimeNullableWithAggregatesFilter<"PaypalIntent"> | Date | string | null
+  djangoPaymentSaveCustomId?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
   receiptLink?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
   receiptFile?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
   status?: Prisma.StringWithAggregatesFilter<"PaypalIntent"> | string
@@ -554,7 +670,8 @@ export type PaypalIntentCreateInput = {
   orderToken: string
   paypalOrderId?: string | null
   paypalAuthorizationId?: string | null
-  otpOrderId?: string | null
+  djangoOrderIntentUuid?: string | null
+  djangoOrderIntentOrderId?: string | null
   customerName: string
   customerEmail: string
   userId?: string | null
@@ -565,9 +682,19 @@ export type PaypalIntentCreateInput = {
   shippingSnapshot: Prisma.JsonNullValueInput | runtime.InputJsonValue
   authorizePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   capturePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  paymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  fulfillmentSendResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  backendCustomId?: string | null
+  djangoOrderIntentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  djangoOrderIntentVerifyPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  djangoPaymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentRequestPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentProcessingId?: string | null
+  merchizeProviderOrderId?: string | null
+  merchizeProviderOrderCode?: string | null
+  fulfillmentAddressOverride?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fulfillmentAddressOverrideReason?: string | null
+  fulfillmentAddressOverriddenBy?: string | null
+  fulfillmentAddressOverriddenAt?: Date | string | null
+  djangoPaymentSaveCustomId?: string | null
   receiptLink?: string | null
   receiptFile?: string | null
   status: string
@@ -588,7 +715,8 @@ export type PaypalIntentUncheckedCreateInput = {
   orderToken: string
   paypalOrderId?: string | null
   paypalAuthorizationId?: string | null
-  otpOrderId?: string | null
+  djangoOrderIntentUuid?: string | null
+  djangoOrderIntentOrderId?: string | null
   customerName: string
   customerEmail: string
   userId?: string | null
@@ -599,9 +727,19 @@ export type PaypalIntentUncheckedCreateInput = {
   shippingSnapshot: Prisma.JsonNullValueInput | runtime.InputJsonValue
   authorizePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   capturePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  paymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  fulfillmentSendResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  backendCustomId?: string | null
+  djangoOrderIntentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  djangoOrderIntentVerifyPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  djangoPaymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentRequestPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentProcessingId?: string | null
+  merchizeProviderOrderId?: string | null
+  merchizeProviderOrderCode?: string | null
+  fulfillmentAddressOverride?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fulfillmentAddressOverrideReason?: string | null
+  fulfillmentAddressOverriddenBy?: string | null
+  fulfillmentAddressOverriddenAt?: Date | string | null
+  djangoPaymentSaveCustomId?: string | null
   receiptLink?: string | null
   receiptFile?: string | null
   status: string
@@ -622,7 +760,8 @@ export type PaypalIntentUpdateInput = {
   orderToken?: Prisma.StringFieldUpdateOperationsInput | string
   paypalOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paypalAuthorizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  otpOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  djangoOrderIntentUuid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  djangoOrderIntentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   customerName?: Prisma.StringFieldUpdateOperationsInput | string
   customerEmail?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -633,9 +772,19 @@ export type PaypalIntentUpdateInput = {
   shippingSnapshot?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   authorizePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   capturePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  paymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  fulfillmentSendResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  backendCustomId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  djangoOrderIntentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  djangoOrderIntentVerifyPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  djangoPaymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentRequestPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentProcessingId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merchizeProviderOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merchizeProviderOrderCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentAddressOverride?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fulfillmentAddressOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentAddressOverriddenBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentAddressOverriddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  djangoPaymentSaveCustomId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptLink?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptFile?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -656,7 +805,8 @@ export type PaypalIntentUncheckedUpdateInput = {
   orderToken?: Prisma.StringFieldUpdateOperationsInput | string
   paypalOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paypalAuthorizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  otpOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  djangoOrderIntentUuid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  djangoOrderIntentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   customerName?: Prisma.StringFieldUpdateOperationsInput | string
   customerEmail?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -667,9 +817,19 @@ export type PaypalIntentUncheckedUpdateInput = {
   shippingSnapshot?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   authorizePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   capturePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  paymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  fulfillmentSendResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  backendCustomId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  djangoOrderIntentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  djangoOrderIntentVerifyPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  djangoPaymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentRequestPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentProcessingId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merchizeProviderOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merchizeProviderOrderCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentAddressOverride?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fulfillmentAddressOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentAddressOverriddenBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentAddressOverriddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  djangoPaymentSaveCustomId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptLink?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptFile?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -690,7 +850,8 @@ export type PaypalIntentCreateManyInput = {
   orderToken: string
   paypalOrderId?: string | null
   paypalAuthorizationId?: string | null
-  otpOrderId?: string | null
+  djangoOrderIntentUuid?: string | null
+  djangoOrderIntentOrderId?: string | null
   customerName: string
   customerEmail: string
   userId?: string | null
@@ -701,9 +862,19 @@ export type PaypalIntentCreateManyInput = {
   shippingSnapshot: Prisma.JsonNullValueInput | runtime.InputJsonValue
   authorizePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   capturePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  paymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  fulfillmentSendResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  backendCustomId?: string | null
+  djangoOrderIntentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  djangoOrderIntentVerifyPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  djangoPaymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentRequestPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentProcessingId?: string | null
+  merchizeProviderOrderId?: string | null
+  merchizeProviderOrderCode?: string | null
+  fulfillmentAddressOverride?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fulfillmentAddressOverrideReason?: string | null
+  fulfillmentAddressOverriddenBy?: string | null
+  fulfillmentAddressOverriddenAt?: Date | string | null
+  djangoPaymentSaveCustomId?: string | null
   receiptLink?: string | null
   receiptFile?: string | null
   status: string
@@ -724,7 +895,8 @@ export type PaypalIntentUpdateManyMutationInput = {
   orderToken?: Prisma.StringFieldUpdateOperationsInput | string
   paypalOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paypalAuthorizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  otpOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  djangoOrderIntentUuid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  djangoOrderIntentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   customerName?: Prisma.StringFieldUpdateOperationsInput | string
   customerEmail?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -735,9 +907,19 @@ export type PaypalIntentUpdateManyMutationInput = {
   shippingSnapshot?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   authorizePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   capturePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  paymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  fulfillmentSendResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  backendCustomId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  djangoOrderIntentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  djangoOrderIntentVerifyPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  djangoPaymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentRequestPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentProcessingId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merchizeProviderOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merchizeProviderOrderCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentAddressOverride?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fulfillmentAddressOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentAddressOverriddenBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentAddressOverriddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  djangoPaymentSaveCustomId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptLink?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptFile?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -758,7 +940,8 @@ export type PaypalIntentUncheckedUpdateManyInput = {
   orderToken?: Prisma.StringFieldUpdateOperationsInput | string
   paypalOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paypalAuthorizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  otpOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  djangoOrderIntentUuid?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  djangoOrderIntentOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   customerName?: Prisma.StringFieldUpdateOperationsInput | string
   customerEmail?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -769,9 +952,19 @@ export type PaypalIntentUncheckedUpdateManyInput = {
   shippingSnapshot?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   authorizePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   capturePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  paymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  fulfillmentSendResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  backendCustomId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  djangoOrderIntentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  djangoOrderIntentVerifyPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  djangoPaymentSaveResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentRequestPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeFulfillmentProcessingId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merchizeProviderOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merchizeProviderOrderCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentAddressOverride?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  fulfillmentAddressOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentAddressOverriddenBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentAddressOverriddenAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  djangoPaymentSaveCustomId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptLink?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   receiptFile?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -792,7 +985,8 @@ export type PaypalIntentCountOrderByAggregateInput = {
   orderToken?: Prisma.SortOrder
   paypalOrderId?: Prisma.SortOrder
   paypalAuthorizationId?: Prisma.SortOrder
-  otpOrderId?: Prisma.SortOrder
+  djangoOrderIntentUuid?: Prisma.SortOrder
+  djangoOrderIntentOrderId?: Prisma.SortOrder
   customerName?: Prisma.SortOrder
   customerEmail?: Prisma.SortOrder
   userId?: Prisma.SortOrder
@@ -803,9 +997,19 @@ export type PaypalIntentCountOrderByAggregateInput = {
   shippingSnapshot?: Prisma.SortOrder
   authorizePayload?: Prisma.SortOrder
   capturePayload?: Prisma.SortOrder
-  paymentSaveResponsePayload?: Prisma.SortOrder
-  fulfillmentSendResponsePayload?: Prisma.SortOrder
-  backendCustomId?: Prisma.SortOrder
+  djangoOrderIntentPayload?: Prisma.SortOrder
+  djangoOrderIntentVerifyPayload?: Prisma.SortOrder
+  djangoPaymentSaveResponsePayload?: Prisma.SortOrder
+  merchizeFulfillmentRequestPayload?: Prisma.SortOrder
+  merchizeFulfillmentResponsePayload?: Prisma.SortOrder
+  merchizeFulfillmentProcessingId?: Prisma.SortOrder
+  merchizeProviderOrderId?: Prisma.SortOrder
+  merchizeProviderOrderCode?: Prisma.SortOrder
+  fulfillmentAddressOverride?: Prisma.SortOrder
+  fulfillmentAddressOverrideReason?: Prisma.SortOrder
+  fulfillmentAddressOverriddenBy?: Prisma.SortOrder
+  fulfillmentAddressOverriddenAt?: Prisma.SortOrder
+  djangoPaymentSaveCustomId?: Prisma.SortOrder
   receiptLink?: Prisma.SortOrder
   receiptFile?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -830,14 +1034,21 @@ export type PaypalIntentMaxOrderByAggregateInput = {
   orderToken?: Prisma.SortOrder
   paypalOrderId?: Prisma.SortOrder
   paypalAuthorizationId?: Prisma.SortOrder
-  otpOrderId?: Prisma.SortOrder
+  djangoOrderIntentUuid?: Prisma.SortOrder
+  djangoOrderIntentOrderId?: Prisma.SortOrder
   customerName?: Prisma.SortOrder
   customerEmail?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   countryIso2?: Prisma.SortOrder
   countryIso3?: Prisma.SortOrder
   initialCurrency?: Prisma.SortOrder
-  backendCustomId?: Prisma.SortOrder
+  merchizeFulfillmentProcessingId?: Prisma.SortOrder
+  merchizeProviderOrderId?: Prisma.SortOrder
+  merchizeProviderOrderCode?: Prisma.SortOrder
+  fulfillmentAddressOverrideReason?: Prisma.SortOrder
+  fulfillmentAddressOverriddenBy?: Prisma.SortOrder
+  fulfillmentAddressOverriddenAt?: Prisma.SortOrder
+  djangoPaymentSaveCustomId?: Prisma.SortOrder
   receiptLink?: Prisma.SortOrder
   receiptFile?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -858,14 +1069,21 @@ export type PaypalIntentMinOrderByAggregateInput = {
   orderToken?: Prisma.SortOrder
   paypalOrderId?: Prisma.SortOrder
   paypalAuthorizationId?: Prisma.SortOrder
-  otpOrderId?: Prisma.SortOrder
+  djangoOrderIntentUuid?: Prisma.SortOrder
+  djangoOrderIntentOrderId?: Prisma.SortOrder
   customerName?: Prisma.SortOrder
   customerEmail?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   countryIso2?: Prisma.SortOrder
   countryIso3?: Prisma.SortOrder
   initialCurrency?: Prisma.SortOrder
-  backendCustomId?: Prisma.SortOrder
+  merchizeFulfillmentProcessingId?: Prisma.SortOrder
+  merchizeProviderOrderId?: Prisma.SortOrder
+  merchizeProviderOrderCode?: Prisma.SortOrder
+  fulfillmentAddressOverrideReason?: Prisma.SortOrder
+  fulfillmentAddressOverriddenBy?: Prisma.SortOrder
+  fulfillmentAddressOverriddenAt?: Prisma.SortOrder
+  djangoPaymentSaveCustomId?: Prisma.SortOrder
   receiptLink?: Prisma.SortOrder
   receiptFile?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -893,16 +1111,16 @@ export type NullableStringFieldUpdateOperationsInput = {
   set?: string | null
 }
 
+export type NullableDateTimeFieldUpdateOperationsInput = {
+  set?: Date | string | null
+}
+
 export type IntFieldUpdateOperationsInput = {
   set?: number
   increment?: number
   decrement?: number
   multiply?: number
   divide?: number
-}
-
-export type NullableDateTimeFieldUpdateOperationsInput = {
-  set?: Date | string | null
 }
 
 export type DateTimeFieldUpdateOperationsInput = {
@@ -916,7 +1134,8 @@ export type PaypalIntentSelect<ExtArgs extends runtime.Types.Extensions.Internal
   orderToken?: boolean
   paypalOrderId?: boolean
   paypalAuthorizationId?: boolean
-  otpOrderId?: boolean
+  djangoOrderIntentUuid?: boolean
+  djangoOrderIntentOrderId?: boolean
   customerName?: boolean
   customerEmail?: boolean
   userId?: boolean
@@ -927,9 +1146,19 @@ export type PaypalIntentSelect<ExtArgs extends runtime.Types.Extensions.Internal
   shippingSnapshot?: boolean
   authorizePayload?: boolean
   capturePayload?: boolean
-  paymentSaveResponsePayload?: boolean
-  fulfillmentSendResponsePayload?: boolean
-  backendCustomId?: boolean
+  djangoOrderIntentPayload?: boolean
+  djangoOrderIntentVerifyPayload?: boolean
+  djangoPaymentSaveResponsePayload?: boolean
+  merchizeFulfillmentRequestPayload?: boolean
+  merchizeFulfillmentResponsePayload?: boolean
+  merchizeFulfillmentProcessingId?: boolean
+  merchizeProviderOrderId?: boolean
+  merchizeProviderOrderCode?: boolean
+  fulfillmentAddressOverride?: boolean
+  fulfillmentAddressOverrideReason?: boolean
+  fulfillmentAddressOverriddenBy?: boolean
+  fulfillmentAddressOverriddenAt?: boolean
+  djangoPaymentSaveCustomId?: boolean
   receiptLink?: boolean
   receiptFile?: boolean
   status?: boolean
@@ -950,7 +1179,8 @@ export type PaypalIntentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   orderToken?: boolean
   paypalOrderId?: boolean
   paypalAuthorizationId?: boolean
-  otpOrderId?: boolean
+  djangoOrderIntentUuid?: boolean
+  djangoOrderIntentOrderId?: boolean
   customerName?: boolean
   customerEmail?: boolean
   userId?: boolean
@@ -961,9 +1191,19 @@ export type PaypalIntentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   shippingSnapshot?: boolean
   authorizePayload?: boolean
   capturePayload?: boolean
-  paymentSaveResponsePayload?: boolean
-  fulfillmentSendResponsePayload?: boolean
-  backendCustomId?: boolean
+  djangoOrderIntentPayload?: boolean
+  djangoOrderIntentVerifyPayload?: boolean
+  djangoPaymentSaveResponsePayload?: boolean
+  merchizeFulfillmentRequestPayload?: boolean
+  merchizeFulfillmentResponsePayload?: boolean
+  merchizeFulfillmentProcessingId?: boolean
+  merchizeProviderOrderId?: boolean
+  merchizeProviderOrderCode?: boolean
+  fulfillmentAddressOverride?: boolean
+  fulfillmentAddressOverrideReason?: boolean
+  fulfillmentAddressOverriddenBy?: boolean
+  fulfillmentAddressOverriddenAt?: boolean
+  djangoPaymentSaveCustomId?: boolean
   receiptLink?: boolean
   receiptFile?: boolean
   status?: boolean
@@ -984,7 +1224,8 @@ export type PaypalIntentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   orderToken?: boolean
   paypalOrderId?: boolean
   paypalAuthorizationId?: boolean
-  otpOrderId?: boolean
+  djangoOrderIntentUuid?: boolean
+  djangoOrderIntentOrderId?: boolean
   customerName?: boolean
   customerEmail?: boolean
   userId?: boolean
@@ -995,9 +1236,19 @@ export type PaypalIntentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   shippingSnapshot?: boolean
   authorizePayload?: boolean
   capturePayload?: boolean
-  paymentSaveResponsePayload?: boolean
-  fulfillmentSendResponsePayload?: boolean
-  backendCustomId?: boolean
+  djangoOrderIntentPayload?: boolean
+  djangoOrderIntentVerifyPayload?: boolean
+  djangoPaymentSaveResponsePayload?: boolean
+  merchizeFulfillmentRequestPayload?: boolean
+  merchizeFulfillmentResponsePayload?: boolean
+  merchizeFulfillmentProcessingId?: boolean
+  merchizeProviderOrderId?: boolean
+  merchizeProviderOrderCode?: boolean
+  fulfillmentAddressOverride?: boolean
+  fulfillmentAddressOverrideReason?: boolean
+  fulfillmentAddressOverriddenBy?: boolean
+  fulfillmentAddressOverriddenAt?: boolean
+  djangoPaymentSaveCustomId?: boolean
   receiptLink?: boolean
   receiptFile?: boolean
   status?: boolean
@@ -1018,7 +1269,8 @@ export type PaypalIntentSelectScalar = {
   orderToken?: boolean
   paypalOrderId?: boolean
   paypalAuthorizationId?: boolean
-  otpOrderId?: boolean
+  djangoOrderIntentUuid?: boolean
+  djangoOrderIntentOrderId?: boolean
   customerName?: boolean
   customerEmail?: boolean
   userId?: boolean
@@ -1029,9 +1281,19 @@ export type PaypalIntentSelectScalar = {
   shippingSnapshot?: boolean
   authorizePayload?: boolean
   capturePayload?: boolean
-  paymentSaveResponsePayload?: boolean
-  fulfillmentSendResponsePayload?: boolean
-  backendCustomId?: boolean
+  djangoOrderIntentPayload?: boolean
+  djangoOrderIntentVerifyPayload?: boolean
+  djangoPaymentSaveResponsePayload?: boolean
+  merchizeFulfillmentRequestPayload?: boolean
+  merchizeFulfillmentResponsePayload?: boolean
+  merchizeFulfillmentProcessingId?: boolean
+  merchizeProviderOrderId?: boolean
+  merchizeProviderOrderCode?: boolean
+  fulfillmentAddressOverride?: boolean
+  fulfillmentAddressOverrideReason?: boolean
+  fulfillmentAddressOverriddenBy?: boolean
+  fulfillmentAddressOverriddenAt?: boolean
+  djangoPaymentSaveCustomId?: boolean
   receiptLink?: boolean
   receiptFile?: boolean
   status?: boolean
@@ -1047,7 +1309,7 @@ export type PaypalIntentSelectScalar = {
   updatedAt?: boolean
 }
 
-export type PaypalIntentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderToken" | "paypalOrderId" | "paypalAuthorizationId" | "otpOrderId" | "customerName" | "customerEmail" | "userId" | "countryIso2" | "countryIso3" | "initialCurrency" | "cartSnapshot" | "shippingSnapshot" | "authorizePayload" | "capturePayload" | "paymentSaveResponsePayload" | "fulfillmentSendResponsePayload" | "backendCustomId" | "receiptLink" | "receiptFile" | "status" | "lastEventType" | "lastErrorCode" | "lastErrorMessage" | "retryCount" | "postProcessingLockId" | "postProcessingLockedAt" | "postProcessingLockExpiresAt" | "processingCompletedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["paypalIntent"]>
+export type PaypalIntentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderToken" | "paypalOrderId" | "paypalAuthorizationId" | "djangoOrderIntentUuid" | "djangoOrderIntentOrderId" | "customerName" | "customerEmail" | "userId" | "countryIso2" | "countryIso3" | "initialCurrency" | "cartSnapshot" | "shippingSnapshot" | "authorizePayload" | "capturePayload" | "djangoOrderIntentPayload" | "djangoOrderIntentVerifyPayload" | "djangoPaymentSaveResponsePayload" | "merchizeFulfillmentRequestPayload" | "merchizeFulfillmentResponsePayload" | "merchizeFulfillmentProcessingId" | "merchizeProviderOrderId" | "merchizeProviderOrderCode" | "fulfillmentAddressOverride" | "fulfillmentAddressOverrideReason" | "fulfillmentAddressOverriddenBy" | "fulfillmentAddressOverriddenAt" | "djangoPaymentSaveCustomId" | "receiptLink" | "receiptFile" | "status" | "lastEventType" | "lastErrorCode" | "lastErrorMessage" | "retryCount" | "postProcessingLockId" | "postProcessingLockedAt" | "postProcessingLockExpiresAt" | "processingCompletedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["paypalIntent"]>
 
 export type $PaypalIntentPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "PaypalIntent"
@@ -1057,7 +1319,8 @@ export type $PaypalIntentPayload<ExtArgs extends runtime.Types.Extensions.Intern
     orderToken: string
     paypalOrderId: string | null
     paypalAuthorizationId: string | null
-    otpOrderId: string | null
+    djangoOrderIntentUuid: string | null
+    djangoOrderIntentOrderId: string | null
     customerName: string
     customerEmail: string
     userId: string | null
@@ -1068,9 +1331,19 @@ export type $PaypalIntentPayload<ExtArgs extends runtime.Types.Extensions.Intern
     shippingSnapshot: runtime.JsonValue
     authorizePayload: runtime.JsonValue | null
     capturePayload: runtime.JsonValue | null
-    paymentSaveResponsePayload: runtime.JsonValue | null
-    fulfillmentSendResponsePayload: runtime.JsonValue | null
-    backendCustomId: string | null
+    djangoOrderIntentPayload: runtime.JsonValue | null
+    djangoOrderIntentVerifyPayload: runtime.JsonValue | null
+    djangoPaymentSaveResponsePayload: runtime.JsonValue | null
+    merchizeFulfillmentRequestPayload: runtime.JsonValue | null
+    merchizeFulfillmentResponsePayload: runtime.JsonValue | null
+    merchizeFulfillmentProcessingId: string | null
+    merchizeProviderOrderId: string | null
+    merchizeProviderOrderCode: string | null
+    fulfillmentAddressOverride: runtime.JsonValue | null
+    fulfillmentAddressOverrideReason: string | null
+    fulfillmentAddressOverriddenBy: string | null
+    fulfillmentAddressOverriddenAt: Date | null
+    djangoPaymentSaveCustomId: string | null
     receiptLink: string | null
     receiptFile: string | null
     status: string
@@ -1511,7 +1784,8 @@ export interface PaypalIntentFieldRefs {
   readonly orderToken: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly paypalOrderId: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly paypalAuthorizationId: Prisma.FieldRef<"PaypalIntent", 'String'>
-  readonly otpOrderId: Prisma.FieldRef<"PaypalIntent", 'String'>
+  readonly djangoOrderIntentUuid: Prisma.FieldRef<"PaypalIntent", 'String'>
+  readonly djangoOrderIntentOrderId: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly customerName: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly customerEmail: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly userId: Prisma.FieldRef<"PaypalIntent", 'String'>
@@ -1522,9 +1796,19 @@ export interface PaypalIntentFieldRefs {
   readonly shippingSnapshot: Prisma.FieldRef<"PaypalIntent", 'Json'>
   readonly authorizePayload: Prisma.FieldRef<"PaypalIntent", 'Json'>
   readonly capturePayload: Prisma.FieldRef<"PaypalIntent", 'Json'>
-  readonly paymentSaveResponsePayload: Prisma.FieldRef<"PaypalIntent", 'Json'>
-  readonly fulfillmentSendResponsePayload: Prisma.FieldRef<"PaypalIntent", 'Json'>
-  readonly backendCustomId: Prisma.FieldRef<"PaypalIntent", 'String'>
+  readonly djangoOrderIntentPayload: Prisma.FieldRef<"PaypalIntent", 'Json'>
+  readonly djangoOrderIntentVerifyPayload: Prisma.FieldRef<"PaypalIntent", 'Json'>
+  readonly djangoPaymentSaveResponsePayload: Prisma.FieldRef<"PaypalIntent", 'Json'>
+  readonly merchizeFulfillmentRequestPayload: Prisma.FieldRef<"PaypalIntent", 'Json'>
+  readonly merchizeFulfillmentResponsePayload: Prisma.FieldRef<"PaypalIntent", 'Json'>
+  readonly merchizeFulfillmentProcessingId: Prisma.FieldRef<"PaypalIntent", 'String'>
+  readonly merchizeProviderOrderId: Prisma.FieldRef<"PaypalIntent", 'String'>
+  readonly merchizeProviderOrderCode: Prisma.FieldRef<"PaypalIntent", 'String'>
+  readonly fulfillmentAddressOverride: Prisma.FieldRef<"PaypalIntent", 'Json'>
+  readonly fulfillmentAddressOverrideReason: Prisma.FieldRef<"PaypalIntent", 'String'>
+  readonly fulfillmentAddressOverriddenBy: Prisma.FieldRef<"PaypalIntent", 'String'>
+  readonly fulfillmentAddressOverriddenAt: Prisma.FieldRef<"PaypalIntent", 'DateTime'>
+  readonly djangoPaymentSaveCustomId: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly receiptLink: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly receiptFile: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly status: Prisma.FieldRef<"PaypalIntent", 'String'>

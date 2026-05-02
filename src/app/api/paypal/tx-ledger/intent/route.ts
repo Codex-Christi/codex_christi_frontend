@@ -75,7 +75,10 @@ export async function POST(req: Request) {
       initialCurrency,
       delivery_address,
       userId,
-      otpOrderId,
+      djangoOrderIntentUuid,
+      djangoOrderIntentOrderId,
+      djangoOrderIntentPayload,
+      djangoOrderIntentVerifyPayload,
     } = body;
 
     if (!Array.isArray(cart) || cart.length === 0) {
@@ -97,7 +100,10 @@ export async function POST(req: Request) {
         customerName: customer.name,
         customerEmail: customer.email,
         userId: userId ?? null,
-        otpOrderId: otpOrderId ?? null,
+        djangoOrderIntentUuid: djangoOrderIntentUuid ?? null,
+        djangoOrderIntentOrderId: djangoOrderIntentOrderId ?? null,
+        djangoOrderIntentPayload: djangoOrderIntentPayload ?? null,
+        djangoOrderIntentVerifyPayload: djangoOrderIntentVerifyPayload ?? null,
         countryIso2: country ?? null,
         countryIso3: country_iso_3 ?? null,
         initialCurrency: initialCurrency ?? null,

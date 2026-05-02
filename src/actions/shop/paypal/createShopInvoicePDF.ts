@@ -2,6 +2,17 @@ import PDFDocument from 'pdfkit';
 import fsSync from 'node:fs';
 import path from 'node:path';
 import { OrderResponseBody } from '@paypal/paypal-js';
+import type { CartVariant } from '@/stores/shop_stores/cartStore';
+
+type InvoiceLineItem = {
+  name: string;
+  sku: string;
+  quantity: string;
+  unitAmount: {
+    value: string;
+    currencyCode: string;
+  };
+};
 
 function getCreateTime(authData: OrderResponseBody) {
   return (
@@ -36,8 +47,69 @@ function getPurchaseUnit(authData: OrderResponseBody) {
   );
 }
 
+function getCurrencyCodeFromPurchaseUnit(purchaseUnit: unknown) {
+  return (
+    (purchaseUnit as {
+      amount?: {
+        currencyCode?: string;
+        currency_code?: string;
+      };
+    } | null)?.amount?.currencyCode ??
+    (purchaseUnit as {
+      amount?: {
+        currency_code?: string;
+      };
+    } | null)?.amount?.currency_code ??
+    'USD'
+  );
+}
+
+function getPaypalLineItems(purchaseUnit: unknown) {
+  return (((purchaseUnit as {
+    items?: Array<{
+      name?: string;
+      sku?: string;
+      quantity?: string;
+      unitAmount?: { value?: string; currencyCode?: string };
+      unit_amount?: { value?: string; currency_code?: string };
+    }>;
+  } | null)?.items ?? []) as Array<{
+    name?: string;
+    sku?: string;
+    quantity?: string;
+    unitAmount?: { value?: string; currencyCode?: string };
+    unit_amount?: { value?: string; currency_code?: string };
+  }>).map((item) => {
+    const unitAmount = item.unitAmount ?? item.unit_amount ?? null;
+    return {
+      name: item.name ?? '',
+      sku: item.sku ?? '',
+      quantity: item.quantity ?? '0',
+      unitAmount: {
+        value: unitAmount?.value ?? '0',
+        currencyCode: item.unitAmount?.currencyCode ?? item.unit_amount?.currency_code ?? '',
+      },
+    } satisfies InvoiceLineItem;
+  });
+}
+
+function getCartLineItems(cart: CartVariant[] | undefined, currencyCode: string) {
+  return (cart ?? []).map((item) => ({
+    name: item.title || item.itemDetail.title || item.variantId,
+    sku: item.itemDetail.sku_seller || item.itemDetail.sku || item.variantId,
+    quantity: String(item.quantity),
+    unitAmount: {
+      value: String(item.itemDetail.retail_price ?? 0),
+      currencyCode,
+    },
+  })) satisfies InvoiceLineItem[];
+}
+
 // Main Func
-export const createPaypalShopInvoicePDF = async (authData: OrderResponseBody) => {
+export const createPaypalShopInvoicePDF = async (
+  authData: OrderResponseBody,
+  cart?: CartVariant[],
+) => {
   ensureHelveticaAFM();
 
   // Generate PDF
@@ -116,24 +188,11 @@ export const createPaypalShopInvoicePDF = async (authData: OrderResponseBody) =>
         .moveDown(1);
     }
 
-    // Line items table
-    const items =
-      ((purchaseUnit as {
-        items?: Array<{
-          name?: string;
-          sku?: string;
-          quantity?: string;
-          unitAmount?: { value?: string; currencyCode?: string };
-          unit_amount?: { value?: string; currency_code?: string };
-        }>;
-      } | null)?.items ??
-        []) as Array<{
-        name?: string;
-        sku?: string;
-        quantity?: string;
-        unitAmount?: { value?: string; currencyCode?: string };
-        unit_amount?: { value?: string; currency_code?: string };
-      }>;
+    // PayPal does not always echo item-level lines on authorization/capture payloads.
+    // Use the persisted ledger cart snapshot as the fallback so receipts remain itemized.
+    const currencyCode = getCurrencyCodeFromPurchaseUnit(purchaseUnit);
+    const paypalItems = getPaypalLineItems(purchaseUnit);
+    const items = paypalItems.length ? paypalItems : getCartLineItems(cart, currencyCode);
     const startY = 270;
 
     // Table header
@@ -152,9 +211,8 @@ export const createPaypalShopInvoicePDF = async (authData: OrderResponseBody) =>
     // Table rows
     let y = startY + 25;
     items.forEach((item) => {
-      const unitAmount = item.unitAmount ?? item.unit_amount ?? null;
-      const currencyCode =
-        item.unitAmount?.currencyCode ?? item.unit_amount?.currency_code ?? '';
+      const unitAmount = item.unitAmount;
+      const itemCurrencyCode = unitAmount.currencyCode || currencyCode;
       const quantity = parseInt(item.quantity || '0');
       const price = parseFloat(unitAmount?.value || '0');
       const total = quantity * price;
@@ -164,8 +222,8 @@ export const createPaypalShopInvoicePDF = async (authData: OrderResponseBody) =>
         .text(item.name || '', 50, y, { width: 145, lineBreak: true })
         .text(item.sku || '', 210, y, { width: 150, lineBreak: true })
         .text(quantity.toString(), 350, y, { width: 50, align: 'right' })
-        .text(`${price} ${currencyCode}`, 400, y, { width: 70, align: 'right' })
-        .text(`${total.toFixed(2)} ${currencyCode}`, 470, y, { width: 80, align: 'right' });
+        .text(`${price.toFixed(2)} ${itemCurrencyCode}`, 400, y, { width: 70, align: 'right' })
+        .text(`${total.toFixed(2)} ${itemCurrencyCode}`, 470, y, { width: 80, align: 'right' });
 
       y += 30;
     });

@@ -15,7 +15,7 @@ import { CheckoutAccordionContext } from '../ProductCheckout';
 import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
 import { DeliveryAddressInputFields } from './DeliveryAddressInputFields';
 import errorToast from '@/lib/error-toast';
-import { useVerifyEmailWithOTP } from '@/lib/hooks/shopHooks/checkout/useVerifyEmailWithOTP';
+import { useVerifyBackendOrderIntentWithOTP } from '@/lib/hooks/shopHooks/checkout/useVerifyBackendOrderIntentWithOTP';
 import { CheckoutOTPModalHandles } from './CheckoutOTPModal';
 import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
@@ -73,8 +73,8 @@ export const BasicCheckoutInfo = () => {
   const fallbackEmail = useUserMainProfileStore((s) => s.userMainProfile?.email);
   const selectedCountryISO3 = useCurrencyCookie((s) => s.iso3);
   const changeCookieStoreCountry = useCurrencyCookie((s) => s.changeCountry);
-  const otpSendHookProps = useVerifyEmailWithOTP(email, () => setIsOtpOpen(true));
-  const { isEmailVerified, sendInitialOTPToEmail } = otpSendHookProps;
+  const otpSendHookProps = useVerifyBackendOrderIntentWithOTP(email, () => setIsOtpOpen(true));
+  const { createBackendOrderIntent } = otpSendHookProps;
 
   const {
     shipping_address_line_1,
@@ -205,11 +205,21 @@ export const BasicCheckoutInfo = () => {
         zip_code: postalCode,
       },
     }));
-    // Move Accordion to Delivery Details
-    if (isEmailVerified) {
+    // This creates/reuses the Django backend order intent, not the PayPal ledger intent.
+    const backendOrderIntent = await createBackendOrderIntent({
+      email,
+      first_name: firstname,
+      last_name: lastname,
+      address: addressLine1,
+      address_2: addressLine2 ?? '',
+      city: adminArea2,
+      state: adminArea1,
+      zip_code: postalCode,
+      country,
+    });
+
+    if (backendOrderIntent?.data.otp_status === 'verified') {
       handleOpenItem('payment-section');
-    } else {
-      await sendInitialOTPToEmail(data.email);
     }
   }
 

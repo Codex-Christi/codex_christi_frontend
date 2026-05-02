@@ -52,7 +52,8 @@ export const AnyNull = runtime.AnyNull
 
 export const ModelName = {
   PaypalIntent: 'PaypalIntent',
-  PaypalWebhookEvent: 'PaypalWebhookEvent'
+  PaypalWebhookEvent: 'PaypalWebhookEvent',
+  CheckoutRecoveryOtpChallenge: 'CheckoutRecoveryOtpChallenge'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -76,7 +77,8 @@ export const PaypalIntentScalarFieldEnum = {
   orderToken: 'orderToken',
   paypalOrderId: 'paypalOrderId',
   paypalAuthorizationId: 'paypalAuthorizationId',
-  otpOrderId: 'otpOrderId',
+  djangoOrderIntentUuid: 'djangoOrderIntentUuid',
+  djangoOrderIntentOrderId: 'djangoOrderIntentOrderId',
   customerName: 'customerName',
   customerEmail: 'customerEmail',
   userId: 'userId',
@@ -87,9 +89,19 @@ export const PaypalIntentScalarFieldEnum = {
   shippingSnapshot: 'shippingSnapshot',
   authorizePayload: 'authorizePayload',
   capturePayload: 'capturePayload',
-  paymentSaveResponsePayload: 'paymentSaveResponsePayload',
-  fulfillmentSendResponsePayload: 'fulfillmentSendResponsePayload',
-  backendCustomId: 'backendCustomId',
+  djangoOrderIntentPayload: 'djangoOrderIntentPayload',
+  djangoOrderIntentVerifyPayload: 'djangoOrderIntentVerifyPayload',
+  djangoPaymentSaveResponsePayload: 'djangoPaymentSaveResponsePayload',
+  merchizeFulfillmentRequestPayload: 'merchizeFulfillmentRequestPayload',
+  merchizeFulfillmentResponsePayload: 'merchizeFulfillmentResponsePayload',
+  merchizeFulfillmentProcessingId: 'merchizeFulfillmentProcessingId',
+  merchizeProviderOrderId: 'merchizeProviderOrderId',
+  merchizeProviderOrderCode: 'merchizeProviderOrderCode',
+  fulfillmentAddressOverride: 'fulfillmentAddressOverride',
+  fulfillmentAddressOverrideReason: 'fulfillmentAddressOverrideReason',
+  fulfillmentAddressOverriddenBy: 'fulfillmentAddressOverriddenBy',
+  fulfillmentAddressOverriddenAt: 'fulfillmentAddressOverriddenAt',
+  djangoPaymentSaveCustomId: 'djangoPaymentSaveCustomId',
   receiptLink: 'receiptLink',
   receiptFile: 'receiptFile',
   status: 'status',
@@ -123,6 +135,18 @@ export const PaypalWebhookEventScalarFieldEnum = {
 } as const
 
 export type PaypalWebhookEventScalarFieldEnum = (typeof PaypalWebhookEventScalarFieldEnum)[keyof typeof PaypalWebhookEventScalarFieldEnum]
+
+
+export const CheckoutRecoveryOtpChallengeScalarFieldEnum = {
+  id: 'id',
+  email: 'email',
+  otpHash: 'otpHash',
+  expiresAt: 'expiresAt',
+  consumedAt: 'consumedAt',
+  attemptCount: 'attemptCount'
+} as const
+
+export type CheckoutRecoveryOtpChallengeScalarFieldEnum = (typeof CheckoutRecoveryOtpChallengeScalarFieldEnum)[keyof typeof CheckoutRecoveryOtpChallengeScalarFieldEnum]
 
 
 export const SortOrder = {

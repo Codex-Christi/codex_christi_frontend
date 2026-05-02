@@ -4,7 +4,7 @@ export type PayPalTxPaymentStatusResponse = {
   lastEventType?: string | null;
   receiptLink?: string | null;
   receiptFile?: string | null;
-  backendCustomId?: string | null;
+  djangoPaymentSaveCustomId?: string | null;
   processingCompletedAt?: string | null;
   error?: { code?: string | null; message?: string | null } | null;
 };
@@ -62,7 +62,7 @@ function buildErrorSteps(data: PayPalTxPaymentStatusResponse) {
   let steps = createSteps();
   const message = data.error?.message ?? 'Payment processing failed';
 
-  if (data.backendCustomId) {
+  if (data.djangoPaymentSaveCustomId) {
     steps = withStepStatus(steps, 'receiptUpload', 'success');
     steps = withStepStatus(steps, 'paymentSave', 'success');
     steps = withStepStatus(steps, 'orderPush', 'error', message);
@@ -85,7 +85,7 @@ export function mapLedgerToProcessingState(
   const shared = {
     receiptLink: data.receiptLink ?? undefined,
     receiptFileName: data.receiptFile ?? undefined,
-    orderCustomId: data.backendCustomId ?? undefined,
+    orderCustomId: data.djangoPaymentSaveCustomId ?? undefined,
     errorMessage: data.error?.message ?? undefined,
   };
 
@@ -94,6 +94,14 @@ export function mapLedgerToProcessingState(
       ...shared,
       flowStatus: 'completed',
       steps: createSteps().map((step) => ({ ...step, status: 'success' })),
+    };
+  }
+
+  if (data.status === 'not_found') {
+    return {
+      ...shared,
+      flowStatus: 'idle',
+      steps: createSteps(),
     };
   }
 
@@ -122,7 +130,7 @@ export function mapLedgerToProcessingState(
     };
   }
 
-  if (data.status === 'error' || data.status === 'refunded') {
+  if (data.status === 'error' || data.status === 'refunded' || data.error?.message) {
     return {
       ...shared,
       flowStatus: 'error',

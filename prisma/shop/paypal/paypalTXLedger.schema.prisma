@@ -2,66 +2,94 @@ datasource db {
   provider = "postgresql"
   // URL is set in prisma.config.ts (Prisma 7 style)
 }
+
 generator paypalTxLedger {
   provider = "prisma-client"
   output   = "../../../src/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger"
 }
 
 model PaypalIntent {
-  id                    String   @id @default(cuid())
-  orderToken            String   @unique
-  paypalOrderId         String?  @unique
-  paypalAuthorizationId String?
-  otpOrderId            String?
-  customerName          String
-  customerEmail         String
-  userId                String?
-  countryIso2           String?
-  countryIso3           String?
-  initialCurrency       String?
-  cartSnapshot          Json
-  shippingSnapshot      Json
+  id                                 String    @id @default(cuid())
+  orderToken                         String    @unique
+  paypalOrderId                      String?   @unique
+  paypalAuthorizationId              String?
+  djangoOrderIntentUuid              String?
+  djangoOrderIntentOrderId           String?
+  customerName                       String
+  customerEmail                      String
+  userId                             String?
+  countryIso2                        String?
+  countryIso3                        String?
+  initialCurrency                    String?
+  cartSnapshot                       Json
+  shippingSnapshot                   Json
   // Raw payloads needed to reuse your existing server actions
-  authorizePayload      Json?
-  capturePayload        Json?
-  paymentSaveResponsePayload Json?
-  fulfillmentSendResponsePayload Json?
-  backendCustomId       String?
-  receiptLink           String?
-  receiptFile           String?
-  status                String
-  lastEventType         String?
-  lastErrorCode         String?
-  lastErrorMessage      String?
-  retryCount            Int      @default(0)
-  postProcessingLockId  String?
-  postProcessingLockedAt DateTime?
-  postProcessingLockExpiresAt DateTime?
-  processingCompletedAt DateTime?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  authorizePayload                   Json?
+  capturePayload                     Json?
+  djangoOrderIntentPayload           Json?
+  djangoOrderIntentVerifyPayload     Json?
+  djangoPaymentSaveResponsePayload   Json?
+  merchizeFulfillmentRequestPayload  Json?
+  merchizeFulfillmentResponsePayload Json?
+  merchizeFulfillmentProcessingId    String?
+  merchizeProviderOrderId            String?
+  merchizeProviderOrderCode          String?
+  fulfillmentAddressOverride         Json?
+  fulfillmentAddressOverrideReason   String?
+  fulfillmentAddressOverriddenBy     String?
+  fulfillmentAddressOverriddenAt     DateTime?
+  djangoPaymentSaveCustomId          String?
+  receiptLink                        String?
+  receiptFile                        String?
+  status                             String
+  lastEventType                      String?
+  lastErrorCode                      String?
+  lastErrorMessage                   String?
+  retryCount                         Int       @default(0)
+  postProcessingLockId               String?
+  postProcessingLockedAt             DateTime?
+  postProcessingLockExpiresAt        DateTime?
+  processingCompletedAt              DateTime?
+  createdAt                          DateTime  @default(now())
+  updatedAt                          DateTime  @updatedAt
+
   @@index([customerEmail])
+  @@index([djangoOrderIntentUuid])
+  @@index([djangoOrderIntentOrderId])
+  @@index([djangoPaymentSaveCustomId])
   @@index([status])
   @@index([createdAt])
   @@index([postProcessingLockExpiresAt])
 }
 
-
 model PaypalWebhookEvent {
-  id               String   @id @default(cuid())
-  eventId          String   @unique
+  id               String    @id @default(cuid())
+  eventId          String    @unique
   eventType        String
   paypalOrderId    String?
   payload          Json
-  processingStatus String   @default("received")
-  attemptCount     Int      @default(0)
+  processingStatus String    @default("received")
+  attemptCount     Int       @default(0)
   lastAttemptAt    DateTime?
   processedAt      DateTime?
   lastErrorMessage String?
-  createdAt        DateTime @default(now())
+  createdAt        DateTime  @default(now())
+
   @@index([paypalOrderId])
   @@index([eventType])
   @@index([processingStatus])
   @@index([processedAt])
   @@index([createdAt])
+}
+
+model CheckoutRecoveryOtpChallenge {
+  id           String    @id @default(cuid())
+  email        String
+  otpHash      String
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  attemptCount Int       @default(0)
+
+  @@index([email, expiresAt])
+  @@index([consumedAt])
 }

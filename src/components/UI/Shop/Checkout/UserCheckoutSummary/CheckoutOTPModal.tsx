@@ -25,6 +25,8 @@ export type CheckoutOTPModalProps = {
   title?: string;
   length?: number;
   onComplete?: (otp: string) => void;
+  onResendOTP?: () => void;
+  isResendingOTP?: boolean;
   defaultValue?: string;
   email?: string;
 };
@@ -38,6 +40,8 @@ export const CheckoutOTPModal = React.forwardRef<CheckoutOTPModalHandles, Checko
       title = 'Enter verification code',
       length = 6,
       onComplete,
+      onResendOTP,
+      isResendingOTP = false,
       defaultValue,
       email,
     } = props;
@@ -139,6 +143,16 @@ export const CheckoutOTPModal = React.forwardRef<CheckoutOTPModalHandles, Checko
                   className='px-3 py-2 rounded-lg bg-white/10 border border-white/20 hover:bg-white/15'
                 >
                   Clear
+                </button>
+
+                <button
+                  name='Resend OTP'
+                  type='button'
+                  onClick={onResendOTP}
+                  disabled={!onResendOTP || isResendingOTP}
+                  className='px-3 py-2 rounded-lg bg-white/10 border border-white/20 hover:bg-white/15 disabled:opacity-50 disabled:cursor-not-allowed'
+                >
+                  {isResendingOTP ? 'Resending...' : 'Resend OTP'}
                 </button>
 
                 <button

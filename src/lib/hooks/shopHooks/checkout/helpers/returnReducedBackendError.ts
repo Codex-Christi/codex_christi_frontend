@@ -31,9 +31,12 @@ export const returnReducedBackendError = (err: FetcherError) => {
       (acc, currErrObj) => {
         const infoString = `[${currErrObj.type}]: ${currErrObj.code}
            ${currErrObj.field_name ? `field name: ${currErrObj.field_name}` : ``}`;
+        const message = currErrObj.field_name
+          ? `${currErrObj.field_name}: ${currErrObj.message}`
+          : currErrObj.message;
         return {
           ...acc,
-          message: acc.message ? acc.message + `\n ${currErrObj.message}` : currErrObj.message,
+          message: acc.message ? acc.message + `\n ${message}` : message,
           status: err.status,
           info: acc.info ? acc.info + ` \n` + infoString : infoString,
         };

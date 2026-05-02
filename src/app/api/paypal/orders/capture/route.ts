@@ -1,9 +1,11 @@
 import { randomUUID } from 'crypto';
+import { after } from 'next/server';
 import { PaymentsController, type CapturedPayment } from '@paypal/paypal-server-sdk';
 import { paypalClient } from '@/lib/paymentClients/paypalClient';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { createPayPalRouteResponders } from '@/lib/paypal/txLedger/routeResponses';
+import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
 
 const payments = new PaymentsController(paypalClient);
 
@@ -80,6 +82,21 @@ export async function POST(req: Request) {
     });
   };
 
+  const schedulePostProcessing = (token: string, reason: string) => {
+    after(async () => {
+      try {
+        await runPostProcessing(token);
+      } catch (error) {
+        console.error('[paypal.capture.post_processing_failed]', {
+          requestId,
+          orderToken: token,
+          reason,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
+  };
+
   try {
     const { authorizationId, orderToken: requestOrderToken } = await req.json();
 
@@ -112,10 +129,16 @@ export async function POST(req: Request) {
       });
     }
 
-    // If capture already succeeded earlier, return the stored payload instead of capturing again.
-    if (intent.status === PAYPAL_LEDGER_STATUS.CAPTURED && intent.capturePayload) {
+    // If capture already succeeded earlier, resume server-side follow-up work instead of
+    // attempting another PayPal capture. Webhooks may arrive late or not reach local dev tunnels.
+    if (intent.capturePayload && intent.status !== PAYPAL_LEDGER_STATUS.REFUNDED) {
+      if (!intent.processingCompletedAt && intent.status !== PAYPAL_LEDGER_STATUS.COMPLETED) {
+        schedulePostProcessing(orderToken, 'stored_capture_payload');
+      }
+
       return Response.json(intent.capturePayload);
     }
+
     if (
       intent.status === PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED ||
       intent.status === PAYPAL_LEDGER_STATUS.PAYMENT_SAVED ||
@@ -152,6 +175,7 @@ export async function POST(req: Request) {
 
     try {
       await persistCapturedResult(result);
+      schedulePostProcessing(orderToken, 'capture_persisted');
     } catch (persistErr) {
       // Keep this separate so retries know PayPal may already be ahead of the ledger.
       return fail({

@@ -5,13 +5,11 @@
  */
 const nextConfig = {
   /* config options here */
-  output: 'standalone',
-  productionBrowserSourceMaps: false,
+  allowedDevOrigins: ['192.168.1.231'],
   compiler: {
     // Uncomment if you want to remove logs from production server
     // removeConsole: process.env.NODE_ENV === 'production',
   },
-  serverExternalPackages: ['pdfkit'],
   images: {
     remotePatterns: [
       new URL('https://avatar.iran.liara.run/public/**'),
@@ -34,6 +32,15 @@ const nextConfig = {
     qualities: [25, 50, 75, 80, 90, 100],
     formats: ['image/avif', 'image/webp'],
   },
+  logging: {
+    fetches: { fullUrl: true },
+    // browserToTerminal: true, // Forwards logs with file/line info to the terminal
+  },
+  output: 'standalone',
+  productionBrowserSourceMaps: false,
+  serverExternalPackages: ['pdfkit'],
+
+  // Func-based configs
   async rewrites() {
     return [
       {
@@ -42,7 +49,6 @@ const nextConfig = {
       },
     ];
   },
-  allowedDevOrigins: ['192.168.1.231'],
 };
 
 export default nextConfig;

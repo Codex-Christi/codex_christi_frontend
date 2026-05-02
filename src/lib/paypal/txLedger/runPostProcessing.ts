@@ -10,12 +10,11 @@ import {
   savePaymentReceiptToCloud,
   type PaymentReceiptProps,
 } from '@/actions/shop/paypal/processAndUploadCompletedTx/savePaymentReceiptToCloud';
-import {
-  sendMerchizeFulfillmentOrder,
-} from '@/lib/paypal/txLedger/sendMerchizeFulfillmentOrder';
+import { sendMerchizeFulfillmentOrder } from '@/lib/paypal/txLedger/sendMerchizeFulfillmentOrder';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
+import type { CartVariant } from '@/stores/shop_stores/cartStore';
 
 const POST_PROCESSING_LEASE_MS = 5 * 60_000;
 
@@ -59,10 +58,7 @@ export async function runPostProcessing(orderToken: string) {
     where: {
       orderToken,
       processingCompletedAt: null,
-      OR: [
-        { postProcessingLockExpiresAt: null },
-        { postProcessingLockExpiresAt: { lt: now } },
-      ],
+      OR: [{ postProcessingLockExpiresAt: null }, { postProcessingLockExpiresAt: { lt: now } }],
     },
     data: {
       postProcessingLockId: lockId,
@@ -87,7 +83,9 @@ export async function runPostProcessing(orderToken: string) {
 
   try {
     const authData = row.authorizePayload as PaymentReceiptProps['authData'] | null;
-    const finalCapturedOrder = row.capturePayload as PaymentSavingActionProps['finalCapturedOrder'] | null;
+    const finalCapturedOrder = row.capturePayload as
+      | PaymentSavingActionProps['finalCapturedOrder']
+      | null;
 
     if (!authData || !finalCapturedOrder) {
       throw new Error('Missing authorize/capture payload in ledger');
@@ -97,12 +95,13 @@ export async function runPostProcessing(orderToken: string) {
       name: row.customerName,
       email: row.customerEmail,
     };
-    const ORD_string = row.otpOrderId ?? row.orderToken;
+    const ORD_string = row.djangoOrderIntentOrderId ?? row.orderToken;
 
     if (!row.receiptLink || !row.receiptFile) {
       const receiptRes = await savePaymentReceiptToCloud(
         buildPaymentReceiptPayload({
           authData,
+          cart: row.cartSnapshot as CartVariant[],
           customer,
           ORD_string,
         }),
@@ -113,9 +112,7 @@ export async function runPostProcessing(orderToken: string) {
         !('pdfReceiptLink' in receiptRes) ||
         !('receiptFileName' in receiptRes)
       ) {
-        throw new Error(
-          'message' in receiptRes ? receiptRes.message : 'Receipt upload failed',
-        );
+        throw new Error('message' in receiptRes ? receiptRes.message : 'Receipt upload failed');
       }
 
       await updateLockedRow(orderToken, lockId, {
@@ -130,7 +127,7 @@ export async function runPostProcessing(orderToken: string) {
       row.receiptFile = receiptRes.receiptFileName;
     }
 
-    if (!row.backendCustomId) {
+    if (!row.djangoPaymentSaveCustomId) {
       const paymentSave = await savePaymentDataToBackend(
         buildPaymentSavePayload({
           authData,
@@ -151,50 +148,62 @@ export async function runPostProcessing(orderToken: string) {
         throw new Error(paymentSave.error?.message ?? 'Payment save failed');
       }
 
-      await updateLockedRow(
-        orderToken,
-        lockId,
-        {
-          status: PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
-          backendCustomId: paymentSave.data?.custom_id ?? null,
-          paymentSaveResponsePayload: JSON.parse(JSON.stringify(paymentSave)),
-          lastErrorCode: null,
-          lastErrorMessage: null,
-        } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
-      );
-
-      row.backendCustomId = paymentSave.data?.custom_id ?? null;
-    }
-
-    const fulfillmentSend = await sendMerchizeFulfillmentOrder({
-      orderVariants: row.cartSnapshot as {
-        variantId: string;
-        quantity: number;
-      }[],
-      deliveryAddress: row.shippingSnapshot as PaymentSavingActionProps['delivery_address'],
-      customer,
-      countryIso2: row.countryIso2 ?? 'US',
-      orderCustomId: row.backendCustomId ?? row.paypalOrderId ?? row.orderToken,
-    });
-
-    await updateLockedRow(
-      orderToken,
-      lockId,
-      {
-        status: PAYPAL_LEDGER_STATUS.COMPLETED,
-        fulfillmentSendResponsePayload: JSON.parse(JSON.stringify(fulfillmentSend)),
-        processingCompletedAt: new Date(),
-        postProcessingLockId: null,
-        postProcessingLockedAt: null,
-        postProcessingLockExpiresAt: null,
+      await updateLockedRow(orderToken, lockId, {
+        status: PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
+        djangoPaymentSaveCustomId: paymentSave.data?.custom_id ?? null,
+        djangoPaymentSaveResponsePayload: JSON.parse(JSON.stringify(paymentSave)),
         lastErrorCode: null,
         lastErrorMessage: null,
-      } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
-    );
+      } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
+
+      row.djangoPaymentSaveCustomId = paymentSave.data?.custom_id ?? null;
+    }
+
+    if (!row.djangoPaymentSaveCustomId) {
+      throw new Error('Missing Django payment save custom_id before fulfillment push');
+    }
+
+    const fulfillmentAddress =
+      (row.fulfillmentAddressOverride as PaymentSavingActionProps['delivery_address'] | null) ??
+      (row.shippingSnapshot as PaymentSavingActionProps['delivery_address']);
+    const fulfillmentSend = await sendMerchizeFulfillmentOrder({
+      cartSnapshot: row.cartSnapshot as CartVariant[],
+      djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
+      identifier: 'codexchristi-shop',
+      currency: row.initialCurrency ?? 'USD',
+      customerName: row.customerName,
+      fulfillmentAddress,
+    });
+
+    await updateLockedRow(orderToken, lockId, {
+      status: PAYPAL_LEDGER_STATUS.COMPLETED,
+      merchizeFulfillmentRequestPayload: JSON.parse(
+        JSON.stringify(fulfillmentSend.requestPayload),
+      ),
+      merchizeFulfillmentResponsePayload: JSON.parse(
+        JSON.stringify({
+          ok: fulfillmentSend.ok,
+          status: fulfillmentSend.status,
+          success: fulfillmentSend.success,
+          message: fulfillmentSend.message,
+          data: fulfillmentSend.data,
+        }),
+      ),
+      merchizeFulfillmentProcessingId: fulfillmentSend.data?.id ?? null,
+      merchizeProviderOrderId: fulfillmentSend.data?.provider_order_id ?? null,
+      merchizeProviderOrderCode: fulfillmentSend.data?.provider_order_code ?? null,
+      processingCompletedAt: new Date(),
+      postProcessingLockId: null,
+      postProcessingLockedAt: null,
+      postProcessingLockExpiresAt: null,
+      lastErrorCode: null,
+      lastErrorMessage: null,
+    } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 
     await updateLockedRow(orderToken, lockId, {
+      status: PAYPAL_LEDGER_STATUS.ERROR,
       lastErrorCode: 'POST_PROCESSING_FAILED',
       lastErrorMessage: message,
       postProcessingLockId: null,

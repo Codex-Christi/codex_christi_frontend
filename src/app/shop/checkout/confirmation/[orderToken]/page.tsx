@@ -10,7 +10,7 @@ import errorToast from '@/lib/error-toast';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { useVerifiedEmailsStore } from '@/stores/shop_stores/checkoutStore/useVerifiedEmailsStore';
-import { useOrderStringStore } from '@/stores/shop_stores/checkoutStore/ORD-stringStore';
+import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
 import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 import {
   mapLedgerToProcessingState,
@@ -59,7 +59,7 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
   const clearCart = useCartStore((store) => store.clearCart);
   const resetCheckoutToInitial = useShopCheckoutStore((store) => store.resetCheckoutToInitial);
   const clearVerifiedEmails = useVerifiedEmailsStore((store) => store.clearStore);
-  const setOrderString = useOrderStringStore((store) => store.setOrderString);
+  const clearDjangoOrderIntent = useDjangoOrderIntentStore((store) => store.clearDjangoOrderIntent);
   const clearIntent = usePayPalIntentStore((store) => store.clearIntent);
   const flowStatus = processingState?.flowStatus ?? 'processing';
   const steps =
@@ -143,15 +143,15 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
   const resetCheckoutRelatedStoresAndVars = useCallback(() => {
     clearIntent();
     clearVerifiedEmails();
-    setOrderString('');
+    clearDjangoOrderIntent();
     clearCart();
     resetCheckoutToInitial();
   }, [
     clearCart,
     clearIntent,
+    clearDjangoOrderIntent,
     clearVerifiedEmails,
     resetCheckoutToInitial,
-    setOrderString,
   ]);
 
   useEffect(() => {
@@ -169,6 +169,23 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
           { cache: 'no-store' },
         );
 
+        if (res.status === 404) {
+          const nextState = mapLedgerToProcessingState({
+            orderToken: routeOrderToken,
+            status: 'not_found',
+            error: {
+              code: 'NOT_FOUND',
+              message: 'We could not find a payment record for this confirmation link.',
+            },
+          });
+
+          if (!cancelled) {
+            setProcessingState(nextState);
+          }
+
+          return;
+        }
+
         if (!res.ok) {
           throw new Error(`Payment status lookup failed: ${res.status}`);
         }
@@ -180,7 +197,8 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
           setProcessingState(nextState);
 
           // Safe to clear here because the intent/authorize/capture routes have already persisted
-          // otpOrderId, cart/shipping snapshots, customer info, and PayPal payloads to the ledger.
+          // Django order intent IDs, cart/shipping snapshots, customer info, and PayPal payloads
+          // have already been persisted to the ledger.
           if (!hasHydratedFromLedger) {
             resetCheckoutRelatedStoresAndVars();
             setHasHydratedFromLedger(true);

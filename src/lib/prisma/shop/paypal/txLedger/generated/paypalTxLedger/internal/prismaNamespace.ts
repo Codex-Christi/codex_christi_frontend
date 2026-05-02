@@ -80,12 +80,12 @@ export type PrismaVersion = {
 }
 
 /**
- * Prisma Client JS version: 7.7.0
- * Query Engine version: 75cbdc1eb7150937890ad5465d861175c6624711
+ * Prisma Client JS version: 7.8.0
+ * Query Engine version: 3c6e192761c0362d496ed980de936e2f3cebcd3a
  */
 export const prismaVersion: PrismaVersion = {
-  client: "7.7.0",
-  engine: "75cbdc1eb7150937890ad5465d861175c6624711"
+  client: "7.8.0",
+  engine: "3c6e192761c0362d496ed980de936e2f3cebcd3a"
 }
 
 /**
@@ -385,7 +385,8 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   PaypalIntent: 'PaypalIntent',
-  PaypalWebhookEvent: 'PaypalWebhookEvent'
+  PaypalWebhookEvent: 'PaypalWebhookEvent',
+  CheckoutRecoveryOtpChallenge: 'CheckoutRecoveryOtpChallenge'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -401,7 +402,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "paypalIntent" | "paypalWebhookEvent"
+    modelProps: "paypalIntent" | "paypalWebhookEvent" | "checkoutRecoveryOtpChallenge"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -553,6 +554,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    CheckoutRecoveryOtpChallenge: {
+      payload: Prisma.$CheckoutRecoveryOtpChallengePayload<ExtArgs>
+      fields: Prisma.CheckoutRecoveryOtpChallengeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CheckoutRecoveryOtpChallengeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CheckoutRecoveryOtpChallengePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CheckoutRecoveryOtpChallengeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CheckoutRecoveryOtpChallengePayload>
+        }
+        findFirst: {
+          args: Prisma.CheckoutRecoveryOtpChallengeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CheckoutRecoveryOtpChallengePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CheckoutRecoveryOtpChallengeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CheckoutRecoveryOtpChallengePayload>
+        }
+        findMany: {
+          args: Prisma.CheckoutRecoveryOtpChallengeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CheckoutRecoveryOtpChallengePayload>[]
+        }
+        create: {
+          args: Prisma.CheckoutRecoveryOtpChallengeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CheckoutRecoveryOtpChallengePayload>
+        }
+        createMany: {
+          args: Prisma.CheckoutRecoveryOtpChallengeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CheckoutRecoveryOtpChallengeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CheckoutRecoveryOtpChallengePayload>[]
+        }
+        delete: {
+          args: Prisma.CheckoutRecoveryOtpChallengeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CheckoutRecoveryOtpChallengePayload>
+        }
+        update: {
+          args: Prisma.CheckoutRecoveryOtpChallengeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CheckoutRecoveryOtpChallengePayload>
+        }
+        deleteMany: {
+          args: Prisma.CheckoutRecoveryOtpChallengeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CheckoutRecoveryOtpChallengeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CheckoutRecoveryOtpChallengeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CheckoutRecoveryOtpChallengePayload>[]
+        }
+        upsert: {
+          args: Prisma.CheckoutRecoveryOtpChallengeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CheckoutRecoveryOtpChallengePayload>
+        }
+        aggregate: {
+          args: Prisma.CheckoutRecoveryOtpChallengeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCheckoutRecoveryOtpChallenge>
+        }
+        groupBy: {
+          args: Prisma.CheckoutRecoveryOtpChallengeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CheckoutRecoveryOtpChallengeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CheckoutRecoveryOtpChallengeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CheckoutRecoveryOtpChallengeCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -597,7 +672,8 @@ export const PaypalIntentScalarFieldEnum = {
   orderToken: 'orderToken',
   paypalOrderId: 'paypalOrderId',
   paypalAuthorizationId: 'paypalAuthorizationId',
-  otpOrderId: 'otpOrderId',
+  djangoOrderIntentUuid: 'djangoOrderIntentUuid',
+  djangoOrderIntentOrderId: 'djangoOrderIntentOrderId',
   customerName: 'customerName',
   customerEmail: 'customerEmail',
   userId: 'userId',
@@ -608,9 +684,19 @@ export const PaypalIntentScalarFieldEnum = {
   shippingSnapshot: 'shippingSnapshot',
   authorizePayload: 'authorizePayload',
   capturePayload: 'capturePayload',
-  paymentSaveResponsePayload: 'paymentSaveResponsePayload',
-  fulfillmentSendResponsePayload: 'fulfillmentSendResponsePayload',
-  backendCustomId: 'backendCustomId',
+  djangoOrderIntentPayload: 'djangoOrderIntentPayload',
+  djangoOrderIntentVerifyPayload: 'djangoOrderIntentVerifyPayload',
+  djangoPaymentSaveResponsePayload: 'djangoPaymentSaveResponsePayload',
+  merchizeFulfillmentRequestPayload: 'merchizeFulfillmentRequestPayload',
+  merchizeFulfillmentResponsePayload: 'merchizeFulfillmentResponsePayload',
+  merchizeFulfillmentProcessingId: 'merchizeFulfillmentProcessingId',
+  merchizeProviderOrderId: 'merchizeProviderOrderId',
+  merchizeProviderOrderCode: 'merchizeProviderOrderCode',
+  fulfillmentAddressOverride: 'fulfillmentAddressOverride',
+  fulfillmentAddressOverrideReason: 'fulfillmentAddressOverrideReason',
+  fulfillmentAddressOverriddenBy: 'fulfillmentAddressOverriddenBy',
+  fulfillmentAddressOverriddenAt: 'fulfillmentAddressOverriddenAt',
+  djangoPaymentSaveCustomId: 'djangoPaymentSaveCustomId',
   receiptLink: 'receiptLink',
   receiptFile: 'receiptFile',
   status: 'status',
@@ -644,6 +730,18 @@ export const PaypalWebhookEventScalarFieldEnum = {
 } as const
 
 export type PaypalWebhookEventScalarFieldEnum = (typeof PaypalWebhookEventScalarFieldEnum)[keyof typeof PaypalWebhookEventScalarFieldEnum]
+
+
+export const CheckoutRecoveryOtpChallengeScalarFieldEnum = {
+  id: 'id',
+  email: 'email',
+  otpHash: 'otpHash',
+  expiresAt: 'expiresAt',
+  consumedAt: 'consumedAt',
+  attemptCount: 'attemptCount'
+} as const
+
+export type CheckoutRecoveryOtpChallengeScalarFieldEnum = (typeof CheckoutRecoveryOtpChallengeScalarFieldEnum)[keyof typeof CheckoutRecoveryOtpChallengeScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -729,20 +827,6 @@ export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$Prisma
 
 
 /**
- * Reference to a field of type 'Int'
- */
-export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
-    
-
-
-/**
- * Reference to a field of type 'Int[]'
- */
-export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
-    
-
-
-/**
  * Reference to a field of type 'DateTime'
  */
 export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
@@ -753,6 +837,20 @@ export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel
  * Reference to a field of type 'DateTime[]'
  */
 export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Int'
+ */
+export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+    
+
+
+/**
+ * Reference to a field of type 'Int[]'
+ */
+export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
     
 
 
@@ -862,10 +960,26 @@ export type PrismaClientOptions = ({
    * ```
    */
   comments?: runtime.SqlCommenterPlugin[]
+  /**
+   * Optional maximum size for the query plan cache. If not provided, a default size will be used.
+   * A value of `0` can be used to disable the cache entirely. A higher cache size can improve
+   * performance for applications that execute a large number of unique queries, while a smaller
+   * cache size can reduce memory usage.
+   * 
+   * @example
+   * ```
+   * const prisma = new PrismaClient({
+   *   adapter,
+   *   queryPlanCacheMaxSize: 100,
+   * })
+   * ```
+   */
+  queryPlanCacheMaxSize?: number
 }
 export type GlobalOmitConfig = {
   paypalIntent?: Prisma.PaypalIntentOmit
   paypalWebhookEvent?: Prisma.PaypalWebhookEventOmit
+  checkoutRecoveryOtpChallenge?: Prisma.CheckoutRecoveryOtpChallengeOmit
 }
 
 /* Types for Logging */

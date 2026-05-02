@@ -58,6 +58,67 @@ export class FetcherError extends Error {
   }
 }
 
+function parseResponseText(text: string): Record<string, unknown> | null {
+  if (!text) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return parsed && typeof parsed === 'object'
+      ? (parsed as Record<string, unknown>)
+      : { message: String(parsed) };
+  } catch {
+    return { message: text };
+  }
+}
+
+function formatBackendErrorMessage(
+  status: number,
+  statusText: string,
+  errInfo: Record<string, unknown> | null,
+) {
+  const fallback = `HTTP ${status}${statusText ? ` ${statusText}` : ''}`;
+
+  if (!errInfo) {
+    return fallback;
+  }
+
+  const errors = errInfo.errors;
+  if (Array.isArray(errors) && errors.length > 0) {
+    const messages = errors
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') {
+          return null;
+        }
+
+        const error = entry as Record<string, unknown>;
+        const fieldName = typeof error.field_name === 'string' ? error.field_name : null;
+        const message = typeof error.message === 'string' ? error.message : null;
+
+        if (fieldName && message) {
+          return `${fieldName}: ${message}`;
+        }
+        return message;
+      })
+      .filter((message): message is string => Boolean(message));
+
+    if (messages.length > 0) {
+      return messages.join(' ');
+    }
+  }
+
+  if (typeof errInfo.message === 'string' && errInfo.message) {
+    return errInfo.message;
+  }
+
+  if (typeof errInfo.detail === 'string' && errInfo.detail) {
+    return errInfo.detail;
+  }
+
+  return fallback;
+}
+
 export interface FetcherOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   headers?: HeadersInit;
@@ -177,21 +238,20 @@ export async function universalFetcher<Data, Arg = undefined>(
     });
 
     if (!res.ok) {
-      console.log(await res.text());
+      const text = await res.text().catch(() => '');
+      const errInfo = parseResponseText(text);
+      const message = formatBackendErrorMessage(res.status, res.statusText, errInfo);
 
-      let errInfo: Record<string, unknown> | null = null;
-      try {
-        errInfo = await res.json();
-      } catch {
-        const txt = await res
-          .text()
-          .then((v) => v)
-          .catch(() => null);
-        if (txt !== null) {
-          errInfo = { message: txt };
-        }
+      if (isDebugging) {
+        console.error('Fetch error response:', {
+          url: key,
+          status: res.status,
+          statusText: res.statusText,
+          body: errInfo ?? text,
+        });
       }
-      throw new FetcherError(`HTTP ${res.status}`, errInfo, res.status);
+
+      throw new FetcherError(message, errInfo, res.status);
     }
 
     try {

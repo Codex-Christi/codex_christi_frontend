@@ -9,6 +9,7 @@ import { decryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/
 
 export interface PaymentReceiptProps {
   authData: CompletedTxInterface['authData'];
+  cart?: CompletedTxInterface['cart'];
   customer: CompletedTxInterface['customer'];
   ORD_string: CompletedTxInterface['ORD_string'];
 }
@@ -16,12 +17,12 @@ export interface PaymentReceiptProps {
 export const savePaymentReceiptToCloud = async (encodedProps: string) => {
   try {
     // Decrypt and parse data
-    const { authData, customer, ORD_string } = JSON.parse(
+    const { authData, cart, customer, ORD_string } = JSON.parse(
       decryptForPostProcessingServerAction(encodedProps),
     ) as PaymentReceiptProps;
     const { email: customerEmail, name: customerName } = customer || {};
 
-    const pdfBuffer = await createPaypalShopInvoicePDF(authData);
+    const pdfBuffer = await createPaypalShopInvoicePDF(authData, cart);
 
     // Upload to r2
     const { accessLink } = await uploadPaymentReceiptToR2({

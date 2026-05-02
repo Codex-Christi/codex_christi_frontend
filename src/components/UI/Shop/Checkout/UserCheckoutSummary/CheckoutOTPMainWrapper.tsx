@@ -1,4 +1,4 @@
-import { useVerifyEmailWithOTP } from '@/lib/hooks/shopHooks/checkout/useVerifyEmailWithOTP';
+import { useVerifyBackendOrderIntentWithOTP } from '@/lib/hooks/shopHooks/checkout/useVerifyBackendOrderIntentWithOTP';
 import {
   CheckoutOTPModal,
   CheckoutOTPModalProps,
@@ -7,11 +7,11 @@ import {
 import { forwardRef, useCallback, useEffect } from 'react';
 import loadingToast from '@/lib/loading-toast';
 import { toast } from 'sonner';
-import { useOrderStringStore } from '@/stores/shop_stores/checkoutStore/ORD-stringStore';
+import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
 
 type CheckoutOTPMainWrapperProps = Omit<CheckoutOTPModalProps, 'onComplete'> & {
   proceedToPaymentTrigger: (itemValue: 'basic-checkout-info' | 'payment-section') => void;
-  otpSendHookProps: ReturnType<typeof useVerifyEmailWithOTP>;
+  otpSendHookProps: ReturnType<typeof useVerifyBackendOrderIntentWithOTP>;
 };
 
 export const CheckoutOTPMainWrapper = forwardRef<
@@ -19,18 +19,28 @@ export const CheckoutOTPMainWrapper = forwardRef<
   CheckoutOTPMainWrapperProps
 >((props, ref) => {
   const { otpSendHookProps, proceedToPaymentTrigger, ...rest } = props;
-  const { initialOTPSendResp, triggerVerifySentOTP, isVerifying, isInitialSendLoading } =
-    otpSendHookProps;
-  const { order_id } = initialOTPSendResp?.data || {};
-  const setOrderString = useOrderStringStore((s) => s.setOrderString);
+  const {
+    backendOrderIntentResp,
+    resendBackendOrderIntentOTP,
+    triggerVerifyBackendOrderIntentOTP,
+    isResending,
+    isVerifying,
+    isBackendOrderIntentLoading,
+  } = otpSendHookProps;
+  const { id: djangoOrderIntentUuid, order_id } = backendOrderIntentResp?.data || {};
+  const setDjangoOrderIntent = useDjangoOrderIntentStore((s) => s.setDjangoOrderIntent);
   const { email } = rest;
 
   useEffect(() => {
     let toastID: number;
-    if (isVerifying || isInitialSendLoading) {
+    if (isVerifying || isBackendOrderIntentLoading || isResending) {
       toast.dismiss();
       toastID = loadingToast({
-        message: isInitialSendLoading ? 'Sending OTP...' : 'Verifying OTP...',
+        message: isBackendOrderIntentLoading
+          ? 'Sending OTP...'
+          : isResending
+            ? 'Resending OTP...'
+            : 'Verifying OTP...',
         duration: 5000,
       });
 
@@ -38,29 +48,52 @@ export const CheckoutOTPMainWrapper = forwardRef<
         toast.dismiss(toastID);
       };
     }
-  }, [isVerifying, isInitialSendLoading]);
+  }, [isVerifying, isBackendOrderIntentLoading, isResending]);
 
   // Main JSX
   return (
     <CheckoutOTPModal
       ref={ref}
       {...rest}
+      isResendingOTP={isResending}
+      onResendOTP={email ? () => resendBackendOrderIntentOTP(email) : undefined}
       onComplete={useCallback(
         async (otp: string) => {
           // Handle OTP completion
 
           if (email && order_id) {
-            const resp = await triggerVerifySentOTP({ email, order_id, otp });
+            const resp = await triggerVerifyBackendOrderIntentOTP({ email, order_id, otp });
             setTimeout(() => {
               rest.onOpenChange?.(false);
               if (resp && resp?.data.otp_status === 'verified') {
-                setOrderString(resp.data.order_id);
+                if (!resp.data.order_id) {
+                  return;
+                }
+                console.log('[checkout-otp.verified-intent-for-paypal]', {
+                  djangoOrderIntentUuid: resp.data.id ?? djangoOrderIntentUuid,
+                  djangoOrderIntentOrderId: resp.data.order_id,
+                  email: resp.data.email,
+                  otp_status: resp.data.otp_status,
+                });
+                setDjangoOrderIntent({
+                  djangoOrderIntentUuid: resp.data.id ?? djangoOrderIntentUuid,
+                  djangoOrderIntentOrderId: resp.data.order_id,
+                  djangoOrderIntentVerifyPayload: resp,
+                });
                 proceedToPaymentTrigger('payment-section');
               }
             }, 500);
           }
         },
-        [email, order_id, proceedToPaymentTrigger, rest, setOrderString, triggerVerifySentOTP],
+        [
+          djangoOrderIntentUuid,
+          email,
+          order_id,
+          proceedToPaymentTrigger,
+          rest,
+          setDjangoOrderIntent,
+          triggerVerifyBackendOrderIntentOTP,
+        ],
       )}
     />
   );

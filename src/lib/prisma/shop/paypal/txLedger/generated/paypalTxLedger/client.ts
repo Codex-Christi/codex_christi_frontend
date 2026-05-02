@@ -51,3 +51,8 @@ export type PaypalIntent = Prisma.PaypalIntentModel
  * 
  */
 export type PaypalWebhookEvent = Prisma.PaypalWebhookEventModel
+/**
+ * Model CheckoutRecoveryOtpChallenge
+ * 
+ */
+export type CheckoutRecoveryOtpChallenge = Prisma.CheckoutRecoveryOtpChallengeModel

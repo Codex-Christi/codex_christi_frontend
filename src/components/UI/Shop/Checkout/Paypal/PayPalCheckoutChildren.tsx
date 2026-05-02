@@ -9,7 +9,7 @@ import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { usePayPalTXApproveCallback } from '@/lib/hooks/shopHooks/checkout/usePayPalTXApproveCallback';
 import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
-import { useOrderStringStore } from '@/stores/shop_stores/checkoutStore/ORD-stringStore';
+import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
 
 const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   // Props
@@ -22,7 +22,12 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   const { mainPayPalApproveCallback } = usePayPalTXApproveCallback();
   const setIntent = usePayPalIntentStore((store) => store.setIntent);
   const userId = useUserMainProfileStore((store) => store.userMainProfile?.id);
-  const otpOrderId = useOrderStringStore((store) => store.orderString);
+  const {
+    djangoOrderIntentUuid,
+    djangoOrderIntentOrderId,
+    djangoOrderIntentPayload,
+    djangoOrderIntentVerifyPayload,
+  } = useDjangoOrderIntentStore();
 
   // Destructuring
   const { countrySupport } = serverOrderDetails || {};
@@ -49,6 +54,15 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
         };
 
     try {
+      console.log('[paypal-ledger.intent.request]', {
+        djangoOrderIntentUuid,
+        djangoOrderIntentOrderId,
+        customerEmail: email,
+        delivery_address,
+        cartItemCount: cart.length,
+        userId,
+      });
+
       const response = await fetch('/next-api/paypal/tx-ledger/intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,7 +77,10 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
           initialCurrency: currency ?? 'USD',
           delivery_address,
           userId,
-          otpOrderId,
+          djangoOrderIntentUuid,
+          djangoOrderIntentOrderId,
+          djangoOrderIntentPayload,
+          djangoOrderIntentVerifyPayload,
         }),
       });
 
@@ -103,7 +120,10 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
     email,
     first_name,
     last_name,
-    otpOrderId,
+    djangoOrderIntentUuid,
+    djangoOrderIntentOrderId,
+    djangoOrderIntentPayload,
+    djangoOrderIntentVerifyPayload,
     setIntent,
     userId,
   ]);
