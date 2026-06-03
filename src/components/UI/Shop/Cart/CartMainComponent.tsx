@@ -1,8 +1,10 @@
 'use client';
 
 import { useCartStore } from '@/stores/shop_stores/cartStore';
-import { useEffect, useMemo } from 'react';
+import type { CartVariant } from '@/stores/shop_stores/cartStore';
+import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { hydrateCartDisplayFromMerchizeOfflineCatalog } from '@/actions/shop/cart/hydrateCartDisplayFromMerchizeOfflineCatalog';
 
 // Dynamic Imports
 const CartEmptyComponent = dynamic(
@@ -23,10 +25,34 @@ const CartMainComponent = () => {
   // Hooks
   // Hooks
   const { variants } = useCartStore((state) => state);
+  const [displayVariants, setDisplayVariants] = useState<CartVariant[]>([]);
   const isCartEmpty = useMemo(() => variants.length === 0, [variants.length]);
+  const cartItemsForDisplay = useMemo(
+    () => (isCartEmpty ? [] : displayVariants.length > 0 ? displayVariants : variants),
+    [displayVariants, isCartEmpty, variants],
+  );
 
   useEffect(() => {
     console.log(variants);
+  }, [variants]);
+
+  useEffect(() => {
+    let active = true;
+
+    if (variants.length === 0) return;
+
+    hydrateCartDisplayFromMerchizeOfflineCatalog(variants)
+      .then((hydratedVariants) => {
+        if (active) setDisplayVariants(hydratedVariants);
+      })
+      .catch((error) => {
+        console.warn('[CartMainComponent] Offline catalog cart hydration failed:', error);
+        if (active) setDisplayVariants(variants);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [variants]);
 
   // JSX
@@ -53,13 +79,13 @@ const CartMainComponent = () => {
         {!isCartEmpty && variants && (
           <div className='flex flex-col gap-8 max-h-[90vh] px-5 overflow-y-auto scrollbar'>
             {/* All Cart Items */}
-            <CartItems cartItems={variants} />
+            <CartItems cartItems={cartItemsForDisplay} />
           </div>
         )}
       </div>
 
       {/* Conatiner for Order Summary */}
-      {!isCartEmpty && variants && <OrderSummary />}
+      {!isCartEmpty && variants && <OrderSummary cartItemsOverride={cartItemsForDisplay} />}
     </div>
   );
 };

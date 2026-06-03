@@ -1,6 +1,7 @@
 'use client';
 
 import { useCartStore } from '@/stores/shop_stores/cartStore';
+import type { CartVariant } from '@/stores/shop_stores/cartStore';
 import Link from 'next/link';
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { FaAngleRight } from 'react-icons/fa6';
@@ -11,6 +12,7 @@ import GlobalProductPrice from '../../GlobalShopComponents/GlobalProductPrice';
 type OrderSummaryProps = {
   /** ISO-3 destination country code, e.g. 'USA', 'GBR', 'CAN'. Defaults to 'USA'. */
   countryIso3?: string;
+  cartItemsOverride?: CartVariant[];
 };
 
 type ShippingEstimate = {
@@ -19,9 +21,10 @@ type ShippingEstimate = {
 };
 
 // Main Component
-const OrderSummary: FC<OrderSummaryProps> = ({ countryIso3 = 'USA' }) => {
+const OrderSummary: FC<OrderSummaryProps> = ({ countryIso3 = 'USA', cartItemsOverride }) => {
   // Hooks
-  const { variants: cartItems } = useCartStore();
+  const { variants: storeCartItems } = useCartStore();
+  const cartItems = cartItemsOverride ?? storeCartItems;
   const country = useShopCheckoutStore((state) => state.delivery_address.shipping_country);
   const shippingState = useShopCheckoutStore((state) => state.delivery_address.shipping_state);
 

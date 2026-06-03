@@ -14,6 +14,8 @@ RUN apt-get update -y \
 # Use corepack so Yarn is available
 RUN corepack enable
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 ########################
 # 2) Dependencies layer
 ########################
@@ -25,7 +27,12 @@ COPY package.json yarn.lock .yarnrc.yml ./
 
 # Cache Yarn downloads
 RUN --mount=type=cache,target=/root/.cache/yarn \
-  yarn install --immutable --inline-builds
+  yarn_major="$(yarn --version | cut -d. -f1)" \
+  && if [ "$yarn_major" -ge 2 ]; then \
+    yarn install --immutable --inline-builds; \
+  else \
+    yarn install --frozen-lockfile --check-files; \
+  fi
 
 ########################
 # 3) Builder layer

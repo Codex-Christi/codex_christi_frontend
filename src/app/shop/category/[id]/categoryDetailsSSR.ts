@@ -4,9 +4,19 @@ import {
   merchizeBaseURL,
   merchizeAPIKey,
   cacheForDays,
-  BasicProductInterface,
 } from '../../product/[id]/productDetailsSSR';
 import { cache } from 'react';
+import {
+  fetchMerchizeJson,
+  shouldUseStorefrontSnapshot,
+} from '@/lib/merchizeStorefront/providerErrors';
+import {
+  getCategoryMetadataFromSnapshot,
+  getCategoryProductsFromSnapshot,
+  upsertStorefrontCategoryPageSnapshot,
+  upsertStorefrontCategorySnapshot,
+} from '@/lib/merchizeStorefront/snapshot';
+import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
 
 type BasicProductData = BasicProductInterface['data'];
 
@@ -30,25 +40,40 @@ type PaginationParams = {
   page: number;
   page_size: number;
   category: string;
+  forceSnapshotRefresh?: boolean;
 };
 
 // const baseURL = process.env.NEXT_PUBLIC_BASE_URL!;
 
+type CategorySearchResponse = {
+  data?: {
+    collections?: Array<{ _id: string }>;
+  };
+};
+
 // Get category's ID from Merchize
 const getCategoryIDFromMerchize = async (categoryName: string) => {
   try {
-    const res = await fetchFromMerchizeWithNextCache({
+    const res = (await fetchFromMerchizeWithNextCache({
       url: `${merchizeBaseURL}/product/v2/collections/search`,
       method: 'POST',
       body: new URLSearchParams({ name: `'${categoryName}'` }).toString().toLowerCase(),
       isFormBody: true,
       daysToCache: 0.3,
-    });
+    })) as CategorySearchResponse;
 
-    const categoryID = res!.data!.collections[0]._id as string;
+    const categoryID = res.data?.collections?.[0]?._id;
+    if (!categoryID) {
+      throw new Error(`No Merchize category found for "${categoryName}"`);
+    }
 
     return categoryID;
   } catch (err) {
+    if (shouldUseStorefrontSnapshot(err)) {
+      const snapshot = await getCategoryMetadataFromSnapshot(categoryName);
+      if (snapshot?.categoryID) return snapshot.categoryID;
+    }
+
     console.log(`Error while getting category ID from Merchize`, err);
     throw err;
   }
@@ -69,7 +94,7 @@ export const getCategoryMetadataFromMerchize = cache(async (categoryName: string
 
     const { description, name } = metaDataObj || {};
 
-    return {
+    const categoryMeta = {
       ...metaDataObj,
       name: name.charAt(0).toUpperCase() + name.slice(1),
       description: description
@@ -78,8 +103,26 @@ export const getCategoryMetadataFromMerchize = cache(async (categoryName: string
       categoryID,
     };
 
+    await upsertStorefrontCategorySnapshot({
+      categorySlug: categoryName,
+      merchizeCategoryId: categoryID,
+      name: categoryMeta.name,
+      description: categoryMeta.description,
+      coverUrl: categoryMeta.cover?.url ?? null,
+      rawCategoryJson: categoryMeta,
+    }).catch((err) => {
+      console.warn('[storefrontSnapshot] category snapshot upsert failed:', err);
+    });
+
+    return categoryMeta;
+
     //  Catch errors
   } catch (err) {
+    if (shouldUseStorefrontSnapshot(err)) {
+      const snapshot = await getCategoryMetadataFromSnapshot(categoryName);
+      if (snapshot) return snapshot;
+    }
+
     console.log(err);
     throw err;
   }
@@ -99,56 +142,52 @@ const fetchFromMerchizeWithNextCache = cache(
     const { url, method, body, daysToCache, isFormBody } = params;
 
     // Main fetch from here
-    try {
-      return await fetch(`${url}`, {
-        method: method ?? 'GET',
-        headers: {
-          'X-API-KEY': `${merchizeAPIKey}`,
-          'Content-Type': isFormBody ? 'application/x-www-form-urlencoded' : 'application/json',
-        },
-        next: { revalidate: daysToCache ? cacheForDays(daysToCache) : undefined },
+    return fetchMerchizeJson(url, {
+      method: method ?? 'GET',
+      headers: {
+        'X-API-KEY': `${merchizeAPIKey}`,
+        'Content-Type': isFormBody ? 'application/x-www-form-urlencoded' : 'application/json',
+      },
+      next: { revalidate: daysToCache ? cacheForDays(daysToCache) : undefined },
 
-        body: body,
-      })
-        .then(async (resp) => {
-          if (!resp.ok) {
-            throw new Error('Network error');
-          }
-
-          const data = await resp.json();
-          return data;
-        })
-        .catch((err) => {
-          console.log(err);
-        });
-    } catch (err) {
-      console.log(err);
-
-      throw err;
-    }
+      body: body,
+    });
   },
 );
 
 // Fetch products with caching and pagination
 export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
-  const { page, page_size, category } = params;
+  const { page, page_size, category, forceSnapshotRefresh } = params;
   // const skip = (page - 1) * limit;
 
-  // Get ID first
-  const catID = await getCategoryIDFromMerchize(category);
-
   try {
-    const categoryProductsResponse: CategoryProductsResponse = await fetchFromMerchizeWithNextCache(
+    // Get ID first
+    const catID = await getCategoryIDFromMerchize(category);
+
+    const categoryProductsResponse = (await fetchFromMerchizeWithNextCache(
       // `${baseURL}/product/filter-by-collection?collection=${category}&page=${page}&page_size=${page_size}`,
 
       {
         url: `${merchizeBaseURL}/product/products?limit=${page_size}&page=${page}&title=&collectionId[]=${catID}&minPrice=&maxPrice=`,
         daysToCache: 0.3,
       },
-    );
+    )) as CategoryProductsResponse;
 
     if ('data' in categoryProductsResponse && categoryProductsResponse.success) {
       const { products, total, pages, page } = categoryProductsResponse.data;
+
+      await upsertStorefrontCategoryPageSnapshot({
+        categorySlug: category,
+        merchizeCategoryId: catID,
+        page,
+        pageSize: page_size,
+        total,
+        totalPages: pages,
+        products,
+        force: forceSnapshotRefresh,
+      }).catch((err) => {
+        console.warn('[storefrontSnapshot] category page snapshot upsert failed:', err);
+      });
 
       return {
         next:
@@ -173,6 +212,11 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
       );
     }
   } catch (err) {
+    if (shouldUseStorefrontSnapshot(err)) {
+      const snapshot = await getCategoryProductsFromSnapshot({ category, page, page_size });
+      if (snapshot) return snapshot;
+    }
+
     console.error(err);
 
     throw err;

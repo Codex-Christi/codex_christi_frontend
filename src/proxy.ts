@@ -26,13 +26,10 @@ export const proxy = createNEMO({
 // Config for middleware matcher
 export const config = {
   matcher: [
-    // Match all paths except for the ones starting with:
-    // - api (API routes)
-    // - _next/static (static files)
-    // - _next/image (image optimization files)
-    // - favicon.ico, sitemap.xml, robots.txt (metadata files)
+    // Match all non-root page paths except for static assets and API routes.
+    // The root homepage does not need auth/domain routing and should stay cache-friendly.
     {
-      source: '/((?!api|_next|wp-admin|media|wordpress|favicon.ico|sitemap.xml|robots.txt).*)',
+      source: '/((?!$|api|_next|wp-admin|media|wordpress|favicon.ico|sitemap.xml|robots.txt).*)',
     },
   ],
 };

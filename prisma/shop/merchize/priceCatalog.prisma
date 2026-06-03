@@ -76,3 +76,66 @@ model SyncState {
   lastRunAt     DateTime @default(now())
   lastSuccessAt DateTime?
 }
+
+model StorefrontProductSnapshot {
+  id                    String   @id @default(cuid())
+  merchizeProductId     String   @unique
+  slug                  String?
+  title                 String?
+  description           String?
+  image                 String?
+  retailPrice           Float?
+  rawProductJson        Json?
+  variantsJson          Json?
+  variantCount          Int      @default(0)
+  firstSeenAt           DateTime @default(now())
+  lastSeenAt            DateTime @default(now())
+  lastProductFetchAt    DateTime?
+  lastVariantsFetchAt   DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  categories StorefrontCategoryProduct[]
+
+  @@index([slug])
+  @@index([lastSeenAt])
+}
+
+model StorefrontCategorySnapshot {
+  id                 String   @id @default(cuid())
+  categorySlug       String   @unique
+  merchizeCategoryId String?
+  name               String?
+  description        String?
+  coverUrl           String?
+  rawCategoryJson    Json?
+  totalProducts      Int?
+  totalPages         Int?
+  lastSyncedPage     Int?
+  lastSuccessfulFetchAt DateTime?
+  lastMetadataFetchAt DateTime?
+  lastProductsFetchAt DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  products StorefrontCategoryProduct[]
+
+  @@index([merchizeCategoryId])
+}
+
+model StorefrontCategoryProduct {
+  id         String   @id @default(cuid())
+  categoryId String
+  productId  String
+  position   Int?
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category StorefrontCategorySnapshot @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  product  StorefrontProductSnapshot  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, productId])
+  @@index([productId])
+  @@index([categoryId, position])
+}

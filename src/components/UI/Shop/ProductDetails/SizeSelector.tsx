@@ -1,7 +1,7 @@
 'use client';
 
 import RadioButtonGroup from './RadioButtonGroupWithText';
-import { SizeAttribute } from '@/app/shop/product/[id]/productDetailsSSR';
+import { SizeAttribute } from '@/lib/merchizeStorefront/productTypes';
 import { FC, useCallback, useEffect, useMemo } from 'react';
 import { useCurrentVariant } from './currentVariantStore';
 

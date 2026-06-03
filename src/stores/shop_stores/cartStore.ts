@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import CryptoJS from 'crypto-js';
-import { ProductVariantOptions } from '@/app/shop/product/[id]/productDetailsSSR';
+import { ProductVariantOptions } from '@/lib/merchizeStorefront/productTypes';
 
 // Types
 export type VariantOption = {

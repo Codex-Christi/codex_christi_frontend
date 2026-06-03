@@ -1,13 +1,18 @@
 import Image from 'next/image';
 import { categoriesObj } from '@/lib/utils/shopHomePageProductsData';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
-import { formatServerPriceForId } from '@/lib/utils/shop/globalFXProductPrice/server/formatServerPrice';
+import { formatServerPricesByIds } from '@/lib/utils/shop/globalFXProductPrice/server/formatServerPrice';
 import GlobalProductPrice from '../GlobalShopComponents/GlobalProductPrice';
 import dynamic from 'next/dynamic';
 
 const CountryDropdownServer = dynamic(() => import('./CountryDropDownServerFloating'));
 
-const Categories = () => {
+const Categories = async () => {
+  const productIds = Object.values(categoriesObj).flatMap((category) =>
+    category.content.map((product) => product.productId),
+  );
+  const priceByProductId = await formatServerPricesByIds(productIds);
+
   // Main JSX
   return (
     <div className='space-y-8'>
@@ -25,8 +30,12 @@ const Categories = () => {
 
               <div className='grid gap-8 grid-cols-2 md:grid-cols-1'>
                 {/* Map through  */}
-                {products.content.map(async (product, productIndex) => {
-                  const { ssrText, usdCentsBase } = await formatServerPriceForId(product.productId);
+                {products.content.map((product, productIndex) => {
+                  const { ssrText, usdCentsBase } = priceByProductId[product.productId] ?? {
+                    ssrText: null,
+                    usdCentsBase: null,
+                  };
+
                   return (
                     <div className='grid gap-4 p-4' key={product.productId}>
                       <CustomShopLink

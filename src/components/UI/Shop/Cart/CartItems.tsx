@@ -1,4 +1,4 @@
-import { ProductVariantOptions } from '@/app/shop/product/[id]/productDetailsSSR';
+import { ProductVariantOptions } from '@/lib/merchizeStorefront/productTypes';
 import { CartVariant, useCartStore } from '@/stores/shop_stores/cartStore';
 import React, { FC, useState } from 'react';
 import Image from 'next/image';

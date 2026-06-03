@@ -2,7 +2,7 @@
 // import Calendar from '@/assets/img/calendar.png';
 import ProductDetailsClientComponent from '@/components/UI/Shop/ProductDetails';
 import { Metadata } from 'next';
-import { getProductDetailsSSR } from './productDetailsSSR';
+import { getProductDetailsSSR, getProductMetaDataOnly } from './productDetailsSSR';
 import { notFound } from 'next/navigation';
 import serialize from 'serialize-javascript';
 import { extractProductMetaDescriptionFromHtml } from '@/lib/utils/extract-plain-text-from-html';
@@ -11,13 +11,16 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
+function resolveProductImageUrl(image: string | undefined | null) {
+  if (!image) return undefined;
+  return image.startsWith('http') ? image : `https://d2dytk4tvgwhb4.cloudfront.net/${image}`;
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   try {
     const { id } = await params;
-    const { productMetaData, productVariants } = await getProductDetailsSSR(id);
-
-    const firstImage = productVariants[0].image_uris[0];
-    const firstImageUrl = `https://d2dytk4tvgwhb4.cloudfront.net/${firstImage}`;
+    const productMetaData = await getProductMetaDataOnly(id);
+    const firstImageUrl = resolveProductImageUrl(productMetaData.image);
 
     const title = `${productMetaData.title} | Codex Christi Shop`;
     const description = extractProductMetaDescriptionFromHtml(
@@ -31,7 +34,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       openGraph: {
         title: title,
         description: description,
-        images: [{ url: firstImageUrl }],
+        ...(firstImageUrl ? { images: [{ url: firstImageUrl }] } : {}),
         url: `https://codexchristi.shop/product/${id}`,
         locale: 'en_US',
         siteName: 'Codex Christi Shop',
@@ -40,7 +43,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         card: 'summary_large_image',
         title: title,
         description: description,
-        images: firstImageUrl,
+        ...(firstImageUrl ? { images: firstImageUrl } : {}),
       },
       other: {
         'og:type': 'product', // Manually add the custom og:type

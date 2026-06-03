@@ -10,6 +10,7 @@ services:
     env_file:
       - .env.production
     environment:
+      MERCHIZE_OFFLINE_CATALOG_DATABASE_URL: file:/app/data/db/shop/merchizeCatalog.db
       MERCHIZE_PRICE_CATALOG_DATABASE_URL: file:/app/data/db/shop/merchizeCatalog.db
     restart: 'no'
     networks:
@@ -27,6 +28,7 @@ services:
     env_file:
       - .env.production
     environment:
+      MERCHIZE_OFFLINE_CATALOG_DATABASE_URL: file:/app/data/db/shop/merchizeCatalog.db
       MERCHIZE_PRICE_CATALOG_DATABASE_URL: file:/app/data/db/shop/merchizeCatalog.db
     depends_on:
       migrate:
@@ -49,6 +51,7 @@ services:
     env_file:
       - .env.production
     environment:
+      MERCHIZE_OFFLINE_CATALOG_DATABASE_URL: file:/app/data/db/shop/merchizeCatalog.db
       MERCHIZE_PRICE_CATALOG_DATABASE_URL: file:/app/data/db/shop/merchizeCatalog.db
     depends_on:
       migrate:

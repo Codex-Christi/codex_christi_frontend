@@ -3,7 +3,7 @@ import {
   ColorAttribute,
   SizeAttribute,
   LabelAttribute,
-} from '@/app/shop/product/[id]/productDetailsSSR';
+} from '@/lib/merchizeStorefront/productTypes';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { shallow } from 'zustand/shallow';

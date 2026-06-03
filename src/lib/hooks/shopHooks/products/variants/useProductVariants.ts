@@ -2,7 +2,7 @@
 
 import useSWRImmutable from 'swr/immutable';
 import { universalFetcher, FetcherError } from '@/lib/utils/SWRfetcherAdvanced';
-import { ProductVariantsInterface } from '@/app/shop/product/[id]/productDetailsSSR';
+import { ProductVariantsInterface } from '@/lib/merchizeStorefront/productTypes';
 
 export const useProductVariants = (productId: string, shouldFetch: boolean) => {
   // Use a unique key for SWR that is part of the API route URL

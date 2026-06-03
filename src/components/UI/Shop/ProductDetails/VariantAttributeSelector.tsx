@@ -6,7 +6,7 @@ import {
   SizeAttribute,
   ProductVariantOptions,
   LabelAttribute,
-} from '@/app/shop/product/[id]/productDetailsSSR';
+} from '@/lib/merchizeStorefront/productTypes';
 import { useCurrentVariant } from './currentVariantStore';
 import { sizeFormatArr } from './SizeSelector';
 

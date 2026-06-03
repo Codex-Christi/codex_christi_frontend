@@ -10,13 +10,19 @@
     "lint": "eslint .",
     "build-with-env": "next build --update-env",
     "build-with-env:webpack": "next build --webpack --update-env",
-    "merchize:setup-catalog": "bash ./scripts/setup_merchize_catalog.sh",
+    "merchize-offline-catalog:setup": "bash ./scripts/setup_merchize_offline_catalog.sh",
+    "merchize-offline-catalog:db:push": "RUST_LOG=info prisma db push --schema prisma/shop/merchize/priceCatalog.prisma",
+    "merchize-offline-catalog:generate": "prisma generate --schema prisma/shop/merchize/priceCatalog.prisma",
+    "merchize:setup-catalog": "bash ./scripts/setup_merchize_offline_catalog.sh",
     "merchize-catalog:db:push": "RUST_LOG=info prisma db push --schema prisma/shop/merchize/priceCatalog.prisma",
     "merchize-catalog:generate": "prisma generate --schema prisma/shop/merchize/priceCatalog.prisma",
     "prisma:paypalTxLedger:generate:dev": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
     "prisma:paypalTxLedger:generate:prod": "PAYPAL_TX_LEDGER_NEON_BRANCH=prod prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
     "prisma:paypalTxLedger:migrate:dev": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev prisma migrate dev --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
-    "prisma:paypalTxLedger:migrate:deploy:prod": "PAYPAL_TX_LEDGER_NEON_BRANCH=prod prisma migrate deploy --schema prisma/shop/paypal/paypalTXLedger.schema.prisma"
+    "prisma:paypalTxLedger:migrate:deploy:prod": "PAYPAL_TX_LEDGER_NEON_BRANCH=prod prisma migrate deploy --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
+    "paypal-ledger:recovery-demo:create": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts create",
+    "paypal-ledger:recovery-demo:list": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts list",
+    "paypal-ledger:recovery-demo:cleanup": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts cleanup"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1026.0",

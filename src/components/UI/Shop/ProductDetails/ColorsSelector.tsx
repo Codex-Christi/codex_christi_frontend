@@ -1,6 +1,6 @@
 import React, { FC, useCallback, useMemo } from 'react';
 import RadioButtonGroup from './RadioButtonGroupWithText';
-import { ColorAttribute } from '@/app/shop/product/[id]/productDetailsSSR';
+import { ColorAttribute } from '@/lib/merchizeStorefront/productTypes';
 import { useCurrentVariant } from './currentVariantStore';
 
 type ColorsSelectorProps = {

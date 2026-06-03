@@ -2,7 +2,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { refreshMerchizeCatalog } from '@/lib/merchizeCatalog/sync';
 
-const CRON_SECRET = process.env.MERCHIZE_PRICE_CATALOG_CRON_SECRET!;
+const CRON_SECRET =
+  process.env.MERCHIZE_OFFLINE_CATALOG_CRON_SECRET ??
+  process.env.MERCHIZE_PRICE_CATALOG_CRON_SECRET!;
 
 export async function POST(req: NextRequest) {
   const headerSecret = req.headers.get('x-cron-secret');

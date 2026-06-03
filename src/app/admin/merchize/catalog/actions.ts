@@ -3,6 +3,11 @@
 
 import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
 import { refreshMerchizeCatalog } from '@/lib/merchizeCatalog/sync';
+import { STOREFRONT_SNAPSHOT_CATEGORY_SLUGS } from '@/lib/merchizeStorefront/categories';
+import {
+  fetchCategoryProducts,
+  getCategoryMetadataFromMerchize,
+} from '@/app/shop/category/[id]/categoryDetailsSSR';
 
 // const v = await merchizeCatalogPrisma.variant.findUnique({
 //   where: { sku: 'FBJSVN000000AA02' },
@@ -18,7 +23,35 @@ import { refreshMerchizeCatalog } from '@/lib/merchizeCatalog/sync';
 
 // console.log('>>> Inspect variant FBJSVN000000AA02', v);
 
-export async function refreshAction() {
+export async function getStorefrontSnapshotStats() {
+  const [productCount, categoryCount, variantAgg, latestProduct, latestCategory] =
+    await Promise.all([
+      merchizeCatalogPrisma.storefrontProductSnapshot.count(),
+      merchizeCatalogPrisma.storefrontCategorySnapshot.count(),
+      merchizeCatalogPrisma.storefrontProductSnapshot.aggregate({
+        _sum: { variantCount: true },
+      }),
+      merchizeCatalogPrisma.storefrontProductSnapshot.findFirst({
+        orderBy: { lastSeenAt: 'desc' },
+        select: { lastSeenAt: true },
+      }),
+      merchizeCatalogPrisma.storefrontCategorySnapshot.findFirst({
+        orderBy: { lastSuccessfulFetchAt: 'desc' },
+        select: { lastSuccessfulFetchAt: true },
+      }),
+    ]);
+
+  return {
+    productCount,
+    categoryCount,
+    variantSnapshotCount: variantAgg._sum.variantCount ?? 0,
+    lastProductSnapshotAt: latestProduct?.lastSeenAt ?? null,
+    lastCategorySnapshotAt: latestCategory?.lastSuccessfulFetchAt ?? null,
+    ttlDays: process.env.MERCHIZE_STOREFRONT_SNAPSHOT_TTL_DAYS ?? '1',
+  };
+}
+
+export async function refreshPriceShippingCatalogAction() {
   try {
     const result = await refreshMerchizeCatalog();
 
@@ -33,7 +66,7 @@ export async function refreshAction() {
       syncState,
     };
   } catch (e: unknown) {
-    console.error('[MerchizeCatalog] refreshAction error', e);
+    console.error('[MerchizeCatalog] refreshPriceShippingCatalogAction error', e);
     const message = e instanceof Error ? e.message : 'Unknown error while refreshing catalog';
     return {
       ok: false as const,
@@ -42,7 +75,56 @@ export async function refreshAction() {
   }
 }
 
-export async function searchCatalogBySku(query: string) {
+export async function refreshStorefrontSnapshotAction() {
+  const pageSize = 50;
+  const failures: Array<{ category: string; message: string }> = [];
+  let productsSeen = 0;
+  let pagesFetched = 0;
+
+  for (const category of STOREFRONT_SNAPSHOT_CATEGORY_SLUGS) {
+    try {
+      await getCategoryMetadataFromMerchize(category);
+      const firstPage = await fetchCategoryProducts({
+        category,
+        page: 1,
+        page_size: pageSize,
+        forceSnapshotRefresh: true,
+      });
+
+      productsSeen += firstPage.products.length;
+      pagesFetched += 1;
+
+      for (let page = 2; page <= firstPage.totalPages; page += 1) {
+        const nextPage = await fetchCategoryProducts({
+          category,
+          page,
+          page_size: pageSize,
+          forceSnapshotRefresh: true,
+        });
+        productsSeen += nextPage.products.length;
+        pagesFetched += 1;
+      }
+    } catch (error) {
+      failures.push({
+        category,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const stats = await getStorefrontSnapshotStats();
+
+  return {
+    ok: failures.length === 0,
+    productsSeen,
+    pagesFetched,
+    categoriesAttempted: STOREFRONT_SNAPSHOT_CATEGORY_SLUGS.length,
+    failures,
+    stats,
+  };
+}
+
+export async function searchPriceShippingCatalogBySku(query: string) {
   const q = query.trim();
   if (!q) {
     return { ok: false as const, message: 'Enter a SKU or partial SKU' };
@@ -57,7 +139,7 @@ export async function searchCatalogBySku(query: string) {
 
     return { ok: true as const, variants };
   } catch (e: unknown) {
-    console.error('[MerchizeCatalog] searchCatalogBySku error', e);
+    console.error('[MerchizeCatalog] searchPriceShippingCatalogBySku error', e);
     const message = e instanceof Error ? e.message : 'Unknown error while searching catalog';
     return { ok: false as const, message };
   }

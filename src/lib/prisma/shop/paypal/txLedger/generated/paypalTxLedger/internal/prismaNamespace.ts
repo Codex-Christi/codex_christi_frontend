@@ -738,7 +738,8 @@ export const CheckoutRecoveryOtpChallengeScalarFieldEnum = {
   otpHash: 'otpHash',
   expiresAt: 'expiresAt',
   consumedAt: 'consumedAt',
-  attemptCount: 'attemptCount'
+  attemptCount: 'attemptCount',
+  createdAt: 'createdAt'
 } as const
 
 export type CheckoutRecoveryOtpChallengeScalarFieldEnum = (typeof CheckoutRecoveryOtpChallengeScalarFieldEnum)[keyof typeof CheckoutRecoveryOtpChallengeScalarFieldEnum]

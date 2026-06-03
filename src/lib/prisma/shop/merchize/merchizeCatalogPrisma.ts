@@ -8,10 +8,13 @@ import path from 'path';
 const DEFAULT_DB_URL = `file:${path.join(process.cwd(), 'data', 'db', 'shop', 'merchizeCatalog.db')}`;
 
 function resolveDbUrl(): ':memory:' | (string & {}) {
-  const url = process.env.MERCHIZE_PRICE_CATALOG_DATABASE_URL ?? DEFAULT_DB_URL;
+  const url =
+    process.env.MERCHIZE_OFFLINE_CATALOG_DATABASE_URL ??
+    process.env.MERCHIZE_PRICE_CATALOG_DATABASE_URL ??
+    DEFAULT_DB_URL;
   if (url === ':memory:' || url === 'file::memory:') return url as ':memory:' | (string & {});
   if (!url.startsWith('file:')) {
-    throw new Error('MERCHIZE_PRICE_CATALOG_DATABASE_URL must be a SQLite file: URL.');
+    throw new Error('MERCHIZE_OFFLINE_CATALOG_DATABASE_URL must be a SQLite file: URL.');
   }
 
   const filePath = url.slice('file:'.length);

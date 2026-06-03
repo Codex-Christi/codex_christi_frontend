@@ -12,7 +12,7 @@ import {
   SizeAttribute,
   ColorAttribute,
   ProductVariantOptions,
-} from '@/app/shop/product/[id]/productDetailsSSR';
+} from '@/lib/merchizeStorefront/productTypes';
 import { useProductVariants } from '@/lib/hooks/shopHooks/products/variants/useProductVariants';
 
 const getOptionsByAttribute = (variants: ProductVariantsInterface['data'], attrName: string) => [

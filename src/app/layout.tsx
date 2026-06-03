@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
 import { cn } from '@/lib/utils';
-import { headers } from 'next/headers';
 import dynamic from 'next/dynamic';
 
 // Dynamic Components
@@ -33,14 +32,10 @@ const TradeWinds = localFont({
   preload: false,
 });
 
-export async function generateMetadata(): Promise<Metadata> {
-  return {
-    // dynamically get the host from the Next headers
-    metadataBase: new URL(`https://${(await headers()).get('host')}`),
-    title: 'Codex Christi',
-    description: 'A Hub for Christian Creatives to connect, share, and glorify God.',
-  };
-}
+export const metadata: Metadata = {
+  title: 'Codex Christi',
+  description: 'A Hub for Christian Creatives to connect, share, and glorify God.',
+};
 
 export const viewport: Viewport = {
   initialScale: 1,

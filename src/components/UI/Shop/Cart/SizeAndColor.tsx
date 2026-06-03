@@ -1,4 +1,4 @@
-import { ProductVariantOptions } from '@/app/shop/product/[id]/productDetailsSSR';
+import { ProductVariantOptions } from '@/lib/merchizeStorefront/productTypes';
 import React, { FC, useMemo } from 'react';
 import { getColorAndSizeLabels, toCartOptions } from './cartOptionHelpers';
 

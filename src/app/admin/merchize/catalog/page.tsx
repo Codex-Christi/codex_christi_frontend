@@ -5,8 +5,11 @@ import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalo
 import AdminCatalogClient from './AdminCatalogClient';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
 import CometsContainer from '@/components/UI/general/CometsContainer';
+import { getStorefrontSnapshotStats } from './actions';
 
-const ADMIN_PASSWORD = process.env.MERCHIZE_PRICE_CATALOG_ADMIN_PASSWORD!;
+const ADMIN_PASSWORD =
+  process.env.MERCHIZE_OFFLINE_CATALOG_ADMIN_PASSWORD ??
+  process.env.MERCHIZE_PRICE_CATALOG_ADMIN_PASSWORD!;
 
 // --- server action for login only ---
 
@@ -25,7 +28,7 @@ async function loginAction(formData: FormData) {
 
 async function getCatalogPageData() {
   try {
-    const [syncState, sampleVariants] = await Promise.all([
+    const [syncState, sampleVariants, storefrontSnapshotStats] = await Promise.all([
       merchizeCatalogPrisma.syncState.findUnique({
         where: { id: 'merchize_catalog' },
       }),
@@ -34,9 +37,10 @@ async function getCatalogPageData() {
         take: 5,
         orderBy: { createdAt: 'desc' },
       }),
+      getStorefrontSnapshotStats(),
     ]);
 
-    return { syncState, sampleVariants };
+    return { syncState, sampleVariants, storefrontSnapshotStats };
   } catch (error) {
     console.error('Failed to fetch catalog data:', error);
     return null;
@@ -81,6 +85,7 @@ export default async function MerchizeAdminPage() {
         <AdminCatalogClient
           initialSyncState={pageData.syncState}
           initialSamples={pageData.sampleVariants}
+          initialStorefrontSnapshotStats={pageData.storefrontSnapshotStats}
         />
       );
     }

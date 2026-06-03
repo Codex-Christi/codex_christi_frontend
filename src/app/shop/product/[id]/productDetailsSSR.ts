@@ -1,5 +1,21 @@
 // utils/getProductDetailsSSR.ts
 import { cache } from 'react';
+import {
+  fetchMerchizeJson,
+  shouldUseStorefrontSnapshot,
+} from '@/lib/merchizeStorefront/providerErrors';
+import {
+  getBasicProductSnapshotState,
+  getProductDetailsFromSnapshot,
+  getProductVariantsSnapshotState,
+  upsertStorefrontProductSnapshot,
+  upsertStorefrontProductVariantsSnapshot,
+} from '@/lib/merchizeStorefront/snapshot';
+import type {
+  BasicProductInterface,
+  ProductResult,
+  ProductVariantsInterface,
+} from '@/lib/merchizeStorefront/productTypes';
 
 // --- Env Config ---
 // const merchizeToken = process.env.MERCHIZE_TOKEN!;
@@ -7,164 +23,75 @@ export const merchizeBaseURL = process.env.MERCHIZE_BASE_URL!;
 export const merchizeAPIKey = process.env.MERCHIZE_API_KEY!;
 
 export const cacheForDays = (days: number): number => 60 * 60 * 24 * days;
-
-// --- In-Memory Memoization Maps ---
-const baseProductMemo = new Map<string, Promise<BasicProductInterface['data']>>();
-const productVariantsMemo = new Map<string, Promise<ProductVariantsInterface['data']>>();
-
-// --- Interfaces ---
-export interface BasicProductInterface {
-  data: {
-    _id: string;
-    title: string;
-    description: string;
-    image: string;
-    retail_price: string;
-    slug: string;
-  };
-}
-
-// --- Attribute Types ---
-// Base type for attributes to ensure consistency
-type AttributeBase<Name extends string, ValueType extends string> = {
-  slug?: string;
-  value: string;
-  name: string;
-  attribute?: {
-    name: Name;
-    value_type: ValueType;
-  };
+export const storefrontSnapshotCacheSeconds = () => {
+  const days = Number(process.env.MERCHIZE_STOREFRONT_SNAPSHOT_TTL_DAYS ?? '1');
+  if (!Number.isFinite(days) || days < 0) return cacheForDays(1);
+  return Math.max(0, Math.floor(cacheForDays(days)));
 };
-
-// canonical value_type literals used across variants
-type VariantValueType = 'size' | 'color' | 'product' | 'label';
-
-export type ProductAttribute = AttributeBase<'Product', VariantValueType> & {
-  is_preselected?: boolean;
-  position?: number;
-  hide_storefront?: boolean;
-};
-
-type ClothingSizeSlug = 'xs' | 's' | 'm' | 'l' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
-export type ClothingSizeValue = Uppercase<ClothingSizeSlug>;
-
-// Required size attribute shape
-type AttrRequired<Name extends string, ValueType extends string, Value = string, Slug = string> = {
-  slug: Slug;
-  value: Value;
-  name: Value;
-  attribute: { name: Name; value_type: ValueType };
-};
-
-type AttrOptionalAttr<Name extends string, ValueType extends string, Value = string> = {
-  slug?: string;
-  value: Value;
-  name: Value;
-  attribute?: { name: Name; value_type: ValueType };
-};
-
-export type SizeAttribute = AttrRequired<'Size', 'size', ClothingSizeValue, ClothingSizeSlug>;
-export type ColorAttribute = AttrOptionalAttr<'Color', 'color', string>;
-export type LabelAttribute = AttrOptionalAttr<'label', 'label', string>;
-
-// Supported combinations based on required SizeAttribute and optional Color/ProductAttribute
-export type ProductOption = SizeAttribute | ColorAttribute | ProductAttribute | LabelAttribute;
-
-/**
- * Flexible variant options:
- * - Must contain at least one option (enforced by tuple type)
- * - Order is not fixed; normalization helpers will canonicalize ordering when needed
- */
-export type ProductVariantOptions = [ProductOption, ...ProductOption[]];
-
-export interface ProductVariantsInterface {
-  data: {
-    _id: string;
-    image_uris: string[];
-    retail_price: number;
-    is_default: boolean;
-    title: string;
-    options: ProductVariantOptions;
-    sku: string;
-    product: string;
-  }[];
-}
-
-// Utility: Check if a product variant has both Color and Size attributes
-export function hasColorAndSize(options: ProductVariantOptions): boolean {
-  const hasColor = options.some(
-    (opt) =>
-      !!opt.attribute &&
-      typeof opt.attribute.name === 'string' &&
-      opt.attribute.name.toLowerCase() === 'color',
-  );
-  const hasSize = options.some(
-    (opt) =>
-      !!opt.attribute &&
-      typeof opt.attribute.name === 'string' &&
-      opt.attribute.name.toLowerCase() === 'size',
-  );
-  return hasColor && hasSize;
-}
-
-export interface ProductResult {
-  productMetaData: BasicProductInterface['data'];
-  productVariants: ProductVariantsInterface['data'];
-}
 
 // --- Fetch Base Product Info ---
 export const fetchBaseProduct = cache((externalProductID: string) => {
-  const key = `${externalProductID}`;
-  if (baseProductMemo.has(key)) {
-    return baseProductMemo.get(key)!;
-  }
-
-  const promise = (async () => {
-    const res = await fetch(`${merchizeBaseURL}/product/products/${externalProductID}`, {
-      headers: {
-        'X-API-KEY': `${merchizeAPIKey}`,
-        // Authorization: `Bearer ${merchizeToken}`,
-      },
-      next: { revalidate: cacheForDays(7) },
-    });
-
-    if (!res.ok) {
-      const error = `[fetchBaseProduct] Failed: ${res.statusText}`;
-      console.error(error);
-      throw new Error(error);
+  return (async () => {
+    const snapshot = await getBasicProductSnapshotState(externalProductID);
+    if (snapshot?.isFresh) {
+      return snapshot.product;
     }
 
-    const json: BasicProductInterface = await res.json();
+    try {
+      const json = await fetchMerchizeJson<BasicProductInterface>(
+        `${merchizeBaseURL}/product/products/${externalProductID}`,
+        {
+          headers: {
+            'X-API-KEY': `${merchizeAPIKey}`,
+            // Authorization: `Bearer ${merchizeToken}`,
+          },
+          next: { revalidate: storefrontSnapshotCacheSeconds() },
+        },
+      );
 
-    return { ...json.data };
+      await upsertStorefrontProductSnapshot(json.data).catch((err) => {
+        console.warn('[storefrontSnapshot] product snapshot upsert failed:', err);
+      });
+
+      return { ...json.data };
+    } catch (err) {
+      if (!shouldUseStorefrontSnapshot(err)) throw err;
+
+      if (!snapshot) throw err;
+      return snapshot.product;
+    }
   })();
-
-  baseProductMemo.set(key, promise);
-  return promise;
 });
 
 // --- Fetch Variants Info ---
 
 export const fetchProductVariants = cache((productIDorSlug: string) => {
-  if (productVariantsMemo.has(productIDorSlug)) {
-    return productVariantsMemo.get(productIDorSlug)!;
-  }
-
-  const promise = (async () => {
-    const res = await fetch(`${merchizeBaseURL}/product/products/${productIDorSlug}/all-variants`, {
-      headers: { 'X-API-KEY': `${merchizeAPIKey}` },
-      next: { revalidate: cacheForDays(7) },
-    });
-
-    if (!res.ok) {
-      const error = `[fetchProductVariants] Failed: ${res.statusText}`;
-      console.error(error);
-      throw new Error(error);
+  return (async () => {
+    const snapshot = await getProductVariantsSnapshotState(productIDorSlug);
+    if (snapshot?.isFresh) {
+      return snapshot.variants;
     }
 
-    const json: ProductVariantsInterface = await res.json();
+    let variantsData: ProductVariantsInterface['data'];
+    try {
+      const json = await fetchMerchizeJson<ProductVariantsInterface>(
+        `${merchizeBaseURL}/product/products/${productIDorSlug}/all-variants`,
+        {
+          headers: { 'X-API-KEY': `${merchizeAPIKey}` },
+          next: { revalidate: storefrontSnapshotCacheSeconds() },
+        },
+      );
 
-    const variantsData = json.data;
+      variantsData = json.data;
+      await upsertStorefrontProductVariantsSnapshot(productIDorSlug, variantsData).catch((err) => {
+        console.warn('[storefrontSnapshot] variants snapshot upsert failed:', err);
+      });
+    } catch (err) {
+      if (!shouldUseStorefrontSnapshot(err)) throw err;
+
+      if (!snapshot) throw err;
+      variantsData = snapshot.variants;
+    }
     // Normalize options ordering and attributes for each variant
     // if (variantsData.length > 0) {
     //   return variantsData.map((variant) => {
@@ -202,21 +129,25 @@ export const fetchProductVariants = cache((productIDorSlug: string) => {
 
     return variantsData;
   })();
-
-  productVariantsMemo.set(productIDorSlug, promise);
-
-  return promise;
 });
 
 // --- Combined Full Fetch ---
 export const getProductDetailsSSR = cache(
   async (productIDorSlug: string): Promise<ProductResult> => {
-    const [productMetaData, productVariants] = await Promise.all([
-      fetchBaseProduct(productIDorSlug),
-      fetchProductVariants(productIDorSlug),
-    ]);
+    try {
+      const [productMetaData, productVariants] = await Promise.all([
+        fetchBaseProduct(productIDorSlug),
+        fetchProductVariants(productIDorSlug),
+      ]);
 
-    return { productMetaData, productVariants };
+      return { productMetaData, productVariants };
+    } catch (err) {
+      if (!shouldUseStorefrontSnapshot(err)) throw err;
+
+      const snapshot = await getProductDetailsFromSnapshot(productIDorSlug);
+      if (!snapshot) throw err;
+      return snapshot;
+    }
   },
 );
 

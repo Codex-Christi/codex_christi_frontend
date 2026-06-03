@@ -1,4 +1,4 @@
-import { ProductVariantOptions } from '@/app/shop/product/[id]/productDetailsSSR';
+import { ProductVariantOptions } from '@/lib/merchizeStorefront/productTypes';
 import type { VariantOption as CartStoreVariantOption } from '@/stores/shop_stores/cartStore';
 
 export type CartOptionLike = ProductVariantOptions[number] | CartStoreVariantOption;

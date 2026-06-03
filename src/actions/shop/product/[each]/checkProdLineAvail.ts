@@ -1,6 +1,10 @@
 'use server';
 
-import { ProductOption, ProductVariantsInterface } from '@/app/shop/product/[id]/productDetailsSSR';
+import { ProductOption, ProductVariantsInterface } from '@/lib/merchizeStorefront/productTypes';
+import {
+  coerceMerchizeProviderError,
+  shouldUseStorefrontSnapshot,
+} from '@/lib/merchizeStorefront/providerErrors';
 import { FetcherOptions, universalFetcher } from '@/lib/utils/SWRfetcherAdvanced';
 import didYouMean, { ThresholdTypeEnums } from 'didyoumean2';
 
@@ -48,11 +52,13 @@ type LineCheckResult =
   | {
       ok: true;
       isAvailable: boolean;
+      source: 'live' | 'offline_catalog';
       drift: DriftResult | null;
     }
   | {
       ok: false;
       isAvailable: false;
+      source: 'live' | 'offline_catalog';
       drift: null;
     };
 
@@ -237,13 +243,34 @@ export const checkProductLineAvail = async ({
     return {
       ok: true as const,
       isAvailable,
+      source: 'live' as const,
       drift,
     };
   } catch (err) {
+    const providerError = coerceMerchizeProviderError(
+      err,
+      'https://seller.merchize.com/api/product-line/catalog-products/preset/v2/search',
+    );
+
+    if (shouldUseStorefrontSnapshot(providerError ?? err)) {
+      console.warn(
+        '[checkProductLineAvail] production line check unavailable; allowing cart add from offline catalog context',
+        providerError ?? err,
+      );
+
+      return {
+        ok: true as const,
+        isAvailable: true,
+        source: 'offline_catalog' as const,
+        drift: null,
+      };
+    }
+
     console.error('[checkProductLineAvail] error verifying production line availability', err);
     return {
       ok: false as const,
       isAvailable: false,
+      source: 'live' as const,
       drift: null,
     };
   }

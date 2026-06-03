@@ -8,7 +8,7 @@ import {
   SizeAttribute,
   ColorAttribute,
   ProductVariantOptions,
-} from '@/app/shop/product/[id]/productDetailsSSR';
+} from '@/lib/merchizeStorefront/productTypes';
 
 const AddToCart = dynamic(() => import('./AddToCart').then((mod) => mod.AddToCart));
 const BuyNow = dynamic(() => import('./BuyNow').then((mod) => mod.BuyNow));

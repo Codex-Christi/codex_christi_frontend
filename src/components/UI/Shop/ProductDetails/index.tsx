@@ -1,5 +1,5 @@
 'use client';
-import { ProductResult } from '@/app/shop/product/[id]/productDetailsSSR';
+import { ProductResult } from '@/lib/merchizeStorefront/productTypes';
 import dynamic from 'next/dynamic';
 const ProductSummary = dynamic(() => import('./ProductSummary'));
 const ProductTitleAndSizesEtc = dynamic(() => import('./ProductTitleAndSizesEtc'));

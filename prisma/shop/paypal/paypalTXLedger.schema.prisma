@@ -89,6 +89,7 @@ model CheckoutRecoveryOtpChallenge {
   expiresAt    DateTime
   consumedAt   DateTime?
   attemptCount Int       @default(0)
+  createdAt    DateTime  @default(now())
 
   @@index([email, expiresAt])
   @@index([consumedAt])

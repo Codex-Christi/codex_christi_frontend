@@ -41,6 +41,7 @@ export type CheckoutRecoveryOtpChallengeMinAggregateOutputType = {
   expiresAt: Date | null
   consumedAt: Date | null
   attemptCount: number | null
+  createdAt: Date | null
 }
 
 export type CheckoutRecoveryOtpChallengeMaxAggregateOutputType = {
@@ -50,6 +51,7 @@ export type CheckoutRecoveryOtpChallengeMaxAggregateOutputType = {
   expiresAt: Date | null
   consumedAt: Date | null
   attemptCount: number | null
+  createdAt: Date | null
 }
 
 export type CheckoutRecoveryOtpChallengeCountAggregateOutputType = {
@@ -59,6 +61,7 @@ export type CheckoutRecoveryOtpChallengeCountAggregateOutputType = {
   expiresAt: number
   consumedAt: number
   attemptCount: number
+  createdAt: number
   _all: number
 }
 
@@ -78,6 +81,7 @@ export type CheckoutRecoveryOtpChallengeMinAggregateInputType = {
   expiresAt?: true
   consumedAt?: true
   attemptCount?: true
+  createdAt?: true
 }
 
 export type CheckoutRecoveryOtpChallengeMaxAggregateInputType = {
@@ -87,6 +91,7 @@ export type CheckoutRecoveryOtpChallengeMaxAggregateInputType = {
   expiresAt?: true
   consumedAt?: true
   attemptCount?: true
+  createdAt?: true
 }
 
 export type CheckoutRecoveryOtpChallengeCountAggregateInputType = {
@@ -96,6 +101,7 @@ export type CheckoutRecoveryOtpChallengeCountAggregateInputType = {
   expiresAt?: true
   consumedAt?: true
   attemptCount?: true
+  createdAt?: true
   _all?: true
 }
 
@@ -192,6 +198,7 @@ export type CheckoutRecoveryOtpChallengeGroupByOutputType = {
   expiresAt: Date
   consumedAt: Date | null
   attemptCount: number
+  createdAt: Date
   _count: CheckoutRecoveryOtpChallengeCountAggregateOutputType | null
   _avg: CheckoutRecoveryOtpChallengeAvgAggregateOutputType | null
   _sum: CheckoutRecoveryOtpChallengeSumAggregateOutputType | null
@@ -224,6 +231,7 @@ export type CheckoutRecoveryOtpChallengeWhereInput = {
   expiresAt?: Prisma.DateTimeFilter<"CheckoutRecoveryOtpChallenge"> | Date | string
   consumedAt?: Prisma.DateTimeNullableFilter<"CheckoutRecoveryOtpChallenge"> | Date | string | null
   attemptCount?: Prisma.IntFilter<"CheckoutRecoveryOtpChallenge"> | number
+  createdAt?: Prisma.DateTimeFilter<"CheckoutRecoveryOtpChallenge"> | Date | string
 }
 
 export type CheckoutRecoveryOtpChallengeOrderByWithRelationInput = {
@@ -233,6 +241,7 @@ export type CheckoutRecoveryOtpChallengeOrderByWithRelationInput = {
   expiresAt?: Prisma.SortOrder
   consumedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
+  createdAt?: Prisma.SortOrder
 }
 
 export type CheckoutRecoveryOtpChallengeWhereUniqueInput = Prisma.AtLeast<{
@@ -245,6 +254,7 @@ export type CheckoutRecoveryOtpChallengeWhereUniqueInput = Prisma.AtLeast<{
   expiresAt?: Prisma.DateTimeFilter<"CheckoutRecoveryOtpChallenge"> | Date | string
   consumedAt?: Prisma.DateTimeNullableFilter<"CheckoutRecoveryOtpChallenge"> | Date | string | null
   attemptCount?: Prisma.IntFilter<"CheckoutRecoveryOtpChallenge"> | number
+  createdAt?: Prisma.DateTimeFilter<"CheckoutRecoveryOtpChallenge"> | Date | string
 }, "id">
 
 export type CheckoutRecoveryOtpChallengeOrderByWithAggregationInput = {
@@ -254,6 +264,7 @@ export type CheckoutRecoveryOtpChallengeOrderByWithAggregationInput = {
   expiresAt?: Prisma.SortOrder
   consumedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
+  createdAt?: Prisma.SortOrder
   _count?: Prisma.CheckoutRecoveryOtpChallengeCountOrderByAggregateInput
   _avg?: Prisma.CheckoutRecoveryOtpChallengeAvgOrderByAggregateInput
   _max?: Prisma.CheckoutRecoveryOtpChallengeMaxOrderByAggregateInput
@@ -271,6 +282,7 @@ export type CheckoutRecoveryOtpChallengeScalarWhereWithAggregatesInput = {
   expiresAt?: Prisma.DateTimeWithAggregatesFilter<"CheckoutRecoveryOtpChallenge"> | Date | string
   consumedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"CheckoutRecoveryOtpChallenge"> | Date | string | null
   attemptCount?: Prisma.IntWithAggregatesFilter<"CheckoutRecoveryOtpChallenge"> | number
+  createdAt?: Prisma.DateTimeWithAggregatesFilter<"CheckoutRecoveryOtpChallenge"> | Date | string
 }
 
 export type CheckoutRecoveryOtpChallengeCreateInput = {
@@ -280,6 +292,7 @@ export type CheckoutRecoveryOtpChallengeCreateInput = {
   expiresAt: Date | string
   consumedAt?: Date | string | null
   attemptCount?: number
+  createdAt?: Date | string
 }
 
 export type CheckoutRecoveryOtpChallengeUncheckedCreateInput = {
@@ -289,6 +302,7 @@ export type CheckoutRecoveryOtpChallengeUncheckedCreateInput = {
   expiresAt: Date | string
   consumedAt?: Date | string | null
   attemptCount?: number
+  createdAt?: Date | string
 }
 
 export type CheckoutRecoveryOtpChallengeUpdateInput = {
@@ -298,6 +312,7 @@ export type CheckoutRecoveryOtpChallengeUpdateInput = {
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   attemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type CheckoutRecoveryOtpChallengeUncheckedUpdateInput = {
@@ -307,6 +322,7 @@ export type CheckoutRecoveryOtpChallengeUncheckedUpdateInput = {
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   attemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type CheckoutRecoveryOtpChallengeCreateManyInput = {
@@ -316,6 +332,7 @@ export type CheckoutRecoveryOtpChallengeCreateManyInput = {
   expiresAt: Date | string
   consumedAt?: Date | string | null
   attemptCount?: number
+  createdAt?: Date | string
 }
 
 export type CheckoutRecoveryOtpChallengeUpdateManyMutationInput = {
@@ -325,6 +342,7 @@ export type CheckoutRecoveryOtpChallengeUpdateManyMutationInput = {
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   attemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type CheckoutRecoveryOtpChallengeUncheckedUpdateManyInput = {
@@ -334,6 +352,7 @@ export type CheckoutRecoveryOtpChallengeUncheckedUpdateManyInput = {
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   attemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type CheckoutRecoveryOtpChallengeCountOrderByAggregateInput = {
@@ -343,6 +362,7 @@ export type CheckoutRecoveryOtpChallengeCountOrderByAggregateInput = {
   expiresAt?: Prisma.SortOrder
   consumedAt?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
+  createdAt?: Prisma.SortOrder
 }
 
 export type CheckoutRecoveryOtpChallengeAvgOrderByAggregateInput = {
@@ -356,6 +376,7 @@ export type CheckoutRecoveryOtpChallengeMaxOrderByAggregateInput = {
   expiresAt?: Prisma.SortOrder
   consumedAt?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
+  createdAt?: Prisma.SortOrder
 }
 
 export type CheckoutRecoveryOtpChallengeMinOrderByAggregateInput = {
@@ -365,6 +386,7 @@ export type CheckoutRecoveryOtpChallengeMinOrderByAggregateInput = {
   expiresAt?: Prisma.SortOrder
   consumedAt?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
+  createdAt?: Prisma.SortOrder
 }
 
 export type CheckoutRecoveryOtpChallengeSumOrderByAggregateInput = {
@@ -380,6 +402,7 @@ export type CheckoutRecoveryOtpChallengeSelect<ExtArgs extends runtime.Types.Ext
   expiresAt?: boolean
   consumedAt?: boolean
   attemptCount?: boolean
+  createdAt?: boolean
 }, ExtArgs["result"]["checkoutRecoveryOtpChallenge"]>
 
 export type CheckoutRecoveryOtpChallengeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -389,6 +412,7 @@ export type CheckoutRecoveryOtpChallengeSelectCreateManyAndReturn<ExtArgs extend
   expiresAt?: boolean
   consumedAt?: boolean
   attemptCount?: boolean
+  createdAt?: boolean
 }, ExtArgs["result"]["checkoutRecoveryOtpChallenge"]>
 
 export type CheckoutRecoveryOtpChallengeSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -398,6 +422,7 @@ export type CheckoutRecoveryOtpChallengeSelectUpdateManyAndReturn<ExtArgs extend
   expiresAt?: boolean
   consumedAt?: boolean
   attemptCount?: boolean
+  createdAt?: boolean
 }, ExtArgs["result"]["checkoutRecoveryOtpChallenge"]>
 
 export type CheckoutRecoveryOtpChallengeSelectScalar = {
@@ -407,9 +432,10 @@ export type CheckoutRecoveryOtpChallengeSelectScalar = {
   expiresAt?: boolean
   consumedAt?: boolean
   attemptCount?: boolean
+  createdAt?: boolean
 }
 
-export type CheckoutRecoveryOtpChallengeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "otpHash" | "expiresAt" | "consumedAt" | "attemptCount", ExtArgs["result"]["checkoutRecoveryOtpChallenge"]>
+export type CheckoutRecoveryOtpChallengeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "otpHash" | "expiresAt" | "consumedAt" | "attemptCount" | "createdAt", ExtArgs["result"]["checkoutRecoveryOtpChallenge"]>
 
 export type $CheckoutRecoveryOtpChallengePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "CheckoutRecoveryOtpChallenge"
@@ -421,6 +447,7 @@ export type $CheckoutRecoveryOtpChallengePayload<ExtArgs extends runtime.Types.E
     expiresAt: Date
     consumedAt: Date | null
     attemptCount: number
+    createdAt: Date
   }, ExtArgs["result"]["checkoutRecoveryOtpChallenge"]>
   composites: {}
 }
@@ -850,6 +877,7 @@ export interface CheckoutRecoveryOtpChallengeFieldRefs {
   readonly expiresAt: Prisma.FieldRef<"CheckoutRecoveryOtpChallenge", 'DateTime'>
   readonly consumedAt: Prisma.FieldRef<"CheckoutRecoveryOtpChallenge", 'DateTime'>
   readonly attemptCount: Prisma.FieldRef<"CheckoutRecoveryOtpChallenge", 'Int'>
+  readonly createdAt: Prisma.FieldRef<"CheckoutRecoveryOtpChallenge", 'DateTime'>
 }
     
 

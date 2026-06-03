@@ -8,7 +8,11 @@ import type {
   Product,
   ShippingBand,
 } from '../../../../lib/prisma/shop/merchize/generated/merchizeCatalog/client';
-import { refreshAction, searchCatalogBySku } from './actions';
+import {
+  refreshPriceShippingCatalogAction,
+  refreshStorefrontSnapshotAction,
+  searchPriceShippingCatalogBySku,
+} from './actions';
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -33,6 +37,16 @@ type VariantWithRelations = Variant & {
 type Props = {
   initialSyncState: SyncState | null;
   initialSamples: VariantWithRelations[];
+  initialStorefrontSnapshotStats: StorefrontSnapshotStats;
+};
+
+type StorefrontSnapshotStats = {
+  productCount: number;
+  categoryCount: number;
+  variantSnapshotCount: number;
+  lastProductSnapshotAt: Date | null;
+  lastCategorySnapshotAt: Date | null;
+  ttlDays: string;
 };
 
 type StatusState =
@@ -41,8 +55,15 @@ type StatusState =
   | { type: 'success'; message: string }
   | { type: 'error'; message: string };
 
-export default function AdminCatalogClient({ initialSyncState, initialSamples }: Props) {
+export default function AdminCatalogClient({
+  initialSyncState,
+  initialSamples,
+  initialStorefrontSnapshotStats,
+}: Props) {
   const [syncState, setSyncState] = useState<SyncState | null>(initialSyncState);
+  const [storefrontSnapshotStats, setStorefrontSnapshotStats] = useState<StorefrontSnapshotStats>(
+    initialStorefrontSnapshotStats,
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<VariantWithRelations[] | null>(null);
   const [status, setStatus] = useState<StatusState>({ type: 'idle' });
@@ -52,7 +73,7 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
   const working = isPending || status.type === 'loading';
   const list = searchResults ?? initialSamples;
 
-  // 🔄 Simple animated progress bar while "loading"
+  // Simple animated progress bar while "loading".
   useEffect(() => {
     if (status.type !== 'loading') return;
 
@@ -63,14 +84,14 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
     return () => clearInterval(id);
   }, [status.type]);
 
-  const handleRefreshConfirmed = () => {
+  const handlePriceShippingRefreshConfirmed = () => {
     startTransition(async () => {
       setRefreshProgress(10);
-      setStatus({ type: 'loading', message: 'Refreshing catalog…' });
-      const loadID1 = showLoadingToast({ message: 'Refreshing catalog…' });
+      setStatus({ type: 'loading', message: 'Refreshing price and shipping catalog…' });
+      const loadID1 = showLoadingToast({ message: 'Refreshing price and shipping catalog…' });
 
       try {
-        const res = await refreshAction();
+        const res = await refreshPriceShippingCatalogAction();
         toast.dismiss(loadID1);
         if (res.ok) {
           setSyncState(res.syncState ?? null);
@@ -80,7 +101,7 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
             type: 'success',
             message: msg,
           });
-          showSuccessToast({ header: 'Catalog refreshed', message: msg });
+          showSuccessToast({ header: 'Price and shipping catalog refreshed', message: msg });
         } else {
           setRefreshProgress(0);
           const msg = res.error ?? 'Refresh failed.';
@@ -99,6 +120,43 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
     });
   };
 
+  const handleStorefrontSnapshotRefreshConfirmed = () => {
+    startTransition(async () => {
+      setRefreshProgress(10);
+      setStatus({ type: 'loading', message: 'Refreshing storefront snapshot…' });
+      const loadID = showLoadingToast({ message: 'Refreshing storefront snapshot…' });
+
+      try {
+        const res = await refreshStorefrontSnapshotAction();
+        toast.dismiss(loadID);
+        setStorefrontSnapshotStats(res.stats);
+        setRefreshProgress(100);
+
+        const failureText = res.failures.length
+          ? ` Failures: ${res.failures.map((failure) => failure.category).join(', ')}.`
+          : '';
+        const msg = `Storefront snapshot refreshed. Pages: ${res.pagesFetched}, products seen: ${res.productsSeen}.${failureText}`;
+
+        setStatus({
+          type: res.ok ? 'success' : 'error',
+          message: msg,
+        });
+
+        if (res.ok) {
+          showSuccessToast({ header: 'Storefront snapshot refreshed', message: msg });
+        } else {
+          showErrorToast({ header: 'Storefront snapshot partially failed', message: msg });
+        }
+      } catch (e: unknown) {
+        toast.dismiss(loadID);
+        setRefreshProgress(0);
+        const message = e instanceof Error ? e.message : 'Storefront snapshot refresh failed.';
+        setStatus({ type: 'error', message });
+        showErrorToast({ header: 'Snapshot refresh error', message });
+      }
+    });
+  };
+
   const handleSearch = () => {
     startTransition(async () => {
       setRefreshProgress(10);
@@ -106,7 +164,7 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
       const loadID2 = showLoadingToast({ message: 'Searching catalog…' });
 
       try {
-        const res = await searchCatalogBySku(searchTerm);
+        const res = await searchPriceShippingCatalogBySku(searchTerm);
         toast.dismiss(loadID2);
         if (res.ok) {
           setSearchResults(res.variants as VariantWithRelations[]);
@@ -146,60 +204,42 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
       <div className='bg-slate-900/70 border border-slate-800 rounded-2xl p-6 backdrop-blur-md shadow-xl w-full max-w-3xl space-y-6'>
         <header className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2'>
           <div>
-            <h1 className='text-xl font-semibold'>Merchize Catalog Admin</h1>
+            <h1 className='text-xl font-semibold'>Merchize Offline Catalog Admin</h1>
             <p className='text-xs text-slate-400'>
-              Local price / shipping catalog stored in SQLite via Prisma.
+              Local price/shipping data and storefront fallback snapshots stored in SQLite.
             </p>
           </div>
 
-          {/* Refresh with confirmation dialog */}
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <button
-                type='button'
-                disabled={working}
-                className='inline-flex items-center justify-center rounded-md bg-emerald-500 text-slate-950 font-medium px-4 py-2 text-sm hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed transition'
-              >
-                {working ? (
-                  <span className='inline-flex items-center gap-2'>
-                    <span className='h-3 w-3 rounded-full border-2 border-emerald-900 border-t-transparent animate-spin' />
-                    Working…
-                  </span>
-                ) : (
-                  'Refresh now'
-                )}
-              </button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className='bg-slate-950/80 border border-slate-800 backdrop-blur-xl'>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Refresh Merchize catalog?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will pull all pages from the Merchize product catalog API and rewrite the
-                  local catalog database. Depending on network and rate limits, this may take
-                  several seconds.
-                  <br />
-                  <br />
-                  Are you sure you want to continue?
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel className='bg-slate-900 border border-slate-700 hover:bg-slate-800'>
-                  Cancel
-                </AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleRefreshConfirmed}
-                  className='bg-emerald-500 hover:bg-emerald-400 text-slate-950'
-                >
-                  Yes, refresh
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <div className='flex flex-col sm:flex-row gap-2'>
+            <RefreshConfirmationDialog
+              disabled={working}
+              buttonText='Refresh prices'
+              title='Refresh price and shipping catalog?'
+              description='This pulls all pages from the Merchize product-line catalog API and updates local price, SKU, and shipping data.'
+              confirmText='Refresh prices'
+              onConfirm={handlePriceShippingRefreshConfirmed}
+            />
+            <RefreshConfirmationDialog
+              disabled={working}
+              buttonText='Refresh storefront'
+              title='Refresh storefront snapshot?'
+              description='This pulls the shop category/product pages used for degraded storefront rendering and updates only the local storefront snapshot subset.'
+              confirmText='Refresh storefront'
+              onConfirm={handleStorefrontSnapshotRefreshConfirmed}
+            />
+          </div>
         </header>
 
         {/* Progress bar for loading state */}
         {status.type === 'loading' && (
-          <div className='h-1 w-full rounded-full bg-slate-800 overflow-hidden'>
+          <div
+            className='h-1 w-full rounded-full bg-slate-800 overflow-hidden'
+            role='progressbar'
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={refreshProgress}
+            aria-label={status.message}
+          >
             <div
               className='h-full bg-emerald-500 transition-all duration-300 ease-out'
               style={{ width: `${refreshProgress}%` }}
@@ -224,6 +264,8 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
 
         {status.type !== 'idle' && (
           <div
+            role='status'
+            aria-live='polite'
             className={`rounded-lg border px-3 py-2 text-xs transition ${
               status.type === 'success'
                 ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-200'
@@ -236,9 +278,35 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
           </div>
         )}
 
+        <section className='grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs'>
+          <div className='rounded-lg border border-slate-800 bg-slate-900/60 p-3'>
+            <div className='text-slate-400'>Storefront products</div>
+            <div className='mt-1 text-sm font-medium'>
+              {storefrontSnapshotStats.productCount}
+            </div>
+          </div>
+          <div className='rounded-lg border border-slate-800 bg-slate-900/60 p-3'>
+            <div className='text-slate-400'>Snapshot categories</div>
+            <div className='mt-1 text-sm font-medium'>
+              {storefrontSnapshotStats.categoryCount}
+            </div>
+          </div>
+          <div className='rounded-lg border border-slate-800 bg-slate-900/60 p-3'>
+            <div className='text-slate-400'>Snapshot TTL</div>
+            <div className='mt-1 text-sm font-medium'>
+              {storefrontSnapshotStats.ttlDays} day
+              {storefrontSnapshotStats.ttlDays === '1' ? '' : 's'}
+            </div>
+          </div>
+        </section>
+
         <section className='space-y-3'>
           <div className='flex flex-col sm:flex-row gap-2 items-stretch sm:items-center'>
+            <label htmlFor='merchize-sku-search' className='sr-only'>
+              Search price and shipping catalog by SKU
+            </label>
             <input
+              id='merchize-sku-search'
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder='Search by full or partial SKU…'
@@ -248,6 +316,7 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
               type='button'
               onClick={handleSearch}
               disabled={working || !searchTerm.trim()}
+              aria-label='Search price and shipping catalog by SKU'
               className='inline-flex items-center justify-center rounded-md bg-slate-800 text-slate-100 font-medium px-4 py-2 text-xs hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition'
             >
               Search
@@ -293,5 +362,67 @@ export default function AdminCatalogClient({ initialSyncState, initialSamples }:
         </section>
       </div>
     </div>
+  );
+}
+
+function RefreshConfirmationDialog({
+  disabled,
+  buttonText,
+  title,
+  description,
+  confirmText,
+  onConfirm,
+}: {
+  disabled: boolean;
+  buttonText: string;
+  title: string;
+  description: string;
+  confirmText: string;
+  onConfirm: () => void;
+}) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <button
+          type='button'
+          disabled={disabled}
+          className='inline-flex items-center justify-center rounded-md bg-emerald-500 text-slate-950 font-medium px-4 py-2 text-sm hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed transition'
+        >
+          {disabled ? (
+            <span className='inline-flex items-center gap-2'>
+              <span
+                className='h-3 w-3 rounded-full border-2 border-emerald-900 border-t-transparent animate-spin'
+                aria-hidden='true'
+              />
+              Working...
+            </span>
+          ) : (
+            buttonText
+          )}
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent className='bg-slate-950/80 border border-slate-800 backdrop-blur-xl'>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {description}
+            <br />
+            <br />
+            Are you sure you want to continue?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel className='bg-slate-900 border border-slate-700 hover:bg-slate-800'>
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onConfirm}
+            className='bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+          >
+            {confirmText}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

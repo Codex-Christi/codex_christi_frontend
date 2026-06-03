@@ -5,6 +5,10 @@ import { ShippingCountryObj } from '@/lib/datasetSearchers/shippingSupportMerchi
 import { VariantUnitMeta } from './getMerchizeTotalWithShipping';
 import { iso3ToDest } from '@/lib/datasetSearchers/merchize/dest-map';
 import { loadExtrasBySku } from '@/lib/datasetSearchers/merchize/shipping.data';
+import {
+  fetchMerchizeJson,
+  shouldUseStorefrontSnapshot,
+} from '@/lib/merchizeStorefront/providerErrors';
 
 type ShippingRow = {
   SKU_variant: string;
@@ -235,10 +239,12 @@ export const realTimePriceFromMerchize = cache(
   ) => {
     // Base USD total across all units in the cart
     let reducedPriceUSD = 0;
+    let retailPriceSource: 'live' | 'cart_fallback' = 'live';
 
     // 1) Variants that have no parentProductID can still contribute via unitPriceUSD
     const withoutParent = variantsAndParents.filter((v) => !v.parentProductID);
     if (withoutParent.length) {
+      retailPriceSource = 'cart_fallback';
       const fallbackSum = withoutParent.reduce(
         (acc, v) =>
           acc + (typeof v.unitPriceUSD === 'number' ? v.unitPriceUSD * v.quantity : 0),
@@ -274,18 +280,14 @@ export const realTimePriceFromMerchize = cache(
         const parentIds = Array.from(groupedByParent.keys());
         const responses = await Promise.all(
           parentIds.map((parentProductID) =>
-            fetch(`${merchizeBaseURL}/product/products/${parentProductID}/variants/search`, {
-              method: 'POST',
-              headers: { 'X-API-KEY': `${merchizeAPIKey}` },
-              next: { revalidate: 3600 },
-            }).then(async (res) => {
-              try {
-                const json = (await res.json()) as MerchizeApiResponse;
-                return { parentProductID, json };
-              } catch {
-                return { parentProductID, json: {} as MerchizeApiResponse };
-              }
-            }),
+            fetchMerchizeJson<MerchizeApiResponse>(
+              `${merchizeBaseURL}/product/products/${parentProductID}/variants/search`,
+              {
+                method: 'POST',
+                headers: { 'X-API-KEY': `${merchizeAPIKey}` },
+                next: { revalidate: 3600 },
+              },
+            ).then((json) => ({ parentProductID, json })),
           ),
         );
 
@@ -306,12 +308,21 @@ export const realTimePriceFromMerchize = cache(
             const apiPrice = match?.retail_price;
             const fallback = typeof meta.unitPriceUSD === 'number' ? meta.unitPriceUSD : 0;
 
+            if (typeof apiPrice !== 'number') {
+              retailPriceSource = 'cart_fallback';
+            }
+
             const unitPrice = typeof apiPrice === 'number' ? apiPrice : fallback;
             reducedPriceUSD += unitPrice * meta.quantity;
           }
         }
       }
     } catch (err) {
+      if (!shouldUseStorefrontSnapshot(err)) {
+        throw err;
+      }
+
+      retailPriceSource = 'cart_fallback';
       console.error('[AUDIT] realTimePriceFromMerchize failed:', err);
       // If the API fails, fall back to any local unitPriceUSD we have for withParent units
       const fallbackForWithParent = variantsAndParents
@@ -334,6 +345,6 @@ export const realTimePriceFromMerchize = cache(
         ? Math.ceil(reducedPriceUSD * multiplier * 100) / 100
         : reducedPriceUSD;
 
-    return { retailPriceTotalNum: total, currency, currency_symbol };
+    return { retailPriceTotalNum: total, currency, currency_symbol, retailPriceSource };
   },
 );

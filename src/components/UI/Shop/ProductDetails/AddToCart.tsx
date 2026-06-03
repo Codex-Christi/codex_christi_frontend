@@ -5,7 +5,7 @@ import { Button } from '../../primitives/button';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import { setupVariantAutoMatching, useCurrentVariant } from './currentVariantStore';
 import { OptionalProductVariantProps, ProductDetailsContext } from '.';
-import { hasColorAndSize } from '@/app/shop/product/[id]/productDetailsSSR';
+import { hasColorAndSize } from '@/lib/merchizeStorefront/productTypes';
 import errorToast from '@/lib/error-toast';
 import { toast } from 'sonner';
 import CustomShopLink from '../HelperComponents/CustomShopLink';

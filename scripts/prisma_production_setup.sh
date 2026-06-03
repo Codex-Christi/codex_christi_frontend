@@ -6,11 +6,12 @@ set -euo pipefail
 
 MERCHIZE_SCHEMA="prisma/shop/merchize/priceCatalog.prisma"
 PAYPAL_SCHEMA="prisma/shop/paypal/paypalTXLedger.schema.prisma"
-CATALOG_DB_URL="${MERCHIZE_PRICE_CATALOG_DATABASE_URL:-file:/app/data/db/shop/merchizeCatalog.db}"
+CATALOG_DB_URL="${MERCHIZE_OFFLINE_CATALOG_DATABASE_URL:-${MERCHIZE_PRICE_CATALOG_DATABASE_URL:-file:/app/data/db/shop/merchizeCatalog.db}}"
 
 echo "== Prisma production setup start =="
 
 echo "1. Preparing Merchize SQLite catalog"
+export MERCHIZE_OFFLINE_CATALOG_DATABASE_URL="$CATALOG_DB_URL"
 export MERCHIZE_PRICE_CATALOG_DATABASE_URL="$CATALOG_DB_URL"
 mkdir -p /app/data/db/shop
 
