@@ -34,9 +34,7 @@ const schemaPath = getSchemaArg();
 const defaultCatalogDbPath = path.join(root, 'data', 'db', 'shop', 'merchizeCatalog.db');
 
 function resolveCatalogDbUrl(): string {
-  const envUrl =
-    process.env.MERCHIZE_OFFLINE_CATALOG_DATABASE_URL ??
-    process.env.MERCHIZE_PRICE_CATALOG_DATABASE_URL;
+  const envUrl = process.env.MERCHIZE_OFFLINE_CATALOG_DATABASE_URL;
   if (!envUrl) return `file:${defaultCatalogDbPath}`;
   if (!envUrl.startsWith('file:')) {
     throw new Error('MERCHIZE_OFFLINE_CATALOG_DATABASE_URL must be a SQLite file: URL.');

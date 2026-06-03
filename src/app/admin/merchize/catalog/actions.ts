@@ -80,8 +80,24 @@ export async function refreshStorefrontSnapshotAction() {
   const failures: Array<{ category: string; message: string }> = [];
   let productsSeen = 0;
   let pagesFetched = 0;
+  const refreshStartedAt = Date.now();
 
-  for (const category of STOREFRONT_SNAPSHOT_CATEGORY_SLUGS) {
+  console.info('[merchizeOfflineCatalog.refreshStorefrontSnapshot] start', {
+    categories: STOREFRONT_SNAPSHOT_CATEGORY_SLUGS.length,
+    pageSize,
+  });
+
+  for (const [index, category] of STOREFRONT_SNAPSHOT_CATEGORY_SLUGS.entries()) {
+    const categoryStartedAt = Date.now();
+    let categoryProductsSeen = 0;
+    let categoryPagesFetched = 0;
+
+    console.info('[merchizeOfflineCatalog.refreshStorefrontSnapshot] category:start', {
+      category,
+      categoryNumber: index + 1,
+      totalCategories: STOREFRONT_SNAPSHOT_CATEGORY_SLUGS.length,
+    });
+
     try {
       await getCategoryMetadataFromMerchize(category);
       const firstPage = await fetchCategoryProducts({
@@ -92,7 +108,9 @@ export async function refreshStorefrontSnapshotAction() {
       });
 
       productsSeen += firstPage.products.length;
+      categoryProductsSeen += firstPage.products.length;
       pagesFetched += 1;
+      categoryPagesFetched += 1;
 
       for (let page = 2; page <= firstPage.totalPages; page += 1) {
         const nextPage = await fetchCategoryProducts({
@@ -102,19 +120,36 @@ export async function refreshStorefrontSnapshotAction() {
           forceSnapshotRefresh: true,
         });
         productsSeen += nextPage.products.length;
+        categoryProductsSeen += nextPage.products.length;
         pagesFetched += 1;
+        categoryPagesFetched += 1;
       }
+
+      console.info('[merchizeOfflineCatalog.refreshStorefrontSnapshot] category:complete', {
+        category,
+        pagesFetched: categoryPagesFetched,
+        productsSeen: categoryProductsSeen,
+        totalPages: firstPage.totalPages,
+        totalProducts: firstPage.count,
+        elapsedMs: Date.now() - categoryStartedAt,
+      });
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[merchizeOfflineCatalog.refreshStorefrontSnapshot] category:failed', {
+        category,
+        message,
+        elapsedMs: Date.now() - categoryStartedAt,
+      });
+
       failures.push({
         category,
-        message: error instanceof Error ? error.message : String(error),
+        message,
       });
     }
   }
 
   const stats = await getStorefrontSnapshotStats();
-
-  return {
+  const result = {
     ok: failures.length === 0,
     productsSeen,
     pagesFetched,
@@ -122,6 +157,17 @@ export async function refreshStorefrontSnapshotAction() {
     failures,
     stats,
   };
+
+  console.info('[merchizeOfflineCatalog.refreshStorefrontSnapshot] complete', {
+    ok: result.ok,
+    categoriesAttempted: result.categoriesAttempted,
+    pagesFetched: result.pagesFetched,
+    productsSeen: result.productsSeen,
+    failures: result.failures.map((failure) => failure.category),
+    elapsedMs: Date.now() - refreshStartedAt,
+  });
+
+  return result;
 }
 
 export async function searchPriceShippingCatalogBySku(query: string) {

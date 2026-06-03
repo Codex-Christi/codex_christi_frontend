@@ -67,7 +67,10 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({ mode, createOrder,
         onApprove={onApprove}
         onError={(err: unknown) => {
           console.error('PayPal Card Fields Error:', err);
+          const message = err instanceof Error ? err.message : String(err);
+          if (message.includes('Failed to create PayPal order')) return;
           errorToast({
+            header: 'Payment setup failed',
             message: 'An error occurred during payment. Please try again.',
           });
         }}

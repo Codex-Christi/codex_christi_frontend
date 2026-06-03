@@ -7,6 +7,7 @@ import {
 } from '../../product/[id]/productDetailsSSR';
 import { cache } from 'react';
 import {
+  coerceMerchizeProviderError,
   fetchMerchizeJson,
   shouldUseStorefrontSnapshot,
 } from '@/lib/merchizeStorefront/providerErrors';
@@ -120,7 +121,13 @@ export const getCategoryMetadataFromMerchize = cache(async (categoryName: string
   } catch (err) {
     if (shouldUseStorefrontSnapshot(err)) {
       const snapshot = await getCategoryMetadataFromSnapshot(categoryName);
-      if (snapshot) return snapshot;
+      if (snapshot) {
+        console.info('[merchizeOfflineCatalog.categoryMetadata] snapshot:fallback', {
+          category: categoryName,
+          providerError: formatProviderErrorForLog(err),
+        });
+        return snapshot;
+      }
     }
 
     console.log(err);
@@ -214,7 +221,18 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
   } catch (err) {
     if (shouldUseStorefrontSnapshot(err)) {
       const snapshot = await getCategoryProductsFromSnapshot({ category, page, page_size });
-      if (snapshot) return snapshot;
+      if (snapshot) {
+        console.info('[merchizeOfflineCatalog.categoryProducts] snapshot:fallback', {
+          category,
+          page,
+          pageSize: page_size,
+          products: snapshot.products.length,
+          totalPages: snapshot.totalPages,
+          count: snapshot.count,
+          providerError: formatProviderErrorForLog(err),
+        });
+        return snapshot;
+      }
     }
 
     console.error(err);
@@ -230,4 +248,21 @@ export async function revalidateProducts(category: string) {
 
   // In production:
   // await fetch(`/api/revalidate?tag=products-${category}`);
+}
+
+function formatProviderErrorForLog(error: unknown) {
+  const providerError = coerceMerchizeProviderError(error);
+  if (!providerError) {
+    return {
+      kind: 'unknown',
+      status: null,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  return {
+    kind: providerError.kind,
+    status: providerError.status,
+    message: providerError.message.slice(0, 140),
+  };
 }

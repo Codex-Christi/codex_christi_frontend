@@ -34,6 +34,19 @@ export interface CreateOrderActionInterface {
   delivery_address: ShopCheckoutStoreInterface['delivery_address'];
 }
 
+export class CheckoutLivePricingUnavailableError extends Error {
+  code = 'LIVE_PRICING_UNAVAILABLE' as const;
+  status = 503;
+
+  constructor() {
+    super(
+      'Checkout is temporarily unavailable because live product pricing could not be verified. Please try again shortly.',
+    );
+    this.name = 'CheckoutLivePricingUnavailableError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 // Import the OrdersController from PayPal SDK
 const orders = new OrdersController(paypalClient);
 
@@ -81,6 +94,14 @@ export async function createPayPalOrder(body: CreateOrderActionInterface): Promi
   const { finalPricesWithShippingFee } = orderDetailsFromServer || {};
   const { currency, retailPriceTotalNum, shippingPriceNum, multiplier } =
     finalPricesWithShippingFee || {};
+  const retailPriceSource =
+    finalPricesWithShippingFee && 'retailPriceSource' in finalPricesWithShippingFee
+      ? finalPricesWithShippingFee.retailPriceSource
+      : undefined;
+
+  if (retailPriceSource !== 'live') {
+    throw new CheckoutLivePricingUnavailableError();
+  }
 
   // Extract the currency code, defaulting to 'USD' if not supported
   // or if the currency is not provided

@@ -7,9 +7,7 @@ import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
 import CometsContainer from '@/components/UI/general/CometsContainer';
 import { getStorefrontSnapshotStats } from './actions';
 
-const ADMIN_PASSWORD =
-  process.env.MERCHIZE_OFFLINE_CATALOG_ADMIN_PASSWORD ??
-  process.env.MERCHIZE_PRICE_CATALOG_ADMIN_PASSWORD!;
+const ADMIN_PASSWORD = process.env.MERCHIZE_OFFLINE_CATALOG_ADMIN_PASSWORD;
 
 // --- server action for login only ---
 

@@ -23,8 +23,10 @@ const MyPaypalButtons: FC<
         onApprove={onApprove}
         onInit={() => setIsReady(true)}
         onError={(err) => {
-          console.error(String(err));
-          errorToast({ message: String(err) });
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(message);
+          if (message.includes('Failed to create PayPal order')) return;
+          errorToast({ header: 'Payment setup failed', message });
         }}
         className={isReady ? '' : 'opacity-0 pointer-events-none'}
         style={{

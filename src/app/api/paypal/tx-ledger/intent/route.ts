@@ -2,7 +2,10 @@ import { randomUUID } from 'crypto';
 import type { Order } from '@paypal/paypal-server-sdk';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
-import { createPayPalOrder } from '@/lib/paypal/createPayPalOrder';
+import {
+  CheckoutLivePricingUnavailableError,
+  createPayPalOrder,
+} from '@/lib/paypal/createPayPalOrder';
 import { paypalRouteError, paypalRouteSuccess } from '@/lib/paypal/txLedger/routeResponses';
 
 export async function POST(req: Request) {
@@ -123,6 +126,16 @@ export async function POST(req: Request) {
         delivery_address,
       });
     } catch (createErr) {
+      if (createErr instanceof CheckoutLivePricingUnavailableError) {
+        return fail({
+          code: createErr.code,
+          stage: 'verify_live_pricing',
+          message: createErr.message,
+          err: createErr,
+          status: createErr.status,
+        });
+      }
+
       return fail({
         code: 'CREATE_ORDER_FAILED',
         stage: 'create_paypal_order',

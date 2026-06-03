@@ -97,7 +97,12 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
                 requestId: 'unknown_request_id',
               };
 
-        throw new Error(`[${routeError.stage}] ${routeError.code} (${routeError.requestId})`);
+        const error = new Error(routeError.message ?? 'Failed to create PayPal intent');
+        error.name =
+          routeError.code === 'LIVE_PRICING_UNAVAILABLE'
+            ? 'CheckoutLivePricingUnavailableError'
+            : 'PayPalIntentError';
+        throw error;
       }
 
       setIntent({ orderToken: payload.data.orderToken });
@@ -106,7 +111,13 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
     } catch (err: unknown) {
       console.log(err);
 
+      const isLivePricingUnavailable =
+        err instanceof Error && err.name === 'CheckoutLivePricingUnavailableError';
+
       errorToast({
+        header: isLivePricingUnavailable
+          ? 'Checkout temporarily unavailable'
+          : 'Payment setup failed',
         message: err instanceof Error ? err.message : String(err),
       });
       throw new Error('Failed to create PayPal order');
