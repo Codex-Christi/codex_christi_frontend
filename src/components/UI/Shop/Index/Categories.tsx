@@ -35,6 +35,7 @@ const Categories = async () => {
                     ssrText: null,
                     usdCentsBase: null,
                   };
+                  const isPriorityImage = productIndex === 0;
 
                   return (
                     <div className='grid gap-4 p-4' key={product.productId}>
@@ -49,9 +50,9 @@ const Categories = async () => {
                           alt={product.img_alt}
                           width={200}
                           height={200}
-                          fetchPriority={productIndex === 0 ? 'high' : 'auto'}
-                          // loading={productIndex === 0 ? 'eager' : 'lazy'}
-                          loading='eager'
+                          fetchPriority={isPriorityImage ? 'high' : 'auto'}
+                          loading={isPriorityImage ? 'eager' : 'lazy'}
+                          priority={isPriorityImage}
                           quality={100}
                           sizes='(max-width: 412px) 120px, (max-width: 640px) 120px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 200px'
                         />

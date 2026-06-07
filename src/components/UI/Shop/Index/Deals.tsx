@@ -6,27 +6,14 @@ import { useRef } from 'react';
 import { GalleryPrevButton as CarouselPrev } from '../ProductDetails/GalleryPrevButton';
 import { GalleryNextButton as CarouselNext } from '../ProductDetails/GalleryNextButton';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
-import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 import { useAutoScroller } from './useAutoScroller';
 
 // Top-Page Deals Component
 const Deals = () => {
   const slideContainerRef = useRef<HTMLDivElement | null>(null);
-  const { isMobileAndTablet, isMobile, isTabletOnly } = useResponsiveSSRValue();
-  const eagerImageCount = isMobileAndTablet ? 2 : 4;
+  const eagerImageCount = 2;
 
-  const { nudgeScroll } = useAutoScroller(
-    slideContainerRef,
-    { isMobileAndTablet, isMobile, isTabletOnly },
-    {
-      // auto is true on mobile/tablet by default; you can force:
-      // auto: true,
-      // respectReducedMotion: true,
-      // snapManage: true,
-      // override nudge defaults if you like:
-      // nudge: { fraction: 0.33, duration: 600, minPx: 60, maxPx: 180 },
-    },
-  );
+  const { nudgeScroll } = useAutoScroller(slideContainerRef);
 
   // Main JSX
   return (
@@ -91,13 +78,13 @@ const Deals = () => {
       */}
       <CarouselPrev
         className='absolute top-[40%] left-0  md:hidden'
-        onClick={() => (isMobileAndTablet ? nudgeScroll('left') : undefined)}
+        onClick={() => nudgeScroll('left')}
         aria-label='Scroll left'
       />
 
       <CarouselNext
         className='absolute top-[40%] right-0 md:hidden'
-        onClick={() => (isMobileAndTablet ? nudgeScroll('right') : undefined)}
+        onClick={() => nudgeScroll('right')}
         aria-label='Scroll right'
       />
     </div>

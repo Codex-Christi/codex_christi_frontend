@@ -19,15 +19,35 @@ type Options = {
 
 export function useAutoScroller(
   containerRef: React.RefObject<HTMLElement | null>,
-  device: { isMobileAndTablet: boolean; isMobile: boolean; isTabletOnly: boolean },
+  device: Partial<{ isMobileAndTablet: boolean; isMobile: boolean; isTabletOnly: boolean }> = {},
   opts: Options = {},
 ) {
   const {
-    auto = device.isMobileAndTablet,
+    auto,
     respectReducedMotion = true,
     snapManage = true,
     nudge = { fraction: 0.4, duration: 500, minPx: 80, maxPx: 260 },
   } = opts;
+  const { isMobileAndTablet, isMobile, isTabletOnly } = device;
+
+  const getDeviceHints = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return {
+        isMobileAndTablet: isMobileAndTablet ?? false,
+        isMobile: isMobile ?? false,
+        isTabletOnly: isTabletOnly ?? false,
+      };
+    }
+
+    return {
+      isMobileAndTablet:
+        isMobileAndTablet ?? window.matchMedia('(max-width: 1023px)').matches,
+      isMobile: isMobile ?? window.matchMedia('(max-width: 767px)').matches,
+      isTabletOnly:
+        isTabletOnly ??
+        window.matchMedia('(min-width: 768px) and (max-width: 1023px)').matches,
+    };
+  }, [isMobile, isMobileAndTablet, isTabletOnly]);
 
   const animFrameRef = useRef<number | null>(null);
   const isAnimatingRef = useRef(false);
@@ -39,14 +59,15 @@ export function useAutoScroller(
     (el: HTMLElement) => {
       const base = el.clientWidth;
       const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+      const resolvedDevice = getDeviceHints();
 
-      return device.isMobile
+      return resolvedDevice.isMobile
         ? clamp(base * 0.05, 30, 70) //(-+3, -+20, -+30)
-        : device.isTabletOnly
+        : resolvedDevice.isTabletOnly
           ? clamp(base * 0.01, 30, 40) //(-+3, -+20, -+40)
           : clamp(base * 0.04, 60, 90); //(-+3, -+20, -+50)
     },
-    [device.isMobile, device.isTabletOnly],
+    [getDeviceHints],
   );
 
   // Hand-like easing nudge
@@ -113,7 +134,8 @@ export function useAutoScroller(
   // Auto-scroll RAF
   useEffect(() => {
     const el = containerRef.current;
-    if (!el || !auto) return;
+    const shouldAutoScroll = auto ?? getDeviceHints().isMobileAndTablet;
+    if (!el || !shouldAutoScroll) return;
 
     if (respectReducedMotion && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
       return;
@@ -211,7 +233,7 @@ export function useAutoScroller(
       el.removeEventListener('touchend', resumeFn as EventListener);
       el.removeEventListener('contextmenu', pauseFn as EventListener);
     };
-  }, [containerRef, auto, respectReducedMotion, snapManage, computeVelocity]);
+  }, [containerRef, auto, respectReducedMotion, snapManage, computeVelocity, getDeviceHints]);
 
   return {
     nudgeScroll,
