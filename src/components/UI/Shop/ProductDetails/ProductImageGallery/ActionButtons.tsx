@@ -10,6 +10,11 @@ import { useParams } from 'next/navigation';
 import { useWishlist } from '@/stores/shop_stores/use-wishlist';
 import { useHasMounted } from '@/lib/hooks/useHasMounted';
 
+type IdleWindow = Window & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
 export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) => void }) {
   const { id } = useParams();
 
@@ -54,8 +59,17 @@ export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) =>
   }, [currentUrl, shareData]);
 
   useEffect(() => {
-    getWishlist();
-  }, [getWishlist]);
+    if (!isAuthenticated) return;
+
+    const idleWindow = window as IdleWindow;
+    if (idleWindow.requestIdleCallback) {
+      const idleId = idleWindow.requestIdleCallback(() => void getWishlist(), { timeout: 2500 });
+      return () => idleWindow.cancelIdleCallback?.(idleId);
+    }
+
+    const timeoutId = window.setTimeout(() => void getWishlist(), 900);
+    return () => window.clearTimeout(timeoutId);
+  }, [getWishlist, isAuthenticated]);
 
   /* Action buttons (share / wishlist / inspect) */
   return (
