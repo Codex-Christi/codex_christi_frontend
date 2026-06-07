@@ -37,7 +37,7 @@ function ThumbsPanel({
               src={loader.srcWithRetry(image, index)}
               width={80}
               height={80}
-              quality={50}
+              quality={75}
               loading='lazy'
               onLoad={() => loader.markLoaded(index, image)}
               onError={() => loader.markFailed(index)}

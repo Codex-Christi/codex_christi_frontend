@@ -71,7 +71,7 @@ function MainStage({
                       src={loader.srcWithRetry(src, i)}
                       alt={metaTitle || 'Product image'}
                       sizes='(max-width: 640px) calc(100vw - 50px), (max-width: 1024px) 620px, (min-width: 1280px) 640px, 600px'
-                      quality={50}
+                      quality={75}
                       onLoad={() => loader.markLoaded(i, src)}
                       onError={() => loader.markFailed(i)}
                     />
