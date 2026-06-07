@@ -28,7 +28,7 @@ import {
 import errorToast from '@/lib/error-toast';
 import { cn } from '@/lib/utils';
 
-type RecoveryCheckoutSummary = {
+type PaidCheckoutRecoverySummary = {
   orderToken: string;
   status: string;
   receiptLink: string | null;
@@ -48,18 +48,18 @@ type RecoveryCheckoutSummary = {
   message: string;
 };
 
-type RecoveryVerifyResponse =
+type PaidCheckoutRecoveryVerifyResponse =
   | {
       ok: true;
       recoveryVerified: true;
-      checkouts: RecoveryCheckoutSummary[];
+      checkouts: PaidCheckoutRecoverySummary[];
     }
   | {
       ok: false;
       message: string;
     };
 
-type RecoveryStartResponse =
+type PaidCheckoutRecoveryStartResponse =
   | {
       ok: true;
       recoveryRequired: true;
@@ -77,7 +77,7 @@ type RecoveryStartResponse =
       message: string;
     };
 
-type CheckoutRecoveryModalProps = {
+type PaidCheckoutRecoveryModalProps = {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   email: string;
@@ -87,7 +87,7 @@ type CheckoutRecoveryModalProps = {
   onStartSeparateOrder: () => Promise<void>;
 };
 
-export const CheckoutRecoveryModal = (props: CheckoutRecoveryModalProps) => {
+export const PaidCheckoutRecoveryModal = (props: PaidCheckoutRecoveryModalProps) => {
   const {
     isOpen,
     onOpenChange,
@@ -100,7 +100,7 @@ export const CheckoutRecoveryModal = (props: CheckoutRecoveryModalProps) => {
   const [otp, setOtp] = React.useState('');
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [infoMessage, setInfoMessage] = React.useState<string | null>(null);
-  const [checkouts, setCheckouts] = React.useState<RecoveryCheckoutSummary[]>([]);
+  const [checkouts, setCheckouts] = React.useState<PaidCheckoutRecoverySummary[]>([]);
   const [isVerifying, setIsVerifying] = React.useState(false);
   const [isResending, setIsResending] = React.useState(false);
   const [isContinuing, setIsContinuing] = React.useState(false);
@@ -154,7 +154,7 @@ export const CheckoutRecoveryModal = (props: CheckoutRecoveryModalProps) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp }),
       });
-      const payload = (await response.json()) as RecoveryVerifyResponse;
+      const payload = (await response.json()) as PaidCheckoutRecoveryVerifyResponse;
 
       if (!response.ok || !payload.ok) {
         setErrorMessage('message' in payload ? payload.message : 'Invalid recovery code.');
@@ -184,7 +184,7 @@ export const CheckoutRecoveryModal = (props: CheckoutRecoveryModalProps) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, recipientName }),
       });
-      const payload = (await response.json()) as RecoveryStartResponse;
+      const payload = (await response.json()) as PaidCheckoutRecoveryStartResponse;
 
       if (!response.ok || !payload.ok) {
         setErrorMessage(
@@ -264,7 +264,7 @@ export const CheckoutRecoveryModal = (props: CheckoutRecoveryModalProps) => {
 
   return (
     <Drawer open={isOpen} onOpenChange={handleOpenChange}>
-      <DrawerOverlay className='!bg-[linear-gradient(135deg,rgba(0,0,0,0.32),rgba(8,47,73,0.18),rgba(6,78,59,0.14),rgba(0,0,0,0.34))] !backdrop-blur-[8px]' />
+      <DrawerOverlay className='!bg-[linear-gradient(135deg,rgba(0,0,0,0.26),rgba(8,47,73,0.16),rgba(6,78,59,0.14),rgba(0,0,0,0.28))] !backdrop-blur-[5px]' />
       <DrawerContent
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
@@ -274,7 +274,7 @@ export const CheckoutRecoveryModal = (props: CheckoutRecoveryModalProps) => {
           aria-hidden='true'
           className='checkout-recovery-backdrop pointer-events-none absolute inset-0 opacity-90 motion-reduce:animate-none'
         />
-        <section className='checkout-recovery-panel mx-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden p-5 text-white shadow-[0_26px_90px_rgba(8,47,73,0.38)] relative border border-white/20 bg-slate-950/[0.52] supports-[backdrop-filter]:backdrop-blur-2xl sm:w-[92vw] sm:max-w-lg sm:rounded-2xl sm:p-6 md:max-w-2xl lg:max-w-3xl animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4 duration-300 motion-reduce:animate-none'>
+        <section className='checkout-recovery-panel mx-auto flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md flex-col overflow-hidden rounded-[1.65rem] border border-white/20 bg-[linear-gradient(145deg,rgba(15,23,42,0.78),rgba(2,6,23,0.68)_52%,rgba(6,78,59,0.32))] p-5 text-white shadow-[0_26px_90px_rgba(8,47,73,0.34),0_0_0_1px_rgba(255,255,255,0.06)_inset] supports-[backdrop-filter]:backdrop-blur-xl sm:w-[92vw] sm:max-w-lg sm:rounded-[1.8rem] sm:p-6 md:max-w-2xl lg:max-w-3xl animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4 duration-300 motion-reduce:animate-none'>
           <div
             aria-hidden='true'
             className='pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-200/80 to-transparent'
@@ -309,7 +309,7 @@ export const CheckoutRecoveryModal = (props: CheckoutRecoveryModalProps) => {
             </div>
 
             <div className='mt-6 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1'>
-              <div className='rounded-2xl border border-white/10 bg-black/20 p-4 shadow-inner shadow-white/[0.03]'>
+              <div className='rounded-2xl border border-white/10 bg-white/[0.045] p-4 shadow-inner shadow-white/[0.03]'>
                 <p className='text-sm leading-6 text-white/78'>
                   We found a recent checkout issue for{' '}
                   <span className='font-semibold'>{email}</span>. Your payment may already be
@@ -399,14 +399,14 @@ export const CheckoutRecoveryModal = (props: CheckoutRecoveryModalProps) => {
                   {primaryCheckout ? (
                     <div className='mt-4 space-y-3'>
                       <div className='grid grid-cols-2 gap-2 md:grid-cols-4'>
-                        <div className='rounded-xl border border-white/10 bg-black/20 p-3'>
+                        <div className='rounded-xl border border-white/10 bg-white/[0.045] p-3'>
                           <CreditCard className='mb-2 text-emerald-100' size={17} />
                           <p className='text-[11px] uppercase text-white/42'>Paid</p>
                           <p className='mt-1 truncate text-sm font-semibold text-white/90'>
                             {primaryCheckout.paidAmountLabel ?? 'Received'}
                           </p>
                         </div>
-                        <div className='rounded-xl border border-white/10 bg-black/20 p-3'>
+                        <div className='rounded-xl border border-white/10 bg-white/[0.045] p-3'>
                           <Package className='mb-2 text-sky-100' size={17} />
                           <p className='text-[11px] uppercase text-white/42'>Items</p>
                           <p className='mt-1 truncate text-sm font-semibold text-white/90'>
@@ -414,14 +414,14 @@ export const CheckoutRecoveryModal = (props: CheckoutRecoveryModalProps) => {
                               `${primaryCheckout.itemCount || 1} item`}
                           </p>
                         </div>
-                        <div className='rounded-xl border border-white/10 bg-black/20 p-3'>
+                        <div className='rounded-xl border border-white/10 bg-white/[0.045] p-3'>
                           <MapPin className='mb-2 text-cyan-100' size={17} />
                           <p className='text-[11px] uppercase text-white/42'>Ship to</p>
                           <p className='mt-1 truncate text-sm font-semibold text-white/90'>
                             {primaryCheckout.shippingSummaryLabel ?? 'On file'}
                           </p>
                         </div>
-                        <div className='rounded-xl border border-white/10 bg-black/20 p-3'>
+                        <div className='rounded-xl border border-white/10 bg-white/[0.045] p-3'>
                           <Clock3 className='mb-2 text-violet-100' size={17} />
                           <p className='text-[11px] uppercase text-white/42'>Placed</p>
                           <p className='mt-1 truncate text-sm font-semibold text-white/90'>
@@ -432,7 +432,10 @@ export const CheckoutRecoveryModal = (props: CheckoutRecoveryModalProps) => {
 
                       <div className='flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-sm'>
                         <span className='min-w-0 truncate text-white/70'>
-                          Ref: <span className='text-white'>{primaryCheckout.shortSupportReference}</span>
+                          Ref:{' '}
+                          <span className='text-white'>
+                            {primaryCheckout.shortSupportReference}
+                          </span>
                           {hiddenCheckoutCount ? ` +${hiddenCheckoutCount} more` : ''}
                         </span>
                         <button
@@ -470,7 +473,7 @@ export const CheckoutRecoveryModal = (props: CheckoutRecoveryModalProps) => {
             </div>
 
             {recoveryVerified ? (
-              <div className='sticky bottom-0 -mx-5 mt-4 border-t border-white/10 bg-slate-950/80 px-5 pt-4 supports-[backdrop-filter]:backdrop-blur-xl sm:-mx-6 sm:px-6'>
+              <div className='sticky bottom-0 -mx-5 mt-4 border-t border-white/10 bg-slate-950/75 px-5 pt-4 pb-1 supports-[backdrop-filter]:backdrop-blur-xl sm:-mx-6 sm:px-6'>
                 <div className='grid grid-cols-2 gap-3'>
                   {checkouts.length ? (
                     <>

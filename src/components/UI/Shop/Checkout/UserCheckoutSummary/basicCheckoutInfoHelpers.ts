@@ -1,8 +1,8 @@
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
-import type { BackendOrderIntentPayload } from '@/lib/hooks/shopHooks/checkout/backendOrderIntentMutationHooks';
+import type { DjangoOrderIntentPayload } from '@/lib/hooks/shopHooks/checkout/djangoOrderIntentMutationHooks';
 import type { BasicCheckoutInfoFormSchema } from './BasicCheckoutInfo';
 
-export type RecoveryStartResponse = {
+export type PaidCheckoutRecoveryStartResponse = {
   ok: boolean;
   recoveryRequired?: boolean;
   expiresInMinutes?: number;
@@ -11,7 +11,7 @@ export type RecoveryStartResponse = {
   message?: string;
 };
 
-export type RecoveryPromptState = {
+export type PaidCheckoutRecoveryPromptState = {
   email: string;
   expiresInMinutes: number;
   pendingCheckoutData: BasicCheckoutInfoFormSchema | null;
@@ -19,7 +19,7 @@ export type RecoveryPromptState = {
   resendAvailableInSeconds: number;
 };
 
-export const DEFAULT_RECOVERY_PROMPT_STATE: RecoveryPromptState = {
+export const DEFAULT_PAID_CHECKOUT_RECOVERY_PROMPT_STATE: PaidCheckoutRecoveryPromptState = {
   email: '',
   expiresInMinutes: 10,
   pendingCheckoutData: null,
@@ -31,7 +31,9 @@ export function getRecipientName(data: BasicCheckoutInfoFormSchema) {
   return `${data.firstname} ${data.lastname}`.trim();
 }
 
-export function getRecoveryExpiryMinutes(payload: RecoveryStartResponse) {
+export function getPaidCheckoutRecoveryExpiryMinutes(
+  payload: PaidCheckoutRecoveryStartResponse,
+) {
   return payload.expiresInMinutes ?? Math.max(1, Math.ceil((payload.expiresInSeconds ?? 600) / 60));
 }
 
@@ -73,7 +75,7 @@ export function saveBasicCheckoutInfoToStore(data: BasicCheckoutInfoFormSchema) 
 
 export function toDjangoOrderIntentPayload(
   data: BasicCheckoutInfoFormSchema,
-): BackendOrderIntentPayload {
+): DjangoOrderIntentPayload {
   return {
     email: data.email,
     first_name: data.firstname,
@@ -87,13 +89,13 @@ export function toDjangoOrderIntentPayload(
   };
 }
 
-export async function startCheckoutRecovery(data: BasicCheckoutInfoFormSchema) {
+export async function startPaidCheckoutRecovery(data: BasicCheckoutInfoFormSchema) {
   const response = await fetch('/next-api/shop/checkout/recovery/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: data.email, recipientName: getRecipientName(data) }),
   });
-  const payload = (await response.json()) as RecoveryStartResponse;
+  const payload = (await response.json()) as PaidCheckoutRecoveryStartResponse;
 
   if (!response.ok || !payload.ok) {
     throw new Error(

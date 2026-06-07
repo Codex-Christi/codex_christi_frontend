@@ -1,4 +1,4 @@
-// src/lib/hooks/shopHooks/checkout/useVerifyBackendOrderIntentWithOTP.ts
+// src/lib/hooks/shopHooks/checkout/useDjangoOrderIntentEmailVerification.ts
 
 'use client';
 
@@ -8,35 +8,35 @@ import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/dj
 import { useCallback, useState } from 'react';
 import errorToast from '@/lib/error-toast';
 import {
-  BackendOrderIntentPayload,
-  useCreateBackendOrderIntentMutation,
-  useResendBackendOrderIntentOTPMutation,
-  useVerifyBackendOrderIntentOTPMutation,
-} from './backendOrderIntentMutationHooks';
+  DjangoOrderIntentPayload,
+  useCreateDjangoOrderIntentMutation,
+  useResendDjangoOrderIntentOTPMutation,
+  useVerifyDjangoOrderIntentOTPMutation,
+} from './djangoOrderIntentMutationHooks';
 
-export const useVerifyBackendOrderIntentWithOTP = (
+export const useDjangoOrderIntentEmailVerification = (
   email: string | undefined,
   openOTPModal: () => void,
 ) => {
   const {
     trigger,
-    data: backendOrderIntentResp,
+    data: djangoOrderIntentResp,
     error: mutationError,
     isMutating,
-    reset: resetBackendOrderIntentMutation,
-  } = useCreateBackendOrderIntentMutation();
+    reset: resetDjangoOrderIntentMutation,
+  } = useCreateDjangoOrderIntentMutation();
   const {
     trigger: verifyTrigger,
     data: verifyData,
     error: verifyError,
     isMutating: isVerifying,
-  } = useVerifyBackendOrderIntentOTPMutation();
+  } = useVerifyDjangoOrderIntentOTPMutation();
   const {
     trigger: resendTrigger,
     data: resendData,
     error: resendError,
     isMutating: isResending,
-  } = useResendBackendOrderIntentOTPMutation();
+  } = useResendDjangoOrderIntentOTPMutation();
 
   const getEmailStatus = useVerifiedEmailsStore((s) => s.getEmailStatus);
   const addEmailToVerifiedList = useVerifiedEmailsStore((s) => s.addEmailToVerifiedList);
@@ -45,8 +45,8 @@ export const useVerifyBackendOrderIntentWithOTP = (
   const [locallyVerifiedEmail, setLocallyVerifiedEmail] = useState<string | null>(null);
   const isEmailVerified = storeVerified || (email ? locallyVerifiedEmail === email : false);
 
-  const createBackendOrderIntent = useCallback(
-    async (payload: BackendOrderIntentPayload, extraHeaders?: HeadersInit) => {
+  const createDjangoOrderIntent = useCallback(
+    async (payload: DjangoOrderIntentPayload, extraHeaders?: HeadersInit) => {
       if (!payload.email) {
         errorToast({ message: 'No email provided' });
         return;
@@ -62,25 +62,6 @@ export const useVerifyBackendOrderIntentWithOTP = (
         const resp = await trigger({ ...payload, headers: extraHeaders });
         const data = resp?.data;
         const otpStatus = data?.otp_status;
-
-        // Dev probe: compare id/order_id/address/date_updated across repeated UI submissions.
-        console.log('[backend-order-intent.create.response]', {
-          id: data?.id,
-          order_id: data?.order_id,
-          email: data?.email,
-          address: data?.address,
-          address_2: data?.address_2,
-          city: data?.city,
-          state: data?.state,
-          zip_code: data?.zip_code,
-          country: data?.country,
-          otp_status: data?.otp_status,
-          has_pending_otp: data?.has_pending_otp,
-          otp_time_remaining: data?.otp_time_remaining,
-          otp_expires_at: data?.otp_expires_at,
-          date_created: data?.date_created,
-          date_updated: data?.date_updated,
-        });
 
         setDjangoOrderIntent({
           djangoOrderIntentUuid: data?.id,
@@ -123,7 +104,7 @@ export const useVerifyBackendOrderIntentWithOTP = (
     [addEmailToVerifiedList, isMutating, mutationError, openOTPModal, setDjangoOrderIntent, trigger],
   );
 
-  const triggerVerifyBackendOrderIntentOTP = useCallback(
+  const triggerVerifyDjangoOrderIntentOTP = useCallback(
     async ({
       otp,
       order_id,
@@ -165,24 +146,6 @@ export const useVerifyBackendOrderIntentWithOTP = (
         const data = resp?.data;
         const otpStatus = data?.otp_status;
 
-        // Dev probe: this is the verified Django intent that should later link to PayPal ledger.
-        console.log('[backend-order-intent.verify.response]', {
-          id: data?.id,
-          order_id: data?.order_id,
-          email: data?.email,
-          address: data?.address,
-          address_2: data?.address_2,
-          city: data?.city,
-          state: data?.state,
-          zip_code: data?.zip_code,
-          country: data?.country,
-          otp_status: data?.otp_status,
-          has_pending_otp: data?.has_pending_otp,
-          otp_expires_at: data?.otp_expires_at,
-          date_created: data?.date_created,
-          date_updated: data?.date_updated,
-        });
-
         setDjangoOrderIntent({
           djangoOrderIntentUuid: data?.id,
           djangoOrderIntentOrderId: data?.order_id,
@@ -221,7 +184,7 @@ export const useVerifyBackendOrderIntentWithOTP = (
     ],
   );
 
-  const resendBackendOrderIntentOTP = useCallback(
+  const resendDjangoOrderIntentOTP = useCallback(
     async (email: string | undefined, extraHeaders?: HeadersInit) => {
       if (!email) {
         errorToast({ message: 'No email provided' });
@@ -234,26 +197,6 @@ export const useVerifyBackendOrderIntentWithOTP = (
 
       try {
         const resp = await resendTrigger({ email, headers: extraHeaders });
-        const data = resp?.data;
-
-        // Dev probe: confirms which Django intent the email-only resend endpoint targets.
-        console.log('[backend-order-intent.resend.response]', {
-          id: data?.id,
-          order_id: data?.order_id,
-          email: data?.email,
-          address: data?.address,
-          address_2: data?.address_2,
-          city: data?.city,
-          state: data?.state,
-          zip_code: data?.zip_code,
-          country: data?.country,
-          otp_status: data?.otp_status,
-          has_pending_otp: data?.has_pending_otp,
-          otp_time_remaining: data?.otp_time_remaining,
-          otp_expires_at: data?.otp_expires_at,
-          date_created: data?.date_created,
-          date_updated: data?.date_updated,
-        });
 
         successToast({
           header: 'OTP Sent - Check your email',
@@ -273,8 +216,8 @@ export const useVerifyBackendOrderIntentWithOTP = (
   );
 
   return {
-    triggerVerifyBackendOrderIntentOTP,
-    resendBackendOrderIntentOTP,
+    triggerVerifyDjangoOrderIntentOTP,
+    resendDjangoOrderIntentOTP,
     verifyData,
     verifyError,
     resendData,
@@ -282,10 +225,10 @@ export const useVerifyBackendOrderIntentWithOTP = (
     isVerifying,
     isResending,
     isEmailVerified,
-    createBackendOrderIntent,
-    resetBackendOrderIntentMutation,
-    backendOrderIntentResp,
-    backendOrderIntentError: mutationError,
-    isBackendOrderIntentLoading: isMutating,
+    createDjangoOrderIntent,
+    resetDjangoOrderIntentMutation,
+    djangoOrderIntentResp,
+    djangoOrderIntentError: mutationError,
+    isDjangoOrderIntentLoading: isMutating,
   };
 };

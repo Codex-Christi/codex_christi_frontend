@@ -1,42 +1,45 @@
-import { useVerifyBackendOrderIntentWithOTP } from '@/lib/hooks/shopHooks/checkout/useVerifyBackendOrderIntentWithOTP';
+import { useDjangoOrderIntentEmailVerification } from '@/lib/hooks/shopHooks/checkout/useDjangoOrderIntentEmailVerification';
 import {
-  CheckoutOTPModal,
-  CheckoutOTPModalProps,
-  CheckoutOTPModalHandles,
-} from './CheckoutOTPModal';
+  DjangoOrderIntentOtpModal,
+  DjangoOrderIntentOtpModalProps,
+  DjangoOrderIntentOtpModalHandles,
+} from './DjangoOrderIntentOtpModal';
 import { forwardRef, useCallback, useEffect } from 'react';
 import loadingToast from '@/lib/loading-toast';
 import { toast } from 'sonner';
 import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
 
-type CheckoutOTPMainWrapperProps = Omit<CheckoutOTPModalProps, 'onComplete'> & {
+type DjangoOrderIntentOtpControllerProps = Omit<
+  DjangoOrderIntentOtpModalProps,
+  'onComplete'
+> & {
   proceedToPaymentTrigger: (itemValue: 'basic-checkout-info' | 'payment-section') => void;
-  otpSendHookProps: ReturnType<typeof useVerifyBackendOrderIntentWithOTP>;
+  djangoOrderIntentEmailVerification: ReturnType<typeof useDjangoOrderIntentEmailVerification>;
 };
 
-export const CheckoutOTPMainWrapper = forwardRef<
-  CheckoutOTPModalHandles,
-  CheckoutOTPMainWrapperProps
+export const DjangoOrderIntentOtpController = forwardRef<
+  DjangoOrderIntentOtpModalHandles,
+  DjangoOrderIntentOtpControllerProps
 >((props, ref) => {
-  const { otpSendHookProps, proceedToPaymentTrigger, ...rest } = props;
+  const { djangoOrderIntentEmailVerification, proceedToPaymentTrigger, ...rest } = props;
   const {
-    backendOrderIntentResp,
-    resendBackendOrderIntentOTP,
-    triggerVerifyBackendOrderIntentOTP,
+    djangoOrderIntentResp,
+    resendDjangoOrderIntentOTP,
+    triggerVerifyDjangoOrderIntentOTP,
     isResending,
     isVerifying,
-    isBackendOrderIntentLoading,
-  } = otpSendHookProps;
-  const { id: djangoOrderIntentUuid, order_id } = backendOrderIntentResp?.data || {};
+    isDjangoOrderIntentLoading,
+  } = djangoOrderIntentEmailVerification;
+  const { id: djangoOrderIntentUuid, order_id } = djangoOrderIntentResp?.data || {};
   const setDjangoOrderIntent = useDjangoOrderIntentStore((s) => s.setDjangoOrderIntent);
   const { email } = rest;
 
   useEffect(() => {
     let toastID: number;
-    if (isVerifying || isBackendOrderIntentLoading || isResending) {
+    if (isVerifying || isDjangoOrderIntentLoading || isResending) {
       toast.dismiss();
       toastID = loadingToast({
-        message: isBackendOrderIntentLoading
+        message: isDjangoOrderIntentLoading
           ? 'Sending OTP...'
           : isResending
             ? 'Resending OTP...'
@@ -48,33 +51,27 @@ export const CheckoutOTPMainWrapper = forwardRef<
         toast.dismiss(toastID);
       };
     }
-  }, [isVerifying, isBackendOrderIntentLoading, isResending]);
+  }, [isVerifying, isDjangoOrderIntentLoading, isResending]);
 
   // Main JSX
   return (
-    <CheckoutOTPModal
+    <DjangoOrderIntentOtpModal
       ref={ref}
       {...rest}
       isResendingOTP={isResending}
-      onResendOTP={email ? () => resendBackendOrderIntentOTP(email) : undefined}
+      onResendOTP={email ? () => resendDjangoOrderIntentOTP(email) : undefined}
       onComplete={useCallback(
         async (otp: string) => {
           // Handle OTP completion
 
           if (email && order_id) {
-            const resp = await triggerVerifyBackendOrderIntentOTP({ email, order_id, otp });
+            const resp = await triggerVerifyDjangoOrderIntentOTP({ email, order_id, otp });
             setTimeout(() => {
               rest.onOpenChange?.(false);
               if (resp && resp?.data.otp_status === 'verified') {
                 if (!resp.data.order_id) {
                   return;
                 }
-                console.log('[checkout-otp.verified-intent-for-paypal]', {
-                  djangoOrderIntentUuid: resp.data.id ?? djangoOrderIntentUuid,
-                  djangoOrderIntentOrderId: resp.data.order_id,
-                  email: resp.data.email,
-                  otp_status: resp.data.otp_status,
-                });
                 setDjangoOrderIntent({
                   djangoOrderIntentUuid: resp.data.id ?? djangoOrderIntentUuid,
                   djangoOrderIntentOrderId: resp.data.order_id,
@@ -92,11 +89,11 @@ export const CheckoutOTPMainWrapper = forwardRef<
           proceedToPaymentTrigger,
           rest,
           setDjangoOrderIntent,
-          triggerVerifyBackendOrderIntentOTP,
+          triggerVerifyDjangoOrderIntentOTP,
         ],
       )}
     />
   );
 });
 
-CheckoutOTPMainWrapper.displayName = 'CheckoutOTPMainWrapper';
+DjangoOrderIntentOtpController.displayName = 'DjangoOrderIntentOtpController';

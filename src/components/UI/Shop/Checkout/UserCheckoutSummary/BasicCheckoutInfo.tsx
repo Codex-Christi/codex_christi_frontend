@@ -15,27 +15,28 @@ import { CheckoutAccordionContext } from '../ProductCheckout';
 import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
 import { DeliveryAddressInputFields } from './DeliveryAddressInputFields';
 import errorToast from '@/lib/error-toast';
-import { useVerifyBackendOrderIntentWithOTP } from '@/lib/hooks/shopHooks/checkout/useVerifyBackendOrderIntentWithOTP';
+import { useDjangoOrderIntentEmailVerification } from '@/lib/hooks/shopHooks/checkout/useDjangoOrderIntentEmailVerification';
 import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import dynamic from 'next/dynamic';
 import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore';
 import {
-  DEFAULT_RECOVERY_PROMPT_STATE,
+  DEFAULT_PAID_CHECKOUT_RECOVERY_PROMPT_STATE,
   getCheckoutValuesFromStore,
-  getRecoveryExpiryMinutes,
+  getPaidCheckoutRecoveryExpiryMinutes,
   getRecipientName,
   saveBasicCheckoutInfoToStore,
-  startCheckoutRecovery,
+  startPaidCheckoutRecovery,
   toDjangoOrderIntentPayload,
 } from './basicCheckoutInfoHelpers';
 
-const CheckoutOTPMainWrapper = dynamic(
-  () => import('./CheckoutOTPMainWrapper').then((mod) => mod.CheckoutOTPMainWrapper),
+const DjangoOrderIntentOtpController = dynamic(
+  () =>
+    import('./DjangoOrderIntentOtpController').then((mod) => mod.DjangoOrderIntentOtpController),
   { ssr: false },
 );
-const CheckoutRecoveryModal = dynamic(
-  () => import('./CheckoutRecoveryModal').then((mod) => mod.CheckoutRecoveryModal),
+const PaidCheckoutRecoveryModal = dynamic(
+  () => import('./PaidCheckoutRecoveryModal').then((mod) => mod.PaidCheckoutRecoveryModal),
   { ssr: false },
 );
 
@@ -63,10 +64,12 @@ export type BasicCheckoutInfoFormSchema = z.infer<typeof BasicCheckoutInfoFormSc
 
 export const BasicCheckoutInfo = () => {
   const hasAppliedHydratedCheckoutValuesRef = useRef(false);
-  const [isOtpOpen, setIsOtpOpen] = useState(false);
-  const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
-  const [recoveryPrompt, setRecoveryPrompt] = useState(DEFAULT_RECOVERY_PROMPT_STATE);
-  const [isCheckingRecovery, setIsCheckingRecovery] = useState(false);
+  const [isDjangoOrderIntentOtpOpen, setIsDjangoOrderIntentOtpOpen] = useState(false);
+  const [isPaidCheckoutRecoveryOpen, setIsPaidCheckoutRecoveryOpen] = useState(false);
+  const [paidCheckoutRecoveryPrompt, setPaidCheckoutRecoveryPrompt] = useState(
+    DEFAULT_PAID_CHECKOUT_RECOVERY_PROMPT_STATE,
+  );
+  const [isCheckingPaidCheckoutRecovery, setIsCheckingPaidCheckoutRecovery] = useState(false);
 
   const { handleOpenItem } = useContext(CheckoutAccordionContext);
   const [checkoutHydrated, setCheckoutHydrated] = useState(false);
@@ -82,9 +85,15 @@ export const BasicCheckoutInfo = () => {
   const fallbackEmail = useUserMainProfileStore((s) => s.userMainProfile?.email);
   const selectedCountryISO3 = useCurrencyCookie((s) => s.iso3);
   const changeCookieStoreCountry = useCurrencyCookie((s) => s.changeCountry);
-  const openDjangoOtpModal = useCallback(() => setIsOtpOpen(true), []);
-  const otpSendHookProps = useVerifyBackendOrderIntentWithOTP(email, openDjangoOtpModal);
-  const { createBackendOrderIntent } = otpSendHookProps;
+  const openDjangoOrderIntentOtpModal = useCallback(
+    () => setIsDjangoOrderIntentOtpOpen(true),
+    [],
+  );
+  const djangoOrderIntentEmailVerification = useDjangoOrderIntentEmailVerification(
+    email,
+    openDjangoOrderIntentOtpModal,
+  );
+  const { createDjangoOrderIntent } = djangoOrderIntentEmailVerification;
 
   const basicCheckoutInfoForm = useForm<BasicCheckoutInfoFormSchema>({
     resolver: zodResolver(BasicCheckoutInfoFormSchema),
@@ -166,19 +175,19 @@ export const BasicCheckoutInfo = () => {
   const createDjangoOrderIntentFromCheckoutInfo = useCallback(
     async (data: BasicCheckoutInfoFormSchema) => {
       // This creates/reuses the Django backend order intent, not the PayPal ledger intent.
-      const backendOrderIntent = await createBackendOrderIntent(
+      const djangoOrderIntent = await createDjangoOrderIntent(
         toDjangoOrderIntentPayload(data),
       );
 
-      if (backendOrderIntent?.data.otp_status === 'verified') {
+      if (djangoOrderIntent?.data.otp_status === 'verified') {
         handleOpenItem('payment-section');
       }
     },
-    [createBackendOrderIntent, handleOpenItem],
+    [createDjangoOrderIntent, handleOpenItem],
   );
 
-  const startSeparateOrderAfterRecoveryReview = useCallback(async () => {
-    if (!recoveryPrompt.pendingCheckoutData) {
+  const startNewOrderAfterPaidCheckoutRecoveryReview = useCallback(async () => {
+    if (!paidCheckoutRecoveryPrompt.pendingCheckoutData) {
       errorToast({
         header: 'Checkout details missing',
         message: 'Please submit your checkout details again.',
@@ -186,26 +195,28 @@ export const BasicCheckoutInfo = () => {
       return;
     }
 
-    await createDjangoOrderIntentFromCheckoutInfo(recoveryPrompt.pendingCheckoutData);
-  }, [createDjangoOrderIntentFromCheckoutInfo, recoveryPrompt.pendingCheckoutData]);
+    await createDjangoOrderIntentFromCheckoutInfo(
+      paidCheckoutRecoveryPrompt.pendingCheckoutData,
+    );
+  }, [createDjangoOrderIntentFromCheckoutInfo, paidCheckoutRecoveryPrompt.pendingCheckoutData]);
 
   async function onSubmit(data: BasicCheckoutInfoFormSchema) {
     saveBasicCheckoutInfoToStore(data);
-    setRecoveryPrompt((current) => ({ ...current, pendingCheckoutData: data }));
-    setIsCheckingRecovery(true);
+    setPaidCheckoutRecoveryPrompt((current) => ({ ...current, pendingCheckoutData: data }));
+    setIsCheckingPaidCheckoutRecovery(true);
 
     try {
-      const recoveryStart = await startCheckoutRecovery(data);
+      const paidCheckoutRecoveryStart = await startPaidCheckoutRecovery(data);
 
-      if (recoveryStart.recoveryRequired) {
-        setRecoveryPrompt({
+      if (paidCheckoutRecoveryStart.recoveryRequired) {
+        setPaidCheckoutRecoveryPrompt({
           pendingCheckoutData: data,
           email: data.email,
           recipientName: getRecipientName(data),
-          expiresInMinutes: getRecoveryExpiryMinutes(recoveryStart),
-          resendAvailableInSeconds: recoveryStart.resendAvailableInSeconds ?? 0,
+          expiresInMinutes: getPaidCheckoutRecoveryExpiryMinutes(paidCheckoutRecoveryStart),
+          resendAvailableInSeconds: paidCheckoutRecoveryStart.resendAvailableInSeconds ?? 0,
         });
-        setIsRecoveryOpen(true);
+        setIsPaidCheckoutRecoveryOpen(true);
         return;
       }
 
@@ -218,7 +229,7 @@ export const BasicCheckoutInfo = () => {
           'Unable to check whether this email has a checkout recovery case.',
       });
     } finally {
-      setIsCheckingRecovery(false);
+      setIsCheckingPaidCheckoutRecovery(false);
     }
   }
 
@@ -229,12 +240,11 @@ export const BasicCheckoutInfo = () => {
       </h2>
       <Form {...basicCheckoutInfoForm}>
         <form
-          onSubmit={basicCheckoutInfoForm.handleSubmit(onSubmit, (errors) => {
+          onSubmit={basicCheckoutInfoForm.handleSubmit(onSubmit, () => {
             errorToast({
               message: 'Check form and correct errors',
               header: 'Incorrect details!',
             });
-            console.log(errors);
           })}
           className='w-full  grid grid-cols-1 md:grid-cols-2 gap-x-20 gap-3 items-center'
         >
@@ -271,37 +281,39 @@ export const BasicCheckoutInfo = () => {
           <Button
             name='Checkout Summary Submit'
             type='submit'
-            disabled={isCheckingRecovery}
+            disabled={isCheckingPaidCheckoutRecovery}
             className=' col-span-1 md:col-span-2 w-full max-w-[400px] mt-5 mx-auto rounded-3xl
             !font-bold px-4 sm:px-6 py-2 sm:py-3 text-lg sm:text-base
             bg-stone-500 hover:bg-stone-100 hover:bg-opacity-10 bg-opacity-10 
             backdrop-blur-md shadow-md shadow-gray-400 flex gap-6'
           >
             <h4 className='[word-spacing:0.25rem]'>
-              {isCheckingRecovery ? 'Checking Checkout Status' : 'Choose Payment Method'}
+              {isCheckingPaidCheckoutRecovery
+                ? 'Checking Checkout Status'
+                : 'Choose Payment Method'}
             </h4>
             <FaAngleDoubleDown size={22.5} />
           </Button>
         </form>
       </Form>
 
-      <CheckoutRecoveryModal
-        key={`${recoveryPrompt.email}-${recoveryPrompt.expiresInMinutes}-${recoveryPrompt.resendAvailableInSeconds}`}
-        isOpen={isRecoveryOpen}
-        onOpenChange={setIsRecoveryOpen}
-        email={recoveryPrompt.email}
-        recipientName={recoveryPrompt.recipientName}
-        expiresInMinutes={recoveryPrompt.expiresInMinutes}
-        resendAvailableInSeconds={recoveryPrompt.resendAvailableInSeconds}
-        onStartSeparateOrder={startSeparateOrderAfterRecoveryReview}
+      <PaidCheckoutRecoveryModal
+        key={`${paidCheckoutRecoveryPrompt.email}-${paidCheckoutRecoveryPrompt.expiresInMinutes}-${paidCheckoutRecoveryPrompt.resendAvailableInSeconds}`}
+        isOpen={isPaidCheckoutRecoveryOpen}
+        onOpenChange={setIsPaidCheckoutRecoveryOpen}
+        email={paidCheckoutRecoveryPrompt.email}
+        recipientName={paidCheckoutRecoveryPrompt.recipientName}
+        expiresInMinutes={paidCheckoutRecoveryPrompt.expiresInMinutes}
+        resendAvailableInSeconds={paidCheckoutRecoveryPrompt.resendAvailableInSeconds}
+        onStartSeparateOrder={startNewOrderAfterPaidCheckoutRecoveryReview}
       />
-      <CheckoutOTPMainWrapper
-        isOpen={isOtpOpen}
-        onOpenChange={setIsOtpOpen}
+      <DjangoOrderIntentOtpController
+        isOpen={isDjangoOrderIntentOtpOpen}
+        onOpenChange={setIsDjangoOrderIntentOtpOpen}
         title='Verify your email before proceeding'
         length={6}
         proceedToPaymentTrigger={handleOpenItem}
-        otpSendHookProps={otpSendHookProps}
+        djangoOrderIntentEmailVerification={djangoOrderIntentEmailVerification}
         email={email}
       />
     </>

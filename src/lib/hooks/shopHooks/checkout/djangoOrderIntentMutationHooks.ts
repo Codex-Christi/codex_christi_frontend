@@ -5,7 +5,7 @@ import { HmacSHA256 } from 'crypto-js';
 
 const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
 
-export interface BackendOrderIntentPayload {
+export interface DjangoOrderIntentPayload {
   email: string;
   first_name: string;
   last_name: string;
@@ -18,7 +18,7 @@ export interface BackendOrderIntentPayload {
   phone?: string;
 }
 
-export interface BackendOrderIntentAPIResponse {
+export interface DjangoOrderIntentAPIResponse {
   status: number;
   success: boolean;
   message?: string;
@@ -44,25 +44,25 @@ export interface BackendOrderIntentAPIResponse {
   };
 }
 
-interface CreateBackendOrderIntentArg extends BackendOrderIntentPayload {
+interface CreateDjangoOrderIntentArg extends DjangoOrderIntentPayload {
   headers?: HeadersInit;
 }
 
-interface VerifyBackendOrderIntentOTPArg {
+interface VerifyDjangoOrderIntentOTPArg {
   email: string;
   otp: string;
   order_id: string;
   headers?: HeadersInit;
 }
 
-interface ResendBackendOrderIntentOTPArg {
+interface ResendDjangoOrderIntentOTPArg {
   email: string;
   headers?: HeadersInit;
 }
 
 // Creates or reuses the Django backend order intent used for checkout OTP verification.
-export const useCreateBackendOrderIntentMutation = () => {
-  return useMutationHook<BackendOrderIntentAPIResponse, CreateBackendOrderIntentArg>(
+export const useCreateDjangoOrderIntentMutation = () => {
+  return useMutationHook<DjangoOrderIntentAPIResponse, CreateDjangoOrderIntentArg>(
     `${baseURL}/orders/intent`,
     (arg) => {
       const { headers, ...body } = arg;
@@ -82,8 +82,8 @@ export const useCreateBackendOrderIntentMutation = () => {
   )();
 };
 
-export const useVerifyBackendOrderIntentOTPMutation = () => {
-  return useMutationHook<BackendOrderIntentAPIResponse, VerifyBackendOrderIntentOTPArg>(
+export const useVerifyDjangoOrderIntentOTPMutation = () => {
+  return useMutationHook<DjangoOrderIntentAPIResponse, VerifyDjangoOrderIntentOTPArg>(
     `${baseURL}/orders/intent/verify`,
     (arg) => ({
       body: { email: arg.email, otp: arg.otp, order_id: arg.order_id },
@@ -99,8 +99,8 @@ export const useVerifyBackendOrderIntentOTPMutation = () => {
   )();
 };
 
-export const useResendBackendOrderIntentOTPMutation = () => {
-  return useMutationHook<BackendOrderIntentAPIResponse, ResendBackendOrderIntentOTPArg>(
+export const useResendDjangoOrderIntentOTPMutation = () => {
+  return useMutationHook<DjangoOrderIntentAPIResponse, ResendDjangoOrderIntentOTPArg>(
     `${baseURL}/orders/intent/resend-otp`,
     (arg) => ({
       body: { email: arg.email },
