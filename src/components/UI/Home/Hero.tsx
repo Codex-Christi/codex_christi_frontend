@@ -21,11 +21,12 @@ const Hero = () => {
       </section>
 
       <Image
-        priority
-        fetchPriority='high'
         alt='Hero Logo Image'
-        src={HeroImage}
         className='pointer-events-none absolute left-auto right-0 h-auto w-[12rem] md:w-[18rem] lg:w-[22rem]'
+        decoding='sync'
+        fetchPriority='high'
+        priority
+        src={HeroImage}
       />
     </div>
   );
