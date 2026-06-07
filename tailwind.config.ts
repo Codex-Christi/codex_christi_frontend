@@ -79,10 +79,10 @@ const config = {
         },
         'ltr-linear-infinite': {
           from: {
-            'background-position': '0 0',
+            transform: 'translate3d(0, 0, 0)',
           },
           to: {
-            'background-position': '-400vw 1000vw',
+            transform: 'translate3d(-25%, 25%, 0)',
           },
         },
         'caret-blink': {

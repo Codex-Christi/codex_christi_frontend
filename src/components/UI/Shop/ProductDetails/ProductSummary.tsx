@@ -17,7 +17,7 @@ const reviews = [
 
 function ReviewStars() {
   return (
-    <div aria-label='5 out of 5 stars' className='flex gap-0.5'>
+    <div aria-label='5 out of 5 stars' className='flex gap-0.5' role='img'>
       {Array.from({ length: 5 }).map((_, index) => (
         <svg
           key={index}

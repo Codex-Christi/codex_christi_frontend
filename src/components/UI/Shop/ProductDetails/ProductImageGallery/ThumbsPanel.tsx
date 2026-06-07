@@ -20,8 +20,8 @@ function ThumbsPanel({
 
   // clamp maximum thumbnail width considered for `sizes`
   const MAX_THUMB = 160; // choose a cap, e.g. 160px — browser won't pick variants larger than this
-  const thumbSizeHint = `${Math.min(width, MAX_THUMB)}px`;
-  const thumbSizeHintHighDPI = `${Math.min(width * 1.5, MAX_THUMB)}px`;
+  const thumbSizeHint = Math.min(width, MAX_THUMB);
+  const thumbSizeHintHighDPI = Math.min(width * 1.5, MAX_THUMB);
 
   return (
     <div
@@ -46,8 +46,7 @@ function ThumbsPanel({
               src={loader.srcWithRetry(image, index)}
               width={width}
               height={width}
-              // Use the clamped thumbSizeHint here
-              sizes={`(max-width: 412px) ${thumbSizeHint}px, (min-resolution: 2dppx) ${thumbSizeHintHighDPI}px, ${thumbSizeHint}`}
+              sizes={`(max-width: 412px) ${thumbSizeHint}px, (min-resolution: 2dppx) ${thumbSizeHintHighDPI}px, ${thumbSizeHint}px`}
               quality={75}
               loading='lazy'
               onLoad={() => loader.markLoaded(index, image)}
