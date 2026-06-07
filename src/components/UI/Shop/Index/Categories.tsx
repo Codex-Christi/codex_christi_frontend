@@ -6,7 +6,7 @@ import GlobalProductPrice from '../GlobalShopComponents/GlobalProductPrice';
 import CountryDropdownServer from './CountryDropDownServerFloating';
 
 const Categories = async () => {
-  const imageQuality = 80;
+  const imageQuality = 50;
   const imageSizes =
     '(max-width: 640px) 80px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 160px';
   const productIds = Object.values(categoriesObj).flatMap((category) =>
@@ -31,12 +31,11 @@ const Categories = async () => {
 
               <div className='grid gap-8 grid-cols-2 md:grid-cols-1'>
                 {/* Map through  */}
-                {products.content.map((product, productIndex) => {
+                {products.content.map((product) => {
                   const { ssrText, usdCentsBase } = priceByProductId[product.productId] ?? {
                     ssrText: null,
                     usdCentsBase: null,
                   };
-                  const isPriorityImage = productIndex === 0;
 
                   return (
                     <div className='grid gap-4 p-4' key={product.productId}>
@@ -51,9 +50,8 @@ const Categories = async () => {
                           alt={product.img_alt}
                           width={200}
                           height={200}
-                          fetchPriority={isPriorityImage ? 'high' : 'auto'}
-                          loading={isPriorityImage ? 'eager' : 'lazy'}
-                          priority={isPriorityImage}
+                          fetchPriority='auto'
+                          loading='lazy'
                           quality={imageQuality}
                           sizes={imageSizes}
                         />

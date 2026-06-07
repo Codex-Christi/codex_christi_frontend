@@ -5,8 +5,8 @@ import DealsScrollControls from './DealsScrollControls';
 
 // Top-Page Deals Component
 const Deals = () => {
-  const eagerImageCount = 2;
-  const imageQuality = 80;
+  const eagerImageCount = 1;
+  const imageQuality = 50;
   const imageSizes =
     '(max-width: 640px) 80px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 160px';
 
@@ -58,6 +58,7 @@ const Deals = () => {
               fetchPriority={i < eagerImageCount ? 'high' : 'auto'}
               alt={merch.img_alt}
               draggable={false}
+              decoding={i === 0 ? 'sync' : 'async'}
               loading={i < eagerImageCount ? 'eager' : 'lazy'}
               priority={i < eagerImageCount}
               quality={imageQuality}
