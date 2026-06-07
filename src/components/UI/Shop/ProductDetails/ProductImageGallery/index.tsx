@@ -13,8 +13,7 @@ import MainStage from './MainStage';
 import { type CarouselApi } from '@/components/UI/primitives/carousel';
 import { GalleryPrevButton } from '../GalleryPrevButton';
 import { GalleryNextButton } from '../GalleryNextButton';
-import { ControllerRef, Plugin } from 'yet-another-react-lightbox';
-import Zoom from 'yet-another-react-lightbox/plugins/zoom';
+import type { ControllerRef, Plugin } from 'yet-another-react-lightbox';
 import { useLightboxHistory } from './useLightBoxHistory';
 
 const Lightbox = dynamic(() => import('yet-another-react-lightbox'), { ssr: false });
@@ -96,6 +95,7 @@ export const ProductImageGallery: React.FC = () => {
   const [currentItem, setCurrentItem] = useState(0);
   const [open, setOpen] = useState(false);
   const [api, setApi] = useState<CarouselApi | null>(null);
+  const [zoomPlugin, setZoomPlugin] = useState<Plugin | null>(null);
   const controllerRef = useRef<ControllerRef>(null);
 
   // Back button support while fullscreen
@@ -123,7 +123,7 @@ export const ProductImageGallery: React.FC = () => {
   const loader = useImageListLoader(images);
   const imageKey = useMemo(() => images.join('|'), [images]);
 
-  // Pre-measure natural sizes for Lightbox zoom (safe, client-only)
+  // Pre-measure natural sizes for Lightbox zoom only after the user opens it.
   const [dimsState, setDimsState] = useState<{
     imageKey: string;
     dims: Record<number, { w: number; h: number }>;
@@ -133,6 +133,8 @@ export const ProductImageGallery: React.FC = () => {
   });
 
   useEffect(() => {
+    if (!open) return;
+
     images.forEach((src, i) => {
       const img = new window.Image();
       img.onload = () =>
@@ -152,7 +154,20 @@ export const ProductImageGallery: React.FC = () => {
         });
       img.src = src;
     });
-  }, [imageKey, images]);
+  }, [imageKey, images, open]);
+
+  useEffect(() => {
+    if (!open || zoomPlugin) return;
+
+    let cancelled = false;
+    void import('yet-another-react-lightbox/plugins/zoom').then((mod) => {
+      if (!cancelled) setZoomPlugin(() => mod.default as Plugin);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, zoomPlugin]);
 
   // URL-driven reset (unchanged)
   useEffect(() => {
@@ -230,7 +245,7 @@ export const ProductImageGallery: React.FC = () => {
           close={() => setOpen(false)}
           index={safeCurrentItem}
           slides={slides}
-          plugins={[Zoom as Plugin]}
+          plugins={zoomPlugin ? [zoomPlugin] : []}
           controller={{ ref: controllerRef }}
           carousel={{
             imageFit: 'contain',
