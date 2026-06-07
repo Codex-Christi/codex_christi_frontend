@@ -6,6 +6,9 @@ import GlobalProductPrice from '../GlobalShopComponents/GlobalProductPrice';
 import CountryDropdownServer from './CountryDropDownServerFloating';
 
 const Categories = async () => {
+  const imageQuality = 80;
+  const imageSizes =
+    '(max-width: 640px) 80px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 160px';
   const productIds = Object.values(categoriesObj).flatMap((category) =>
     category.content.map((product) => product.productId),
   );
@@ -51,8 +54,8 @@ const Categories = async () => {
                           fetchPriority={isPriorityImage ? 'high' : 'auto'}
                           loading={isPriorityImage ? 'eager' : 'lazy'}
                           priority={isPriorityImage}
-                          quality={100}
-                          sizes='(max-width: 412px) 120px, (max-width: 640px) 120px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 200px'
+                          quality={imageQuality}
+                          sizes={imageSizes}
                         />
 
                         <h3 className='text-center font-bold'>

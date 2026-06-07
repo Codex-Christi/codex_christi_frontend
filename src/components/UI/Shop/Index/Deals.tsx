@@ -12,6 +12,9 @@ import { useAutoScroller } from './useAutoScroller';
 const Deals = () => {
   const slideContainerRef = useRef<HTMLDivElement | null>(null);
   const eagerImageCount = 2;
+  const imageQuality = 80;
+  const imageSizes =
+    '(max-width: 640px) 80px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 160px';
 
   const { nudgeScroll } = useAutoScroller(slideContainerRef);
 
@@ -66,8 +69,8 @@ const Deals = () => {
               onDragStart={(e) => e.preventDefault()} // prevent ghost drag only
               loading={i < eagerImageCount ? 'eager' : 'lazy'}
               priority={i < eagerImageCount}
-              quality={100}
-              sizes='(max-width: 412px) 120px, (max-width: 640px) 120px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 200px'
+              quality={imageQuality}
+              sizes={imageSizes}
             />
           </CustomShopLink>
         ))}

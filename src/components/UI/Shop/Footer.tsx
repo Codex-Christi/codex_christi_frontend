@@ -159,7 +159,13 @@ const Footer = () => {
         <div className='flex items-center gap-4 md:gap-8 flex-wrap'>
           {images.map((media, index) => (
             <CustomShopLink href={media.route} key={index}>
-              <Image className='w-6 h-auto' src={media.image} alt='Connect with us' />
+              <Image
+                alt='Connect with us'
+                className='size-6 shrink-0'
+                height={24}
+                src={media.image}
+                width={24}
+              />
             </CustomShopLink>
           ))}
         </div>
