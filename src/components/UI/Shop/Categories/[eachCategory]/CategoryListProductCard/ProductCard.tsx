@@ -18,7 +18,13 @@ const SizeAndColorSelectorPopover = dynamic(
   { ssr: false },
 );
 
-export default function ProductCard({ product }: { product: CategoryProductDetail }) {
+export default function ProductCard({
+  product,
+  priority = false,
+}: {
+  product: CategoryProductDetail;
+  priority?: boolean;
+}) {
   const { title, _id, slug } = product;
 
   return (
@@ -42,7 +48,9 @@ export default function ProductCard({ product }: { product: CategoryProductDetai
             alt={product.title}
             height={300}
             width={150}
-            fetchPriority='high'
+            fetchPriority={priority ? 'high' : 'auto'}
+            loading={priority ? 'eager' : 'lazy'}
+            sizes='(min-width: 1280px) 25vw, (min-width: 900px) 33vw, (min-width: 640px) 50vw, 100vw'
             className='h-auto w-full object-cover object-top aspect-[16/18] md:aspect-[16/13]'
             style={{ filter: isDayOrNight() === 'night' ? 'brightness(.9)' : 'none' }}
           />

@@ -80,7 +80,9 @@ export default function ProductList({
         {isLoading && !data.length ? (
           <Skeleton count={count} />
         ) : (
-          data.map((product) => <ProductCard key={product._id} product={product} />)
+          data.map((product, index) => (
+            <ProductCard key={product._id} product={product} priority={index < 4} />
+          ))
         )}
       </div>
 
