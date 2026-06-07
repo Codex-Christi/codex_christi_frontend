@@ -1,7 +1,6 @@
 'use client';
 
 import { MouseEvent } from 'react';
-import Image from 'next/image';
 import CustomShopLink from './HelperComponents/CustomShopLink';
 
 export default function Logo() {
@@ -12,10 +11,10 @@ export default function Logo() {
       href='/'
       className='inline-block'
     >
-      <Image
-        priority={true}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
         width={72}
-        height={48.375}
+        height={48}
         className='relative block pointer-events-auto !max-w-[unset]'
         style={{ width: '72px', height: 'auto' }}
         alt='Codex Christi Main Logo'

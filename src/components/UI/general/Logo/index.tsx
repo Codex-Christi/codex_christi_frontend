@@ -1,6 +1,5 @@
 'use client';
 import { FC } from 'react';
-import Image from 'next/image';
 import { MouseEvent } from 'react';
 import Link from 'next/link';
 
@@ -17,10 +16,10 @@ const Logo: FC<LogoInterface> = ({ className }) => {
   // Main JSX
   return (
     <Link href='/' className='inline-block'>
-      <Image
-        priority
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
         width={100}
-        height={100}
+        height={43}
         className={`relative block ${className ?? ''}`}
         style={{ height: 'auto' }}
         alt='Codex Christi Main Logo'
