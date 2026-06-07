@@ -1,18 +1,16 @@
 'use client';
 
 import { FC, useState } from 'react';
+import dynamic from 'next/dynamic';
 // import Image from "next/image";
 // import Link from "next/link";
 import Logo from '../Logo';
 import NavList from './NavList';
-import SideDrawer from './SideDrawer';
-import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
+
+const SideDrawer = dynamic(() => import('./SideDrawer'), { ssr: false });
 
 // Main Nav Component
 const MainNav: FC = () => {
-  // Hooks
-  const { isDesktopOnly } = useResponsiveSSRValue();
-
   // States
   const [isSideDrawerOpen, setIsSideDrawerOpen] = useState<boolean>(false);
 
@@ -29,6 +27,7 @@ const MainNav: FC = () => {
         <button
           name='Mobile hamburger button'
           aria-label='Mobile hamburger button'
+          className='lg:hidden'
           onClick={() => {
             setIsSideDrawerOpen((state) => !state);
           }}
@@ -54,11 +53,15 @@ const MainNav: FC = () => {
         </button>
 
         {/*  NavList for Desktop only*/}
-        {isDesktopOnly && <NavList />}
+        <div className='hidden lg:contents'>
+          <NavList />
+        </div>
       </nav>
 
       {/* Drawer */}
-      <SideDrawer openState={isSideDrawerOpen} openCloseController={setIsSideDrawerOpen} />
+      {isSideDrawerOpen && (
+        <SideDrawer openState={isSideDrawerOpen} openCloseController={setIsSideDrawerOpen} />
+      )}
     </>
   );
 };

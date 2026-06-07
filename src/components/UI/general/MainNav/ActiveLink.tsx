@@ -4,7 +4,6 @@ import Link, { LinkProps } from 'next/link';
 import { FC, ReactNode } from 'react';
 import { navListArr } from './NavList';
 import { BsCaretLeftFill, BsCaretDownFill } from 'react-icons/bs';
-import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 
 interface ActiveLinkInterface extends LinkProps {
   index: number;
@@ -13,9 +12,6 @@ interface ActiveLinkInterface extends LinkProps {
 }
 
 const ActiveLink: FC<ActiveLinkInterface> = (props) => {
-  // Hooks
-  const { isDesktopOnly } = useResponsiveSSRValue();
-
   // Props Destructuring
   const { children, href, linkText, index } = props;
 
@@ -62,11 +58,13 @@ const ActiveLink: FC<ActiveLinkInterface> = (props) => {
       //
       href={href.toString().toLowerCase()}
     >
-      {linkText === 'ABOUT US' && !isDesktopOnly && <BsCaretLeftFill className='!h-[45%]' />}
+      {linkText === 'ABOUT US' && <BsCaretLeftFill className='!h-[45%] lg:hidden' />}
       {/* ↑↑↑↑ Caret for Mobiles only ↑↑↑↑ */}
       {linkText} {/* ⟸⟸⟸⟸ the Text of each Link */}
       {/*  */}
-      {linkText === 'ABOUT US' && isDesktopOnly && <BsCaretDownFill className='!h-[45%]' />}
+      {linkText === 'ABOUT US' && (
+        <BsCaretDownFill className='!h-[45%] hidden lg:inline-block' />
+      )}
       {/* ↑↑↑↑ Caret for Desktop only ↑↑↑↑ */}
       {linkText === 'SHOP' && (
         <svg
