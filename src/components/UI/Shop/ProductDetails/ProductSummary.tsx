@@ -3,10 +3,8 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import dynamic from 'next/dynamic';
+import { ProductImageGallery } from './ProductImageGallery';
 
-const ProductImageGallery = dynamic(() =>
-  import('./ProductImageGallery/index').then((mod) => mod.ProductImageGallery),
-);
 const ProductTitleAndSizesEtc = dynamic(() => import('./ProductTitleAndSizesEtc'));
 
 const reviews = [

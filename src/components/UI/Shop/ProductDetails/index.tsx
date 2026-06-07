@@ -1,7 +1,6 @@
 'use client';
 import { ProductResult } from '@/lib/merchizeStorefront/productTypes';
-import dynamic from 'next/dynamic';
-const ProductSummary = dynamic(() => import('./ProductSummary'));
+import ProductSummary from './ProductSummary';
 import { createContext, useContext, FC, ReactNode, useMemo } from 'react';
 
 export interface ProductDetailsProps {
