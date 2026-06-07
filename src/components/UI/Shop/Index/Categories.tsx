@@ -3,9 +3,7 @@ import { categoriesObj } from '@/lib/utils/shopHomePageProductsData';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import { formatServerPricesByIds } from '@/lib/utils/shop/globalFXProductPrice/server/formatServerPrice';
 import GlobalProductPrice from '../GlobalShopComponents/GlobalProductPrice';
-import dynamic from 'next/dynamic';
-
-const CountryDropdownServer = dynamic(() => import('./CountryDropDownServerFloating'));
+import CountryDropdownServer from './CountryDropDownServerFloating';
 
 const Categories = async () => {
   const productIds = Object.values(categoriesObj).flatMap((category) =>

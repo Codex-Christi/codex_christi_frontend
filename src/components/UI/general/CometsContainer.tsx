@@ -20,7 +20,7 @@ const CometsContainer: FC<CometsContainerInterface> = (props) => {
           bg-[url('/media/img/home/comets_mobile.svg')]
           md:bg-[url('/media/img/home/comets_tablet.svg')]
           lg:bg-[url('/media/img/home/comets_ desktop.svg')]
-          bg-repeat animate-ltr-linear-infinite !ease-linear`}
+          bg-repeat animate-ltr-linear-infinite !ease-linear motion-reduce:animate-none`}
       />
 
       {children ? (

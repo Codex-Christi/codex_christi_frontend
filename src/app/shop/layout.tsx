@@ -1,9 +1,8 @@
 import { Metadata } from 'next';
 import { ReactNode } from 'react';
-import dynamic from 'next/dynamic';
 import ShopNav from '@/components/UI/Shop/Nav/Navbar';
 import Footer from '@/components/UI/Shop/Footer';
-const CometsContainer = dynamic(() => import('@/components/UI/general/CometsContainer'));
+import CometsContainer from '@/components/UI/general/CometsContainer';
 import GlobalCurrencyFXWrapper from '@/components/UI/Providers/Shop/GlobalCurrencyFXWrapper';
 
 export const metadata: Metadata = {
