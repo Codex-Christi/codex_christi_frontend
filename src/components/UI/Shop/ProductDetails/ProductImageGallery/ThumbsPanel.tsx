@@ -47,7 +47,7 @@ function ThumbsPanel({
               width={width}
               height={width}
               sizes={`(max-width: 412px) ${thumbSizeHint}px, (min-resolution: 2dppx) ${thumbSizeHintHighDPI}px, ${thumbSizeHint}px`}
-              quality={75}
+              quality={50}
               loading='lazy'
               onLoad={() => loader.markLoaded(index, image)}
               onError={() => loader.markFailed(index)}
