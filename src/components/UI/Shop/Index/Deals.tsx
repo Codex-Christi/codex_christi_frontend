@@ -21,7 +21,7 @@ const Deals = () => {
   // Main JSX
   return (
     <div
-      className='md:pt-12 pb-8 px-4 bg-[linear-gradient(95.55deg,_#9747FF_3.68%,_#4264FF_53.29%,_#007AFF_100%)] relative 
+      className='min-h-[21rem] md:min-h-[14rem] md:pt-12 pb-8 px-4 bg-[linear-gradient(95.55deg,_#9747FF_3.68%,_#4264FF_53.29%,_#007AFF_100%)] relative 
       md:grid md:grid-cols-12 md:gap-2 items-center'
     >
       {/* Launch Merch Text */}
