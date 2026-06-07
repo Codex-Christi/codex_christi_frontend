@@ -161,10 +161,8 @@ const Footer = () => {
             <CustomShopLink href={media.route} key={index}>
               <Image
                 alt='Connect with us'
-                className='size-6 shrink-0'
-                height={24}
+                className='h-auto max-h-6 w-auto max-w-6 shrink-0'
                 src={media.image}
-                width={24}
               />
             </CustomShopLink>
           ))}
