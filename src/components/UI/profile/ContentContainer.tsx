@@ -8,6 +8,7 @@ import SponsoredAd from '@/assets/img/sponsored-ad.png';
 import UserAvatar from './UserAvatar';
 import { useState } from 'react';
 import { BsCart } from 'react-icons/bs';
+import BluePlanetImage from '../Home/BluePlanetImage';
 
 const ContentContainer = ({ children }: { children: React.ReactNode }) => {
   const [navIsOpen, setNavIsOpen] = useState(false);
@@ -123,12 +124,10 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
         </div>
 
         <div className='flex items-center gap-2 md:gap-10 relative'>
-          <Image
-            priority
+          <BluePlanetImage
             alt='Blue Planet'
-            height={0}
-            width={0}
-            src='/media/img/home/blue-planet.svg'
+            fetchPriority='high'
+            loading='eager'
             className='w-[80%] max-w-[550px] h-[8.5rem] right-[-4rem] top-[-1.25rem] 
             md:w-[65%] md:max-w-[500px] md:h-[9rem] md:right-[-4.5rem] lg:w-[35%] lg:max-w-[470px] lg:h-[200px] 
             lg:[inset-inline-end:16px;] lg:top-[-.1rem] fixed !overflow-x-hidden !-z-10'
