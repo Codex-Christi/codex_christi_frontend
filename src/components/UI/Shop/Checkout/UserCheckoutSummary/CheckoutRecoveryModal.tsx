@@ -1,0 +1,560 @@
+'use client';
+
+import * as React from 'react';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerClose,
+  DrawerOverlay,
+} from '@/components/UI/primitives/drawer';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/UI/primitives/input-otp';
+import { Button } from '@/components/UI/primitives/button';
+import {
+  AlertTriangle,
+  BellRing,
+  CheckCircle2,
+  Clipboard,
+  Clock3,
+  CreditCard,
+  Loader2,
+  MapPin,
+  Package,
+  RefreshCw,
+  ShieldCheck,
+  X,
+} from 'lucide-react';
+import errorToast from '@/lib/error-toast';
+import { cn } from '@/lib/utils';
+
+type RecoveryCheckoutSummary = {
+  orderToken: string;
+  status: string;
+  receiptLink: string | null;
+  receiptFile: string | null;
+  djangoPaymentSaveCustomId: string | null;
+  supportReference: string;
+  shortSupportReference: string;
+  createdAt: string;
+  updatedAt: string;
+  placedAtLabel: string;
+  paidAmountLabel: string | null;
+  itemCount: number;
+  itemSummaryLabel: string | null;
+  itemTitles: string[];
+  shippingSummaryLabel: string | null;
+  statusLabel: string;
+  message: string;
+};
+
+type RecoveryVerifyResponse =
+  | {
+      ok: true;
+      recoveryVerified: true;
+      checkouts: RecoveryCheckoutSummary[];
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
+type RecoveryStartResponse =
+  | {
+      ok: true;
+      recoveryRequired: true;
+      expiresInMinutes?: number;
+      expiresInSeconds?: number;
+      resendAvailableInSeconds?: number;
+      message?: string;
+    }
+  | {
+      ok: true;
+      recoveryRequired: false;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
+type CheckoutRecoveryModalProps = {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  email: string;
+  recipientName?: string;
+  expiresInMinutes?: number;
+  resendAvailableInSeconds?: number;
+  onStartSeparateOrder: () => Promise<void>;
+};
+
+export const CheckoutRecoveryModal = (props: CheckoutRecoveryModalProps) => {
+  const {
+    isOpen,
+    onOpenChange,
+    email,
+    recipientName,
+    expiresInMinutes = 10,
+    resendAvailableInSeconds = 0,
+    onStartSeparateOrder,
+  } = props;
+  const [otp, setOtp] = React.useState('');
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = React.useState<string | null>(null);
+  const [checkouts, setCheckouts] = React.useState<RecoveryCheckoutSummary[]>([]);
+  const [isVerifying, setIsVerifying] = React.useState(false);
+  const [isResending, setIsResending] = React.useState(false);
+  const [isContinuing, setIsContinuing] = React.useState(false);
+  const [resendCooldown, setResendCooldown] = React.useState(resendAvailableInSeconds);
+  const [hasVerifiedRecovery, setHasVerifiedRecovery] = React.useState(false);
+  const recoveryVerified = hasVerifiedRecovery;
+
+  const resetRecoveryState = React.useCallback(() => {
+    setOtp('');
+    setErrorMessage(null);
+    setInfoMessage(null);
+    setCheckouts([]);
+    setIsVerifying(false);
+    setIsResending(false);
+    setIsContinuing(false);
+    setHasVerifiedRecovery(false);
+    setResendCooldown(resendAvailableInSeconds);
+  }, [resendAvailableInSeconds]);
+
+  const handleOpenChange = React.useCallback(
+    (open: boolean) => {
+      if (!open) resetRecoveryState();
+      onOpenChange(open);
+    },
+    [onOpenChange, resetRecoveryState],
+  );
+
+  React.useEffect(() => {
+    if (!isOpen || resendCooldown <= 0) return;
+
+    const timer = window.setInterval(() => {
+      setResendCooldown((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [isOpen, resendCooldown]);
+
+  const verifyRecoveryOtp = React.useCallback(async () => {
+    if (otp.length < 6) {
+      setErrorMessage('Enter the 6-digit recovery code sent to your email.');
+      return;
+    }
+
+    setIsVerifying(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const response = await fetch('/next-api/shop/checkout/recovery/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+      const payload = (await response.json()) as RecoveryVerifyResponse;
+
+      if (!response.ok || !payload.ok) {
+        setErrorMessage('message' in payload ? payload.message : 'Invalid recovery code.');
+        return;
+      }
+
+      setCheckouts(payload.checkouts);
+      setHasVerifiedRecovery(true);
+      setOtp('');
+    } catch {
+      setErrorMessage('Unable to verify the recovery code. Please try again.');
+    } finally {
+      setIsVerifying(false);
+    }
+  }, [email, otp]);
+
+  const resendRecoveryOtp = React.useCallback(async () => {
+    if (resendCooldown > 0) return;
+
+    setIsResending(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const response = await fetch('/next-api/shop/checkout/recovery/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, recipientName }),
+      });
+      const payload = (await response.json()) as RecoveryStartResponse;
+
+      if (!response.ok || !payload.ok) {
+        setErrorMessage(
+          ('message' in payload ? payload.message : undefined) ??
+            'Unable to resend recovery code.',
+        );
+        return;
+      }
+
+      if (!payload.recoveryRequired) {
+        setErrorMessage('No active checkout recovery case was found for this email.');
+        return;
+      }
+
+      setInfoMessage(payload.message ?? 'A recovery code has been sent to your email.');
+      setResendCooldown(payload.resendAvailableInSeconds ?? 60);
+    } catch {
+      setErrorMessage('Unable to resend the recovery code. Please try again.');
+    } finally {
+      setIsResending(false);
+    }
+  }, [email, recipientName, resendCooldown]);
+
+  const copySupportReference = React.useCallback(async (supportReference: string) => {
+    try {
+      await navigator.clipboard.writeText(supportReference);
+    } catch {
+      errorToast({ message: 'Unable to copy support reference.' });
+    }
+  }, []);
+
+  const copySupportDetails = React.useCallback(async () => {
+    if (!checkouts.length) return;
+
+    const details = checkouts
+      .map((checkout, index) =>
+        [
+          `Checkout ${index + 1}`,
+          `Reference: ${checkout.supportReference}`,
+          `Status: ${checkout.statusLabel}`,
+          `Paid: ${checkout.paidAmountLabel ?? 'Payment received'}`,
+          `Placed: ${checkout.placedAtLabel}`,
+          `Items: ${checkout.itemSummaryLabel ?? 'Not available'}`,
+          `Ship to: ${checkout.shippingSummaryLabel ?? 'Not available'}`,
+        ].join('\n'),
+      )
+      .join('\n\n');
+
+    try {
+      await navigator.clipboard.writeText(details);
+    } catch {
+      errorToast({ message: 'Unable to copy support details.' });
+    }
+  }, [checkouts]);
+
+  const notifySupportPlaceholder = React.useCallback(() => {
+    // TODO: Replace this close-only placeholder with the support notification workflow.
+    handleOpenChange(false);
+  }, [handleOpenChange]);
+
+  const startSeparateOrder = React.useCallback(async () => {
+    setIsContinuing(true);
+    setErrorMessage(null);
+
+    try {
+      await onStartSeparateOrder();
+      handleOpenChange(false);
+    } catch {
+      setErrorMessage('Unable to continue checkout. Please try again.');
+    } finally {
+      setIsContinuing(false);
+    }
+  }, [handleOpenChange, onStartSeparateOrder]);
+
+  const primaryCheckout = checkouts[0];
+  const hiddenCheckoutCount = Math.max(0, checkouts.length - 1);
+
+  return (
+    <Drawer open={isOpen} onOpenChange={handleOpenChange}>
+      <DrawerOverlay className='!bg-[linear-gradient(135deg,rgba(0,0,0,0.32),rgba(8,47,73,0.18),rgba(6,78,59,0.14),rgba(0,0,0,0.34))] !backdrop-blur-[8px]' />
+      <DrawerContent
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+        className='!rounded-none h-full -mt-6 bg-transparent !border-none !fixed !bottom-0 flex items-center justify-center !right-0 !z-[520] w-full overflow-hidden'
+      >
+        <div
+          aria-hidden='true'
+          className='checkout-recovery-backdrop pointer-events-none absolute inset-0 opacity-90 motion-reduce:animate-none'
+        />
+        <section className='checkout-recovery-panel mx-auto flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden p-5 text-white shadow-[0_26px_90px_rgba(8,47,73,0.38)] relative border border-white/20 bg-slate-950/[0.52] supports-[backdrop-filter]:backdrop-blur-2xl sm:w-[92vw] sm:max-w-lg sm:rounded-2xl sm:p-6 md:max-w-2xl lg:max-w-3xl animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4 duration-300 motion-reduce:animate-none'>
+          <div
+            aria-hidden='true'
+            className='pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-200/80 to-transparent'
+          />
+
+          <div className='relative flex min-h-0 flex-1 flex-col'>
+            <div className='flex items-start justify-between gap-4'>
+              <div className='flex items-center gap-3'>
+                <div className='size-11 rounded-2xl border border-sky-200/30 bg-sky-300/10 flex items-center justify-center shadow-[0_0_28px_rgba(125,211,252,0.18)]'>
+                  {recoveryVerified ? (
+                    <ShieldCheck className='text-emerald-200' size={22} />
+                  ) : (
+                    <AlertTriangle className='text-sky-100' size={22} />
+                  )}
+                </div>
+                <div>
+                  <DrawerTitle className='text-lg font-semibold tracking-tight'>
+                    Checkout Recovery
+                  </DrawerTitle>
+                  <DrawerDescription className='text-sm text-white/65 mt-1'>
+                    Protecting you from a duplicate payment.
+                  </DrawerDescription>
+                </div>
+              </div>
+
+              <DrawerClose
+                className='rounded-full border border-white/15 bg-white/[0.04] p-2 text-white/70 hover:text-white hover:bg-white/12 transition'
+                aria-label='Close checkout recovery'
+              >
+                <X size={18} />
+              </DrawerClose>
+            </div>
+
+            <div className='mt-6 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1'>
+              <div className='rounded-2xl border border-white/10 bg-black/20 p-4 shadow-inner shadow-white/[0.03]'>
+                <p className='text-sm leading-6 text-white/78'>
+                  We found a recent checkout issue for{' '}
+                  <span className='font-semibold'>{email}</span>. Your payment may already be
+                  recorded, so verify your email before starting another checkout for the same
+                  purchase.
+                </p>
+              </div>
+
+              {!recoveryVerified ? (
+                <div className='space-y-5'>
+                  <div>
+                    <p className='text-sm text-white/65'>
+                      Enter the recovery code sent to your email. The code expires in{' '}
+                      {expiresInMinutes} minutes.
+                    </p>
+                    <div className='mt-4 flex justify-center'>
+                      <InputOTP maxLength={6} value={otp} onChange={setOtp} className='font-otp'>
+                        <InputOTPGroup className='gap-3'>
+                          {Array.from({ length: 6 }).map((_, i) => (
+                            <InputOTPSlot
+                              key={i}
+                              index={i}
+                              className='w-11 h-12 rounded-xl bg-white/5 border border-white/45 text-white text-xl text-center tracking-widest outline-none ring-offset-transparent focus:ring-2 focus:ring-sky-200/40 focus:bg-white/10 transition-all'
+                            />
+                          ))}
+                        </InputOTPGroup>
+                      </InputOTP>
+                    </div>
+                  </div>
+
+                  {errorMessage ? (
+                    <p className='rounded-xl border border-rose-200/20 bg-rose-400/10 px-3 py-2 text-sm text-rose-100'>
+                      {errorMessage}
+                    </p>
+                  ) : null}
+
+                  {infoMessage ? (
+                    <p className='rounded-xl border border-sky-200/20 bg-sky-400/10 px-3 py-2 text-sm text-sky-100'>
+                      {infoMessage}
+                    </p>
+                  ) : null}
+
+                  <div className='flex flex-col sm:flex-row gap-3'>
+                    <Button
+                      name='Verify checkout recovery code'
+                      type='button'
+                      onClick={verifyRecoveryOtp}
+                      disabled={isVerifying}
+                      className='rounded-2xl bg-white text-black hover:bg-white/90 font-semibold gap-2 shadow-[0_14px_34px_rgba(255,255,255,0.12)]'
+                    >
+                      {isVerifying ? (
+                        <Loader2 className='animate-spin' size={17} />
+                      ) : (
+                        <CheckCircle2 size={17} />
+                      )}
+                      Verify code
+                    </Button>
+                    <Button
+                      name='Resend checkout recovery code'
+                      type='button'
+                      onClick={resendRecoveryOtp}
+                      disabled={isResending || resendCooldown > 0}
+                      className='rounded-2xl border border-white/20 bg-transparent hover:bg-white/10 font-semibold gap-2'
+                    >
+                      {isResending ? (
+                        <Loader2 className='animate-spin' size={17} />
+                      ) : (
+                        <RefreshCw size={17} />
+                      )}
+                      {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className='flex min-h-0 flex-col'>
+                  <div className='rounded-2xl border border-emerald-200/20 bg-emerald-400/10 p-4'>
+                    <p className='font-semibold text-emerald-100'>
+                      {primaryCheckout ? 'Payment received' : 'No active recovery case remains'}
+                    </p>
+                    <p className='mt-2 text-sm text-white/68'>
+                      {primaryCheckout
+                        ? 'You do not need to pay again for this order. We are reviewing the final order step.'
+                        : 'The checkout issue no longer appears unresolved. You can continue with checkout.'}
+                    </p>
+                  </div>
+
+                  {primaryCheckout ? (
+                    <div className='mt-4 space-y-3'>
+                      <div className='grid grid-cols-2 gap-2 md:grid-cols-4'>
+                        <div className='rounded-xl border border-white/10 bg-black/20 p-3'>
+                          <CreditCard className='mb-2 text-emerald-100' size={17} />
+                          <p className='text-[11px] uppercase text-white/42'>Paid</p>
+                          <p className='mt-1 truncate text-sm font-semibold text-white/90'>
+                            {primaryCheckout.paidAmountLabel ?? 'Received'}
+                          </p>
+                        </div>
+                        <div className='rounded-xl border border-white/10 bg-black/20 p-3'>
+                          <Package className='mb-2 text-sky-100' size={17} />
+                          <p className='text-[11px] uppercase text-white/42'>Items</p>
+                          <p className='mt-1 truncate text-sm font-semibold text-white/90'>
+                            {primaryCheckout.itemSummaryLabel ??
+                              `${primaryCheckout.itemCount || 1} item`}
+                          </p>
+                        </div>
+                        <div className='rounded-xl border border-white/10 bg-black/20 p-3'>
+                          <MapPin className='mb-2 text-cyan-100' size={17} />
+                          <p className='text-[11px] uppercase text-white/42'>Ship to</p>
+                          <p className='mt-1 truncate text-sm font-semibold text-white/90'>
+                            {primaryCheckout.shippingSummaryLabel ?? 'On file'}
+                          </p>
+                        </div>
+                        <div className='rounded-xl border border-white/10 bg-black/20 p-3'>
+                          <Clock3 className='mb-2 text-violet-100' size={17} />
+                          <p className='text-[11px] uppercase text-white/42'>Placed</p>
+                          <p className='mt-1 truncate text-sm font-semibold text-white/90'>
+                            {primaryCheckout.placedAtLabel}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className='flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-sm'>
+                        <span className='min-w-0 truncate text-white/70'>
+                          Ref: <span className='text-white'>{primaryCheckout.shortSupportReference}</span>
+                          {hiddenCheckoutCount ? ` +${hiddenCheckoutCount} more` : ''}
+                        </span>
+                        <button
+                          type='button'
+                          onClick={() => copySupportReference(primaryCheckout.supportReference)}
+                          className='inline-flex items-center gap-1.5 rounded-full border border-white/15 px-2.5 py-1 text-xs font-semibold text-white/78 transition hover:bg-white/10 hover:text-white'
+                        >
+                          <Clipboard size={14} />
+                          Copy
+                        </button>
+                      </div>
+
+                      <p className='text-sm text-white/62'>{primaryCheckout.statusLabel}</p>
+
+                      {primaryCheckout.receiptLink ? (
+                        <a
+                          href={primaryCheckout.receiptLink}
+                          target='_blank'
+                          rel='noreferrer'
+                          className='inline-flex text-sm font-semibold text-sky-100 underline underline-offset-4'
+                        >
+                          View receipt
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {errorMessage ? (
+                    <p className='rounded-xl border border-rose-200/20 bg-rose-400/10 px-3 py-2 text-sm text-rose-100'>
+                      {errorMessage}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </div>
+
+            {recoveryVerified ? (
+              <div className='sticky bottom-0 -mx-5 mt-4 border-t border-white/10 bg-slate-950/80 px-5 pt-4 supports-[backdrop-filter]:backdrop-blur-xl sm:-mx-6 sm:px-6'>
+                <div className='grid grid-cols-2 gap-3'>
+                  {checkouts.length ? (
+                    <>
+                      <Button
+                        name='Notify support about recovered checkout'
+                        type='button'
+                        onClick={notifySupportPlaceholder}
+                        className='col-span-2 rounded-2xl bg-white text-black hover:bg-white/90 font-semibold gap-2'
+                      >
+                        <BellRing size={17} />
+                        Notify support
+                      </Button>
+                      <Button
+                        name='Copy checkout recovery support details'
+                        type='button'
+                        onClick={copySupportDetails}
+                        className='rounded-2xl border border-white/20 bg-transparent hover:bg-white/10 font-semibold gap-2'
+                      >
+                        <Clipboard size={17} />
+                        Copy details
+                      </Button>
+                    </>
+                  ) : null}
+                  <Button
+                    name='Start a new order after checkout recovery'
+                    type='button'
+                    onClick={startSeparateOrder}
+                    disabled={isContinuing}
+                    className={cn(
+                      'rounded-2xl border border-white/20 bg-transparent hover:bg-white/10 font-semibold gap-2',
+                      checkouts.length ? 'text-white/78' : 'col-span-2',
+                      isContinuing && 'opacity-70',
+                    )}
+                  >
+                    {isContinuing ? <Loader2 className='animate-spin' size={17} /> : null}
+                    {checkouts.length ? 'New order' : 'Continue checkout'}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <style jsx>{`
+            .checkout-recovery-backdrop {
+              animation: checkout-recovery-backdrop 12s ease-in-out infinite alternate;
+              background:
+                linear-gradient(115deg, rgba(14, 165, 233, 0.12), transparent 34%),
+                linear-gradient(245deg, rgba(16, 185, 129, 0.12), transparent 42%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 32%);
+            }
+
+            .checkout-recovery-panel {
+              animation: checkout-recovery-panel 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+            }
+
+            @keyframes checkout-recovery-backdrop {
+              from {
+                opacity: 0.55;
+              }
+              to {
+                opacity: 0.8;
+              }
+            }
+
+            @keyframes checkout-recovery-panel {
+              from {
+                opacity: 0;
+                transform: translateY(14px) scale(0.98);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+              .checkout-recovery-backdrop,
+              .checkout-recovery-panel {
+                animation: none;
+              }
+            }
+          `}</style>
+        </section>
+      </DrawerContent>
+    </Drawer>
+  );
+};
