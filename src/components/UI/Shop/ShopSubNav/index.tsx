@@ -2,15 +2,11 @@
 
 import React, { FC } from 'react';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
-import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 import { categories, helperLinks } from './SubNavObj';
 import { usePathname } from 'next/navigation';
 import Divider from '../../general/Divider';
 
 const SubNav = () => {
-  // Hooks
-  const { isMobileAndTablet, isDesktopOnly } = useResponsiveSSRValue();
-
   const pathname = usePathname();
 
   // jsx
@@ -25,24 +21,29 @@ const SubNav = () => {
        `}
     >
       {/* HelperLinks component for only  desktop */}
-      {isDesktopOnly && <HelperLinksComponent />}
+      <div className='hidden lg:contents'>
+        <HelperLinksComponent hideDesktopContact />
+      </div>
       {/* Vertical Divider for Desktop only */}
-      {isDesktopOnly && <Divider vertical length='1.05rem' />}
+      <div className='hidden lg:block'>
+        <Divider vertical length='1.05rem' />
+      </div>
       {/* Main Categories List for both mobile and Desktop */}
       <CategoriesComponent />
       {/* Horizontal Divider for Mobile devices only */}
-      {isMobileAndTablet && <Divider horizontal />}
+      <div className='lg:hidden w-full'>
+        <Divider horizontal />
+      </div>
       {/* Helper Lsit Components for only Mobile devices */}
-      {isMobileAndTablet && <HelperLinksComponent />}
+      <div className='contents lg:hidden'>
+        <HelperLinksComponent />
+      </div>
     </nav>
   );
 };
 
 // Categories Component
 const CategoriesComponent: FC = () => {
-  // Hooks
-  const { isMobileAndTablet } = useResponsiveSSRValue();
-
   return (
     <>
       {categories.map((obj, index) => {
@@ -55,7 +56,7 @@ const CategoriesComponent: FC = () => {
             ariaLabel={ariaLabel}
             className='flex items-center gap-7 lg:gap-[unset]'
           >
-            {isMobileAndTablet && <SvgElem className='!w-9 h-9' />}
+            <SvgElem className='!w-9 h-9 lg:hidden' />
             <h3 className='font-semibold text-lg'>{textValue}</h3>
           </CustomShopLink>
         );
@@ -65,20 +66,19 @@ const CategoriesComponent: FC = () => {
 };
 
 // Helkper Link like "Contact us, Track order, etc"
-const HelperLinksComponent: FC = () => {
-  const { isDesktopOnly } = useResponsiveSSRValue();
+const HelperLinksComponent: FC<{ hideDesktopContact?: boolean }> = ({ hideDesktopContact }) => {
   return helperLinks.map((obj, index) => {
     const { textValue, href, SvgElem } = obj;
     const ariaLabel = `${textValue}`;
     return (
-      !(isDesktopOnly && href === '/contact-us') && (
+      !(hideDesktopContact && href === '/contact-us') && (
         <CustomShopLink
           key={textValue + index}
           href={`/shop${href}`}
           ariaLabel={ariaLabel}
           className='flex items-center gap-7 lg:gap-[unset]'
         >
-          {<SvgElem className='!w-9 h-9 lg:w-5 lg:h-5' />}
+          {<SvgElem className='!w-9 !h-9 lg:!w-5 lg:!h-5' />}
           <h3 className='font-semibold text-lg text-[1.05rem]'>{textValue}</h3>
         </CustomShopLink>
       )

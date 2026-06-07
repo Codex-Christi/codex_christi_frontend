@@ -7,16 +7,12 @@ import { Button } from '../../primitives/button';
 import NavTopRightLinks from './NavTopRightLinks';
 import SubNav from '../ShopSubNav';
 import { usePathname } from 'next/navigation';
-import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 import dynamic from 'next/dynamic';
 // import RouteWatcher from './RouteWatcher';
 
 const ShopMobileSideBar = dynamic(() => import('../MobileSidebar'), { ssr: false });
 
 const ShopNav: FC = () => {
-  // Hooks
-  const { isDesktopOnly, isMobileAndTablet } = useResponsiveSSRValue();
-
   // State Values
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -66,9 +62,11 @@ const ShopNav: FC = () => {
         <NavTopRightLinks />
       </nav>
 
-      {isDesktopOnly && <SubNav />}
+      <div className='hidden lg:block'>
+        <SubNav />
+      </div>
 
-      {isMobileAndTablet && (
+      {isSidebarOpen && (
         <ShopMobileSideBar openState={isSidebarOpen} openCloseController={setIsSidebarOpen} />
       )}
 

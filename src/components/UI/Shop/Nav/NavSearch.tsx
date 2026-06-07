@@ -2,13 +2,9 @@ import { FC, ReactNode, ComponentPropsWithRef } from 'react';
 import { Input } from '../../primitives/input';
 import { Button } from '../../primitives/button';
 import { Search } from 'lucide-react';
-import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 
 // Main NavSearch Component
 const NavSearch: FC = () => {
-  // Hooks
-  const { isDesktopOnly } = useResponsiveSSRValue();
-
   // Main JSX
   return (
     <>
@@ -21,7 +17,7 @@ const NavSearch: FC = () => {
         />
         <SearchButtonOnly
           name='Search button'
-          isDesktopOnly={isDesktopOnly}
+          searchContext='desktop'
           className='hidden lg:!block'
         />
       </section>
@@ -30,12 +26,12 @@ const NavSearch: FC = () => {
 };
 
 interface SearchButtonInterface extends ComponentPropsWithRef<typeof Button> {
-  isDesktopOnly: boolean;
+  searchContext?: 'desktop' | 'mobile';
   children?: ReactNode;
 }
 
 export const SearchButtonOnly: FC<SearchButtonInterface> = ({
-  isDesktopOnly,
+  searchContext = 'mobile',
   children,
   className,
   ...props
@@ -47,7 +43,7 @@ export const SearchButtonOnly: FC<SearchButtonInterface> = ({
       className={`bg-transparent border-none absolute h-8 right-0 p-0 pr-2 flex
             ${className}`}
       onClick={() => {
-        if (isDesktopOnly) {
+        if (searchContext === 'desktop') {
           alert('From PC');
         } else {
           alert('From mobile');

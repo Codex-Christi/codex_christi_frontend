@@ -33,7 +33,7 @@ const NavTopRightLinks: FC = () => {
       <SearchButtonOnly
         name='Search Button'
         className='scale-125 relative block lg:!hidden'
-        isDesktopOnly={false}
+        searchContext='mobile'
       />
 
       <>
