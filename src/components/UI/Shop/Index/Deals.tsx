@@ -1,22 +1,14 @@
-'use client';
-
 import Image from 'next/image';
 import { launchMerchProducts } from '@/lib/utils/shopHomePageProductsData';
-import { useRef } from 'react';
-import { GalleryPrevButton as CarouselPrev } from '../ProductDetails/GalleryPrevButton';
-import { GalleryNextButton as CarouselNext } from '../ProductDetails/GalleryNextButton';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
-import { useAutoScroller } from './useAutoScroller';
+import DealsScrollControls from './DealsScrollControls';
 
 // Top-Page Deals Component
 const Deals = () => {
-  const slideContainerRef = useRef<HTMLDivElement | null>(null);
   const eagerImageCount = 2;
   const imageQuality = 80;
   const imageSizes =
     '(max-width: 640px) 80px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 160px';
-
-  const { nudgeScroll } = useAutoScroller(slideContainerRef);
 
   // Main JSX
   return (
@@ -48,9 +40,9 @@ const Deals = () => {
 
       {/* Product Slider Carousel */}
       <div
+        id='launch-merch-products'
         className='overflow-x-auto overflow-y-hidden min-w-full flex gap-2 lg:gap-10 xl:gap-7
         scroll-smooth snap-x snap-mandatory md:grid-cols-5 md:w-full md:col-span-8 custom-scrollbar'
-        ref={slideContainerRef}
       >
         {launchMerchProducts.map((merch, i) => (
           <CustomShopLink
@@ -66,7 +58,6 @@ const Deals = () => {
               fetchPriority={i < eagerImageCount ? 'high' : 'auto'}
               alt={merch.img_alt}
               draggable={false}
-              onDragStart={(e) => e.preventDefault()} // prevent ghost drag only
               loading={i < eagerImageCount ? 'eager' : 'lazy'}
               priority={i < eagerImageCount}
               quality={imageQuality}
@@ -76,20 +67,7 @@ const Deals = () => {
         ))}
       </div>
 
-      {/* NOTE: Desktop currently performs no scroll. To enable later:
-          // onClick={() => nudgeScroll('right', { fraction: 0.33, duration: 450 })}
-      */}
-      <CarouselPrev
-        className='absolute top-[40%] left-0  md:hidden'
-        onClick={() => nudgeScroll('left')}
-        aria-label='Scroll left'
-      />
-
-      <CarouselNext
-        className='absolute top-[40%] right-0 md:hidden'
-        onClick={() => nudgeScroll('right')}
-        aria-label='Scroll right'
-      />
+      <DealsScrollControls targetId='launch-merch-products' />
     </div>
   );
 };
