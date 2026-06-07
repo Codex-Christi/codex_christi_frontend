@@ -3,6 +3,7 @@
 import { ReactNode, FC } from 'react';
 import FaviconUpdater from '../general/Helpers/FaviconUpdater';
 import dynamic from 'next/dynamic';
+import { usePathname } from 'next/navigation';
 
 const LoggedinProvider = dynamic(() => import('./LoggedinProvider'));
 
@@ -15,11 +16,14 @@ const ResponsiveMediaProvider = dynamic(() => import('./ResponsiveMediaQueryProv
 });
 
 const AllRootProviders: FC<{ children: ReactNode }> = ({ children }) => {
+  const pathname = usePathname();
+  const needsResponsiveMediaProvider = pathname.startsWith('/shop/checkout');
+
   return (
     <>
       <LoggedinProvider>{children}</LoggedinProvider>
       <Toaster richColors />
-      <ResponsiveMediaProvider />
+      {needsResponsiveMediaProvider && <ResponsiveMediaProvider />}
       <FaviconUpdater />
       <NextProgressProvider />
     </>

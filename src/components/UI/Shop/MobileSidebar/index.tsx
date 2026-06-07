@@ -1,6 +1,6 @@
 'use client';
 
-import { Dispatch, FC, ReactNode, SetStateAction } from 'react';
+import { Dispatch, FC, ReactNode, SetStateAction, useEffect, useState } from 'react';
 import {
   Drawer,
   DrawerClose,
@@ -9,7 +9,6 @@ import {
   DrawerDescription,
   DrawerOverlay,
 } from '@/components/UI/primitives/drawer';
-import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 import SubNav from '../ShopSubNav';
 import { useRouteChangeAware } from '@/lib/hooks/useRouteChangeAware';
 import { useAmIOnShopRoute } from '@/lib/hooks/shopHooks/useAmIOnShopRoute';
@@ -29,7 +28,20 @@ interface SideDrawerInterface {
 
 const ShopMobileSideBar: FC<SideDrawerInterface> = ({ openState, openCloseController }) => {
   // Hooks
-  const { isMobile } = useResponsiveSSRValue();
+  const [isMobile, setIsMobile] = useState(true);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    const syncMobileState = () => setIsMobile(mediaQuery.matches);
+
+    syncMobileState();
+    mediaQuery.addEventListener('change', syncMobileState);
+
+    return () => {
+      mediaQuery.removeEventListener('change', syncMobileState);
+    };
+  }, []);
+
   useRouteChangeAware(() => {
     openCloseController(false);
   });
