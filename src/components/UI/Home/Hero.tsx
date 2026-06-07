@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import HeroImage from '../../../../public/media/img/general/logo-main.svg';
 
 const Hero = () => {
@@ -20,13 +19,17 @@ const Hero = () => {
         <h2>TRANSFORM</h2>
       </section>
 
-      <Image
+      {/* SVG LCP mark: native img keeps sync decoding and avoids Next image overhead for a non-raster asset. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
         alt='Hero Logo Image'
         className='pointer-events-none absolute left-auto right-0 h-auto w-[12rem] md:w-[18rem] lg:w-[22rem]'
         decoding='sync'
         fetchPriority='high'
-        priority
-        src={HeroImage}
+        height={HeroImage.height}
+        loading='eager'
+        src={HeroImage.src}
+        width={HeroImage.width}
       />
     </div>
   );
