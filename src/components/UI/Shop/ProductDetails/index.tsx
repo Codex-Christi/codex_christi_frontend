@@ -3,13 +3,13 @@ import { ProductResult } from '@/lib/merchizeStorefront/productTypes';
 import dynamic from 'next/dynamic';
 const ProductSummary = dynamic(() => import('./ProductSummary'));
 const ProductTitleAndSizesEtc = dynamic(() => import('./ProductTitleAndSizesEtc'));
-import Link from 'next/link';
-import { createContext, useContext, FC, useMemo } from 'react';
+import { createContext, useContext, FC, ReactNode, useMemo } from 'react';
 import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 
 export interface ProductDetailsProps {
   // Define any props if needed
   fetchedProductData: ProductResult;
+  descriptionSection: ReactNode;
 }
 
 export interface OptionalProductVariantProps {
@@ -28,7 +28,7 @@ export const useProductDetailsContext = () => {
   return context;
 };
 
-const ProductDetails: FC<ProductDetailsProps> = ({ fetchedProductData }) => {
+const ProductDetails: FC<ProductDetailsProps> = ({ fetchedProductData, descriptionSection }) => {
   // Hooks
   const { isDesktopOnly } = useResponsiveSSRValue();
 
@@ -37,20 +37,8 @@ const ProductDetails: FC<ProductDetailsProps> = ({ fetchedProductData }) => {
     // Main JSX
     <ProductDetailsContext.Provider value={useMemo(() => fetchedProductData, [fetchedProductData])}>
       <div className='grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-6 xl:grid-cols-3'>
-        <ProductSummary />
+        <ProductSummary descriptionSection={descriptionSection} />
         {isDesktopOnly && <ProductTitleAndSizesEtc />}
-      </div>
-      <div className='space-y-8 mt-4 lg:col-span-2'>
-        <div className='grid place-content-center gap-4'>
-          <p>Please tell us what you think.</p>
-
-          <Link
-            className='text-center bg-[#0085FF] px-4 py-3 rounded-lg text-white'
-            href='/shop/contact-us/'
-          >
-            Kindly give us a feedback!
-          </Link>
-        </div>
       </div>
     </ProductDetailsContext.Provider>
   );

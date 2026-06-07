@@ -6,6 +6,10 @@ import { getProductDetailsSSR, getProductMetaDataOnly } from './productDetailsSS
 import { notFound } from 'next/navigation';
 import serialize from 'serialize-javascript';
 import { extractProductMetaDescriptionFromHtml } from '@/lib/utils/extract-plain-text-from-html';
+import {
+  ProductDescriptionSection,
+  ProductFeedbackSection,
+} from '@/components/UI/Shop/ProductDetails/ProductStaticSections';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -104,7 +108,11 @@ const ProductDetails = async ({ params }: PageProps) => {
   // Main JSX
   return (
     <>
-      <ProductDetailsClientComponent fetchedProductData={productData} />
+      <ProductDetailsClientComponent
+        fetchedProductData={productData}
+        descriptionSection={<ProductDescriptionSection description={description} />}
+      />
+      <ProductFeedbackSection />
       <script type='application/ld+json'>{JSON_LD_Data}</script>
     </>
   );

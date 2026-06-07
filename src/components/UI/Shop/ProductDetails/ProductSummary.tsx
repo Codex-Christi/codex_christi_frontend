@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 
 import dynamic from 'next/dynamic';
 import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
@@ -8,13 +9,10 @@ import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
 const ProductImageGallery = dynamic(() =>
   import('./ProductImageGallery/index').then((mod) => mod.ProductImageGallery),
 );
-const ProductDescription = dynamic(() =>
-  import('./ProductDescription').then((mod) => mod.ProductDescription),
-);
 const ProductTitleAndSizesEtc = dynamic(() => import('./ProductTitleAndSizesEtc'));
 
 // Component
-const ProductSummary = () => {
+const ProductSummary = ({ descriptionSection }: { descriptionSection: ReactNode }) => {
   // Hooks
   const { isMobileAndTablet } = useResponsiveSSRValue();
 
@@ -24,7 +22,7 @@ const ProductSummary = () => {
       <ProductImageGallery />
       {isMobileAndTablet && <ProductTitleAndSizesEtc />}
 
-      <ProductDescription />
+      {descriptionSection}
 
       <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-2 lg:p-8'>
         <h2 className='font-bold text-2xl'>Specifications</h2>
