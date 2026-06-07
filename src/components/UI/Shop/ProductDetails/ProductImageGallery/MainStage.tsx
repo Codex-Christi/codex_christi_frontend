@@ -79,7 +79,9 @@ function MainStage({
                     <div aria-hidden='true' className='size-full bg-black/10' />
                   )}
                   <LoadingOverlay
-                    show={shouldRenderImage && (!loader.loaded[i] || loader.failed[i])}
+                    show={
+                      shouldRenderImage && (loader.failed[i] || (i !== 0 && !loader.loaded[i]))
+                    }
                     onRetry={loader.failed[i] ? () => loader.retryOne(i) : undefined}
                   />
                 </div>
