@@ -5,7 +5,7 @@
  */
 const nextConfig = {
   /* config options here */
-  allowedDevOrigins: ['192.168.1.231'],
+  allowedDevOrigins: ['192.168.1.231', '127.0.0.1'],
   compiler: {
     // Uncomment if you want to remove logs from production server
     // removeConsole: process.env.NODE_ENV === 'production',

@@ -1,5 +1,19 @@
 import crypto from 'node:crypto';
 
+function getRecoveryOtpHashSecret() {
+  const secret =
+    process.env.CHECKOUT_RECOVERY_OTP_SECRET ??
+    process.env.SHOP_CHECKOUT_SERVER_ACTIONS_POST_PROCESSING_CRYPTO_SECRET;
+
+  if (!secret) {
+    throw new Error(
+      'Missing CHECKOUT_RECOVERY_OTP_SECRET or SHOP_CHECKOUT_SERVER_ACTIONS_POST_PROCESSING_CRYPTO_SECRET',
+    );
+  }
+
+  return secret;
+}
+
 export function normalizeRecoveryEmail(email: string) {
   return email.trim().toLowerCase();
 }
@@ -10,7 +24,7 @@ export function createRecoveryOtp(length = 6) {
 }
 
 export function hashRecoveryOtp(otp: string) {
-  return crypto.createHash('sha256').update(otp).digest('hex');
+  return crypto.createHmac('sha256', getRecoveryOtpHashSecret()).update(otp).digest('hex');
 }
 
 export function getRecoveryOtpExpiry(minutes = 10) {

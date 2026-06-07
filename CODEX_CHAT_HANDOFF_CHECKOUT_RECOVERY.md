@@ -243,6 +243,7 @@ Core capabilities:
 
 - Search ledger by email, order token, PayPal order ID, Django intent identifiers, Django payment save custom ID.
 - Filter by statuses: `captured`, `receipt_uploaded`, `payment_saved`, `error`, `completed`, `refunded`.
+- Link out from a broader admin dashboard hub alongside other shop tools, including Merchize catalog refresh.
 - View transaction detail:
   - cart snapshot
   - shipping snapshot
@@ -258,7 +259,17 @@ Core capabilities:
 - Mark manually resolved.
 - Send customer update/support email.
 - Show related checkout recovery OTP activity for the customer email.
+- Clear expired checkout recovery OTP challenges.
+- Show the same customer-safe recovery summary shown in checkout:
+  - paid amount when capture payload includes it
+  - placed date
+  - cart item summary
+  - shipping region
+  - current processing step
+  - support reference
+- Support a customer acknowledgement/update path for "keep me updated" events, so support can see when a customer chose not to place another order.
 - Clear expired checkout recovery OTPs as a maintenance action.
+- Optional future UX refinement: compare a compact current-cart fingerprint against unresolved ledger `cartSnapshot` rows after email ownership is verified. Use it to label the case as same cart, different cart, or unknown cart. This is not a blocker; it should change copy/severity only, not hide the warning that a paid checkout is still unresolved.
 
 Maintenance action:
 

@@ -8,8 +8,8 @@
     "build:webpack": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",
-    "build-with-env": "next build --update-env",
-    "build-with-env:webpack": "next build --webpack --update-env",
+    "build-with-env": "next build --webpack",
+    "build-with-env:webpack": "next build --webpack",
     "merchize-offline-catalog:setup": "bash ./scripts/setup_merchize_offline_catalog.sh",
     "merchize-offline-catalog:db:push": "RUST_LOG=info prisma db push --schema prisma/shop/merchize/priceCatalog.prisma",
     "merchize-offline-catalog:generate": "prisma generate --schema prisma/shop/merchize/priceCatalog.prisma",
@@ -19,7 +19,8 @@
     "prisma:paypalTxLedger:migrate:deploy:prod": "PAYPAL_TX_LEDGER_NEON_BRANCH=prod prisma migrate deploy --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
     "paypal-ledger:recovery-demo:create": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts create",
     "paypal-ledger:recovery-demo:list": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts list",
-    "paypal-ledger:recovery-demo:cleanup": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts cleanup"
+    "paypal-ledger:recovery-demo:cleanup": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts cleanup",
+    "paypal-ledger:recovery-demo:cleanup-all": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts cleanup-all"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1026.0",

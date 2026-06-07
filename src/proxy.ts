@@ -10,8 +10,7 @@ import { authVerifierAndRouteProtector } from './lib/middlewares/codexchristi.sh
 //   /^\/(_next(?:\/[^ ]*)*(?:\?[^ ]*)?|media(?:\/[^ ]*)?(?:\?[^ ]*)?)/;
 
 export const proxy = createNEMO({
-  // For shop
-  '/shop': [],
+  // Protected shop routes
   '/shop/account-overview': [redirectExpSessionToLoginPage],
   '/shop/account-overview/(.*)': [redirectExpSessionToLoginPage],
   '/shop/auth/login': [authVerifierAndRouteProtector],
@@ -26,10 +25,10 @@ export const proxy = createNEMO({
 // Config for middleware matcher
 export const config = {
   matcher: [
-    // Match all non-root page paths except for static assets and API routes.
-    // The root homepage does not need auth/domain routing and should stay cache-friendly.
-    {
-      source: '/((?!$|api|_next|wp-admin|media|wordpress|favicon.ico|sitemap.xml|robots.txt).*)',
-    },
+    '/shop/account-overview/:path*',
+    '/shop/auth/login',
+    '/auth/sign-in',
+    '/auth/signup',
+    '/profile/:path*',
   ],
 };

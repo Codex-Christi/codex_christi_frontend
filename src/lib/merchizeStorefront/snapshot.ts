@@ -39,6 +39,13 @@ export type SnapshotCategoryProductsResponse = {
   count: number;
 };
 
+export type SnapshotCategoryMetadataResponse = {
+  cover: { url: string } | null;
+  description: string;
+  name: string;
+  categoryID: string | null;
+};
+
 export function normalizeStorefrontCategorySlug(input: string) {
   return input.trim().toLowerCase();
 }
@@ -349,6 +356,11 @@ export async function getProductDetailsFromSnapshot(
 }
 
 export async function getCategoryMetadataFromSnapshot(categoryName: string) {
+  const snapshotState = await getCategoryMetadataSnapshotState(categoryName);
+  return snapshotState?.category ?? null;
+}
+
+export async function getCategoryMetadataSnapshotState(categoryName: string) {
   const categorySlug = normalizeStorefrontCategorySlug(categoryName);
   const snapshot = await merchizeCatalogPrisma.storefrontCategorySnapshot.findUnique({
     where: { categorySlug },
@@ -357,12 +369,26 @@ export async function getCategoryMetadataFromSnapshot(categoryName: string) {
   if (!snapshot) return null;
 
   return {
-    cover: snapshot.coverUrl ? { url: snapshot.coverUrl } : null,
-    description:
-      snapshot.description ?? `Buy ${snapshot.name ?? displayCategoryName(categorySlug)} now.`,
-    name: snapshot.name ?? displayCategoryName(categorySlug),
-    categoryID: snapshot.merchizeCategoryId ?? null,
+    category: {
+      cover: snapshot.coverUrl ? { url: snapshot.coverUrl } : null,
+      description:
+        snapshot.description ?? `Buy ${snapshot.name ?? displayCategoryName(categorySlug)} now.`,
+      name: snapshot.name ?? displayCategoryName(categorySlug),
+      categoryID: snapshot.merchizeCategoryId ?? null,
+    } satisfies SnapshotCategoryMetadataResponse,
+    isFresh: isFresh(snapshot.lastMetadataFetchAt),
+    lastFetchedAt: snapshot.lastMetadataFetchAt,
   };
+}
+
+export async function getCategoryIdFromSnapshot(categoryName: string) {
+  const categorySlug = normalizeStorefrontCategorySlug(categoryName);
+  const snapshot = await merchizeCatalogPrisma.storefrontCategorySnapshot.findUnique({
+    where: { categorySlug },
+    select: { merchizeCategoryId: true },
+  });
+
+  return snapshot?.merchizeCategoryId ?? null;
 }
 
 export async function getCategoryProductsFromSnapshot({
@@ -374,10 +400,27 @@ export async function getCategoryProductsFromSnapshot({
   page: number;
   page_size: number;
 }): Promise<SnapshotCategoryProductsResponse | null> {
+  const snapshotState = await getCategoryProductsSnapshotState({ category, page, page_size });
+  return snapshotState?.products ?? null;
+}
+
+export async function getCategoryProductsSnapshotState({
+  category,
+  page,
+  page_size,
+}: {
+  category: string;
+  page: number;
+  page_size: number;
+}): Promise<{
+  products: SnapshotCategoryProductsResponse;
+  isFresh: boolean;
+  lastFetchedAt: Date | null;
+} | null> {
   const categorySlug = normalizeStorefrontCategorySlug(category);
   const snapshot = await merchizeCatalogPrisma.storefrontCategorySnapshot.findUnique({
     where: { categorySlug },
-    select: { id: true, totalProducts: true },
+    select: { id: true, totalProducts: true, lastProductsFetchAt: true },
   });
 
   if (!snapshot) return null;
@@ -399,12 +442,16 @@ export async function getCategoryProductsFromSnapshot({
   });
 
   return {
-    next: safePage < totalPages ? `/shop/category/${categorySlug}?page=${safePage + 1}` : null,
-    previous: safePage > 1 ? `/shop/category/${categorySlug}?page=${safePage - 1}` : null,
-    current_page: safePage,
-    products: rows.map((row) => toBasicProductData(row.product)),
-    totalPages,
-    count,
+    products: {
+      next: safePage < totalPages ? `/shop/category/${categorySlug}?page=${safePage + 1}` : null,
+      previous: safePage > 1 ? `/shop/category/${categorySlug}?page=${safePage - 1}` : null,
+      current_page: safePage,
+      products: rows.map((row) => toBasicProductData(row.product)),
+      totalPages,
+      count,
+    },
+    isFresh: isFresh(snapshot.lastProductsFetchAt),
+    lastFetchedAt: snapshot.lastProductsFetchAt,
   };
 }
 

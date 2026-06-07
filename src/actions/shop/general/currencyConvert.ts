@@ -22,6 +22,14 @@ export const getDollarMultiplier = cache(async (countryCode: string) => {
       currencyCode = 'EUR';
     }
 
+    if (currencyCode === 'USD') {
+      return {
+        multiplier: 1,
+        currency: 'USD',
+        currency_symbol,
+      };
+    }
+
     const response = await fetch(`https://open.er-api.com/v6/latest/USD`, {
       next: { revalidate: 86400 },
     });

@@ -1,8 +1,6 @@
 import { Metadata } from 'next';
 import { fetchCategoryProducts, getCategoryMetadataFromMerchize } from './categoryDetailsSSR';
 import { notFound } from 'next/navigation';
-import { headers } from 'next/headers';
-import errorToast from '@/lib/error-toast';
 import dynamic from 'next/dynamic';
 
 // Dynamic Components
@@ -21,6 +19,8 @@ type PageProps = {
   params: Promise<{ id: string }>;
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 };
+
+const CATEGORY_PAGE_SIZE = 15;
 
 // ✅ 1. Generate metadata dynamically
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -56,7 +56,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   } catch (err) {
     // fallback metadata or suppress entirely
     const errorMessage = err instanceof Error ? err.message : String(err);
-    errorToast({ message: errorMessage, header: 'Metadata Fetch Error!' });
+    console.warn('[category.generateMetadata] metadata fetch failed:', errorMessage);
     return {
       title: 'Product not found',
     };
@@ -85,10 +85,7 @@ export default async function EachCategoryPage({ params, searchParams }: PagePro
   const searchParamsObj = await searchParams;
   const page = parseInt((searchParamsObj?.page as string) ?? '1');
 
-  // Device Type SSR
-  const userAgent = (await headers()).get('user-agent') || '';
-  const deviceType = /mobile|android|iphone|ipad|ipod/i.test(userAgent) ? 'mobile' : 'desktop';
-  const productLimit = deviceType === 'mobile' ? 10 : 15;
+  const productLimit = CATEGORY_PAGE_SIZE;
   const pageData = await getCategoryPageData(categoryName, page, productLimit);
   if (!pageData) {
     return notFound();

@@ -1,9 +1,14 @@
 import { cache } from 'react';
 import { merchizeAPIKey, merchizeBaseURL } from '@/app/shop/product/[id]/productDetailsSSR';
+import { getBasicProductFromSnapshot } from '@/lib/merchizeStorefront/snapshot';
 
 // Resolve USD base price (in cents) for a productId.
 // Uses Next fetch cache with revalidate + tags for surgical invalidation.
 export const getUSDCentsForProduct = cache(async (productId: string): Promise<number | null> => {
+  const snapshotProduct = await getBasicProductFromSnapshot(productId);
+  const snapshotDollars = Number(snapshotProduct?.retail_price);
+  if (Number.isFinite(snapshotDollars)) return Math.round(snapshotDollars * 100);
+
   try {
     const res = await fetch(`${merchizeBaseURL}/product/products/${productId}`, {
       headers: { 'X-API-KEY': merchizeAPIKey },

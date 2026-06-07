@@ -1,5 +1,5 @@
-// Array for the Lauch Merch Section
-export const lauchMerchProducts = [
+// Array for the Launch Merch Section
+export const launchMerchProducts = [
   {
     image_name: 'launch_merch_grid_rb_hoodie.png',
     img_alt: 'Random Blessings Unisex Hoodie',

@@ -9,6 +9,18 @@ import {
 import { findUnresolvedPaidCheckoutsByEmail } from '@/lib/shop/checkout/checkoutRecovery/findUnresolvedPaidCheckouts';
 
 const RECOVERY_OTP_EXPIRY_MINUTES = 10;
+const RECOVERY_OTP_RESEND_COOLDOWN_SECONDS = 60;
+const MAX_ACTIVE_RECOVERY_OTP_CHALLENGES = 3;
+
+function logRecoveryStartTiming(payload: Record<string, unknown>) {
+  if (process.env.NODE_ENV !== 'production') {
+    console.info('[checkout-recovery.start.timing]', payload);
+  }
+}
+
+function secondsUntil(date: Date) {
+  return Math.max(0, Math.ceil((date.getTime() - Date.now()) / 1000));
+}
 
 export async function POST(req: Request) {
   const startedAt = Date.now();
@@ -29,7 +41,7 @@ export async function POST(req: Request) {
     const lookupMs = Date.now() - lookupStartedAt;
 
     if (!unresolvedCheckouts.length) {
-      console.info('[checkout-recovery.start.timing]', {
+      logRecoveryStartTiming({
         recoveryRequired: false,
         lookupMs,
         totalMs: Date.now() - startedAt,
@@ -38,6 +50,55 @@ export async function POST(req: Request) {
       return NextResponse.json({
         ok: true,
         recoveryRequired: false,
+      });
+    }
+
+    const now = new Date();
+    const activeChallenges = await paypalTxLedger.checkoutRecoveryOtpChallenge.findMany({
+      where: {
+        email,
+        consumedAt: null,
+        expiresAt: {
+          gt: now,
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: MAX_ACTIVE_RECOVERY_OTP_CHALLENGES,
+    });
+    const latestActiveChallenge = activeChallenges[0];
+    const secondsSinceLatestChallenge = latestActiveChallenge
+      ? Math.floor((now.getTime() - latestActiveChallenge.createdAt.getTime()) / 1000)
+      : null;
+    const resendAvailableInSeconds =
+      secondsSinceLatestChallenge === null
+        ? 0
+        : Math.max(0, RECOVERY_OTP_RESEND_COOLDOWN_SECONDS - secondsSinceLatestChallenge);
+
+    if (
+      latestActiveChallenge &&
+      (resendAvailableInSeconds > 0 ||
+        activeChallenges.length >= MAX_ACTIVE_RECOVERY_OTP_CHALLENGES)
+    ) {
+      logRecoveryStartTiming({
+        recoveryRequired: true,
+        reusedActiveChallenge: true,
+        activeChallengeCount: activeChallenges.length,
+        resendAvailableInSeconds,
+        lookupMs,
+        totalMs: Date.now() - startedAt,
+      });
+
+      return NextResponse.json({
+        ok: true,
+        recoveryRequired: true,
+        expiresInSeconds: secondsUntil(latestActiveChallenge.expiresAt),
+        resendAvailableInSeconds,
+        message:
+          resendAvailableInSeconds > 0
+            ? 'A recovery code was already sent recently.'
+            : 'Use the latest recovery code or wait for it to expire before requesting another.',
       });
     }
 
@@ -81,7 +142,7 @@ export async function POST(req: Request) {
     });
     const mailMs = Date.now() - mailStartedAt;
 
-    console.info('[checkout-recovery.start.timing]', {
+    logRecoveryStartTiming({
       recoveryRequired: true,
       lookupMs,
       challengeCreateMs,
@@ -94,6 +155,7 @@ export async function POST(req: Request) {
       ok: true,
       recoveryRequired: true,
       expiresInMinutes: RECOVERY_OTP_EXPIRY_MINUTES,
+      resendAvailableInSeconds: RECOVERY_OTP_RESEND_COOLDOWN_SECONDS,
     });
   } catch (error) {
     console.error('[checkout-recovery.start.failed]', error);

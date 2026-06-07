@@ -3,6 +3,7 @@ import 'server-only';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { normalizeRecoveryEmail } from './recoveryOtpUtils';
+import { Prisma } from '@/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger/client';
 
 const UNRESOLVED_PAID_STATUSES = [
   PAYPAL_LEDGER_STATUS.CAPTURED,
@@ -18,6 +19,15 @@ export async function findUnresolvedPaidCheckoutsByEmail(email: string) {
     where: {
       customerEmail: normalizedEmail,
       processingCompletedAt: null,
+      capturePayload: {
+        not: Prisma.AnyNull,
+      },
+      djangoOrderIntentOrderId: {
+        not: null,
+      },
+      djangoOrderIntentVerifyPayload: {
+        not: Prisma.AnyNull,
+      },
       status: {
         in: [...UNRESOLVED_PAID_STATUSES],
       },

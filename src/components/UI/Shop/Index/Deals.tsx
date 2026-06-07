@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { lauchMerchProducts } from '@/lib/utils/shopHomePageProductsData';
+import { launchMerchProducts } from '@/lib/utils/shopHomePageProductsData';
 import { useRef } from 'react';
 import { GalleryPrevButton as CarouselPrev } from '../ProductDetails/GalleryPrevButton';
 import { GalleryNextButton as CarouselNext } from '../ProductDetails/GalleryNextButton';
@@ -36,7 +36,7 @@ const Deals = () => {
     >
       {/* Launch Merch Text */}
       <CustomShopLink
-        href='/shop/category/lauch-merch'
+        href='/shop/category/launch-merch'
         className='flex font-ocr justify-between md:gap-4 -ml-10 md:ml-[unset]
          md:col-span-4 md:flex-col place-items-center select-none md:scale-[0.6] lg:scale-100
       '
@@ -62,7 +62,7 @@ const Deals = () => {
         scroll-smooth snap-x snap-mandatory md:grid-cols-5 md:w-full md:col-span-8 custom-scrollbar'
         ref={slideContainerRef}
       >
-        {lauchMerchProducts.map((merch, i) => (
+        {launchMerchProducts.map((merch, i) => (
           <CustomShopLink
             className='w-[12rem] h-[12rem] md:h-[150px] relative shrink-0 overflow-hidden'
             href={`/shop/product/${merch.productId}`}

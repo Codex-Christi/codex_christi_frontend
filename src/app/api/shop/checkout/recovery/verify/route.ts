@@ -47,6 +47,15 @@ export async function POST(req: Request) {
     }
 
     if (challenge.attemptCount >= MAX_RECOVERY_OTP_ATTEMPTS) {
+      await paypalTxLedger.checkoutRecoveryOtpChallenge.update({
+        where: {
+          id: challenge.id,
+        },
+        data: {
+          consumedAt: new Date(),
+        },
+      });
+
       return NextResponse.json(
         { ok: false, message: 'Too many incorrect attempts. Request a new code.' },
         { status: 429 },
@@ -54,6 +63,7 @@ export async function POST(req: Request) {
     }
 
     if (challenge.otpHash !== otpHash) {
+      const nextAttemptCount = challenge.attemptCount + 1;
       await paypalTxLedger.checkoutRecoveryOtpChallenge.update({
         where: {
           id: challenge.id,
@@ -62,8 +72,17 @@ export async function POST(req: Request) {
           attemptCount: {
             increment: 1,
           },
+          consumedAt:
+            nextAttemptCount >= MAX_RECOVERY_OTP_ATTEMPTS ? new Date() : undefined,
         },
       });
+
+      if (nextAttemptCount >= MAX_RECOVERY_OTP_ATTEMPTS) {
+        return NextResponse.json(
+          { ok: false, message: 'Too many incorrect attempts. Request a new code.' },
+          { status: 429 },
+        );
+      }
 
       return NextResponse.json({ ok: false, message: 'Invalid recovery code.' }, { status: 400 });
     }

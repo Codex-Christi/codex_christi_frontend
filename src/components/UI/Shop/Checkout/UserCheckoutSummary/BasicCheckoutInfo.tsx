@@ -10,21 +10,32 @@ import { EmailInput, NameInput } from '@/components/UI/Auth/FormFields';
 import { FaAngleDoubleDown } from 'react-icons/fa';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { useShallow } from 'zustand/react/shallow';
-import { useContext, useRef, useState, useEffect, startTransition } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, startTransition } from 'react';
 import { CheckoutAccordionContext } from '../ProductCheckout';
 import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
 import { DeliveryAddressInputFields } from './DeliveryAddressInputFields';
 import errorToast from '@/lib/error-toast';
 import { useVerifyBackendOrderIntentWithOTP } from '@/lib/hooks/shopHooks/checkout/useVerifyBackendOrderIntentWithOTP';
-import { CheckoutOTPModalHandles } from './CheckoutOTPModal';
 import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
-
-//Dynamic component import
 import dynamic from 'next/dynamic';
 import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore';
+import {
+  DEFAULT_RECOVERY_PROMPT_STATE,
+  getCheckoutValuesFromStore,
+  getRecoveryExpiryMinutes,
+  getRecipientName,
+  saveBasicCheckoutInfoToStore,
+  startCheckoutRecovery,
+  toDjangoOrderIntentPayload,
+} from './basicCheckoutInfoHelpers';
+
 const CheckoutOTPMainWrapper = dynamic(
   () => import('./CheckoutOTPMainWrapper').then((mod) => mod.CheckoutOTPMainWrapper),
+  { ssr: false },
+);
+const CheckoutRecoveryModal = dynamic(
+  () => import('./CheckoutRecoveryModal').then((mod) => mod.CheckoutRecoveryModal),
   { ssr: false },
 );
 
@@ -50,20 +61,18 @@ const BasicCheckoutInfoFormSchema = z
 
 export type BasicCheckoutInfoFormSchema = z.infer<typeof BasicCheckoutInfoFormSchema>;
 
-// Main Form Component Starts Here
 export const BasicCheckoutInfo = () => {
-  // Ref for OTP Popover
-  const popoverRef = useRef<CheckoutOTPModalHandles>(null);
+  const hasAppliedHydratedCheckoutValuesRef = useRef(false);
   const [isOtpOpen, setIsOtpOpen] = useState(false);
+  const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
+  const [recoveryPrompt, setRecoveryPrompt] = useState(DEFAULT_RECOVERY_PROMPT_STATE);
+  const [isCheckingRecovery, setIsCheckingRecovery] = useState(false);
 
-  // Hooks
   const { handleOpenItem } = useContext(CheckoutAccordionContext);
   const [checkoutHydrated, setCheckoutHydrated] = useState(false);
-  const { delivery_address, first_name, last_name, email } = useShopCheckoutStore(
+  const { delivery_address, email } = useShopCheckoutStore(
     useShallow((s) => ({
       delivery_address: s.delivery_address,
-      first_name: s.first_name,
-      last_name: s.last_name,
       email: s.email,
     })),
   );
@@ -73,157 +82,146 @@ export const BasicCheckoutInfo = () => {
   const fallbackEmail = useUserMainProfileStore((s) => s.userMainProfile?.email);
   const selectedCountryISO3 = useCurrencyCookie((s) => s.iso3);
   const changeCookieStoreCountry = useCurrencyCookie((s) => s.changeCountry);
-  const otpSendHookProps = useVerifyBackendOrderIntentWithOTP(email, () => setIsOtpOpen(true));
+  const openDjangoOtpModal = useCallback(() => setIsOtpOpen(true), []);
+  const otpSendHookProps = useVerifyBackendOrderIntentWithOTP(email, openDjangoOtpModal);
   const { createBackendOrderIntent } = otpSendHookProps;
 
-  const {
-    shipping_address_line_1,
-    shipping_address_line_2,
-    shipping_city,
-    shipping_country,
-    shipping_state,
-    zip_code,
-  } = delivery_address || {};
-
-  // Helper to derive form values from current store state (used on hydration/reset)
-  const deriveValuesFromStore = () => {
-    const s = useShopCheckoutStore.getState();
-    const da = s.delivery_address || ({} as typeof delivery_address);
-    return {
-      country: selectedCountryISO3 ?? da?.shipping_country ?? '',
-      firstname: s.first_name ?? '',
-      lastname: s.last_name ?? '',
-      email: s.email ?? '',
-      addressLine1: da?.shipping_address_line_1 ?? '',
-      addressLine2: da?.shipping_address_line_2 ?? '',
-      adminArea1: da?.shipping_state ?? '',
-      adminArea2: da?.shipping_city ?? '',
-      postalCode: da?.zip_code ?? '',
-    } as const;
-  };
-
-  // Extract Default Values
-  const storeValues = {
-    country: selectedCountryISO3 ?? shipping_country ?? '',
-    firstname: first_name ?? '',
-    lastname: last_name ?? '',
-    email: email ?? '',
-    // Extract addressLine1 from delivery_address
-    addressLine1: shipping_address_line_1 ?? '',
-    addressLine2: shipping_address_line_2 ?? '',
-    adminArea1: shipping_state ?? '',
-    adminArea2: shipping_city ?? '',
-    postalCode: zip_code ?? '',
-  };
-
-  // useForm Hook Starts Here
-  const basicCheckoutInfoForm = useForm<z.infer<typeof BasicCheckoutInfoFormSchema>>({
+  const basicCheckoutInfoForm = useForm<BasicCheckoutInfoFormSchema>({
     resolver: zodResolver(BasicCheckoutInfoFormSchema),
-    defaultValues: storeValues,
+    defaultValues: getCheckoutValuesFromStore(selectedCountryISO3),
   });
+  const {
+    formState: { isDirty: isCheckoutFormDirty },
+    reset,
+    setValue,
+  } = basicCheckoutInfoForm;
 
-  const isCheckoutMissingSavedProfileDetails = () => {
-    const vals = deriveValuesFromStore();
-    return !vals.addressLine1 && !vals.adminArea1 && !vals.adminArea2;
-  };
+  const deriveValuesFromStore = useCallback(
+    () => getCheckoutValuesFromStore(selectedCountryISO3),
+    [selectedCountryISO3],
+  );
+
+  const applyHydratedCheckoutValues = useCallback(() => {
+    if (hasAppliedHydratedCheckoutValuesRef.current) return;
+
+    hasAppliedHydratedCheckoutValuesRef.current = true;
+    reset(deriveValuesFromStore());
+    queueMicrotask(() => setCheckoutHydrated(true));
+  }, [deriveValuesFromStore, reset]);
 
   // Ensure form is populated after Zustand persist hydration (full reload case)
   useEffect(() => {
-    const apply = () => {
-      const vals = deriveValuesFromStore();
-      basicCheckoutInfoForm.reset(vals);
-      queueMicrotask(() => setCheckoutHydrated(true));
-    };
-
     const hasHydrated = useShopCheckoutStore.persist?.hasHydrated?.();
     if (hasHydrated) {
-      apply();
+      applyHydratedCheckoutValues();
     } else {
       const unsub = useShopCheckoutStore.persist?.onFinishHydration?.(() => {
-        apply();
+        applyHydratedCheckoutValues();
       });
       return () => {
         if (typeof unsub === 'function') unsub();
       };
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [applyHydratedCheckoutValues]);
 
   useEffect(() => {
     if (!userShopProfile?.data) return;
     if (!checkoutHydrated) return;
-    if (basicCheckoutInfoForm.formState.isDirty) return;
-    if (!isCheckoutMissingSavedProfileDetails()) return;
+    if (isCheckoutFormDirty) return;
+
+    const vals = deriveValuesFromStore();
+    if (vals.addressLine1 || vals.adminArea1 || vals.adminArea2) return;
 
     hydrateFromShopProfile(userShopProfile, fallbackEmail);
-    const vals = deriveValuesFromStore();
-    basicCheckoutInfoForm.reset(vals);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkoutHydrated, fallbackEmail, hydrateFromShopProfile, userShopProfile]);
+    reset(deriveValuesFromStore());
+  }, [
+    checkoutHydrated,
+    deriveValuesFromStore,
+    fallbackEmail,
+    hydrateFromShopProfile,
+    isCheckoutFormDirty,
+    reset,
+    userShopProfile,
+  ]);
 
   useEffect(() => {
-    if (!checkoutHydrated) return;
-    if (!selectedCountryISO3) return;
-    if (delivery_address?.shipping_country === selectedCountryISO3) return;
+    if (
+      !checkoutHydrated ||
+      !selectedCountryISO3 ||
+      delivery_address?.shipping_country === selectedCountryISO3
+    ) {
+      return;
+    }
 
     setShippingCountryISO3(selectedCountryISO3);
-    basicCheckoutInfoForm.setValue('country', selectedCountryISO3, { shouldDirty: false });
+    setValue('country', selectedCountryISO3, { shouldDirty: false });
   }, [
-    basicCheckoutInfoForm,
     checkoutHydrated,
     delivery_address?.shipping_country,
     selectedCountryISO3,
     setShippingCountryISO3,
+    setValue,
   ]);
 
-  // Handlers
-  async function onSubmit(data: z.infer<typeof BasicCheckoutInfoFormSchema>) {
-    // Only spread the rest of the data except country
-    const {
-      email,
-      country,
-      firstname,
-      lastname,
-      addressLine1,
-      addressLine2,
-      adminArea1,
-      adminArea2,
-      postalCode,
-    } = data;
-    useShopCheckoutStore.setState((state) => ({
-      ...state,
-      email: email,
-      first_name: firstname,
-      last_name: lastname,
-      delivery_address: {
-        ...state.delivery_address,
-        shipping_country: country,
-        shipping_address_line_1: addressLine1,
-        shipping_address_line_2: addressLine2 ?? '',
-        shipping_city: adminArea2,
-        shipping_state: adminArea1,
-        zip_code: postalCode,
-      },
-    }));
-    // This creates/reuses the Django backend order intent, not the PayPal ledger intent.
-    const backendOrderIntent = await createBackendOrderIntent({
-      email,
-      first_name: firstname,
-      last_name: lastname,
-      address: addressLine1,
-      address_2: addressLine2 ?? '',
-      city: adminArea2,
-      state: adminArea1,
-      zip_code: postalCode,
-      country,
-    });
+  const createDjangoOrderIntentFromCheckoutInfo = useCallback(
+    async (data: BasicCheckoutInfoFormSchema) => {
+      // This creates/reuses the Django backend order intent, not the PayPal ledger intent.
+      const backendOrderIntent = await createBackendOrderIntent(
+        toDjangoOrderIntentPayload(data),
+      );
 
-    if (backendOrderIntent?.data.otp_status === 'verified') {
-      handleOpenItem('payment-section');
+      if (backendOrderIntent?.data.otp_status === 'verified') {
+        handleOpenItem('payment-section');
+      }
+    },
+    [createBackendOrderIntent, handleOpenItem],
+  );
+
+  const startSeparateOrderAfterRecoveryReview = useCallback(async () => {
+    if (!recoveryPrompt.pendingCheckoutData) {
+      errorToast({
+        header: 'Checkout details missing',
+        message: 'Please submit your checkout details again.',
+      });
+      return;
+    }
+
+    await createDjangoOrderIntentFromCheckoutInfo(recoveryPrompt.pendingCheckoutData);
+  }, [createDjangoOrderIntentFromCheckoutInfo, recoveryPrompt.pendingCheckoutData]);
+
+  async function onSubmit(data: BasicCheckoutInfoFormSchema) {
+    saveBasicCheckoutInfoToStore(data);
+    setRecoveryPrompt((current) => ({ ...current, pendingCheckoutData: data }));
+    setIsCheckingRecovery(true);
+
+    try {
+      const recoveryStart = await startCheckoutRecovery(data);
+
+      if (recoveryStart.recoveryRequired) {
+        setRecoveryPrompt({
+          pendingCheckoutData: data,
+          email: data.email,
+          recipientName: getRecipientName(data),
+          expiresInMinutes: getRecoveryExpiryMinutes(recoveryStart),
+          resendAvailableInSeconds: recoveryStart.resendAvailableInSeconds ?? 0,
+        });
+        setIsRecoveryOpen(true);
+        return;
+      }
+
+      await createDjangoOrderIntentFromCheckoutInfo(data);
+    } catch (error) {
+      errorToast({
+        header: 'Checkout recovery check failed',
+        message:
+          (error as Error)?.message ??
+          'Unable to check whether this email has a checkout recovery case.',
+      });
+    } finally {
+      setIsCheckingRecovery(false);
     }
   }
 
-  // Main JSX
   return (
     <>
       <h2 className='border-b max-w-fit mb-10 border-white pb-1 text-xl font-bold'>
@@ -240,19 +238,14 @@ export const BasicCheckoutInfo = () => {
           })}
           className='w-full  grid grid-cols-1 md:grid-cols-2 gap-x-20 gap-3 items-center'
         >
-          {/* First Name Input*/}
           <NameInput currentZodForm={basicCheckoutInfoForm} inputName='firstname' />
 
-          {/* Last Name Input*/}
           <NameInput currentZodForm={basicCheckoutInfoForm} inputName='lastname' />
 
-          {/* Email Input */}
           <EmailInput currentZodForm={basicCheckoutInfoForm} inputName='email' />
 
-          {/* Dleivery Address Input Fields */}
           <DeliveryAddressInputFields currentZodForm={basicCheckoutInfoForm} />
 
-          {/* Country Input */}
           <FormField
             control={basicCheckoutInfoForm.control}
             name='country'
@@ -274,36 +267,37 @@ export const BasicCheckoutInfo = () => {
               </FormItem>
             )}
           />
-          {/*  */}
 
-          {/* Submit Checkout Summary */}
           <Button
             name='Checkout Summary Submit'
             type='submit'
+            disabled={isCheckingRecovery}
             className=' col-span-1 md:col-span-2 w-full max-w-[400px] mt-5 mx-auto rounded-3xl
             !font-bold px-4 sm:px-6 py-2 sm:py-3 text-lg sm:text-base
             bg-stone-500 hover:bg-stone-100 hover:bg-opacity-10 bg-opacity-10 
             backdrop-blur-md shadow-md shadow-gray-400 flex gap-6'
-            // border-[#0085FF] text-white bg-[#0085FF] hover:bg-[#0085FF]/70 hover:text-white
           >
-            <h4>Choose Payment Method</h4>
+            <h4 className='[word-spacing:0.25rem]'>
+              {isCheckingRecovery ? 'Checking Checkout Status' : 'Choose Payment Method'}
+            </h4>
             <FaAngleDoubleDown size={22.5} />
-            <style jsx>
-              {`
-                h4 {
-                  word-spacing: 0.25rem;
-                }
-              `}
-            </style>
           </Button>
         </form>
       </Form>
 
-      {/* OTP Modal Popover */}
+      <CheckoutRecoveryModal
+        key={`${recoveryPrompt.email}-${recoveryPrompt.expiresInMinutes}-${recoveryPrompt.resendAvailableInSeconds}`}
+        isOpen={isRecoveryOpen}
+        onOpenChange={setIsRecoveryOpen}
+        email={recoveryPrompt.email}
+        recipientName={recoveryPrompt.recipientName}
+        expiresInMinutes={recoveryPrompt.expiresInMinutes}
+        resendAvailableInSeconds={recoveryPrompt.resendAvailableInSeconds}
+        onStartSeparateOrder={startSeparateOrderAfterRecoveryReview}
+      />
       <CheckoutOTPMainWrapper
         isOpen={isOtpOpen}
         onOpenChange={setIsOtpOpen}
-        ref={popoverRef}
         title='Verify your email before proceeding'
         length={6}
         proceedToPaymentTrigger={handleOpenItem}

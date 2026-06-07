@@ -8,8 +8,10 @@ import NavTopRightLinks from './NavTopRightLinks';
 import SubNav from '../ShopSubNav';
 import { usePathname } from 'next/navigation';
 import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
-import ShopMobileSideBar from '../MobileSidebar';
+import dynamic from 'next/dynamic';
 // import RouteWatcher from './RouteWatcher';
+
+const ShopMobileSideBar = dynamic(() => import('../MobileSidebar'), { ssr: false });
 
 const ShopNav: FC = () => {
   // Hooks

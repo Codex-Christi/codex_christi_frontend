@@ -122,3 +122,12 @@ Issue:
 12. Schema/template mismatch in guide post-processing section
 Status: `resolved` — all fields in Section 21 (post-processing runner) match the Section 7 schema. Confirmation page integration, server-safe encrypt note, and browser-close recovery added to guide on 2026-03-23.
 
+13. Admin dashboard hub and checkout recovery operations
+Status: `deferred`
+Scope:
+- Add a single admin dashboard hub with CTAs/cards into shop tools first, including Merchize catalog refresh and PayPal/Merchize ledger recovery.
+- Add PayPal/Merchize ledger search by email, support reference/order token, PayPal order ID, Django intent identifiers, and Django payment save custom ID.
+- Show the customer-safe checkout recovery summary in admin detail views: paid amount, placed date, cart summary, shipping region, current processing step, and support reference.
+- Add support actions for retry post-processing, retry fulfillment only, regenerate receipt, save fulfillment address override, clear stale locks, mark manually resolved, send customer update email, and clear expired checkout recovery OTP challenges.
+- Track future "keep me updated" customer acknowledgements so support can see that the customer saw the recovered paid checkout and chose not to place another same-order checkout.
+- Optional future enhancement: send a compact current-cart fingerprint during checkout recovery so the server can classify unresolved paid rows as `same`, `different`, or `unknown` compared with the shopper's current cart. This should tune the customer-facing copy only; any unresolved paid checkout for the verified email should still be shown.

@@ -12,8 +12,11 @@ import {
   shouldUseStorefrontSnapshot,
 } from '@/lib/merchizeStorefront/providerErrors';
 import {
+  getCategoryIdFromSnapshot,
   getCategoryMetadataFromSnapshot,
+  getCategoryMetadataSnapshotState,
   getCategoryProductsFromSnapshot,
+  getCategoryProductsSnapshotState,
   upsertStorefrontCategoryPageSnapshot,
   upsertStorefrontCategorySnapshot,
 } from '@/lib/merchizeStorefront/snapshot';
@@ -53,15 +56,18 @@ type CategorySearchResponse = {
 };
 
 // Get category's ID from Merchize
-const getCategoryIDFromMerchize = async (categoryName: string) => {
+const getCategoryIDFromMerchize = cache(async (categoryName: string) => {
+  const snapshotCategoryID = await getCategoryIdFromSnapshot(categoryName);
+  if (snapshotCategoryID) return snapshotCategoryID;
+
   try {
-    const res = (await fetchFromMerchizeWithNextCache({
-      url: `${merchizeBaseURL}/product/v2/collections/search`,
-      method: 'POST',
-      body: new URLSearchParams({ name: `'${categoryName}'` }).toString().toLowerCase(),
-      isFormBody: true,
-      daysToCache: 0.3,
-    })) as CategorySearchResponse;
+    const res = (await fetchFromMerchizeWithNextCache(
+      `${merchizeBaseURL}/product/v2/collections/search`,
+      'POST',
+      new URLSearchParams({ name: `'${categoryName}'` }).toString().toLowerCase(),
+      0.3,
+      true,
+    )) as CategorySearchResponse;
 
     const categoryID = res.data?.collections?.[0]?._id;
     if (!categoryID) {
@@ -78,18 +84,23 @@ const getCategoryIDFromMerchize = async (categoryName: string) => {
     console.log(`Error while getting category ID from Merchize`, err);
     throw err;
   }
-};
+});
 
 // Get tCategory's Metadata from Merchize
 export const getCategoryMetadataFromMerchize = cache(async (categoryName: string) => {
+  const snapshotState = await getCategoryMetadataSnapshotState(categoryName);
+  if (snapshotState?.isFresh) return snapshotState.category;
+
   try {
     const categoryID = await getCategoryIDFromMerchize(categoryName);
 
     // Make second request to extract all metadata
-    const { data: metaDataObj } = (await fetchFromMerchizeWithNextCache({
-      url: `${merchizeBaseURL}/product/v2/collections/${categoryID}`,
-      daysToCache: 1,
-    })) as {
+    const { data: metaDataObj } = (await fetchFromMerchizeWithNextCache(
+      `${merchizeBaseURL}/product/v2/collections/${categoryID}`,
+      'GET',
+      null,
+      1,
+    )) as {
       data: { cover: { url: string } | null | undefined; description: string; name: string };
     };
 
@@ -138,19 +149,16 @@ export const getCategoryMetadataFromMerchize = cache(async (categoryName: string
 // Fetch from Merchize with Next.js Cache
 // This function is used to fetch data from Merchize API with caching enabled
 const fetchFromMerchizeWithNextCache = cache(
-  async (params: {
-    url: string;
-    body?: BodyInit | null | undefined;
-    method?: string | undefined;
-    daysToCache?: number;
-    isFormBody?: boolean;
-  }) => {
-    // DEstrcuting params
-    const { url, method, body, daysToCache, isFormBody } = params;
-
+  async (
+    url: string,
+    method: string = 'GET',
+    body: BodyInit | null | undefined = null,
+    daysToCache?: number,
+    isFormBody?: boolean,
+  ) => {
     // Main fetch from here
     return fetchMerchizeJson(url, {
-      method: method ?? 'GET',
+      method,
       headers: {
         'X-API-KEY': `${merchizeAPIKey}`,
         'Content-Type': isFormBody ? 'application/x-www-form-urlencoded' : 'application/json',
@@ -167,17 +175,20 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
   const { page, page_size, category, forceSnapshotRefresh } = params;
   // const skip = (page - 1) * limit;
 
+  if (!forceSnapshotRefresh) {
+    const snapshot = await getCategoryProductsSnapshotState({ category, page, page_size });
+    if (snapshot?.isFresh) return snapshot.products;
+  }
+
   try {
     // Get ID first
     const catID = await getCategoryIDFromMerchize(category);
 
     const categoryProductsResponse = (await fetchFromMerchizeWithNextCache(
-      // `${baseURL}/product/filter-by-collection?collection=${category}&page=${page}&page_size=${page_size}`,
-
-      {
-        url: `${merchizeBaseURL}/product/products?limit=${page_size}&page=${page}&title=&collectionId[]=${catID}&minPrice=&maxPrice=`,
-        daysToCache: 0.3,
-      },
+      `${merchizeBaseURL}/product/products?limit=${page_size}&page=${page}&title=&collectionId[]=${catID}&minPrice=&maxPrice=`,
+      'GET',
+      null,
+      0.3,
     )) as CategoryProductsResponse;
 
     if ('data' in categoryProductsResponse && categoryProductsResponse.success) {

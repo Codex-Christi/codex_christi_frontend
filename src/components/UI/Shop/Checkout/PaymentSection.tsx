@@ -25,6 +25,7 @@ const PaymentSection = () => {
 
   // States
   const [payOption, setPayOption] = useState<CheckoutOptions>('');
+  const shouldRenderPayPalCheckout = payOption === 'card' || payOption === 'paypal_buttons';
 
   // JSX
   return (
@@ -105,7 +106,7 @@ const PaymentSection = () => {
 
         {/* Paypal Component Here */}
 
-        <PayPalCheckout mode={payOption} />
+        {shouldRenderPayPalCheckout ? <PayPalCheckout mode={payOption} /> : null}
 
         <div className='rounded-3xl border border-white/10 bg-gradient-to-br from-[#111827]/80 via-[#0b1220]/70 to-[#1f2937]/80 p-5 text-sm text-white/75 shadow-[0_20px_40px_rgba(0,0,0,0.35)]'>
           <p className='text-base font-semibold text-white'>Shipping and POD policy</p>
