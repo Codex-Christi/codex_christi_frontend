@@ -5,7 +5,13 @@ import fs from 'fs';
 import path from 'path';
 
 // Keep this default in sync with prisma.config.ts and the Docker /app/data volume.
-const DEFAULT_DB_URL = `file:${path.join(process.cwd(), 'data', 'db', 'shop', 'merchizeCatalog.db')}`;
+const DEFAULT_DB_URL = `file:${path.join(
+  /*turbopackIgnore: true*/ process.cwd(),
+  'data',
+  'db',
+  'shop',
+  'merchizeCatalog.db',
+)}`;
 
 function resolveDbUrl(): ':memory:' | (string & {}) {
   const url = process.env.MERCHIZE_OFFLINE_CATALOG_DATABASE_URL ?? DEFAULT_DB_URL;
@@ -15,7 +21,11 @@ function resolveDbUrl(): ':memory:' | (string & {}) {
   }
 
   const filePath = url.slice('file:'.length);
-  return (path.isAbsolute(filePath) ? url : `file:${path.resolve(process.cwd(), filePath)}`) as string & {};
+  return (
+    path.isAbsolute(filePath)
+      ? url
+      : `file:${path.resolve(/*turbopackIgnore: true*/ process.cwd(), filePath)}`
+  ) as string & {};
 }
 
 // Prisma's adapter expects ':memory:' | (string & {}), so we narrow the type here.
