@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import 'yet-another-react-lightbox/styles.css';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useProductDetailsContext } from '..';
 import { useCurrentVariant } from '../currentVariantStore';
 import ThumbsPanel from './ThumbsPanel';
@@ -106,7 +106,6 @@ export const ProductImageGallery: React.FC = () => {
   const metadata = productDetailsContext.productMetaData;
 
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   // Build image URLs (unchanged from your template)
   const images = useMemo(() => {
@@ -177,7 +176,7 @@ export const ProductImageGallery: React.FC = () => {
     }, 0);
 
     return () => window.clearTimeout(resetTimer);
-  }, [pathname, searchParams, setMatchingVariant]);
+  }, [pathname, setMatchingVariant]);
 
   // Embla -> React state
   useEffect(() => {
@@ -199,16 +198,13 @@ export const ProductImageGallery: React.FC = () => {
   );
 
   // Build slides with known width/height when available
-  const slides = useMemo(
-    () => {
-      const activeDims = dimsState.imageKey === imageKey ? dimsState.dims : {};
+  const slides = useMemo(() => {
+    const activeDims = dimsState.imageKey === imageKey ? dimsState.dims : {};
 
-      return images.map((src, i) =>
-        activeDims[i] ? { src, width: activeDims[i].w, height: activeDims[i].h } : { src },
-      );
-    },
-    [dimsState, imageKey, images],
-  );
+    return images.map((src, i) =>
+      activeDims[i] ? { src, width: activeDims[i].w, height: activeDims[i].h } : { src },
+    );
+  }, [dimsState, imageKey, images]);
   const safeCurrentItem = images.length === 1 ? 0 : currentItem;
 
   return (
