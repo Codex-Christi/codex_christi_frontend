@@ -6,6 +6,8 @@ import dynamic from 'next/dynamic';
 
 const Deals = dynamic(() => import('@/components/UI/Shop/Index/Deals'));
 
+export const revalidate = 3600;
+
 const Shop: FC = () => {
   return (
     <>

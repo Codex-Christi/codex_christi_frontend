@@ -7,6 +7,13 @@ type PageProps = {
   params: Promise<{ id: string; page: string }>;
 };
 
+export const revalidate = 3600;
+export const dynamicParams = true;
+
+export async function generateStaticParams() {
+  return [];
+}
+
 function parseCategoryPage(pageParam: string) {
   const page = Number.parseInt(pageParam, 10);
   if (!Number.isSafeInteger(page) || page < 1) return null;

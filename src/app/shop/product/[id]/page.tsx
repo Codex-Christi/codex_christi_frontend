@@ -15,6 +15,13 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
+export const revalidate = 3600;
+export const dynamicParams = true;
+
+export async function generateStaticParams() {
+  return [];
+}
+
 function resolveProductImageUrl(image: string | undefined | null) {
   if (!image) return undefined;
   return image.startsWith('http') ? image : `https://d2dytk4tvgwhb4.cloudfront.net/${image}`;

@@ -1,6 +1,7 @@
 // src/app/admin/merchize/catalog/actions.ts
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
 import { refreshMerchizeCatalog } from '@/lib/merchizeCatalog/sync';
 import { STOREFRONT_SNAPSHOT_CATEGORY_SLUGS } from '@/lib/merchizeStorefront/categories';
@@ -8,6 +9,7 @@ import {
   fetchCategoryProducts,
   getCategoryMetadataFromMerchize,
 } from '@/app/shop/category/[id]/categoryDetailsSSR';
+import { getCategoryPagePath } from '@/lib/utils/shop/categoryPagePath';
 
 // const v = await merchizeCatalogPrisma.variant.findUnique({
 //   where: { sku: 'FBJSVN000000AA02' },
@@ -78,6 +80,8 @@ export async function refreshPriceShippingCatalogAction() {
 export async function refreshStorefrontSnapshotAction() {
   const pageSize = 50;
   const failures: Array<{ category: string; message: string }> = [];
+  const categoryTotalPages = new Map<string, number>();
+  const productIds = new Set<string>();
   let productsSeen = 0;
   let pagesFetched = 0;
   const refreshStartedAt = Date.now();
@@ -111,6 +115,10 @@ export async function refreshStorefrontSnapshotAction() {
       categoryProductsSeen += firstPage.products.length;
       pagesFetched += 1;
       categoryPagesFetched += 1;
+      categoryTotalPages.set(category, firstPage.totalPages);
+      for (const product of firstPage.products) {
+        if (product._id) productIds.add(product._id);
+      }
 
       for (let page = 2; page <= firstPage.totalPages; page += 1) {
         const nextPage = await fetchCategoryProducts({
@@ -123,6 +131,9 @@ export async function refreshStorefrontSnapshotAction() {
         categoryProductsSeen += nextPage.products.length;
         pagesFetched += 1;
         categoryPagesFetched += 1;
+        for (const product of nextPage.products) {
+          if (product._id) productIds.add(product._id);
+        }
       }
 
       console.info('[merchizeOfflineCatalog.refreshStorefrontSnapshot] category:complete', {
@@ -149,6 +160,10 @@ export async function refreshStorefrontSnapshotAction() {
   }
 
   const stats = await getStorefrontSnapshotStats();
+  const revalidatedPaths = revalidateStorefrontSnapshotPaths({
+    categoryTotalPages,
+    productIds,
+  });
   const result = {
     ok: failures.length === 0,
     productsSeen,
@@ -156,6 +171,7 @@ export async function refreshStorefrontSnapshotAction() {
     categoriesAttempted: STOREFRONT_SNAPSHOT_CATEGORY_SLUGS.length,
     failures,
     stats,
+    revalidatedPaths,
   };
 
   console.info('[merchizeOfflineCatalog.refreshStorefrontSnapshot] complete', {
@@ -164,10 +180,38 @@ export async function refreshStorefrontSnapshotAction() {
     pagesFetched: result.pagesFetched,
     productsSeen: result.productsSeen,
     failures: result.failures.map((failure) => failure.category),
+    revalidatedPaths: result.revalidatedPaths.length,
     elapsedMs: Date.now() - refreshStartedAt,
   });
 
   return result;
+}
+
+function revalidateStorefrontSnapshotPaths({
+  categoryTotalPages,
+  productIds,
+}: {
+  categoryTotalPages: Map<string, number>;
+  productIds: Set<string>;
+}) {
+  const paths = new Set<string>(['/shop']);
+
+  for (const [category, totalPages] of categoryTotalPages) {
+    const safeTotalPages = Math.max(1, totalPages);
+    for (let page = 1; page <= safeTotalPages; page += 1) {
+      paths.add(getCategoryPagePath(category, page));
+    }
+  }
+
+  for (const productId of productIds) {
+    paths.add(`/shop/product/${encodeURIComponent(productId)}`);
+  }
+
+  for (const path of paths) {
+    revalidatePath(path);
+  }
+
+  return [...paths];
 }
 
 export async function searchPriceShippingCatalogBySku(query: string) {

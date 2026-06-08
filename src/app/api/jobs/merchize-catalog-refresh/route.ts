@@ -1,5 +1,6 @@
 // src/app/api/jobs/merchize-catalog-refresh/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { refreshMerchizeCatalog } from '@/lib/merchizeCatalog/sync';
 
 const CRON_SECRET = process.env.MERCHIZE_OFFLINE_CATALOG_CRON_SECRET;
@@ -13,6 +14,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await refreshMerchizeCatalog();
+    revalidatePath('/shop');
     return NextResponse.json({ ok: true, ...result });
   } catch (e: unknown) {
     console.error('Merchize refresh failed:', e);

@@ -5,6 +5,13 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
+export const revalidate = 3600;
+export const dynamicParams = true;
+
+export async function generateStaticParams() {
+  return [];
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id: categoryName } = await params;
   return generateCategoryPageMetadata(categoryName, 1);
