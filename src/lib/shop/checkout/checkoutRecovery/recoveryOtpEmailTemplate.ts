@@ -59,7 +59,7 @@ export function buildRecoveryOtpEmailHtml({
         </tr>
     </table>
 
-    <p style="margin:0 auto;max-width:460px;font-size:14px;line-height:1.6;color:#94a3b8;
+    <p style="margin:0 auto;max-width:460px;background:#05070d;font-size:14px;line-height:1.6;color:#94a3b8;
     text-align:center">
         Copyright <strong style="color:#e2e8f0;"> &copy; ${currentYear} Codex Christi. All Rights Reserved. </strong>
     </p>

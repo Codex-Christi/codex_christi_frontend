@@ -72,11 +72,11 @@ Move post-payment processing (receipt generation/upload, payment save, fulfillme
 
 - Checkout info form lives in:
   - `src/components/UI/Shop/Checkout/UserCheckoutSummary/BasicCheckoutInfo.tsx`
-- OTP send/verify flow lives in:
-  - `src/lib/hooks/shopHooks/checkout/useVerifyEmailWithOTP.ts`
-  - `src/lib/hooks/shopHooks/checkout/customMutationHooks.ts`
-- OTP order ID (`ORD-*`) is stored in:
-  - `src/stores/shop_stores/checkoutStore/ORD-stringStore.ts`
+- Django order-intent OTP send/verify flow lives in:
+  - `src/lib/hooks/shopHooks/checkout/useDjangoOrderIntentEmailVerification.ts`
+  - `src/lib/hooks/shopHooks/checkout/djangoOrderIntentMutationHooks.ts`
+- Verified Django order-intent identifiers are stored in:
+  - `src/stores/shop_stores/checkoutStore/djangoOrderIntentStore.ts`
 
 ## 2.2 PayPal order creation
 
@@ -140,11 +140,12 @@ Current state:
 
 ```mermaid
 flowchart TD
-  A["Checkout Form + OTP"] --> B["PayPalCheckoutChildren"]
-  B --> C["POST /next-api/paypal/tx-ledger/intent"]
+  A["Checkout form + Django order-intent OTP verified"] --> B["PayPalCheckoutChildren"]
+  B --> B2["Read djangoOrderIntentUuid + djangoOrderIntentOrderId + djangoOrderIntentVerifyPayload"]
+  B2 --> C["POST /next-api/paypal/tx-ledger/intent"]
   C --> D["Ledger row created (intent_creating)"]
   D --> E["Call createPayPalOrder() directly"]
-  E --> F["Save paypalOrderId in ledger; return orderToken + paypalOrderId to createOrder()"]
+  E --> F["Save PayPal + Django identifiers in ledger; return orderToken + paypalOrderId to createOrder()"]
   F --> G["PayPal approve UI"]
   G --> H["POST /next-api/paypal/orders/authorize (with orderToken)"]
   H --> I["Ledger: authorized + authorizePayload"]
@@ -264,45 +265,54 @@ generator paypalTxLedger {
 }
 
 model PaypalIntent {
-  id                    String   @id @default(cuid())
-  orderToken            String   @unique
-  paypalOrderId         String?  @unique
-  paypalAuthorizationId String?
-  otpOrderId            String?
-
-  customerName          String
-  customerEmail         String
-  userId                String?
-
-  countryIso2           String?
-  countryIso3           String?
-  initialCurrency       String?
-
-  cartSnapshot          Json
-  shippingSnapshot      Json
-
+  id                                 String    @id @default(cuid())
+  orderToken                         String    @unique
+  paypalOrderId                      String?   @unique
+  paypalAuthorizationId              String?
+  djangoOrderIntentUuid              String?
+  djangoOrderIntentOrderId           String?
+  customerName                       String
+  customerEmail                      String
+  userId                             String?
+  countryIso2                        String?
+  countryIso3                        String?
+  initialCurrency                    String?
+  cartSnapshot                       Json
+  shippingSnapshot                   Json
   // Raw payloads needed to reuse your existing server actions
-  authorizePayload      Json?
-  capturePayload        Json?
-
-  backendCustomId       String?
-  receiptLink           String?
-  receiptFile           String?
-
-  status                String
-  lastEventType         String?
-  lastErrorCode         String?
-  lastErrorMessage      String?
-  retryCount            Int      @default(0)
-  postProcessingLockId  String?
-  postProcessingLockedAt DateTime?
-  postProcessingLockExpiresAt DateTime?
-  processingCompletedAt DateTime?
-
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  authorizePayload                   Json?
+  capturePayload                     Json?
+  djangoOrderIntentPayload           Json?
+  djangoOrderIntentVerifyPayload     Json?
+  djangoPaymentSaveResponsePayload   Json?
+  merchizeFulfillmentRequestPayload  Json?
+  merchizeFulfillmentResponsePayload Json?
+  merchizeFulfillmentProcessingId    String?
+  merchizeProviderOrderId            String?
+  merchizeProviderOrderCode          String?
+  fulfillmentAddressOverride         Json?
+  fulfillmentAddressOverrideReason   String?
+  fulfillmentAddressOverriddenBy     String?
+  fulfillmentAddressOverriddenAt     DateTime?
+  djangoPaymentSaveCustomId          String?
+  receiptLink                        String?
+  receiptFile                        String?
+  status                             String
+  lastEventType                      String?
+  lastErrorCode                      String?
+  lastErrorMessage                   String?
+  retryCount                         Int       @default(0)
+  postProcessingLockId               String?
+  postProcessingLockedAt             DateTime?
+  postProcessingLockExpiresAt        DateTime?
+  processingCompletedAt              DateTime?
+  createdAt                          DateTime  @default(now())
+  updatedAt                          DateTime  @updatedAt
 
   @@index([customerEmail])
+  @@index([djangoOrderIntentUuid])
+  @@index([djangoOrderIntentOrderId])
+  @@index([djangoPaymentSaveCustomId])
   @@index([status])
   @@index([createdAt])
   @@index([postProcessingLockExpiresAt])
@@ -726,7 +736,10 @@ export async function POST(req: Request) {
       initialCurrency,
       delivery_address,
       userId,
-      otpOrderId,
+      djangoOrderIntentUuid,
+      djangoOrderIntentOrderId,
+      djangoOrderIntentPayload,
+      djangoOrderIntentVerifyPayload,
     } = body;
 
     if (!Array.isArray(cart) || cart.length === 0) {
@@ -748,7 +761,10 @@ export async function POST(req: Request) {
         customerName: customer.name,
         customerEmail: customer.email,
         userId: userId ?? null,
-        otpOrderId: otpOrderId ?? null,
+        djangoOrderIntentUuid: djangoOrderIntentUuid ?? null,
+        djangoOrderIntentOrderId: djangoOrderIntentOrderId ?? null,
+        djangoOrderIntentPayload: djangoOrderIntentPayload ?? null,
+        djangoOrderIntentVerifyPayload: djangoOrderIntentVerifyPayload ?? null,
         countryIso2: country ?? null,
         countryIso3: country_iso_3 ?? null,
         initialCurrency: initialCurrency ?? null,
@@ -829,16 +845,21 @@ Important behavior:
 - `cart` from `useCartStore`
 - `customer` + `delivery_address` from `useShopCheckoutStore`
 - `country_iso2`, `country_iso3`, `currency` from `ServerOrderDetailsContext`
-- `otpOrderId` from `ORD-stringStore`
+- `djangoOrderIntentUuid`, `djangoOrderIntentOrderId`, and `djangoOrderIntentVerifyPayload` from `djangoOrderIntentStore`
 
 ## Template (drop-in replacement shape)
 
 ```ts
-import { useOrderStringStore } from '@/stores/shop_stores/checkoutStore/ORD-stringStore';
+import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
 import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 
 // inside component
-const otpOrderId = useOrderStringStore((s) => s.orderString);
+const {
+  djangoOrderIntentUuid,
+  djangoOrderIntentOrderId,
+  djangoOrderIntentPayload,
+  djangoOrderIntentVerifyPayload,
+} = useDjangoOrderIntentStore();
 const setIntent = usePayPalIntentStore((s) => s.setIntent);
 
 const createOrder = useCallback(async (): Promise<string> => {
@@ -852,7 +873,10 @@ const createOrder = useCallback(async (): Promise<string> => {
     country_iso_3: country_iso3 ?? 'USA',
     initialCurrency: currency ?? 'USD',
     delivery_address,
-    otpOrderId: otpOrderId || undefined,
+    djangoOrderIntentUuid,
+    djangoOrderIntentOrderId,
+    djangoOrderIntentPayload,
+    djangoOrderIntentVerifyPayload,
   };
 
   const res = await fetch('/next-api/paypal/tx-ledger/intent', {
@@ -882,7 +906,10 @@ const createOrder = useCallback(async (): Promise<string> => {
   country_iso3,
   currency,
   delivery_address,
-  otpOrderId,
+  djangoOrderIntentUuid,
+  djangoOrderIntentOrderId,
+  djangoOrderIntentPayload,
+  djangoOrderIntentVerifyPayload,
   setIntent,
 ]);
 ```
@@ -1293,7 +1320,9 @@ export async function GET(_req: Request, { params }: PageProps) {
     lastEventType: row.lastEventType,
     receiptLink: row.receiptLink,
     receiptFile: row.receiptFile,
-    backendCustomId: row.backendCustomId,
+    djangoOrderIntentUuid: row.djangoOrderIntentUuid,
+    djangoOrderIntentOrderId: row.djangoOrderIntentOrderId,
+    djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
     processingCompletedAt: row.processingCompletedAt,
     error: row.lastErrorMessage
       ? { code: row.lastErrorCode, message: row.lastErrorMessage }
@@ -1827,7 +1856,7 @@ Keep two helpers:
 - webhook/post-processing must use a server-only helper backed by `SHOP_SERVER_ACTIONS_CRYPTO_SECRET`
 
 ```ts
-// src/lib/utils/serverActionCrypto.ts
+// src/lib/utils/shop/checkout/serverPostProcessingCrypto.ts
 import 'server-only';
 import CryptoJS from 'crypto-js';
 
@@ -1839,7 +1868,7 @@ function getServerActionSecret() {
   return secret;
 }
 
-export function encryptForServerAction(text: string): string {
+export function encryptForPostProcessingServerAction(text: string): string {
   return CryptoJS.AES.encrypt(text, getServerActionSecret()).toString();
 }
 ```
@@ -1848,12 +1877,12 @@ Update the decrypt side of `savePaymentReceiptToCloud`, `savePaymentDataToBacken
 
 ```ts
 import { randomUUID } from 'crypto';
-import { encryptForServerAction } from '@/lib/utils/serverActionCrypto';
+import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { savePaymentReceiptToCloud } from '@/actions/shop/paypal/processAndUploadCompletedTx/savePaymentReceiptToCloud';
 import { savePaymentDataToBackend } from '@/actions/shop/paypal/processAndUploadCompletedTx/savePaymentDataToBackend';
-import { sendFulfillmentOrder } from '@/lib/paypal/txLedger/providers/fulfillmentAdapter';
+import { sendMerchizeFulfillmentOrder } from '@/lib/paypal/txLedger/sendMerchizeFulfillmentOrder';
 
 const POST_PROCESSING_LEASE_MS = 5 * 60_000;
 
@@ -1905,11 +1934,11 @@ export async function runPostProcessing(orderToken: string) {
     }
 
     const customer = { name: row.customerName, email: row.customerEmail };
-    const ORD_string = row.otpOrderId ?? row.orderToken;
+    const ORD_string = row.djangoOrderIntentOrderId ?? row.orderToken;
 
     // Step 1: Receipt
     if (!row.receiptLink || !row.receiptFile) {
-      const receiptPayload = encryptForServerAction(JSON.stringify({ authData, customer, ORD_string }));
+      const receiptPayload = encryptForPostProcessingServerAction(JSON.stringify({ authData, customer, ORD_string }));
       const receiptRes = await savePaymentReceiptToCloud(receiptPayload);
       if (!receiptRes.success) {
         throw new Error(receiptRes.message ?? 'Receipt upload failed');
@@ -1931,8 +1960,8 @@ export async function runPostProcessing(orderToken: string) {
     }
 
     // Step 2: Payment save
-    if (!row.backendCustomId) {
-      const savePayload = encryptForServerAction(
+    if (!row.djangoPaymentSaveCustomId) {
+      const savePayload = encryptForPostProcessingServerAction(
         JSON.stringify({
           authData,
           finalCapturedOrder,
@@ -1955,23 +1984,27 @@ export async function runPostProcessing(orderToken: string) {
         where: { orderToken, postProcessingLockId: lockId },
         data: {
           status: PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
-          backendCustomId: paymentSave.data?.custom_id ?? null,
+          djangoPaymentSaveCustomId: paymentSave.data?.custom_id ?? null,
           lastErrorCode: null,
           lastErrorMessage: null,
         },
       });
 
-      row.backendCustomId = paymentSave.data?.custom_id ?? null;
+      row.djangoPaymentSaveCustomId = paymentSave.data?.custom_id ?? null;
     }
 
-    // Step 3: Fulfillment (provider isolated)
-    await sendFulfillmentOrder({
+    if (!row.djangoPaymentSaveCustomId) {
+      throw new Error('Missing Django payment save custom_id before fulfillment push');
+    }
+
+    // Step 3: Merchize fulfillment
+    await sendMerchizeFulfillmentOrder({
       cartSnapshot: row.cartSnapshot,
-      shippingSnapshot: row.shippingSnapshot,
-      customer,
-      countryIso2: row.countryIso2,
-      orderCustomId: row.backendCustomId ?? row.paypalOrderId ?? row.orderToken,
-      idempotencyKey: row.orderToken,
+      djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
+      identifier: 'codexchristi-shop',
+      currency: row.initialCurrency ?? 'USD',
+      customerName: row.customerName,
+      fulfillmentAddress: row.shippingSnapshot,
     });
 
     await paypalTxLedger.paypalIntent.updateMany({
@@ -2013,75 +2046,53 @@ Operational note:
 
 ---
 
-# 22) Fulfillment Provider Adapter (Merchize isolated)
+# 22) Merchize Fulfillment Helper
 
-This section isolates non-ledger fulfillment concerns from the main ledger flow.
+This section isolates Merchize fulfillment payload construction from the main ledger runner.
 
-New files:
-- `src/lib/paypal/txLedger/providers/fulfillmentAdapter.ts`
-- `src/lib/paypal/txLedger/providers/merchizeFulfillmentAdapter.ts`
+Current file:
+- `src/lib/paypal/txLedger/sendMerchizeFulfillmentOrder.ts`
 
-## Adapter interface (ledger-facing)
+## Ledger-facing helper shape
 
 ```ts
-// src/lib/paypal/txLedger/providers/fulfillmentAdapter.ts
-import { sendMerchizeFulfillmentOrder } from './merchizeFulfillmentAdapter';
+// src/lib/paypal/txLedger/sendMerchizeFulfillmentOrder.ts
+import { sendMerchizeOrderDetailsToBackend } from '@/actions/shop/checkout/createMerchizeOrder/sendMerchizeOrderDetailsToBackend';
+import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
 
-type FulfillmentArgs = {
-  cartSnapshot: unknown;
-  shippingSnapshot: unknown;
-  customer: { name: string; email: string };
-  countryIso2?: string | null;
-  orderCustomId: string;
-  idempotencyKey: string;
+export type MerchizeFulfillmentOrderArgs = {
+  cartSnapshot: CartVariant[];
+  djangoPaymentSaveCustomId: string;
+  identifier: string;
+  currency: string;
+  customerName: string;
+  fulfillmentAddress: PaymentSavingActionProps['delivery_address'];
 };
 
-export async function sendFulfillmentOrder(args: FulfillmentArgs) {
-  // Hard-wired to Merchize for now — swap adapter if provider changes
-  return sendMerchizeFulfillmentOrder(args);
-}
-```
-
-## Merchize adapter (provider-specific code isolated here)
-
-```ts
-// src/lib/paypal/txLedger/providers/merchizeFulfillmentAdapter.ts
-import { sendMerchizeOrderDetailsToBackend } from '@/actions/shop/checkout/createMerchizeOrder/sendMerchizeOrderDetailsToBackend';
-import { encryptForServerAction } from '@/lib/utils/serverActionCrypto';
-
-export async function sendMerchizeFulfillmentOrder(args: {
-  cartSnapshot: unknown;
-  shippingSnapshot: any;
-  customer: { name: string; email: string };
-  countryIso2?: string | null;
-  orderCustomId: string;
-  idempotencyKey: string;
-}) {
-  const cart = (args.cartSnapshot as Array<{ variantId: string; quantity: number }>) ?? [];
-
-  const payload = encryptForServerAction(
-    JSON.stringify({
-      orderVariants: cart.map(({ variantId, quantity }) => ({ variantId, quantity })),
-      orderRecipientInfo: {
-        delivery_address: args.shippingSnapshot,
-        customer: args.customer,
-      },
-      country_iso2: args.countryIso2,
-      order_custom_id: args.orderCustomId,
-      idempotency_key: args.idempotencyKey,
-    }),
+export async function sendMerchizeFulfillmentOrder(args: MerchizeFulfillmentOrderArgs) {
+  const requestPayload = buildFulfillmentPayload(
+    args,
+    mapCartToProcessingItems(args.cartSnapshot, args.currency),
   );
 
-  const pushRes = await sendMerchizeOrderDetailsToBackend(payload);
-  if (!pushRes.ok) throw new Error(pushRes.error?.message ?? 'Fulfillment push failed');
+  const response = await sendMerchizeOrderDetailsToBackend(
+    encryptForPostProcessingServerAction(
+      JSON.stringify({
+        djangoPaymentSaveCustomId: args.djangoPaymentSaveCustomId,
+        payload: requestPayload,
+      }),
+    ),
+  );
 
-  return pushRes;
+  if (!response.ok) throw new Error(response.error?.message ?? 'Fulfillment push failed');
+  return { ...response, requestPayload };
 }
 ```
 
 Why this matters:
-- The guide remains ledger-focused.
-- If you change fulfillment provider later, only adapter files change.
+- The Django payment save custom ID is the fulfillment process path identifier.
+- The fulfillment request payload is saved back to the ledger as `merchizeFulfillmentRequestPayload`.
+- The fulfillment response payload is saved back to the ledger as `merchizeFulfillmentResponsePayload`.
 
 ---
 
@@ -2116,9 +2127,9 @@ export function assertAdminSecret(req: Request) {
 # 24) Admin Ledger UI + Retry Actions (Search, Filter, Retry)
 
 New files:
-- `src/app/admin/paypal-ledger/page.tsx`
-- `src/app/admin/paypal-ledger/actions.ts`
-- `src/app/admin/paypal-ledger/AdminLedgerTable.tsx`
+- `src/app/admin/shop/paypal-merchize-ledger/page.tsx`
+- `src/app/admin/shop/paypal-merchize-ledger/actions.ts`
+- `src/app/admin/shop/paypal-merchize-ledger/AdminLedgerTable.tsx`
 
 ## Goals for the admin UI
 
@@ -2126,7 +2137,9 @@ New files:
   - `orderToken`
   - `paypalOrderId`
   - `customerEmail`
-  - `backendCustomId`
+  - `djangoOrderIntentUuid`
+  - `djangoOrderIntentOrderId`
+  - `djangoPaymentSaveCustomId`
 - Filter by:
   - `status`
   - date window (optional simple version)
@@ -2141,7 +2154,7 @@ New files:
 ## Server actions template
 
 ```ts
-// src/app/admin/paypal-ledger/actions.ts
+// src/app/admin/shop/paypal-merchize-ledger/actions.ts
 'use server';
 
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
@@ -2165,7 +2178,7 @@ export async function retryPostProcessing(orderToken: string) {
 This is the missing practical part: the admin page should not fetch everything unfiltered.
 
 ```ts
-// add to src/app/admin/paypal-ledger/actions.ts (or a local server helper file)
+// add to src/app/admin/shop/paypal-merchize-ledger/actions.ts (or a local server helper file)
 'use server';
 
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
@@ -2195,7 +2208,9 @@ export async function listLedgerRows({
             { orderToken: { contains: q, mode: 'insensitive' as const } },
             { paypalOrderId: { contains: q, mode: 'insensitive' as const } },
             { customerEmail: { contains: q, mode: 'insensitive' as const } },
-            { backendCustomId: { contains: q, mode: 'insensitive' as const } },
+            { djangoOrderIntentUuid: { contains: q, mode: 'insensitive' as const } },
+            { djangoOrderIntentOrderId: { contains: q, mode: 'insensitive' as const } },
+            { djangoPaymentSaveCustomId: { contains: q, mode: 'insensitive' as const } },
           ],
         }
       : {}),
@@ -2224,7 +2239,7 @@ export async function listLedgerRows({
 ## Admin page route template (server component shell)
 
 ```tsx
-// src/app/admin/paypal-ledger/page.tsx
+// src/app/admin/shop/paypal-merchize-ledger/page.tsx
 import AdminLedgerTable from './AdminLedgerTable';
 import { listLedgerRows } from './actions';
 
@@ -2274,7 +2289,7 @@ export default async function PayPalLedgerAdminPage({ searchParams }: PageProps)
 ## Admin table UI template (search + filter + retry)
 
 ```tsx
-// src/app/admin/paypal-ledger/AdminLedgerTable.tsx
+// src/app/admin/shop/paypal-merchize-ledger/AdminLedgerTable.tsx
 'use client';
 
 import { useMemo, useTransition } from 'react';
@@ -2286,7 +2301,9 @@ type LedgerRow = {
   orderToken: string;
   paypalOrderId: string | null;
   customerEmail: string;
-  backendCustomId: string | null;
+  djangoOrderIntentUuid: string | null;
+  djangoOrderIntentOrderId: string | null;
+  djangoPaymentSaveCustomId: string | null;
   status: string;
   retryCount: number;
   lastErrorCode: string | null;
@@ -2342,7 +2359,7 @@ export default function AdminLedgerTable({
       next.page > 1 ? params.set('page', String(next.page)) : params.delete('page');
     }
     startTransition(() => {
-      router.replace(`/admin/paypal-ledger?${params.toString()}`);
+      router.replace(`/admin/shop/paypal-merchize-ledger?${params.toString()}`);
     });
   };
 
@@ -2371,7 +2388,7 @@ export default function AdminLedgerTable({
         <input
           name='q'
           defaultValue={q}
-          placeholder='Search by orderToken / paypalOrderId / email / backendCustomId'
+          placeholder='Search by orderToken / PayPal ID / email / Django IDs'
           className='border rounded px-3 py-2'
         />
         <select name='status' defaultValue={status} className='border rounded px-3 py-2'>
@@ -2396,7 +2413,8 @@ export default function AdminLedgerTable({
               <th className='text-left p-2'>Customer</th>
               <th className='text-left p-2'>Order Token</th>
               <th className='text-left p-2'>PayPal Order</th>
-              <th className='text-left p-2'>Backend ID</th>
+              <th className='text-left p-2'>Django Intent</th>
+              <th className='text-left p-2'>Django Payment Save ID</th>
               <th className='text-left p-2'>Retries</th>
               <th className='text-left p-2'>Last Error</th>
               <th className='text-left p-2'>Actions</th>
@@ -2409,7 +2427,11 @@ export default function AdminLedgerTable({
                 <td className='p-2'>{row.customerEmail}</td>
                 <td className='p-2 break-all'>{row.orderToken}</td>
                 <td className='p-2 break-all'>{row.paypalOrderId ?? '-'}</td>
-                <td className='p-2 break-all'>{row.backendCustomId ?? '-'}</td>
+                <td className='p-2 break-all'>
+                  <div>{row.djangoOrderIntentOrderId ?? '-'}</div>
+                  <div className='opacity-70'>{row.djangoOrderIntentUuid ?? '-'}</div>
+                </td>
+                <td className='p-2 break-all'>{row.djangoPaymentSaveCustomId ?? '-'}</td>
                 <td className='p-2'>{row.retryCount}</td>
                 <td className='p-2 max-w-[320px]'>
                   <div className='font-medium'>{row.lastErrorCode ?? '-'}</div>
@@ -2430,7 +2452,7 @@ export default function AdminLedgerTable({
             ))}
             {rows.length === 0 && (
               <tr>
-                <td className='p-4 text-center opacity-70' colSpan={8}>
+                <td className='p-4 text-center opacity-70' colSpan={9}>
                   No ledger rows found for current filters.
                 </td>
               </tr>
@@ -2612,7 +2634,7 @@ Why this is safe:
 - Use dev fallback endpoint to trigger `runPostProcessing(orderToken)`.
 - Verify:
   - receipt link/file saved
-  - backend custom id saved
+  - Django payment save custom ID saved
   - final status `completed`
 
 ## Sandbox webhook testing
@@ -2654,7 +2676,8 @@ These defaults are implemented in this guide’s templates. Items marked **(defe
 1. `ORD_string` source
 - Keep dual references.
 - Internal primary key: `orderToken`
-- External/business fallback: `otpOrderId ?? orderToken`
+- External/business fallback: `djangoOrderIntentOrderId ?? orderToken`
+- `djangoOrderIntentOrderId` comes from the verified Django order-intent OTP flow, not from a client-generated order string.
 
 2. Webhook + sandbox testing mode
 - Add dev-only fallback endpoint for `runPostProcessing(orderToken)`
@@ -2700,7 +2723,7 @@ These defaults are implemented in this guide’s templates. Items marked **(defe
 Use this section only if you intentionally want to diverge from Section 30.
 
 1. `ORD_string` override
-- Use `orderToken` only and stop storing OTP order id.
+- Use `orderToken` only and stop storing the Django order-intent order ID.
 
 2. Sandbox override
 - Disable dev fallback endpoint and require webhook-only testing.

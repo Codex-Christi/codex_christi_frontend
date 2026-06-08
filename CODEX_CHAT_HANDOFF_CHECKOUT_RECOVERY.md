@@ -128,29 +128,29 @@ Important lesson:
 - Verification uses `expiresAt: { gt: new Date() }` to accept only unexpired rows.
 - `consumedAt` prevents reuse.
 
-## Recovery OTP Helper Files
+## Paid Checkout Recovery OTP Helper Files
 
-Suggested helper files:
+Current helper files:
 
 ```txt
-src/lib/shop/checkoutRecovery/recoveryOtpUtils.ts
-src/lib/shop/checkoutRecovery/recoveryOtpEmailTemplate.ts
-src/lib/shop/checkoutRecovery/findUnresolvedPaidCheckouts.ts
-src/lib/shop/checkoutRecovery/mapRecoveryCheckoutSummary.ts
+src/lib/shop/checkout/checkoutRecovery/recoveryOtpUtils.ts
+src/lib/shop/checkout/checkoutRecovery/recoveryOtpEmailTemplate.ts
+src/lib/shop/checkout/checkoutRecovery/findUnresolvedPaidCheckouts.ts
+src/lib/shop/checkout/checkoutRecovery/mapRecoveryCheckoutSummary.ts
 ```
 
 Route files:
 
 ```txt
-src/app/api/checkout/recovery/start/route.ts
-src/app/api/checkout/recovery/verify/route.ts
+src/app/api/shop/checkout/recovery/start/route.ts
+src/app/api/shop/checkout/recovery/verify/route.ts
 ```
 
 Client route paths should follow the current app convention:
 
 ```txt
-/next-api/checkout/recovery/start
-/next-api/checkout/recovery/verify
+/next-api/shop/checkout/recovery/start
+/next-api/shop/checkout/recovery/verify
 ```
 
 ## Recovery Flow
