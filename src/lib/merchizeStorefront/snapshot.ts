@@ -10,6 +10,7 @@ import {
   toMerchizeImageUrl,
   toMerchizeThumbnailUrl,
 } from '@/lib/merchizeStorefront/imageUrls';
+import { getCategoryPagePath } from '@/lib/utils/shop/categoryPagePath';
 
 type BasicProductData = BasicProductInterface['data'];
 type ProductVariantsData = ProductVariantsInterface['data'];
@@ -468,8 +469,8 @@ export async function getCategoryProductsSnapshotState({
 
   return {
     products: {
-      next: safePage < totalPages ? `/shop/category/${categorySlug}?page=${safePage + 1}` : null,
-      previous: safePage > 1 ? `/shop/category/${categorySlug}?page=${safePage - 1}` : null,
+      next: safePage < totalPages ? getCategoryPagePath(categorySlug, safePage + 1) : null,
+      previous: safePage > 1 ? getCategoryPagePath(categorySlug, safePage - 1) : null,
       current_page: safePage,
       products: rows.map((row) => toBasicProductData(row.product)),
       totalPages,

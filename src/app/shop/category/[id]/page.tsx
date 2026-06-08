@@ -1,128 +1,16 @@
 import { Metadata } from 'next';
-import { fetchCategoryProducts, getCategoryMetadataFromMerchize } from './categoryDetailsSSR';
-import { notFound } from 'next/navigation';
-import dynamic from 'next/dynamic';
-
-// Dynamic Components
-const ProductList = dynamic(
-  () =>
-    import('@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/ProductList'),
-);
-const PaginationControls = dynamic(
-  () =>
-    import(
-      '@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/PaginationControls'
-    ),
-);
+import CategoryPageView, { generateCategoryPageMetadata } from './CategoryPageView';
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
-const CATEGORY_PAGE_SIZE = 15;
-
-// ✅ 1. Generate metadata dynamically
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  try {
-    const { id: categoryName } = await params;
-    const categoryMetaData = await getCategoryMetadataFromMerchize(categoryName);
-
-    const { cover, description, name } = categoryMetaData;
-
-    const title = `${name} | Codex Christi Shop`;
-
-    return {
-      title: title,
-      description: description,
-      openGraph: {
-        title: title,
-        description: description,
-        // ✅ Correct conditional: Omit images property entirely when no cover
-        ...(cover ? { images: [{ url: cover.url }] } : {}),
-        type: 'website',
-        url: `https://codexchristi.shop/category/${categoryName}`,
-        locale: 'en_US',
-        siteName: 'Codex Christi Shop',
-      },
-      twitter: {
-        card: 'summary_large_image',
-        title: title,
-        description: description,
-        // ✅ Correct conditional: Omit images property entirely when no cover
-        ...(cover ? { images: cover.url } : {}),
-      },
-    };
-  } catch (err) {
-    // fallback metadata or suppress entirely
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    console.warn('[category.generateMetadata] metadata fetch failed:', errorMessage);
-    return {
-      title: 'Product not found',
-    };
-  }
-}
-
-async function getCategoryPageData(categoryName: string, page: number, productLimit: number) {
-  try {
-    const [categoryMetaData, initialProductFetchResp] = await Promise.all([
-      getCategoryMetadataFromMerchize(categoryName),
-      fetchCategoryProducts({ category: categoryName, page, page_size: productLimit }),
-    ]);
-
-    return {
-      categoryMetaData,
-      initialProductFetchResp,
-    };
-  } catch (err) {
-    console.log(err);
-    return null;
-  }
-}
-
-export default async function EachCategoryPage({ params, searchParams }: PageProps) {
   const { id: categoryName } = await params;
-  const searchParamsObj = await searchParams;
-  const page = parseInt((searchParamsObj?.page as string) ?? '1');
+  return generateCategoryPageMetadata(categoryName, 1);
+}
 
-  const productLimit = CATEGORY_PAGE_SIZE;
-  const pageData = await getCategoryPageData(categoryName, page, productLimit);
-  if (!pageData) {
-    return notFound();
-  }
-
-  const { name, description } = pageData.categoryMetaData;
-  const { products, totalPages } = pageData.initialProductFetchResp;
-
-  return (
-    <div className='min-h-[60vh]'>
-      <header className='px-8 pt-10'>
-        <h1 className='font-ocr text-3xl'>{name}</h1>
-        <h2 className='text-lg'>{description}</h2>
-      </header>
-
-      {/* <SkeletonContainer count={productLimit} /> */}
-
-      {/* <Suspense fallback={<SkeletonContainer count={productLimit} />}>
-        <main className='px-8'>
-          <h4>Products Loaded: {JSON.stringify(initialProductFetchResp)}</h4>
-        </main>
-      </Suspense> */}
-      <main className='px-8 pt-7 flex flex-col gap-16 mb-10'>
-        <ProductList
-          category={categoryName}
-          count={productLimit}
-          initialData={products}
-          initialPage={page}
-        />
-
-        <PaginationControls
-          currentPage={page}
-          category={categoryName}
-          limit={productLimit}
-          totalPages={totalPages}
-        />
-      </main>
-    </div>
-  );
+export default async function EachCategoryPage({ params }: PageProps) {
+  const { id: categoryName } = await params;
+  return <CategoryPageView categoryName={categoryName} page={1} />;
 }
