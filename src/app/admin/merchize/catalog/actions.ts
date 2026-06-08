@@ -77,7 +77,7 @@ export async function refreshPriceShippingCatalogAction() {
   }
 }
 
-export async function refreshStorefrontSnapshotAction() {
+export async function refreshOfflineStorefrontCatalogAction() {
   const pageSize = 50;
   const failures: Array<{ category: string; message: string }> = [];
   const categoryTotalPages = new Map<string, number>();

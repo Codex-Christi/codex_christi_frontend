@@ -1,7 +1,8 @@
 // src/app/admin/merchize/catalog/AdminCatalogClient.tsx
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useState, useTransition, type ReactNode } from 'react';
+import { Database, RefreshCw, Search, Store } from 'lucide-react';
 import type {
   SyncState,
   Variant,
@@ -9,8 +10,8 @@ import type {
   ShippingBand,
 } from '../../../../lib/prisma/shop/merchize/generated/merchizeCatalog/client';
 import {
+  refreshOfflineStorefrontCatalogAction,
   refreshPriceShippingCatalogAction,
-  refreshStorefrontSnapshotAction,
   searchPriceShippingCatalogBySku,
 } from './actions';
 import {
@@ -120,14 +121,14 @@ export default function AdminCatalogClient({
     });
   };
 
-  const handleStorefrontSnapshotRefreshConfirmed = () => {
+  const handleOfflineStorefrontCatalogRefreshConfirmed = () => {
     startTransition(async () => {
       setRefreshProgress(10);
-      setStatus({ type: 'loading', message: 'Refreshing storefront snapshot…' });
-      const loadID = showLoadingToast({ message: 'Refreshing storefront snapshot…' });
+      setStatus({ type: 'loading', message: 'Refreshing offline storefront catalog…' });
+      const loadID = showLoadingToast({ message: 'Refreshing offline storefront catalog…' });
 
       try {
-        const res = await refreshStorefrontSnapshotAction();
+        const res = await refreshOfflineStorefrontCatalogAction();
         toast.dismiss(loadID);
         setStorefrontSnapshotStats(res.stats);
         setRefreshProgress(100);
@@ -135,7 +136,10 @@ export default function AdminCatalogClient({
         const failureText = res.failures.length
           ? ` Failures: ${res.failures.map((failure) => failure.category).join(', ')}.`
           : '';
-        const msg = `Storefront snapshot refreshed. Pages: ${res.pagesFetched}, products seen: ${res.productsSeen}.${failureText}`;
+        const revalidationText = res.revalidatedPaths.length
+          ? ` Revalidated public paths: ${res.revalidatedPaths.length}.`
+          : '';
+        const msg = `Offline storefront catalog refreshed. Pages: ${res.pagesFetched}, products seen: ${res.productsSeen}.${revalidationText}${failureText}`;
 
         setStatus({
           type: res.ok ? 'success' : 'error',
@@ -143,16 +147,17 @@ export default function AdminCatalogClient({
         });
 
         if (res.ok) {
-          showSuccessToast({ header: 'Storefront snapshot refreshed', message: msg });
+          showSuccessToast({ header: 'Offline storefront catalog refreshed', message: msg });
         } else {
-          showErrorToast({ header: 'Storefront snapshot partially failed', message: msg });
+          showErrorToast({ header: 'Offline storefront catalog partially failed', message: msg });
         }
       } catch (e: unknown) {
         toast.dismiss(loadID);
         setRefreshProgress(0);
-        const message = e instanceof Error ? e.message : 'Storefront snapshot refresh failed.';
+        const message =
+          e instanceof Error ? e.message : 'Offline storefront catalog refresh failed.';
         setStatus({ type: 'error', message });
-        showErrorToast({ header: 'Snapshot refresh error', message });
+        showErrorToast({ header: 'Offline storefront catalog refresh error', message });
       }
     });
   };
@@ -200,32 +205,39 @@ export default function AdminCatalogClient({
     : 'Never';
 
   return (
-    <div className='min-h-screen flex items-center justify-center bg-indigo-950/30 backdrop-blur-[2px] text-slate-50 px-4'>
-      <div className='bg-slate-900/70 border border-slate-800 rounded-2xl p-6 backdrop-blur-md shadow-xl w-full max-w-3xl space-y-6'>
-        <header className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2'>
+    <div className='min-h-screen bg-indigo-950/30 backdrop-blur-[2px] text-slate-50 px-4 py-8'>
+      <div className='mx-auto bg-slate-900/70 border border-slate-800 rounded-2xl p-5 md:p-6 backdrop-blur-md shadow-xl w-full max-w-5xl space-y-6'>
+        <header className='grid gap-5 lg:grid-cols-[1fr_auto] lg:items-start'>
           <div>
-            <h1 className='text-xl font-semibold'>Merchize Offline Catalog Admin</h1>
-            <p className='text-xs text-slate-400'>
-              Local price/shipping data and storefront fallback snapshots stored in SQLite.
+            <p className='mb-2 inline-flex rounded-full border border-slate-700 bg-slate-950/60 px-2.5 py-1 text-[11px] uppercase tracking-wide text-slate-400'>
+              Merchize inventory
+            </p>
+            <h1 className='text-2xl font-semibold'>Offline Catalog Admin</h1>
+            <p className='mt-1 max-w-2xl text-sm text-slate-400'>
+              Manage local price, shipping, and offline storefront catalog data stored in SQLite.
             </p>
           </div>
 
-          <div className='flex flex-col sm:flex-row gap-2'>
+          <div className='grid gap-3 sm:grid-cols-2 lg:w-[34rem]'>
             <RefreshConfirmationDialog
               disabled={working}
-              buttonText='Refresh prices'
+              icon={<Database size={16} />}
+              buttonText='Price & shipping'
+              helperText='SKU, variant, and shipping bands'
               title='Refresh price and shipping catalog?'
               description='This pulls all pages from the Merchize product-line catalog API and updates local price, SKU, and shipping data.'
-              confirmText='Refresh prices'
+              confirmText='Refresh price and shipping'
               onConfirm={handlePriceShippingRefreshConfirmed}
             />
             <RefreshConfirmationDialog
               disabled={working}
-              buttonText='Refresh storefront'
-              title='Refresh storefront snapshot?'
-              description='This pulls the shop category/product pages used for degraded storefront rendering and updates only the local storefront snapshot subset.'
-              confirmText='Refresh storefront'
-              onConfirm={handleStorefrontSnapshotRefreshConfirmed}
+              icon={<Store size={16} />}
+              buttonText='Offline storefront'
+              helperText='Browse snapshots and ISR paths'
+              title='Refresh offline storefront catalog?'
+              description='This refreshes the category and product data used by public storefront pages when Merchize is unavailable, then revalidates the affected shop, category, and product pages.'
+              confirmText='Refresh offline storefront'
+              onConfirm={handleOfflineStorefrontCatalogRefreshConfirmed}
             />
           </div>
         </header>
@@ -281,15 +293,11 @@ export default function AdminCatalogClient({
         <section className='grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs'>
           <div className='rounded-lg border border-slate-800 bg-slate-900/60 p-3'>
             <div className='text-slate-400'>Storefront products</div>
-            <div className='mt-1 text-sm font-medium'>
-              {storefrontSnapshotStats.productCount}
-            </div>
+            <div className='mt-1 text-sm font-medium'>{storefrontSnapshotStats.productCount}</div>
           </div>
           <div className='rounded-lg border border-slate-800 bg-slate-900/60 p-3'>
             <div className='text-slate-400'>Snapshot categories</div>
-            <div className='mt-1 text-sm font-medium'>
-              {storefrontSnapshotStats.categoryCount}
-            </div>
+            <div className='mt-1 text-sm font-medium'>{storefrontSnapshotStats.categoryCount}</div>
           </div>
           <div className='rounded-lg border border-slate-800 bg-slate-900/60 p-3'>
             <div className='text-slate-400'>Snapshot TTL</div>
@@ -317,8 +325,9 @@ export default function AdminCatalogClient({
               onClick={handleSearch}
               disabled={working || !searchTerm.trim()}
               aria-label='Search price and shipping catalog by SKU'
-              className='inline-flex items-center justify-center rounded-md bg-slate-800 text-slate-100 font-medium px-4 py-2 text-xs hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition'
+              className='inline-flex items-center justify-center gap-2 rounded-md bg-slate-800 text-slate-100 font-medium px-4 py-2 text-xs hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition'
             >
+              <Search size={14} aria-hidden='true' />
               Search
             </button>
           </div>
@@ -367,14 +376,18 @@ export default function AdminCatalogClient({
 
 function RefreshConfirmationDialog({
   disabled,
+  icon,
   buttonText,
+  helperText,
   title,
   description,
   confirmText,
   onConfirm,
 }: {
   disabled: boolean;
+  icon: ReactNode;
   buttonText: string;
+  helperText: string;
   title: string;
   description: string;
   confirmText: string;
@@ -386,18 +399,23 @@ function RefreshConfirmationDialog({
         <button
           type='button'
           disabled={disabled}
-          className='inline-flex items-center justify-center rounded-md bg-emerald-500 text-slate-950 font-medium px-4 py-2 text-sm hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed transition'
+          className='group flex min-h-[4.5rem] w-full items-center gap-3 rounded-xl border border-emerald-400/30 bg-emerald-500/95 px-4 py-3 text-left text-slate-950 shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60'
         >
           {disabled ? (
-            <span className='inline-flex items-center gap-2'>
-              <span
-                className='h-3 w-3 rounded-full border-2 border-emerald-900 border-t-transparent animate-spin'
-                aria-hidden='true'
-              />
-              Working...
+            <span className='inline-flex items-center gap-3'>
+              <RefreshCw className='h-4 w-4 animate-spin' aria-hidden='true' />
+              <span className='font-medium'>Working...</span>
             </span>
           ) : (
-            buttonText
+            <>
+              <span className='grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-950/10'>
+                {icon}
+              </span>
+              <span className='min-w-0'>
+                <span className='block text-sm font-semibold'>{buttonText}</span>
+                <span className='block text-[11px] text-slate-900/75'>{helperText}</span>
+              </span>
+            </>
           )}
         </button>
       </AlertDialogTrigger>
