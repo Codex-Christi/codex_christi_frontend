@@ -11,7 +11,7 @@ export function CurrencyCookiePersist() {
 
   useEffect(() => {
     const existing = readCurrencyCookieClient();
-    if (existing?.iso3 || !iso3) return;
+    if (existing?.iso3 || !iso3 || updatedAt <= 0) return;
 
     void fetch('/next-api/currency-cookies/bootstrapper', {
       method: 'POST',

@@ -1,18 +1,13 @@
 import Image from 'next/image';
 import { categoriesObj } from '@/lib/utils/shopHomePageProductsData';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
-import { formatServerPricesByIds } from '@/lib/utils/shop/globalFXProductPrice/server/formatServerPrice';
 import GlobalProductPrice from '../GlobalShopComponents/GlobalProductPrice';
-import CountryDropdownServer from './CountryDropDownServerFloating';
+import CountryDropdownClientFloating from './CountryDropDownClientFloating';
 
-const Categories = async () => {
+const Categories = () => {
   const imageQuality = 50;
   const imageSizes =
     '(max-width: 640px) 80px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 160px';
-  const productIds = Object.values(categoriesObj).flatMap((category) =>
-    category.content.map((product) => product.productId),
-  );
-  const priceByProductId = await formatServerPricesByIds(productIds);
 
   // Main JSX
   return (
@@ -31,49 +26,41 @@ const Categories = async () => {
 
               <div className='grid gap-8 grid-cols-2 md:grid-cols-1'>
                 {/* Map through  */}
-                {products.content.map((product) => {
-                  const { ssrText, usdCentsBase } = priceByProductId[product.productId] ?? {
-                    ssrText: null,
-                    usdCentsBase: null,
-                  };
+                {products.content.map((product) => (
+                  <div className='grid gap-4 p-4' key={product.productId}>
+                    <CustomShopLink
+                      className='grid gap-2 xl:gap-4'
+                      href={`/shop/product/${product.productId}`}
+                    >
+                      <Image
+                        className='mx-auto h-[250px] object-contain object-center md:h-[120px] xl:h-[150px] 2xl:h-[200px]'
+                        style={{ width: 'auto' }}
+                        src={`/${product.image_name}`}
+                        alt={product.img_alt}
+                        width={200}
+                        height={200}
+                        fetchPriority='auto'
+                        loading='lazy'
+                        quality={imageQuality}
+                        sizes={imageSizes}
+                      />
 
-                  return (
-                    <div className='grid gap-4 p-4' key={product.productId}>
-                      <CustomShopLink
-                        className='grid gap-2 xl:gap-4'
-                        href={`/shop/product/${product.productId}`}
-                      >
-                        <Image
-                          className='mx-auto h-[250px] object-contain object-center md:h-[120px] xl:h-[150px] 2xl:h-[200px]'
-                          style={{ width: 'auto' }}
-                          src={`/${product.image_name}`}
-                          alt={product.img_alt}
-                          width={200}
-                          height={200}
-                          fetchPriority='auto'
-                          loading='lazy'
-                          quality={imageQuality}
-                          sizes={imageSizes}
+                      <h3 className='text-center font-bold'>
+                        <GlobalProductPrice
+                          usdCentsBase={product.usdCentsBase}
+                          className='text-lg font-semibold'
                         />
-
-                        <h3 className='text-center font-bold'>
-                          <GlobalProductPrice
-                            ssrText={ssrText}
-                            usdCentsBase={usdCentsBase ?? 0}
-                            className='text-lg font-semibold'
-                          />
-                        </h3>
-                      </CustomShopLink>
-                    </div>
-                  );
-                })}
+                      </h3>
+                    </CustomShopLink>
+                  </div>
+                ))}
               </div>
             </section>
           </div>
         ))}
       </div>
 
-      <CountryDropdownServer />
+      <CountryDropdownClientFloating initialIso3='USA' />
     </div>
   );
 };

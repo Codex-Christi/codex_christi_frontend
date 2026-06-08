@@ -3,7 +3,7 @@ import { ReactNode } from 'react';
 import ShopNav from '@/components/UI/Shop/Nav/Navbar';
 import Footer from '@/components/UI/Shop/Footer';
 import CometsContainer from '@/components/UI/general/CometsContainer';
-import GlobalCurrencyFXWrapper from '@/components/UI/Providers/Shop/GlobalCurrencyFXWrapper';
+import PublicCurrencyFXWrapper from '@/components/UI/Providers/Shop/PublicCurrencyFXWrapper';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SHOP_SITE_URL ?? 'https://codexchristi.shop'),
@@ -16,10 +16,10 @@ export const metadata: Metadata = {
 export default function ShopRootLayout({ children }: { children: ReactNode }) {
   return (
     <CometsContainer>
-      <GlobalCurrencyFXWrapper>
+      <PublicCurrencyFXWrapper>
         <ShopNav />
         {children}
-      </GlobalCurrencyFXWrapper>
+      </PublicCurrencyFXWrapper>
       <Footer />
     </CometsContainer>
   );
