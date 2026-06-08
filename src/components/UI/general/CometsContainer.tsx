@@ -7,27 +7,41 @@ interface CometsContainerInterface {
 const CometsContainer: FC<CometsContainerInterface> = (props) => {
   // Props
   const { children } = props || {};
+  const hasChildren = Boolean(children);
 
   // Main JSX
   return (
     <div
-      className={`${children ? 'relative' : 'absolute'} top-0 bottom-0 left-0 right-0 w-full
-      ${children ? '!-z-[0] min-h-dvh' : '!-z-[1]'} overflow-hidden `}
+      className={`${hasChildren ? 'relative min-h-dvh overflow-x-hidden' : 'absolute top-0 bottom-0 left-0 right-0 !-z-[1] overflow-hidden'} w-full`}
     >
-      <div
-        aria-hidden='true'
-        className={`absolute -top-1/2 -left-1/2 w-[200%] h-[200%]
-          ${children ? '!-z-[0]' : '!-z-[1]'} ${children ? 'min-h-dvh' : 'min-h-[auto]'}
-          bg-[url('/media/img/home/comets_mobile.svg')]
-          md:bg-[url('/media/img/home/comets_tablet.svg')]
-          lg:bg-[url('/media/img/home/comets_ desktop.svg')]
-          bg-repeat animate-ltr-linear-infinite !ease-linear motion-reduce:animate-none`}
-      />
-
-      {children ? (
+      {hasChildren ? (
         <div
-          className={`!pointer-events-auto absolute top-0 bottom-0 left-0 right-0 w-full h-full !z-[0]`}
+          aria-hidden='true'
+          className='pointer-events-none absolute inset-0 z-0 min-h-dvh overflow-hidden'
         >
+          <div
+            className='absolute -left-1/2 -top-1/2 h-[200%] min-h-dvh w-[200%]
+            bg-[url("/media/img/home/comets_mobile.svg")]
+            bg-repeat animate-ltr-linear-infinite !ease-linear motion-reduce:animate-none
+            md:bg-[url("/media/img/home/comets_tablet.svg")]
+            lg:bg-[url("/media/img/home/comets_ desktop.svg")]'
+          />
+        </div>
+      ) : null}
+
+      {!hasChildren ? (
+        <div
+          aria-hidden='true'
+          className='pointer-events-none absolute -left-1/2 -top-1/2 !-z-[1] h-[200%] min-h-[auto] w-[200%]
+          bg-[url("/media/img/home/comets_mobile.svg")]
+          bg-repeat animate-ltr-linear-infinite !ease-linear motion-reduce:animate-none
+          md:bg-[url("/media/img/home/comets_tablet.svg")]
+          lg:bg-[url("/media/img/home/comets_ desktop.svg")]'
+        />
+      ) : null}
+
+      {hasChildren ? (
+        <div className='relative z-10 min-h-dvh w-full pointer-events-auto'>
           {children}
         </div>
       ) : null}
