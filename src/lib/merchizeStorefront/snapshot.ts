@@ -5,6 +5,11 @@ import type {
   ProductResult,
   ProductVariantsInterface,
 } from '@/lib/merchizeStorefront/productTypes';
+import {
+  firstStringValue,
+  toMerchizeImageUrl,
+  toMerchizeThumbnailUrl,
+} from '@/lib/merchizeStorefront/imageUrls';
 
 type BasicProductData = BasicProductInterface['data'];
 type ProductVariantsData = ProductVariantsInterface['data'];
@@ -84,15 +89,32 @@ function toBasicProductData(snapshot: {
   description: string | null;
   image: string | null;
   retailPrice: number | null;
+  variantsJson?: Prisma.JsonValue | null;
 }): BasicProductData {
   return {
     _id: snapshot.merchizeProductId,
     title: snapshot.title ?? 'Product',
     description: snapshot.description ?? '',
-    image: snapshot.image ?? '',
+    image: getVariantPreviewImage(snapshot.variantsJson) ?? toMerchizeImageUrl(snapshot.image),
     retail_price: String(snapshot.retailPrice ?? 0),
     slug: snapshot.slug ?? snapshot.merchizeProductId,
   };
+}
+
+function getProductImageFromRawProduct(product: BasicProductData) {
+  const galleryImage = firstStringValue((product as { gallery_uris?: unknown }).gallery_uris);
+  return galleryImage ? toMerchizeThumbnailUrl(galleryImage) : toMerchizeImageUrl(product.image);
+}
+
+function getVariantPreviewImage(variantsJson: unknown) {
+  if (!isProductVariantsData(variantsJson)) return null;
+
+  const previewVariant =
+    variantsJson.find((variant) => firstStringValue(variant.image_uris) && variant.is_default) ??
+    variantsJson.find((variant) => firstStringValue(variant.image_uris));
+  const imageUri = firstStringValue(previewVariant?.image_uris);
+
+  return imageUri ? toMerchizeThumbnailUrl(imageUri) : null;
 }
 
 function isProductVariantsData(value: unknown): value is ProductVariantsData {
@@ -134,7 +156,7 @@ export async function upsertStorefrontProductSnapshot(
       slug: product.slug ?? null,
       title: product.title ?? null,
       description: product.description ?? null,
-      image: product.image ?? null,
+      image: getProductImageFromRawProduct(product) || null,
       retailPrice,
       rawProductJson: toJsonValue(product),
       lastSeenAt: now,
@@ -144,7 +166,7 @@ export async function upsertStorefrontProductSnapshot(
       slug: product.slug ?? null,
       title: product.title ?? null,
       description: product.description ?? null,
-      image: product.image ?? null,
+      image: getProductImageFromRawProduct(product) || null,
       retailPrice,
       rawProductJson: toJsonValue(product),
       lastSeenAt: now,
@@ -180,7 +202,7 @@ export async function upsertStorefrontProductVariantsSnapshot(
       title: defaultVariant.title ?? null,
       description: '',
       image: defaultVariant.image_uris?.[0]
-        ? `https://d2dytk4tvgwhb4.cloudfront.net/${defaultVariant.image_uris[0]}`
+        ? toMerchizeThumbnailUrl(defaultVariant.image_uris[0])
         : null,
       retailPrice: parseRetailPrice(defaultVariant.retail_price),
       variantsJson: toJsonValue(variants),
@@ -189,6 +211,9 @@ export async function upsertStorefrontProductVariantsSnapshot(
       lastVariantsFetchAt: now,
     },
     update: {
+      image: defaultVariant.image_uris?.[0]
+        ? toMerchizeThumbnailUrl(defaultVariant.image_uris[0])
+        : undefined,
       variantsJson: toJsonValue(variants),
       variantCount: variants.length,
       lastSeenAt: now,

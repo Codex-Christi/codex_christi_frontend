@@ -21,6 +21,11 @@ import {
   upsertStorefrontCategorySnapshot,
 } from '@/lib/merchizeStorefront/snapshot';
 import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
+import {
+  firstStringValue,
+  toMerchizeImageUrl,
+  toMerchizeThumbnailUrl,
+} from '@/lib/merchizeStorefront/imageUrls';
 
 type BasicProductData = BasicProductInterface['data'];
 
@@ -54,6 +59,13 @@ type CategorySearchResponse = {
     collections?: Array<{ _id: string }>;
   };
 };
+
+function normalizeCategoryProductImage(product: CategoryProductDetail): CategoryProductDetail {
+  const galleryImage = firstStringValue((product as { gallery_uris?: unknown }).gallery_uris);
+  const image = galleryImage ? toMerchizeThumbnailUrl(galleryImage) : toMerchizeImageUrl(product.image);
+
+  return image ? { ...product, image } : product;
+}
 
 // Get category's ID from Merchize
 const getCategoryIDFromMerchize = cache(async (categoryName: string) => {
@@ -193,6 +205,7 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
 
     if ('data' in categoryProductsResponse && categoryProductsResponse.success) {
       const { products, total, pages, page } = categoryProductsResponse.data;
+      const normalizedProducts = products.map(normalizeCategoryProductImage);
 
       await upsertStorefrontCategoryPageSnapshot({
         categorySlug: category,
@@ -201,7 +214,7 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
         pageSize: page_size,
         total,
         totalPages: pages,
-        products,
+        products: normalizedProducts,
         force: forceSnapshotRefresh,
       }).catch((err) => {
         console.warn('[storefrontSnapshot] category page snapshot upsert failed:', err);
@@ -217,7 +230,7 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
             ? `${merchizeBaseURL}/product/products?limit=${page_size}&page=${page - 1}&title=&collectionId[]=${catID}&minPrice=&maxPrice=`
             : null,
         current_page: page,
-        products,
+        products: normalizedProducts,
         totalPages: pages,
         count: total,
       };
