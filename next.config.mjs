@@ -49,22 +49,6 @@ const nextConfig = {
       },
     ];
   },
-  async redirects() {
-    return [
-      {
-        source: '/shop/category/:id',
-        has: [
-          {
-            type: 'query',
-            key: 'page',
-            value: '(?<page>\\d+)',
-          },
-        ],
-        destination: '/shop/category/:id/page/:page',
-        permanent: false,
-      },
-    ];
-  },
 };
 
 export default nextConfig;
