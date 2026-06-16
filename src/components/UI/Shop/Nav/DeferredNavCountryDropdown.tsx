@@ -1,16 +1,29 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+import { useEffect, useState, type ComponentType } from 'react';
 import { useAfterInitialPageLoad } from '@/lib/hooks/useAfterInitialPageLoad';
 
-const NavCountryDropdownLoaded = dynamic(() => import('./NavCountryDropdownLoaded'), {
-  ssr: false,
-});
+type LoadedCountryDropdown = ComponentType;
 
 export default function DeferredNavCountryDropdown({ disabled }: { disabled?: boolean }) {
   const ready = useAfterInitialPageLoad(2200);
+  const [LoadedDropdown, setLoadedDropdown] = useState<LoadedCountryDropdown | null>(null);
 
-  if (disabled || !ready) return null;
+  useEffect(() => {
+    if (disabled || !ready || LoadedDropdown) return;
 
-  return <NavCountryDropdownLoaded />;
+    let cancelled = false;
+
+    void import('./NavCountryDropdownLoaded').then((module) => {
+      if (!cancelled) setLoadedDropdown(() => module.default);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [LoadedDropdown, disabled, ready]);
+
+  if (disabled || !LoadedDropdown) return null;
+
+  return <LoadedDropdown />;
 }

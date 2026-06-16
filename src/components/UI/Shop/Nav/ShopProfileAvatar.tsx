@@ -1,6 +1,6 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+import { useEffect, useState, type ComponentType } from 'react';
 import type { ImageProps } from 'next/image';
 import { useAfterInitialPageLoad } from '@/lib/hooks/useAfterInitialPageLoad';
 
@@ -9,9 +9,7 @@ type ShopProfileAvatarProps = Omit<ImageProps, 'src'> & {
   height: number;
 };
 
-const HydratedShopProfileAvatar = dynamic(() => import('./ShopProfileAvatarHydrated'), {
-  ssr: false,
-});
+type HydratedShopProfileAvatarComponent = ComponentType<ShopProfileAvatarProps>;
 
 function ShopProfileAvatarPlaceholder({
   width,
@@ -45,14 +43,30 @@ function ShopProfileAvatarPlaceholder({
 
 export default function ShopProfileAvatar(props: ShopProfileAvatarProps) {
   const ready = useAfterInitialPageLoad(2400);
+  const [HydratedAvatar, setHydratedAvatar] =
+    useState<HydratedShopProfileAvatarComponent | null>(null);
+
+  useEffect(() => {
+    if (!ready || HydratedAvatar) return;
+
+    let cancelled = false;
+
+    void import('./ShopProfileAvatarHydrated').then((module) => {
+      if (!cancelled) setHydratedAvatar(() => module.default);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [HydratedAvatar, ready]);
 
   return (
     <span
       className='inline-flex items-center justify-center'
       style={{ width: props.width, height: props.height }}
     >
-      {ready ? (
-        <HydratedShopProfileAvatar {...props} />
+      {HydratedAvatar ? (
+        <HydratedAvatar {...props} />
       ) : (
         <ShopProfileAvatarPlaceholder {...props} />
       )}
