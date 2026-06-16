@@ -49,7 +49,7 @@ export default function ShopProfileAvatarHydrated({
       width={width}
       height={height}
       alt={typeof props.alt === 'string' ? props.alt : 'User avatar'}
-      className={`rounded-full object-cover object-center ${className ?? ''}`}
+      className={`!size-full rounded-full object-cover object-center ${className ?? ''}`}
       sizes={`${width}px`}
       quality={75}
       loading='lazy'

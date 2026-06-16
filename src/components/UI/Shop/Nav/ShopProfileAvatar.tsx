@@ -62,7 +62,7 @@ export default function ShopProfileAvatar(props: ShopProfileAvatarProps) {
 
   return (
     <span
-      className='inline-flex items-center justify-center'
+      className='inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full'
       style={{ width: props.width, height: props.height }}
     >
       {HydratedAvatar ? (
