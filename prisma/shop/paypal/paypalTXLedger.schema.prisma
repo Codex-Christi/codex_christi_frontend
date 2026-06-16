@@ -94,3 +94,32 @@ model CheckoutRecoveryOtpChallenge {
   @@index([email, expiresAt])
   @@index([consumedAt])
 }
+
+model AdminNotificationOutbox {
+  id               String    @id @default(cuid())
+  orderToken       String?
+  paypalOrderId    String?
+  type             String
+  stage            String?
+  errorCode        String?
+  severity         String    @default("warning")
+  status           String    @default("pending")
+  dedupeKey        String    @unique
+  recipient        String?
+  payload          Json
+  attemptCount     Int       @default(0)
+  lastAttemptAt    DateTime?
+  sentAt           DateTime?
+  lastErrorMessage String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([orderToken])
+  @@index([paypalOrderId])
+  @@index([type])
+  @@index([stage])
+  @@index([errorCode])
+  @@index([severity])
+  @@index([status])
+  @@index([createdAt])
+}

@@ -11,4 +11,5 @@
 export type * from './models/PaypalIntent'
 export type * from './models/PaypalWebhookEvent'
 export type * from './models/CheckoutRecoveryOtpChallenge'
+export type * from './models/AdminNotificationOutbox'
 export type * from './commonInputTypes'

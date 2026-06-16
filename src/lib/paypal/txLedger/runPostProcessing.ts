@@ -15,6 +15,10 @@ import {
   FulfillmentProviderRejectedError,
   sendMerchizeFulfillmentOrder,
 } from '@/lib/paypal/txLedger/sendMerchizeFulfillmentOrder';
+import {
+  enqueueAdminRecoveryNotification,
+  sendPendingAdminRecoveryNotificationsForOrder,
+} from '@/lib/paypal/txLedger/adminNotificationOutbox';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
@@ -212,38 +216,90 @@ export async function runPostProcessing(orderToken: string) {
     const message = error instanceof Error ? error.message : String(error);
 
     if (error instanceof FulfillmentPayloadValidationError) {
-      await updateLockedRow(orderToken, lockId, {
-        status: PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED,
-        lastErrorCode: 'FULFILLMENT_PAYLOAD_INVALID',
-        lastErrorMessage: message,
-        merchizeFulfillmentRequestPayload: toLedgerJson(error.requestPayload),
-        merchizeFulfillmentResponsePayload: toLedgerJson({
-          source: 'local_validation',
-          success: false,
-          issues: error.issues,
-        }),
-        postProcessingLockId: null,
-        postProcessingLockedAt: null,
-        postProcessingLockExpiresAt: null,
-      } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
+      await paypalTxLedger.$transaction(async (tx) => {
+        await tx.paypalIntent.updateMany({
+          where: { orderToken, postProcessingLockId: lockId },
+          data: {
+            status: PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED,
+            lastErrorCode: 'FULFILLMENT_PAYLOAD_INVALID',
+            lastErrorMessage: message,
+            merchizeFulfillmentRequestPayload: toLedgerJson(error.requestPayload),
+            merchizeFulfillmentResponsePayload: toLedgerJson({
+              source: 'local_validation',
+              success: false,
+              issues: error.issues,
+            }),
+            postProcessingLockId: null,
+            postProcessingLockedAt: null,
+            postProcessingLockExpiresAt: null,
+          } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
+        });
+
+        await enqueueAdminRecoveryNotification({
+          db: tx,
+          orderToken,
+          paypalOrderId: row.paypalOrderId,
+          customerName: row.customerName,
+          customerEmail: row.customerEmail,
+          ledgerStatus: PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED,
+          errorCode: 'FULFILLMENT_PAYLOAD_INVALID',
+          errorMessage: message,
+          issueSummary: error.issues.map((issue) => issue.message),
+          receiptLink: row.receiptLink,
+        });
+      });
+
+      await sendPendingAdminRecoveryNotificationsForOrder(orderToken).catch((notificationError) => {
+        console.error('[AdminNotificationOutbox] failed to send fulfillment blocked alert', {
+          orderToken,
+          error:
+            notificationError instanceof Error ? notificationError.message : String(notificationError),
+        });
+      });
 
       return;
     }
 
     if (error instanceof FulfillmentProviderRejectedError) {
-      await updateLockedRow(orderToken, lockId, {
-        status: PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
-        lastErrorCode: 'FULFILLMENT_PROVIDER_REJECTED',
-        lastErrorMessage: message,
-        merchizeFulfillmentRequestPayload: toLedgerJson(error.requestPayload),
-        merchizeFulfillmentResponsePayload: toLedgerJson(error.responsePayload),
-        merchizeFulfillmentProcessingId: error.responsePayload.data?.id ?? null,
-        merchizeProviderOrderId: error.responsePayload.data?.provider_order_id ?? null,
-        merchizeProviderOrderCode: error.responsePayload.data?.provider_order_code ?? null,
-        postProcessingLockId: null,
-        postProcessingLockedAt: null,
-        postProcessingLockExpiresAt: null,
-      } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
+      await paypalTxLedger.$transaction(async (tx) => {
+        await tx.paypalIntent.updateMany({
+          where: { orderToken, postProcessingLockId: lockId },
+          data: {
+            status: PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
+            lastErrorCode: 'FULFILLMENT_PROVIDER_REJECTED',
+            lastErrorMessage: message,
+            merchizeFulfillmentRequestPayload: toLedgerJson(error.requestPayload),
+            merchizeFulfillmentResponsePayload: toLedgerJson(error.responsePayload),
+            merchizeFulfillmentProcessingId: error.responsePayload.data?.id ?? null,
+            merchizeProviderOrderId: error.responsePayload.data?.provider_order_id ?? null,
+            merchizeProviderOrderCode: error.responsePayload.data?.provider_order_code ?? null,
+            postProcessingLockId: null,
+            postProcessingLockedAt: null,
+            postProcessingLockExpiresAt: null,
+          } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
+        });
+
+        await enqueueAdminRecoveryNotification({
+          db: tx,
+          orderToken,
+          paypalOrderId: row.paypalOrderId,
+          customerName: row.customerName,
+          customerEmail: row.customerEmail,
+          ledgerStatus: PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
+          errorCode: 'FULFILLMENT_PROVIDER_REJECTED',
+          errorMessage: message,
+          issueSummary: [message],
+          receiptLink: row.receiptLink,
+        });
+      });
+
+      await sendPendingAdminRecoveryNotificationsForOrder(orderToken).catch((notificationError) => {
+        console.error('[AdminNotificationOutbox] failed to send fulfillment failed alert', {
+          orderToken,
+          error:
+            notificationError instanceof Error ? notificationError.message : String(notificationError),
+        });
+      });
 
       return;
     }

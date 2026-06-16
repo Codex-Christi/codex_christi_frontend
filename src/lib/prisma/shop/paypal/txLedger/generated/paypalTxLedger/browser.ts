@@ -32,3 +32,8 @@ export type PaypalWebhookEvent = Prisma.PaypalWebhookEventModel
  * 
  */
 export type CheckoutRecoveryOtpChallenge = Prisma.CheckoutRecoveryOtpChallengeModel
+/**
+ * Model AdminNotificationOutbox
+ * 
+ */
+export type AdminNotificationOutbox = Prisma.AdminNotificationOutboxModel

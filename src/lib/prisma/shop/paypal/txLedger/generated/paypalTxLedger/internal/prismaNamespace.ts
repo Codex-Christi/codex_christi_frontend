@@ -386,7 +386,8 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   PaypalIntent: 'PaypalIntent',
   PaypalWebhookEvent: 'PaypalWebhookEvent',
-  CheckoutRecoveryOtpChallenge: 'CheckoutRecoveryOtpChallenge'
+  CheckoutRecoveryOtpChallenge: 'CheckoutRecoveryOtpChallenge',
+  AdminNotificationOutbox: 'AdminNotificationOutbox'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -402,7 +403,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "paypalIntent" | "paypalWebhookEvent" | "checkoutRecoveryOtpChallenge"
+    modelProps: "paypalIntent" | "paypalWebhookEvent" | "checkoutRecoveryOtpChallenge" | "adminNotificationOutbox"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -628,6 +629,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    AdminNotificationOutbox: {
+      payload: Prisma.$AdminNotificationOutboxPayload<ExtArgs>
+      fields: Prisma.AdminNotificationOutboxFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AdminNotificationOutboxFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationOutboxPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AdminNotificationOutboxFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationOutboxPayload>
+        }
+        findFirst: {
+          args: Prisma.AdminNotificationOutboxFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationOutboxPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AdminNotificationOutboxFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationOutboxPayload>
+        }
+        findMany: {
+          args: Prisma.AdminNotificationOutboxFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationOutboxPayload>[]
+        }
+        create: {
+          args: Prisma.AdminNotificationOutboxCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationOutboxPayload>
+        }
+        createMany: {
+          args: Prisma.AdminNotificationOutboxCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AdminNotificationOutboxCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationOutboxPayload>[]
+        }
+        delete: {
+          args: Prisma.AdminNotificationOutboxDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationOutboxPayload>
+        }
+        update: {
+          args: Prisma.AdminNotificationOutboxUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationOutboxPayload>
+        }
+        deleteMany: {
+          args: Prisma.AdminNotificationOutboxDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AdminNotificationOutboxUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AdminNotificationOutboxUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationOutboxPayload>[]
+        }
+        upsert: {
+          args: Prisma.AdminNotificationOutboxUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationOutboxPayload>
+        }
+        aggregate: {
+          args: Prisma.AdminNotificationOutboxAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAdminNotificationOutbox>
+        }
+        groupBy: {
+          args: Prisma.AdminNotificationOutboxGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AdminNotificationOutboxGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AdminNotificationOutboxCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AdminNotificationOutboxCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -743,6 +818,29 @@ export const CheckoutRecoveryOtpChallengeScalarFieldEnum = {
 } as const
 
 export type CheckoutRecoveryOtpChallengeScalarFieldEnum = (typeof CheckoutRecoveryOtpChallengeScalarFieldEnum)[keyof typeof CheckoutRecoveryOtpChallengeScalarFieldEnum]
+
+
+export const AdminNotificationOutboxScalarFieldEnum = {
+  id: 'id',
+  orderToken: 'orderToken',
+  paypalOrderId: 'paypalOrderId',
+  type: 'type',
+  stage: 'stage',
+  errorCode: 'errorCode',
+  severity: 'severity',
+  status: 'status',
+  dedupeKey: 'dedupeKey',
+  recipient: 'recipient',
+  payload: 'payload',
+  attemptCount: 'attemptCount',
+  lastAttemptAt: 'lastAttemptAt',
+  sentAt: 'sentAt',
+  lastErrorMessage: 'lastErrorMessage',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AdminNotificationOutboxScalarFieldEnum = (typeof AdminNotificationOutboxScalarFieldEnum)[keyof typeof AdminNotificationOutboxScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -981,6 +1079,7 @@ export type GlobalOmitConfig = {
   paypalIntent?: Prisma.PaypalIntentOmit
   paypalWebhookEvent?: Prisma.PaypalWebhookEventOmit
   checkoutRecoveryOtpChallenge?: Prisma.CheckoutRecoveryOtpChallengeOmit
+  adminNotificationOutbox?: Prisma.AdminNotificationOutboxOmit
 }
 
 /* Types for Logging */

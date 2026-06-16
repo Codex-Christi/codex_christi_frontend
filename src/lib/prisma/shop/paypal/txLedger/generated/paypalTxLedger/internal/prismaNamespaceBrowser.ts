@@ -53,7 +53,8 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   PaypalIntent: 'PaypalIntent',
   PaypalWebhookEvent: 'PaypalWebhookEvent',
-  CheckoutRecoveryOtpChallenge: 'CheckoutRecoveryOtpChallenge'
+  CheckoutRecoveryOtpChallenge: 'CheckoutRecoveryOtpChallenge',
+  AdminNotificationOutbox: 'AdminNotificationOutbox'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -148,6 +149,29 @@ export const CheckoutRecoveryOtpChallengeScalarFieldEnum = {
 } as const
 
 export type CheckoutRecoveryOtpChallengeScalarFieldEnum = (typeof CheckoutRecoveryOtpChallengeScalarFieldEnum)[keyof typeof CheckoutRecoveryOtpChallengeScalarFieldEnum]
+
+
+export const AdminNotificationOutboxScalarFieldEnum = {
+  id: 'id',
+  orderToken: 'orderToken',
+  paypalOrderId: 'paypalOrderId',
+  type: 'type',
+  stage: 'stage',
+  errorCode: 'errorCode',
+  severity: 'severity',
+  status: 'status',
+  dedupeKey: 'dedupeKey',
+  recipient: 'recipient',
+  payload: 'payload',
+  attemptCount: 'attemptCount',
+  lastAttemptAt: 'lastAttemptAt',
+  sentAt: 'sentAt',
+  lastErrorMessage: 'lastErrorMessage',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AdminNotificationOutboxScalarFieldEnum = (typeof AdminNotificationOutboxScalarFieldEnum)[keyof typeof AdminNotificationOutboxScalarFieldEnum]
 
 
 export const SortOrder = {
