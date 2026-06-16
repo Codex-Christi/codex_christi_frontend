@@ -145,6 +145,192 @@
     transform: perspective(-5rem);
     transform-origin: center center;
   }
+
+  .cc-404-matrix-drop {
+    animation-name: cc-404-matrix-rain;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
+  .cc-404-glitch {
+    animation: cc-404-glitch 1.5s infinite;
+  }
+
+  .cc-404-fade-in,
+  .cc-404-fade-in-delayed,
+  .cc-404-fade-in-button {
+    opacity: 0;
+    animation: cc-404-fade-in 0.5s ease-out forwards;
+  }
+
+  .cc-404-fade-in {
+    animation-duration: 1s;
+  }
+
+  .cc-404-fade-in-delayed {
+    animation-delay: 0.5s;
+  }
+
+  .cc-404-fade-in-button {
+    animation-delay: 1s;
+    animation-name: cc-404-fade-in-scale;
+  }
+
+  .cc-404-cyber-orb {
+    transform: translateX(-50%);
+    animation: cc-404-cyber-orb 5s ease-in-out infinite;
+  }
+
+  .shop-404-cube {
+    animation-name: shop-404-cube-spin;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
+  .shop-not-found-panel {
+    animation: shop-panel-enter 1s ease-out both;
+  }
+
+  .shopping-cart-float {
+    animation: shopping-cart-float 4s ease-in-out infinite;
+  }
+
+  .shop-not-found-title {
+    animation: shop-title-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .shop-not-found-copy {
+    opacity: 0;
+    animation: shop-copy-enter 0.45s ease-out 0.5s both;
+  }
+
+  .shop-not-found-link,
+  .product-not-found-link {
+    transition: transform 180ms ease;
+  }
+
+  .shop-not-found-link:hover,
+  .product-not-found-link:hover {
+    transform: scale(1.05);
+  }
+
+  .shop-not-found-link:active,
+  .product-not-found-link:active {
+    transform: scale(0.95);
+  }
+
+  @keyframes cc-404-matrix-rain {
+    from {
+      translate: 0 -100%;
+    }
+    to {
+      translate: 0 110vh;
+    }
+  }
+
+  @keyframes cc-404-fade-in {
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes cc-404-fade-in-scale {
+    from {
+      opacity: 0;
+      transform: scale(0.8);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes cc-404-cyber-orb {
+    0%,
+    100% {
+      transform: translateX(-50%) translate3d(0, 0, 0) scale(1) rotate(0deg);
+    }
+    50% {
+      transform: translateX(-50%) translate3d(10px, 10px, 0) scale(1.2) rotate(180deg);
+    }
+  }
+
+  @keyframes cc-404-glitch {
+    0% {
+      text-shadow:
+        3px 3px 20px rgba(173, 51, 255, 0.8),
+        -3px -3px 20px rgba(51, 173, 255, 0.8);
+    }
+    25% {
+      text-shadow:
+        -5px -3px 15px rgba(51, 173, 255, 0.9),
+        3px 3px 10px rgba(173, 51, 255, 0.9);
+      transform: translateX(2px);
+    }
+    50% {
+      text-shadow:
+        4px 4px 25px rgba(51, 255, 173, 0.8),
+        -4px -4px 25px rgba(255, 51, 173, 0.8);
+      transform: translateX(-2px);
+    }
+    75% {
+      text-shadow:
+        -5px 3px 10px rgba(51, 173, 255, 0.7),
+        3px -3px 15px rgba(173, 51, 255, 0.7);
+      transform: translateX(3px);
+    }
+    100% {
+      text-shadow:
+        3px 3px 20px rgba(173, 51, 255, 0.8),
+        -3px -3px 20px rgba(51, 173, 255, 0.8);
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes shop-404-cube-spin {
+    to {
+      transform: rotateX(360deg) rotateY(360deg);
+    }
+  }
+
+  @keyframes shop-panel-enter {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes shopping-cart-float {
+    0%,
+    100% {
+      transform: translateY(0) rotate(0deg);
+    }
+    25% {
+      transform: translateY(-20px) rotate(-10deg);
+    }
+    75% {
+      transform: translateY(-20px) rotate(10deg);
+    }
+  }
+
+  @keyframes shop-title-enter {
+    from {
+      transform: scale(0.5);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes shop-copy-enter {
+    to {
+      opacity: 1;
+    }
+  }
 }
 
 .PhoneInputInput,

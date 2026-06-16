@@ -1,9 +1,6 @@
-'use client';
-
 import Image from 'next/image';
 import NotFoundImage from '@/assets/img/shop-not-found.png';
-import { motion } from 'framer-motion';
-import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
+import Link from 'next/link';
 
 export default function NotFound() {
   return (
@@ -24,19 +21,15 @@ export default function NotFound() {
         </div>
       </div>
 
-      <motion.div
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className='flex justify-center'
-      >
-        <CustomShopLink
+      <div className='product-not-found-link flex justify-center'>
+        <Link
           className=' border-[#0085FF] text-white bg-[#0085FF] hover:bg-[#0085FF]/70 rounded-xl 
           hover:text-white font-ocr !font-bold px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base'
           href='/'
         >
           Return to Home
-        </CustomShopLink>
-      </motion.div>
+        </Link>
+      </div>
     </div>
   );
 }

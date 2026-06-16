@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { FC } from 'react';
 
 interface CubeProps {
@@ -15,18 +14,13 @@ const Cube: FC<CubeProps> = ({
   className,
 }) => {
   return (
-    <motion.div
-      className={`absolute ${className}`}
+    <div
+      className={`shop-404-cube absolute ${className}`}
       style={{
         width: `${size}px`,
         height: `${size}px`,
         transformStyle: 'preserve-3d',
-      }}
-      animate={{ rotateX: 360, rotateY: 360 }}
-      transition={{
-        repeat: Infinity,
-        duration: rotationSpeed,
-        ease: 'linear',
+        animationDuration: `${rotationSpeed}s`,
       }}
     >
       {[
@@ -46,7 +40,7 @@ const Cube: FC<CubeProps> = ({
           }}
         />
       ))}
-    </motion.div>
+    </div>
   );
 };
 
