@@ -9,26 +9,30 @@ import dynamic from 'next/dynamic';
 const AllRootProviders = dynamic(() => import('@/components/UI/Providers/AllRootProviders'));
 
 const nicoMoji = localFont({
-  src: '../res/fonts/Nico-Moji.woff',
+  src: '../res/fonts/Nico-Moji-latin.woff2',
   variable: '--font-nico',
+  display: 'swap',
   preload: true,
 });
 
 const OCR_ext = localFont({
-  src: '../res/fonts/OCR-ext.ttf',
+  src: '../res/fonts/OCR-ext-latin.woff2',
   variable: '--font-ocr',
-  preload: false,
+  display: 'swap',
+  preload: true,
 });
 
 const InterFont = localFont({
-  src: '../res/fonts/Inter.ttf',
+  src: '../res/fonts/Inter-latin.var.woff2',
   variable: '--font-inter',
+  display: 'swap',
   preload: true,
 });
 
 const TradeWinds = localFont({
   src: '../res/fonts/Trade-Winds.ttf',
   variable: '--font-trade-winds',
+  display: 'swap',
   preload: false,
 });
 

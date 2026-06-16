@@ -15,8 +15,16 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <div className='w-full grid gap-4 md:gap-8'>
-      <div className='min-w-full w-full bg-[#0D0D0D] md:px-8 p-4 lg:px-[66px] flex items-center justify-between gap-4 sticky z-30 top-0 overflow-x-auto'>
-        <div className='flex items-center justify-between gap-6 md:w-1/2 md:gap-12'>
+      <div className='min-w-full w-full bg-[#0D0D0D] md:px-8 p-4 lg:px-[66px] flex items-center justify-between gap-4 sticky z-30 top-0 overflow-hidden relative isolate'>
+        <BluePlanetImage
+          alt='Blue Planet'
+          aria-hidden='true'
+          loading='lazy'
+          className='pointer-events-none absolute right-[-4rem] top-[-1.25rem] z-0 h-[8.5rem] w-[80%] max-w-[550px] overflow-x-hidden opacity-70
+          md:right-[-4.5rem] md:h-[9rem] md:w-[65%] md:max-w-[500px] lg:right-4 lg:top-[-.1rem] lg:h-[200px] lg:w-[35%] lg:max-w-[470px]'
+        />
+
+        <div className='relative z-10 flex items-center justify-between gap-6 overflow-x-auto md:w-1/2 md:gap-12'>
           <Link href='/'>
             <svg width='25' height='25' viewBox='0 0 33 33' fill='none'>
               <g clipPath='url(#clip0_853_2213)'>
@@ -123,16 +131,7 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
           </Link>
         </div>
 
-        <div className='flex items-center gap-2 md:gap-10 relative'>
-          <BluePlanetImage
-            alt='Blue Planet'
-            fetchPriority='high'
-            loading='eager'
-            className='w-[80%] max-w-[550px] h-[8.5rem] right-[-4rem] top-[-1.25rem] 
-            md:w-[65%] md:max-w-[500px] md:h-[9rem] md:right-[-4.5rem] lg:w-[35%] lg:max-w-[470px] lg:h-[200px] 
-            lg:[inset-inline-end:16px;] lg:top-[-.1rem] fixed !overflow-x-hidden !-z-10'
-          />
-
+        <div className='relative z-10 flex items-center gap-2 md:gap-10'>
           <UserAvatar className='rounded-full size-10 relative z-[1024] lg:size-12' />
 
           <button

@@ -29,6 +29,7 @@ const nextConfig = {
 
     // small sizes for thumbnails, icons, small images
     imageSizes: [24, 48, 80, 120, 160, 240, 320, 400, 480], // added 400 and 480 for better intermediate thumbnails
+    minimumCacheTTL: 60 * 60 * 24 * 365,
     qualities: [25, 50, 75, 80, 90, 100],
     formats: ['image/avif', 'image/webp'],
   },

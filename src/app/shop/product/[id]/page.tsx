@@ -1,6 +1,4 @@
-// import Image from 'next/image';
-// import Calendar from '@/assets/img/calendar.png';
-import ProductDetailsClientComponent from '@/components/UI/Shop/ProductDetails';
+import ProductDetailsShell from '@/components/UI/Shop/ProductDetails/ProductDetailsShell';
 import { Metadata } from 'next';
 import { getProductMetaDataOnly } from './productDetailsSSR';
 import { notFound } from 'next/navigation';
@@ -24,7 +22,8 @@ export async function generateStaticParams() {
 
 function resolveProductImageUrl(image: string | undefined | null) {
   if (!image) return undefined;
-  return image.startsWith('http') ? image : `https://d2dytk4tvgwhb4.cloudfront.net/${image}`;
+  const imageUrl = image.startsWith('http') ? image : `https://d2dytk4tvgwhb4.cloudfront.net/${image}`;
+  return imageUrl.replace(/\/thumb\.jpg(?:[?#].*)?$/i, '');
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -120,7 +119,7 @@ const ProductDetails = async ({ params }: PageProps) => {
   // Main JSX
   return (
     <>
-      <ProductDetailsClientComponent
+      <ProductDetailsShell
         productId={productID}
         fetchedProductData={{ ...productData, productMetaData: clientProductMetaData }}
         initialImageUrls={initialImageUrls}

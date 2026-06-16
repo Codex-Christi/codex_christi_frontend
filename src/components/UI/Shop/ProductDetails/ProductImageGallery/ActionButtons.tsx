@@ -3,7 +3,6 @@
 import { Button } from '@/components/UI/primitives/button';
 import useAuthStore from '@/stores/authStore';
 import { useCallback, useEffect, useMemo } from 'react';
-import { useProductDetailsContext } from '..';
 import successToast from '@/lib/success-toast';
 import errorToast from '@/lib/error-toast';
 import { useParams } from 'next/navigation';
@@ -15,7 +14,13 @@ type IdleWindow = Window & {
   cancelIdleCallback?: (handle: number) => void;
 };
 
-export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) => void }) {
+export default function ActionButtons({
+  productTitle,
+  setOpen,
+}: {
+  productTitle: string;
+  setOpen: (bool: boolean) => void;
+}) {
   const { id } = useParams();
 
   const addWishlistItem = useWishlist((state) => state.addWishlistItem);
@@ -24,19 +29,16 @@ export default function ActionButtons({ setOpen }: { setOpen: (bool: boolean) =>
 
   // Hooks
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const productDetailsContext = useProductDetailsContext();
-  const metadata = productDetailsContext.productMetaData;
-
   const currentUrl = hasMounted ? window.location.href : '';
 
   // Vars
   const shareData = useMemo(() => {
     return {
-      title: `${metadata.title} | Codex CHristi Shop`,
+      title: `${productTitle} | Codex Christi Shop`,
       text: `Check out this amazing merch from Codex Christi`,
       url: currentUrl,
     };
-  }, [currentUrl, metadata.title]);
+  }, [currentUrl, productTitle]);
 
   // Funcs
   const shareContent = useCallback(async () => {

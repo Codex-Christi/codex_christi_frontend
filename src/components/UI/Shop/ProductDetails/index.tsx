@@ -1,14 +1,16 @@
 'use client';
 import { ProductResult, ProductVariantsInterface } from '@/lib/merchizeStorefront/productTypes';
-import ProductSummary from './ProductSummary';
 import { createContext, useContext, FC, ReactNode, useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
+
+const ProductTitleAndSizesEtc = dynamic(() => import('./ProductTitleAndSizesEtc'));
 
 export interface ProductDetailsProps {
   // Define any props if needed
   productId: string;
   fetchedProductData: ProductResult;
   initialImageUrls: string[];
-  descriptionSection: ReactNode;
+  descriptionSection?: ReactNode;
 }
 
 export interface OptionalProductVariantProps {
@@ -47,7 +49,6 @@ const ProductDetails: FC<ProductDetailsProps> = ({
   productId,
   fetchedProductData,
   initialImageUrls,
-  descriptionSection,
 }) => {
   const [productVariants, setProductVariants] = useState<ProductVariantsInterface['data']>(
     fetchedProductData.productVariants,
@@ -143,9 +144,7 @@ const ProductDetails: FC<ProductDetailsProps> = ({
   return (
     // Main JSX
     <ProductDetailsContext.Provider value={contextValue}>
-      <div className='grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-6 xl:grid-cols-3'>
-        <ProductSummary descriptionSection={descriptionSection} />
-      </div>
+      <ProductTitleAndSizesEtc />
     </ProductDetailsContext.Provider>
   );
 };

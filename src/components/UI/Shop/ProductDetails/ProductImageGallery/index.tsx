@@ -1,23 +1,20 @@
 // ProductImageGallery/index.tsx
 'use client';
 
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import 'yet-another-react-lightbox/styles.css';
 import { usePathname } from 'next/navigation';
-import { useProductDetailsContext } from '..';
+import { ProductDetailsContext } from '..';
 import { useCurrentVariant } from '../currentVariantStore';
 import ThumbsPanel from './ThumbsPanel';
 import ActionButtons from './ActionButtons';
 import MainStage from './MainStage';
 import { type CarouselApi } from '@/components/UI/primitives/carousel';
-import { GalleryPrevButton } from '../GalleryPrevButton';
-import { GalleryNextButton } from '../GalleryNextButton';
-import type { ControllerRef, Plugin } from 'yet-another-react-lightbox';
 import { useLightboxHistory } from './useLightBoxHistory';
 import { toMerchizeImageUrl } from '@/lib/merchizeStorefront/imageUrls';
+import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
 
-const Lightbox = dynamic(() => import('yet-another-react-lightbox'), { ssr: false });
+const ProductLightbox = dynamic(() => import('./ProductLightbox'), { ssr: false });
 
 export const imagePreventDefaults = {
   onContextMenu: (e: React.SyntheticEvent) => e.preventDefault(),
@@ -92,19 +89,26 @@ function useImageListLoader(urls: string[]) {
 }
 export type ImageListLoaderReturnType = ReturnType<typeof useImageListLoader>;
 
-export const ProductImageGallery: React.FC = () => {
+type ProductImageGalleryProps = {
+  productMetaData?: BasicProductInterface['data'];
+  initialImageUrls?: string[];
+};
+
+export const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
+  productMetaData,
+  initialImageUrls,
+}) => {
   const [currentItem, setCurrentItem] = useState(0);
   const [open, setOpen] = useState(false);
   const [api, setApi] = useState<CarouselApi | null>(null);
-  const [zoomPlugin, setZoomPlugin] = useState<Plugin | null>(null);
-  const controllerRef = useRef<ControllerRef>(null);
 
   // Back button support while fullscreen
   useLightboxHistory(open, () => setOpen(false));
 
   const { matchingVariant, setMatchingVariant } = useCurrentVariant((s) => s);
-  const productDetailsContext = useProductDetailsContext();
-  const metadata = productDetailsContext.productMetaData;
+  const productDetailsContext = useContext(ProductDetailsContext);
+  const metadata = productMetaData ?? productDetailsContext?.productMetaData;
+  const stableInitialImageUrls = initialImageUrls ?? productDetailsContext?.initialImageUrls ?? [];
 
   const pathname = usePathname();
 
@@ -115,26 +119,10 @@ export const ProductImageGallery: React.FC = () => {
       return image_uris.map((uri) => toMerchizeImageUrl(uri)).filter(Boolean);
     }
 
-    const defaultVariant = productDetailsContext.productVariants.find(
-      (variant) => variant.is_default,
-    );
-    const initialImagesURIArr =
-      defaultVariant?.image_uris ?? productDetailsContext.productVariants[0]?.image_uris ?? [];
-    const variantImageURLs = initialImagesURIArr
-      .map((img) => toMerchizeImageUrl(img))
-      .filter(Boolean);
-
-    if (variantImageURLs.length > 0) return variantImageURLs;
-
-    return productDetailsContext.initialImageUrls.length > 0
-      ? productDetailsContext.initialImageUrls
+    return stableInitialImageUrls.length > 0
+      ? stableInitialImageUrls
       : [toMerchizeImageUrl(metadata?.image)].filter(Boolean);
-  }, [
-    matchingVariant?.image_uris,
-    metadata?.image,
-    productDetailsContext.initialImageUrls,
-    productDetailsContext.productVariants,
-  ]);
+  }, [matchingVariant?.image_uris, metadata?.image, stableInitialImageUrls]);
 
   const loader = useImageListLoader(images);
   const imageKey = useMemo(() => images.join('|'), [images]);
@@ -171,19 +159,6 @@ export const ProductImageGallery: React.FC = () => {
       img.src = src;
     });
   }, [imageKey, images, open]);
-
-  useEffect(() => {
-    if (!open || zoomPlugin) return;
-
-    let cancelled = false;
-    void import('yet-another-react-lightbox/plugins/zoom').then((mod) => {
-      if (!cancelled) setZoomPlugin(() => mod.default as Plugin);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, zoomPlugin]);
 
   // URL-driven reset (unchanged)
   useEffect(() => {
@@ -248,41 +223,16 @@ export const ProductImageGallery: React.FC = () => {
           setApi={(a) => setApi(a)}
           loader={loader}
         />
-        <ActionButtons setOpen={setOpen} />
+        <ActionButtons productTitle={metadata?.title ?? 'Product'} setOpen={setOpen} />
       </div>
 
       {/* Fullscreen Lightbox (no custom zoom UI) */}
       {open && (
-        <Lightbox
+        <ProductLightbox
           open={open}
-          close={() => setOpen(false)}
+          onClose={() => setOpen(false)}
           index={safeCurrentItem}
           slides={slides}
-          plugins={zoomPlugin ? [zoomPlugin] : []}
-          controller={{ ref: controllerRef }}
-          carousel={{
-            imageFit: 'contain',
-            imageProps: {
-              style: {
-                maxWidth: '100vw',
-                maxHeight: '100vh',
-                width: '100vw',
-                height: 'auto',
-              },
-            },
-          }}
-          styles={{
-            container: {
-              backgroundColor: 'rgba(0,0,0,0.4)',
-              backdropFilter: 'blur(30px) contrast(0.95)',
-            },
-            slide: { display: 'grid', placeItems: 'center' },
-          }}
-          render={{
-            // keep your custom prev/next only
-            buttonPrev: () => <GalleryPrevButton onClick={() => controllerRef.current?.prev()} />,
-            buttonNext: () => <GalleryNextButton onClick={() => controllerRef.current?.next()} />,
-          }}
         />
       )}
     </div>
