@@ -26,6 +26,9 @@ export type MappedProcessingState = {
   receiptFileName?: string;
   orderCustomId?: string;
   errorMessage?: string;
+  supportReference: string;
+  shortSupportReference: string;
+  needsManualReview: boolean;
 };
 
 const createSteps = (): ProcessingStep[] => [
@@ -60,12 +63,21 @@ function withStepStatus(
 
 function buildErrorSteps(data: PayPalTxPaymentStatusResponse) {
   let steps = createSteps();
-  const message = data.error?.message ?? 'Payment processing failed';
+  const isFulfillmentReview =
+    data.status === 'fulfillment_blocked' || data.status === 'fulfillment_failed';
+  const message = isFulfillmentReview
+    ? 'Our team is reviewing the fulfillment handoff before your order moves forward.'
+    : (data.error?.message ?? 'Payment processing failed');
 
   if (data.djangoPaymentSaveCustomId) {
     steps = withStepStatus(steps, 'receiptUpload', 'success');
     steps = withStepStatus(steps, 'paymentSave', 'success');
-    steps = withStepStatus(steps, 'orderPush', 'error', message);
+    steps = withStepStatus(
+      steps,
+      'orderPush',
+      'error',
+      message,
+    );
     return steps;
   }
 
@@ -87,6 +99,10 @@ export function mapLedgerToProcessingState(
     receiptFileName: data.receiptFile ?? undefined,
     orderCustomId: data.djangoPaymentSaveCustomId ?? undefined,
     errorMessage: data.error?.message ?? undefined,
+    supportReference: data.orderToken,
+    shortSupportReference: data.orderToken.slice(0, 8),
+    needsManualReview:
+      data.status === 'fulfillment_blocked' || data.status === 'fulfillment_failed',
   };
 
   if (data.status === 'completed') {

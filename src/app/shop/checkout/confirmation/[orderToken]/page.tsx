@@ -4,7 +4,7 @@ import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 import { Button } from '@/components/UI/primitives/button';
 import { motion } from 'framer-motion';
-import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Copy, Loader2, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import errorToast from '@/lib/error-toast';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
@@ -33,9 +33,9 @@ const statusCopy: Record<string, { title: string; description: string }> = {
     description: 'Your transaction is complete and your order is moving forward.',
   },
   error: {
-    title: 'This transaction needs review',
+    title: 'Your payment is safe',
     description:
-      'Your payment activity was recorded, but a follow-up step needs attention before fulfillment can continue.',
+      'We received your payment successfully, but your order needs a quick manual review before it can move to fulfillment.',
   },
   idle: {
     title: 'Payment status unavailable',
@@ -72,6 +72,9 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
   const receiptFileName = processingState?.receiptFileName;
   const orderCustomId = processingState?.orderCustomId;
   const routeErrorMessage = processingState?.errorMessage;
+  const supportReference = processingState?.supportReference ?? routeOrderToken;
+  const shortSupportReference = processingState?.shortSupportReference ?? routeOrderToken.slice(0, 8);
+  const needsManualReview = processingState?.needsManualReview ?? false;
   const currentStatusCopy = statusCopy[flowStatus] ?? statusCopy.idle;
   const canDownloadReceipt = Boolean(receiptLink && receiptFileName);
   const timelineProgress = useMemo(() => {
@@ -153,6 +156,14 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
     clearVerifiedEmails,
     resetCheckoutToInitial,
   ]);
+
+  const copySupportReference = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(supportReference);
+    } catch {
+      errorToast({ message: 'Unable to copy support reference.' });
+    }
+  }, [supportReference]);
 
   useEffect(() => {
     if (!routeOrderToken) return;
@@ -291,11 +302,45 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
             </p>
             <h1 className='text-xl font-semibold mt-2'>{currentStatusCopy.title}</h1>
             <p className='text-white/70 mt-2 text-base'>{currentStatusCopy.description}</p>
-            {routeErrorMessage ? (
+            {routeErrorMessage && !needsManualReview ? (
               <p className='text-rose-200 text-sm mt-3'>{routeErrorMessage}</p>
             ) : null}
           </div>
         </div>
+
+        {needsManualReview ? (
+          <div className='w-full rounded-2xl border border-sky-200/18 bg-sky-300/[0.06] p-4 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+            <div className='flex gap-3'>
+              <div className='mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-sky-200/20 bg-sky-300/10'>
+                <ShieldCheck size={18} className='text-sky-100' />
+              </div>
+              <div className='min-w-0 flex-1'>
+                <p className='text-sm font-medium text-sky-50'>No action is needed from you right now.</p>
+                <p className='mt-1 text-sm leading-5 text-white/68'>
+                  Our team has been notified and will continue this order from here. Please keep this
+                  reference in case you need to contact support.
+                </p>
+                <div className='mt-3 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/10 px-3 py-2'>
+                  <div className='min-w-0'>
+                    <p className='text-[0.65rem] uppercase tracking-[0.18em] text-white/45'>
+                      Support reference
+                    </p>
+                    <p className='truncate font-mono text-sm text-white/90'>{shortSupportReference}</p>
+                  </div>
+                  <button
+                    type='button'
+                    onClick={copySupportReference}
+                    className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/70 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white'
+                    aria-label='Copy full support reference'
+                    title='Copy full support reference'
+                  >
+                    <Copy size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <div className='w-full space-y-2'>
           <div className='flex items-center justify-between text-sm text-white/70'>
