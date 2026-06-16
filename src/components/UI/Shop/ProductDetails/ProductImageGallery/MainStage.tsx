@@ -6,7 +6,11 @@ import {
   CarouselContent,
   CarouselItem,
 } from '@/components/UI/primitives/carousel';
-import { LoadingOverlay, type ImageListLoaderReturnType, imagePreventDefaults } from '.';
+import {
+  LoadingOverlay,
+  type ImageListLoaderReturnType,
+  imagePreventDefaults,
+} from './galleryShared';
 import Image from 'next/image';
 import { GalleryPrevButton } from '../GalleryPrevButton';
 import { GalleryNextButton } from '../GalleryNextButton';

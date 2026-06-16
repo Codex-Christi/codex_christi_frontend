@@ -1,6 +1,10 @@
 // ThumbsPanel.tsx
 import Image from 'next/image';
-import { ImageListLoaderReturnType, LoadingOverlay, imagePreventDefaults } from '.';
+import {
+  type ImageListLoaderReturnType,
+  LoadingOverlay,
+  imagePreventDefaults,
+} from './galleryShared';
 
 function ThumbsPanel({
   images,
