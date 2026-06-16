@@ -1,9 +1,6 @@
 'use client';
 
 import { useMutationHook } from '@/lib/utils/mutationFactory';
-import { HmacSHA256 } from 'crypto-js';
-
-const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
 
 export interface DjangoOrderIntentPayload {
   email: string;
@@ -63,7 +60,7 @@ interface ResendDjangoOrderIntentOTPArg {
 // Creates or reuses the Django backend order intent used for checkout OTP verification.
 export const useCreateDjangoOrderIntentMutation = () => {
   return useMutationHook<DjangoOrderIntentAPIResponse, CreateDjangoOrderIntentArg>(
-    `${baseURL}/orders/intent`,
+    '/next-api/shop/checkout/django-order-intent',
     (arg) => {
       const { headers, ...body } = arg;
 
@@ -72,7 +69,6 @@ export const useCreateDjangoOrderIntentMutation = () => {
         key: arg.email,
         fetcherOptions: {
           headers: {
-            ...generateSignatureHeadersOnClient(),
             ...(headers ?? {}),
           },
           method: 'POST',
@@ -84,13 +80,12 @@ export const useCreateDjangoOrderIntentMutation = () => {
 
 export const useVerifyDjangoOrderIntentOTPMutation = () => {
   return useMutationHook<DjangoOrderIntentAPIResponse, VerifyDjangoOrderIntentOTPArg>(
-    `${baseURL}/orders/intent/verify`,
+    '/next-api/shop/checkout/django-order-intent/verify',
     (arg) => ({
       body: { email: arg.email, otp: arg.otp, order_id: arg.order_id },
       key: arg.email,
       fetcherOptions: {
         headers: {
-          ...generateSignatureHeadersOnClient(),
           ...(arg.headers ?? {}),
         },
         method: 'POST',
@@ -101,13 +96,12 @@ export const useVerifyDjangoOrderIntentOTPMutation = () => {
 
 export const useResendDjangoOrderIntentOTPMutation = () => {
   return useMutationHook<DjangoOrderIntentAPIResponse, ResendDjangoOrderIntentOTPArg>(
-    `${baseURL}/orders/intent/resend-otp`,
+    '/next-api/shop/checkout/django-order-intent/resend-otp',
     (arg) => ({
       body: { email: arg.email },
       key: arg.email,
       fetcherOptions: {
         headers: {
-          ...generateSignatureHeadersOnClient(),
           ...(arg.headers ?? {}),
         },
         method: 'POST',
@@ -115,18 +109,3 @@ export const useResendDjangoOrderIntentOTPMutation = () => {
     }),
   )();
 };
-
-function generateSignatureHeadersOnClient() {
-  const API_SECRET_KEY = process.env.NEXT_PUBLIC_SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY; // Same as backend
-  if (!API_SECRET_KEY) {
-    throw new Error('API_SECRET_KEY is not defined');
-  }
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const signature = HmacSHA256(timestamp, API_SECRET_KEY).toString();
-
-  return {
-    'Content-Type': 'application/json',
-    'X-API-Signature': `${signature}`,
-    'X-API-Timestamp': `${timestamp}`,
-  };
-}

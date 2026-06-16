@@ -37,10 +37,9 @@ Date verified against codebase: 2026-02-24
 26. Rollout and Migration Order (safe deployment)
 27. Package Scripts (no extra Prisma config file)
 28. Testing Matrix (local/sandbox/live)
-29. Deferred Known Issues in Current Code (tracked)
-30. Decision Defaults
-31. Optional Overrides (only if rejecting defaults)
-32. Future: Real-Time Notifications at Scale (SSE + Pub/Sub)
+29. Decision Defaults
+30. Optional Overrides (only if rejecting defaults)
+31. Future: Real-Time Notifications at Scale (SSE + Pub/Sub)
 
 ---
 
@@ -75,6 +74,14 @@ Move post-payment processing (receipt generation/upload, payment save, fulfillme
 - Django order-intent OTP send/verify flow lives in:
   - `src/lib/hooks/shopHooks/checkout/useDjangoOrderIntentEmailVerification.ts`
   - `src/lib/hooks/shopHooks/checkout/djangoOrderIntentMutationHooks.ts`
+- The browser does not sign Django order-intent requests directly. The client hook calls local Next routes:
+  - `/next-api/shop/checkout/django-order-intent`
+  - `/next-api/shop/checkout/django-order-intent/verify`
+  - `/next-api/shop/checkout/django-order-intent/resend-otp`
+- Those Next routes forward to Django through:
+  - `src/lib/shop/checkout/djangoOrderIntent/djangoOrderIntentServer.ts`
+  - `src/lib/hooks/shopHooks/checkout/helpers/generateSignatureHeaders.ts`
+- HMAC generation stays server-side. Do not reintroduce a `NEXT_PUBLIC_*` OTP signing secret into a client hook.
 - Verified Django order-intent identifiers are stored in:
   - `src/stores/shop_stores/checkoutStore/djangoOrderIntentStore.ts`
 
@@ -170,24 +177,25 @@ Implement in this order to avoid half-migrated behavior:
 2. Add status constants/types.
 3. Add ledger client wrapper.
 4. Add intent store (client).
-5. Extract create-order logic into `src/lib/paypal/createPayPalOrder.ts` and refactor `create-order` route to use it.
-6. Add `/next-api/paypal/tx-ledger/intent` (calls `createPayPalOrder` directly, no self-referential fetch).
-7. Update `PayPalCheckoutChildren` to use intent route.
-8. Update authorize route to persist ledger.
-9. Update capture route to persist ledger.
-10. Update approve hook to pass `orderToken`, remove client post-processing, and redirect into the confirmation/status flow.
-11. Add `/next-api/paypal/tx-ledger/payments/[orderToken]/status`.
-12. Add polling + UI mapping.
-13. Upgrade webhook (idempotency + ledger updates + post-processing trigger).
-14. Add server post-processing runner + fulfillment adapter.
-15. Add admin auth + admin UI/actions.
-16. Add dev fallback trigger endpoint.
-17. Retire client-side post-processing from checkout runtime.
+5. Move Django order-intent HMAC signing behind the local Next proxy routes. The browser must not sign `/orders/intent`, `/verify`, or `/resend-otp` directly.
+6. Extract create-order logic into `src/lib/paypal/createPayPalOrder.ts` and refactor `create-order` route to use it.
+7. Add `/next-api/paypal/tx-ledger/intent` (calls `createPayPalOrder` directly, no self-referential fetch).
+8. Update `PayPalCheckoutChildren` to use intent route.
+9. Update authorize route to persist ledger.
+10. Update capture route to persist ledger.
+11. Update approve hook to pass `orderToken`, remove client post-processing, and redirect into the confirmation/status flow.
+12. Add `/next-api/paypal/tx-ledger/payments/[orderToken]/status`.
+13. Add polling + UI mapping.
+14. Upgrade webhook (idempotency + ledger updates + post-processing trigger).
+15. Add server post-processing runner + fulfillment adapter.
+16. Add admin auth + admin UI/actions.
+17. Add dev fallback trigger endpoint.
+18. Retire client-side post-processing from checkout runtime.
 
 Important transition note:
-- After Step 10, the old browser-owned completion path is intentionally gone.
-- Step 11 and Step 12 restore the frontend read path.
-- Step 13 and Step 14 restore durable backend completion.
+- After Step 11, the old browser-owned completion path is intentionally gone.
+- Step 12 and Step 13 restore the frontend read path.
+- Step 14 and Step 15 restore durable backend completion.
 - So if you adopt the thin approve hook early, do not expect receipt upload / payment save / fulfillment to run again until Steps 13 and 14 are implemented.
 
 ---
@@ -219,9 +227,14 @@ PAYPAL_CLIENT_ID="..."
 PAYPAL_CLIENT_SECRET="..."
 PAYPAL_WEBHOOK_ID="..."
 
-# Existing (OTP / backend integrations - keep as-is)
-NEXT_PUBLIC_BASE_URL="..."
-NEXT_PUBLIC_SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY="..." # existing; security issue tracked separately
+# Browser-reachable Django backend base URL
+NEXT_PUBLIC_DJANGO_API_BASE_URL="..."
+
+# Optional server-to-server Django base URL for same-network production calls
+DJANGO_INTERNAL_BASE_URL="http://django:8000/api/v1"
+
+# Django order-intent HMAC signing secret (server-only)
+SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY="..."
 
 # New (ledger)
 PAYPAL_TX_LEDGER_NEON_DB_STRING="postgresql://USER:PASSWORD@HOST/DB?sslmode=require"
@@ -238,10 +251,13 @@ Notes:
 - `PAYPAL_CLIENT_SECRET_*` and `PAYPAL_WEBHOOK_ID_*` stay server-only.
 - The current code supports both the new split variables and the old single-name fallbacks during migration.
 - For clean deployments, keep `PAYPAL_ENV` and `NEXT_PUBLIC_PAYPAL_ENV` aligned.
+- Browser code uses `NEXT_PUBLIC_DJANGO_API_BASE_URL`.
+- Server-only Django calls may use `DJANGO_INTERNAL_BASE_URL` when Next and Django share a private Docker network; otherwise they fall back to the public Django API base.
 - Merchize SQLite continues to use your existing `prisma.config.ts`.
 - PayPal ledger schema also gets its datasource URL from `prisma.config.ts` in Prisma 7.
 - The root `prisma.config.ts` should switch datasource URLs based on the `--schema` target.
-- Do **not** reuse `NEXT_PUBLIC_SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY` for webhook/server post-processing. Keep a separate server-only secret for those actions.
+- Django order-intent HMAC signing is server-only. The browser should call the local Next proxy routes and should never receive the signing secret.
+- Do **not** reuse `SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY` for webhook/server post-processing. Keep a separate server-only secret for those actions.
 - This guide intentionally avoids requiring a second Prisma config file for the ledger.
 
 ---
@@ -533,7 +549,6 @@ import { paypalClient } from '@/lib/paymentClients/paypalClient';
 import { getOrderFinalDetails } from '@/actions/shop/checkout/getOrderFinalDetails';
 import { PAYPAL_CURRENCY_CODES } from '@/datasets/shop_general/paypal_currency_specifics';
 import { removeOrKeepDecimalPrecision } from '@/actions/merchize/getMerchizeTotalWithShipping';
-import { randomUUID } from 'crypto';
 import { format } from 'date-fns';
 
 const orders = new OrdersController(paypalClient);
@@ -546,6 +561,7 @@ const shippingPreferenceForPaymentContext = {
 };
 
 export type CreatePayPalOrderArgs = {
+  orderToken: string;
   cart: Array<{ title: string; itemDetail: any; quantity: number; [k: string]: any }>;
   customer: { name: string; email: string };
   country: string;
@@ -567,8 +583,10 @@ export type CreatePayPalOrderArgs = {
  * Throws on validation or PayPal API failure.
  */
 export async function createPayPalOrder(args: CreatePayPalOrderArgs) {
-  const { cart, customer, country, country_iso_3, initialCurrency, delivery_address } = args;
+  const { orderToken, cart, customer, country, country_iso_3, initialCurrency, delivery_address } =
+    args;
 
+  if (!orderToken) throw new Error('Missing order token');
   if (!cart || cart.length === 0) throw new Error('Missing cart');
   if (!customer) throw new Error('Missing customer');
 
@@ -657,7 +675,7 @@ export async function createPayPalOrder(args: CreatePayPalOrderArgs) {
             },
             emailAddress: customer.email,
           },
-          customId: randomUUID() ?? customer?.email ?? '',
+          customId: orderToken,
           items: payPalSupportsCurrency ? resolvedCartItems : undefined,
         },
       ],
@@ -716,6 +734,7 @@ Purpose:
 Important ownership note:
 - Store only `orderToken` in browser state.
 - Return `paypalOrderId` only so `createOrder()` can hand it to the PayPal SDK.
+- PayPal `purchase_units[].custom_id` should be set to `orderToken`. It is a local ledger correlation key, not the Django payment-save `custom_id`.
 - After capture succeeds, the client should act only as a status consumer. Durable completion belongs to webhook + server runner.
 
 ```ts
@@ -776,6 +795,7 @@ export async function POST(req: Request) {
     let paypalOrder: any;
     try {
       paypalOrder = await createPayPalOrder({
+        orderToken,
         cart,
         customer,
         country,
@@ -1543,7 +1563,7 @@ export function useLedgerPolling({
 
 ### Important: Do not clear checkout state immediately on mount
 
-Deferred fix #7 notes that the current confirmation page clears checkout/order state on mount. With ledger polling, **delay clearing** until `processingState.flowStatus === 'completed'` so recovery context survives.
+The confirmation page should not clear checkout/order state on first render. Clear browser stores only after a valid ledger row has been fetched, because by then the durable recovery inputs already live in Prisma (`cartSnapshot`, `shippingSnapshot`, Django intent identifiers, and PayPal payloads). The browser store is no longer the recovery source of truth after that point.
 
 ---
 
@@ -1595,24 +1615,30 @@ const stale = await paypalTxLedger.paypalWebhookEvent.findMany({
 
 This tradeoff is standard in production webhook systems — ACK fast, process async, recover from your own state.
 
-## Robust PayPal order ID extraction helper
+## Robust PayPal webhook correlation helper
 
-PayPal event shapes vary. Use fallback extraction:
+PayPal event shapes vary. Prefer the real PayPal order ID when it is present. If PayPal only returns `custom_id`, treat that value as the local `orderToken` because the create-order payload sets `customId: orderToken`.
 
 ```ts
-function getWebhookPaypalOrderId(event: any): string | undefined {
-  return (
-    event?.resource?.supplementary_data?.related_ids?.order_id ||
-    event?.resource?.custom_id ||
-    event?.resource?.invoice_id ||
-    undefined
-  );
+type WebhookCorrelation =
+  | { source: 'paypal_order_id'; paypalOrderId: string }
+  | { source: 'order_token'; orderToken: string };
+
+function getWebhookLedgerCorrelation(event: any): WebhookCorrelation | undefined {
+  const paypalOrderId = event?.resource?.supplementary_data?.related_ids?.order_id;
+  if (paypalOrderId) return { source: 'paypal_order_id', paypalOrderId };
+
+  const orderToken = event?.resource?.custom_id || event?.resource?.invoice_id;
+  if (orderToken) return { source: 'order_token', orderToken };
+
+  return undefined;
 }
 ```
 
 Note:
 - For your flow, primary path is still `supplementary_data.related_ids.order_id`.
-- `custom_id` / `invoice_id` are reasonable fallbacks if you later set them explicitly during create-order.
+- `custom_id` is now expected to be the local `orderToken`, so lookup by `orderToken` when that fallback is used.
+- Keep `paypalOrderId`, `orderToken`, and Django `custom_id` separate in naming and UI labels.
 - Do not use unrelated fields as fake fallbacks just to avoid `undefined`. If correlation fails, record that explicitly and let the webhook retry or recovery path handle it.
 
 ## Default idempotent webhook core template (merge into your route)
@@ -1626,7 +1652,7 @@ import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
 // after verification + parsed `event`
 const eventId = event.id;
 const eventType = event.event_type;
-const paypalOrderId = getWebhookPaypalOrderId(event);
+const correlation = getWebhookLedgerCorrelation(event);
 
 if (!eventId) return new Response('Missing event id', { status: 400 });
 
@@ -1639,7 +1665,7 @@ if (!webhookEvent) {
     data: {
       eventId,
       eventType,
-      paypalOrderId: paypalOrderId ?? null,
+      paypalOrderId: correlation?.source === 'paypal_order_id' ? correlation.paypalOrderId : null,
       payload: event,
       processingStatus: 'received',
     },
@@ -1650,7 +1676,7 @@ if (webhookEvent.processedAt) {
   return new Response('OK', { status: 200 });
 }
 
-if (!paypalOrderId) {
+if (!correlation) {
   await paypalTxLedger.paypalWebhookEvent.update({
     where: { eventId },
     data: {
@@ -1665,7 +1691,12 @@ if (!paypalOrderId) {
   return new Response('OK', { status: 200 });
 }
 
-const row = await paypalTxLedger.paypalIntent.findUnique({ where: { paypalOrderId } });
+const row = await paypalTxLedger.paypalIntent.findUnique({
+  where:
+    correlation.source === 'paypal_order_id'
+      ? { paypalOrderId: correlation.paypalOrderId }
+      : { orderToken: correlation.orderToken },
+});
 if (!row) {
   await paypalTxLedger.paypalWebhookEvent.update({
     where: { eventId },
@@ -2127,9 +2158,9 @@ export function assertAdminSecret(req: Request) {
 # 24) Admin Ledger UI + Retry Actions (Search, Filter, Retry)
 
 New files:
-- `src/app/admin/shop/paypal-merchize-ledger/page.tsx`
-- `src/app/admin/shop/paypal-merchize-ledger/actions.ts`
-- `src/app/admin/shop/paypal-merchize-ledger/AdminLedgerTable.tsx`
+- `src/app/admin/shop/order-recovery/page.tsx`
+- `src/app/admin/shop/order-recovery/actions.ts`
+- `src/app/admin/shop/order-recovery/AdminOrderRecoveryLedgerTable.tsx`
 
 ## Goals for the admin UI
 
@@ -2154,7 +2185,7 @@ New files:
 ## Server actions template
 
 ```ts
-// src/app/admin/shop/paypal-merchize-ledger/actions.ts
+// src/app/admin/shop/order-recovery/actions.ts
 'use server';
 
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
@@ -2178,7 +2209,7 @@ export async function retryPostProcessing(orderToken: string) {
 This is the missing practical part: the admin page should not fetch everything unfiltered.
 
 ```ts
-// add to src/app/admin/shop/paypal-merchize-ledger/actions.ts (or a local server helper file)
+// add to src/app/admin/shop/order-recovery/actions.ts (or a local server helper file)
 'use server';
 
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
@@ -2239,7 +2270,7 @@ export async function listLedgerRows({
 ## Admin page route template (server component shell)
 
 ```tsx
-// src/app/admin/shop/paypal-merchize-ledger/page.tsx
+// src/app/admin/shop/order-recovery/page.tsx
 import AdminLedgerTable from './AdminLedgerTable';
 import { listLedgerRows } from './actions';
 
@@ -2289,7 +2320,7 @@ export default async function PayPalLedgerAdminPage({ searchParams }: PageProps)
 ## Admin table UI template (search + filter + retry)
 
 ```tsx
-// src/app/admin/shop/paypal-merchize-ledger/AdminLedgerTable.tsx
+// src/app/admin/shop/order-recovery/AdminOrderRecoveryLedgerTable.tsx
 'use client';
 
 import { useMemo, useTransition } from 'react';
@@ -2359,7 +2390,7 @@ export default function AdminLedgerTable({
       next.page > 1 ? params.set('page', String(next.page)) : params.delete('page');
     }
     startTransition(() => {
-      router.replace(`/admin/shop/paypal-merchize-ledger?${params.toString()}`);
+      router.replace(`/admin/shop/order-recovery?${params.toString()}`);
     });
   };
 
@@ -2656,20 +2687,7 @@ Why this is safe:
 
 ---
 
-# 29) Deferred Known Issues in Current Code (tracked)
-
-These are already tracked in:
-- `PAYPAL_TX_LEDGER_DEFERRED_FIXES.md`
-
-Highlights (do not lose track of these during ledger work):
-- `JSON.parse(await res.json())` bug in `usePayPalTXApproveCallback`
-- create-order route catch returning 200 JSON on failure
-- partially disabled processing modal flow
-- OTP signature secret exposed client-side (`NEXT_PUBLIC_*`) - separate security issue
-
----
-
-# 30) Decision Defaults
+# 29) Decision Defaults
 
 These defaults are implemented in this guide’s templates. Items marked **(deferred)** are intentionally kept simple for now with a known upgrade path.
 
@@ -2718,7 +2736,7 @@ These defaults are implemented in this guide’s templates. Items marked **(defe
 
 ---
 
-# 31) Optional Overrides (only if rejecting defaults)
+# 30) Optional Overrides (only if rejecting defaults)
 
 Use this section only if you intentionally want to diverge from Section 30.
 
@@ -2739,7 +2757,7 @@ Use this section only if you intentionally want to diverge from Section 30.
 
 ---
 
-# 32) Future: Real-Time Notifications at Scale (SSE + Pub/Sub, not gRPC)
+# 31) Future: Real-Time Notifications at Scale (SSE + Pub/Sub, not gRPC)
 
 This section does not need to be implemented now. The polling approach in Section 19 is correct and sufficient. Read this when you are ready to replace polling with push-based real-time updates.
 

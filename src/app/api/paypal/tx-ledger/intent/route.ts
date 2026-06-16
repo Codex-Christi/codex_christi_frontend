@@ -118,6 +118,7 @@ export async function POST(req: Request) {
     let paypalOrder: Order;
     try {
       paypalOrder = await createPayPalOrder({
+        orderToken,
         cart,
         customer,
         country,

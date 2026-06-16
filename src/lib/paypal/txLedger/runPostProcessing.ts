@@ -148,15 +148,17 @@ export async function runPostProcessing(orderToken: string) {
         throw new Error(paymentSave.error?.message ?? 'Payment save failed');
       }
 
+      const djangoPaymentSaveCustomId = paymentSave.data?.custom_id ?? null;
+
       await updateLockedRow(orderToken, lockId, {
         status: PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
-        djangoPaymentSaveCustomId: paymentSave.data?.custom_id ?? null,
+        djangoPaymentSaveCustomId,
         djangoPaymentSaveResponsePayload: JSON.parse(JSON.stringify(paymentSave)),
         lastErrorCode: null,
         lastErrorMessage: null,
       } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
 
-      row.djangoPaymentSaveCustomId = paymentSave.data?.custom_id ?? null;
+      row.djangoPaymentSaveCustomId = djangoPaymentSaveCustomId;
     }
 
     if (!row.djangoPaymentSaveCustomId) {

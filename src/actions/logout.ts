@@ -24,7 +24,7 @@ export const logoutUser = async (): Promise<boolean | LogoutResult> => {
       throw new Error('No refresh token found');
     }
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/auth/user-logout`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL}/auth/user-logout`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

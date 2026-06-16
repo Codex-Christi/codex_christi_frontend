@@ -1,6 +1,6 @@
 # Admin And Recovery Tooling Guide
 
-Last updated: 2026-06-07
+Last updated: 2026-06-15
 
 This guide isolates the admin and checkout recovery work from the broader PayPal TX ledger guide. Use it as the source of truth for the next implementation phase: admin visibility, support recovery, retry operations, and maintenance tooling.
 
@@ -8,7 +8,6 @@ Related source docs:
 
 - `PAYPAL_TX_LEDGER_GUIDE.md`
 - `CODEX_CHAT_HANDOFF_CHECKOUT_RECOVERY.md`
-- `PAYPAL_TX_LEDGER_DEFERRED_FIXES.md`
 
 ## Current Position
 
@@ -37,6 +36,7 @@ Preferred ledger fields:
 
 - `orderToken`: local PayPal TX ledger support reference and durable checkout correlation token.
 - `paypalOrderId`: PayPal order ID required by PayPal SDK/provider flows.
+- PayPal `purchase_units[].custom_id`: mirrors `orderToken` for provider-webhook reconciliation. Do not label this as the Django payment-save custom ID.
 - `paypalAuthorizationId`: PayPal authorization ID.
 - `djangoOrderIntentUuid`: Django order-intent UUID.
 - `djangoOrderIntentOrderId`: Django order-intent order string, originally used as the OTP order ID.
@@ -65,18 +65,20 @@ Avoid:
 Preferred admin routes:
 
 ```txt
-/admin
+/admin (reserved for the future cross-platform admin hub; currently 404)
 /admin/shop
-/admin/shop/paypal-merchize-ledger
-/admin/merchize/catalog
+/admin/shop/order-recovery
+/admin/shop/order-recovery/[orderToken]
+/admin/shop/merchize-catalog-snapshots
 ```
 
 Preferred API/action boundaries:
 
 ```txt
-src/app/admin/shop/paypal-merchize-ledger/page.tsx
-src/app/admin/shop/paypal-merchize-ledger/actions.ts
-src/app/admin/shop/paypal-merchize-ledger/AdminPayPalMerchizeLedgerClient.tsx
+src/app/admin/shop/order-recovery/page.tsx
+src/app/admin/shop/order-recovery/[orderToken]/page.tsx
+src/app/admin/shop/order-recovery/actions.ts
+src/app/admin/shop/order-recovery/AdminOrderRecoveryClient.tsx
 src/lib/paypal/txLedger/adminLedgerQueries.ts
 src/lib/paypal/txLedger/adminLedgerActions.ts
 src/lib/utils/adminAuth.ts
@@ -90,12 +92,12 @@ Do not expose retry operations as unauthenticated public API routes. Prefer serv
 flowchart TD
   A["/admin"] --> B["/admin/shop"]
   B --> C["Shop admin tool cards"]
-  C --> D["PayPal/Merchize ledger recovery"]
+  C --> D["Order recovery ledger"]
   D --> E["Search paid checkout ledger rows"]
-  E --> F["Open transaction detail"]
+  E --> F["Open recovery detail"]
   F --> G["Run retry, repair, notify, or resolve actions"]
-  C --> H["Merchize catalog refresh"]
-  H --> I["Existing catalog refresh screen"]
+  C --> H["Merchize catalog and storefront snapshots"]
+  H --> I["Refresh price/shipping data, snapshot fallback data, and ISR paths"]
   C --> J["Checkout recovery OTP maintenance"]
   J --> K["Clear expired checkout recovery OTP challenges"]
   C --> L["Future support queue"]
@@ -183,8 +185,8 @@ The broader admin dashboard should be a hub, not only a ledger page.
 
 Initial shop-focused cards:
 
-- Merchize catalog refresh.
-- PayPal/Merchize ledger recovery.
+- Merchize Catalog & Snapshots.
+- Order Recovery ledger.
 - Clear expired checkout recovery OTP challenges.
 
 Future cards:
@@ -194,7 +196,74 @@ Future cards:
 - Product/catalog health checks.
 - Fulfillment provider health.
 
-## PayPal/Merchize Ledger Page Scope
+## Admin Dashboard Visual System
+
+The admin dashboard should feel like a polished operational command center, not a marketing page. It should use the existing Codex Christi dark visual language with more deliberate glass, glow, and motion rules.
+
+Visual reference:
+
+![Clean admin dashboard visual reference](./public/media/img/admin/admin-dashboard-clean-preview.png)
+
+The dashboard shell should use:
+
+- Existing `CometsContainer` as the background layer.
+- A dark overlay above the comet field so text remains readable.
+- Translucent graphite panels instead of flat black sections.
+- Compact cards with clear metrics and one primary action.
+- Subtle cyan, emerald, gold, and violet edge accents.
+- Glowing borders only for selected, active, failed, or high-priority states.
+- A recent failures table for fast scanning.
+- Dedicated order recovery detail routes for focused repair work.
+
+The background should support the interface without competing with it:
+
+- Comets remain visible through the glass surfaces.
+- The overlay should not become pitch black.
+- The blur should be strong enough for contrast, but light enough to preserve site continuity.
+- Background movement should stay CSS-based through `CometsContainer`.
+
+Initial admin card groups:
+
+- Order Recovery Ledger: search and repair paid checkout rows across payment and fulfillment providers.
+- Checkout Recovery: review customer-facing recovery signals.
+- Django Order Intent OTP: inspect Django order-intent create and verify state.
+- Merchize Fulfillment: track provider push state and retry eligibility.
+- Failed Processing Queue: surface rows that need manual attention.
+- Reconciliation: compare PayPal, Django, Merchize, and local ledger state.
+- Expired OTP Cleanup: clear expired checkout recovery OTP challenges.
+- Support Cases: future customer support queue and customer updates.
+- Catalog & Snapshots: refresh Merchize price/shipping data and storefront fallback snapshots.
+
+Card content rules:
+
+- Each card must represent a real operational route or action.
+- Avoid decorative cards that do not take the admin somewhere useful.
+- Keep card titles short.
+- Use one concise purpose line.
+- Include one status indicator when the data exists.
+- Include one primary CTA such as "Open", "Review", "Retry", or "Clear".
+- Use icons for recognition, but never rely on icons alone.
+
+Recommended desktop layout:
+
+- Left rail for admin sections.
+- Top command bar for search, environment, queue health, and admin identity.
+- Main card grid for operational entry points.
+- Full-width order recovery queue for fast scanning.
+- Dedicated order recovery detail page for timeline, provider state, payloads, and actions.
+- Sticky action column inside the detail page when the action set becomes live.
+
+Recommended mobile layout:
+
+- Collapse the left rail into a top or drawer navigation.
+- Convert cards into a single-column list.
+- Keep primary CTAs visible without forcing long scrolling.
+- Navigate from a queue row directly to the detail page.
+- Keep dangerous actions behind confirmation dialogs.
+
+## Order Recovery Ledger Page Scope
+
+The first admin ledger page should be provider-neutral in route and UI language. The current data source can still be the PayPal transaction ledger with Django order-intent and Merchize fulfillment fields.
 
 The first admin ledger page should support:
 
@@ -220,13 +289,14 @@ Each result row should show:
 - Created date.
 - Updated date.
 - Primary action: View.
+- Row and action navigation should open `/admin/shop/order-recovery/[orderToken]`.
 
 ## Ledger Recovery Flow
 
 ```mermaid
 flowchart TD
   A["Admin searches ledger"] --> B["List rows by newest updated time"]
-  B --> C["Open paid checkout detail"]
+  B --> C["Open /admin/shop/order-recovery/[orderToken]"]
   C --> D["Show customer-safe summary"]
   D --> E["Show internal payload panels"]
   E --> F["PayPal authorize/capture payloads"]
@@ -241,9 +311,11 @@ flowchart TD
   N --> O["Future support event/audit"]
 ```
 
-## Transaction Detail Scope
+## Order Recovery Detail Page Scope
 
-The detail view should show both a compact support summary and deep debugging data.
+The detail view should be a dedicated route, not the primary right-hand sidebar experience. Use the right-hand sidebar pattern only as a future optional quick preview if there is a clear operational need.
+
+The detail page should show both a compact support summary and deep debugging data.
 
 Customer-safe summary:
 
@@ -323,6 +395,7 @@ Rules:
 Purpose:
 
 - Repair receipts that were created without item rows or had upload issues.
+- Replace a completed transaction receipt when the stored PDF is stale, malformed, or missing item-level detail.
 
 Rules:
 
@@ -330,6 +403,17 @@ Rules:
 - Do not depend only on PayPal item payloads because PayPal may not echo item-level data.
 - Save the new `receiptLink` and `receiptFile`.
 - Keep the old receipt reference visible in audit notes if audit storage exists later.
+- Allow this action on `completed` rows, but require a confirmation dialog and an admin reason.
+- Prefer uploading a new versioned R2 object instead of overwriting the existing object key.
+- Use a filename suffix such as `-v2`, `-v3`, or a timestamp to avoid stale CDN/browser cache.
+- Update the ledger row to point to the new `receiptLink` and `receiptFile` after upload succeeds.
+- Keep the old receipt URL visible to admins until immutable audit storage exists.
+
+Avoid direct same-key overwrites by default:
+
+- Current receipt uploads use long public caching.
+- A same-key overwrite may leave admins or customers seeing the old PDF from cache.
+- A versioned key gives support a fresh URL and preserves traceability.
 
 ### Save Fulfillment Address Override
 
@@ -399,7 +483,7 @@ Purpose:
 
 ```mermaid
 flowchart TD
-  A["Admin opens transaction detail"] --> B{"capturePayload exists?"}
+  A["Admin opens order recovery detail"] --> B{"capturePayload exists?"}
   B -->|"No"| C["Block retry and show why the row is not paid"]
   B -->|"Yes"| D{"processingCompletedAt is null?"}
   D -->|"No"| E["Do not retry completed row"]
@@ -508,9 +592,56 @@ Minimum behavior:
 
 Decision:
 
-- Keep the current Merchize catalog cookie auth working for now.
-- Do not block the ledger UI on a full identity provider.
-- Plan to consolidate admin auth later.
+- Do not keep separate page-local password gates for individual admin tools.
+- The Merchize Catalog & Snapshots route should rely on the future central admin auth boundary.
+- Do not block the ledger UI on a full identity provider during beta.
+- Treat any temporary shared-secret or shared-cookie pattern as a beta bridge only.
+- Plan to consolidate admin auth around cryptographic identity.
+
+Production target:
+
+- Use WebAuthn/passkeys for admin login.
+- Use opaque server-side sessions after login.
+- Require fresh WebAuthn step-up for dangerous actions.
+- Store admin session state server-side, not in browser local storage.
+- Do not use email OTP as the primary admin login method.
+
+Recommended future tables:
+
+```txt
+AdminUser
+AdminPasskeyCredential
+AdminSession
+AdminRecoveryCode
+AdminAuditEvent
+```
+
+Recommended admin session cookie:
+
+```txt
+__Host-admin_session
+HttpOnly
+Secure
+SameSite=Strict
+Path=/
+```
+
+Session rules:
+
+- Store only a hashed session token in the database.
+- Rotate or revoke sessions when admin credentials change.
+- Expire sessions automatically.
+- Keep recovery codes single-use and store only hashed code values.
+
+Step-up auth should be required for:
+
+- Retry full post-processing.
+- Retry Merchize fulfillment.
+- Regenerate receipt.
+- Save fulfillment address override.
+- Mark manually resolved.
+- Refund, dispute, or cancellation actions when added.
+- Admin role or credential changes.
 
 ### Phase 2: Admin Hub
 
@@ -523,8 +654,8 @@ src/app/admin/shop/page.tsx
 
 Hub cards:
 
-- Merchize Catalog
-- PayPal/Merchize Ledger
+- Merchize Catalog & Snapshots
+- Order Recovery Ledger
 - Checkout Recovery OTP Maintenance
 
 Hub cards should include:
@@ -561,8 +692,9 @@ Rules:
 Create:
 
 ```txt
-src/app/admin/shop/paypal-merchize-ledger/page.tsx
-src/app/admin/shop/paypal-merchize-ledger/AdminPayPalMerchizeLedgerClient.tsx
+src/app/admin/shop/order-recovery/page.tsx
+src/app/admin/shop/order-recovery/[orderToken]/page.tsx
+src/app/admin/shop/order-recovery/AdminOrderRecoveryClient.tsx
 ```
 
 UI sections:
@@ -570,8 +702,8 @@ UI sections:
 - Search/filter bar.
 - Status summary strip.
 - Paginated table.
-- Detail drawer or detail page.
-- Action zone.
+- Row and action links to the dedicated detail route.
+- Detail route with overview, timeline, payload sections, and action zone.
 
 Default table columns:
 
@@ -589,7 +721,7 @@ Default table columns:
 Create:
 
 ```txt
-src/app/admin/shop/paypal-merchize-ledger/actions.ts
+src/app/admin/shop/order-recovery/actions.ts
 src/lib/paypal/txLedger/adminLedgerActions.ts
 ```
 
@@ -1057,6 +1189,50 @@ Each runbook should include:
 - Customer message template.
 - Escalation path.
 
+## Motion And Transition Rules
+
+Motion should make the admin dashboard feel responsive and alive without slowing down operational work.
+
+Use existing `framer-motion` for:
+
+- Card entrance.
+- Card hover lift.
+- Selected-card expansion.
+- Detail route transition.
+- Row focus transitions.
+- Optimistic action feedback.
+- Confirmation dialog entrance and exit.
+
+Keep background movement CSS-based:
+
+- `CometsContainer` owns the comet field.
+- Do not add a second background animation system.
+- Do not add a canvas background unless a future performance test justifies it.
+
+Route and view transitions:
+
+- Browser or Next.js view transitions may be used as progressive polish.
+- Core navigation must still work without view transition support.
+- Prefer `framer-motion` for dashboard-local card, table, and detail-route transitions.
+- Keep route transitions short and directional so admins do not wait on animation.
+
+Animation limits:
+
+- No new heavy animation dependency is needed.
+- No distracting looping panel animation.
+- No moving effect inside dense tables.
+- Shimmer should be reserved for loading skeletons.
+- Glow should be reserved for active, failed, selected, or high-priority states.
+- Hover movement should be subtle and should not shift surrounding layout.
+
+Accessibility and performance:
+
+- Respect `motion-reduce` on every animation.
+- Keep animations transform/opacity based where possible.
+- Avoid animating blur intensity during frequent interactions.
+- Keep the dashboard readable while the comet overlay is moving.
+- The page should remain usable before all metrics finish loading.
+
 ## UI Style Guide
 
 Admin tools are operational interfaces. They should be polished, but dense and scannable.
@@ -1087,7 +1263,7 @@ Desktop:
 - Use a centered max-width shell for the admin hub.
 - Use wider layouts for ledger tables.
 - Keep filters sticky or easy to reach.
-- Prefer split layout for detail: summary left/top, action panel right/bottom.
+- Prefer split layout on the detail route: summary left/top, action panel right/bottom.
 
 Mobile:
 
@@ -1287,8 +1463,8 @@ yarn lint
 
 Admin hub:
 
-- Links to Merchize catalog admin.
-- Links to PayPal/Merchize ledger recovery.
+- Links to Merchize Catalog & Snapshots admin.
+- Links to Order Recovery ledger.
 - Includes expired checkout recovery OTP cleanup entry.
 
 Ledger list:
@@ -1316,6 +1492,10 @@ Actions:
 UX:
 
 - Dark glass theme matches existing checkout/admin surfaces.
+- Admin hub uses the `CometsContainer` glass/comet visual system.
+- Cards are operational links or actions, not decorative blocks.
+- Dashboard text remains readable with the comet overlay visible.
+- Reduced-motion mode disables nonessential motion.
 - No pitch-black isolated backdrop.
 - CTAs are short and clear.
 - Long content is collapsible.
@@ -1324,6 +1504,7 @@ UX:
 Security:
 
 - Mutating actions are admin-protected.
+- Production high-risk actions require fresh WebAuthn step-up.
 - Customer emails and payloads are not exposed outside admin.
 - Raw errors are available to admin, but customer-safe copy is used for customer messages.
 
@@ -1333,8 +1514,8 @@ Start with Phase 1 and Phase 2:
 
 1. Standardize admin auth expectations.
 2. Create the admin hub.
-3. Link the existing Merchize catalog tool.
-4. Add the PayPal/Merchize ledger recovery entry.
+3. Link the existing Merchize Catalog & Snapshots tool.
+4. Add the Order Recovery ledger entry.
 5. Add the expired checkout recovery OTP cleanup entry.
 
 After that, build the ledger list/detail before adding retry actions.

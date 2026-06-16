@@ -4,9 +4,10 @@ import axios, { AxiosError, AxiosResponse } from 'axios';
 import { getServerAccessToken } from '@/lib/session/server-session';
 import { redirect } from 'next/navigation';
 import { IUserShopProfile } from '../types/user-shop-interface';
+import { getServerDjangoApiBaseUrl } from '@/lib/django/getServerDjangoApiBaseUrl';
 
 const client = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
+  baseURL: getServerDjangoApiBaseUrl(),
 });
 
 export const fetchUserShopProfile = async () => {

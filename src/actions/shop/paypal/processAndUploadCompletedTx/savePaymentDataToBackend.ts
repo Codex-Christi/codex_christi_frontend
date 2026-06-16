@@ -2,19 +2,21 @@
 
 import { FetcherError, FetcherOptions, universalFetcher } from '@/lib/utils/SWRfetcherAdvanced';
 import { generateSignatureHeaders } from '@/lib/hooks/shopHooks/checkout/helpers/generateSignatureHeaders';
-import { cache } from 'react';
 import type { CompletedTxInterface } from '@/types/shop/paypalCompletedTx';
 import { OrderResponseBody } from '@paypal/paypal-js';
 import { OrdersCapture } from '@paypal/paypal-server-sdk';
 import { returnReducedBackendError } from '@/lib/hooks/shopHooks/checkout/helpers/returnReducedBackendError';
 import { decryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
+import { getServerDjangoApiBaseUrl } from '@/lib/django/getServerDjangoApiBaseUrl';
 
-const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
+const baseURL = getServerDjangoApiBaseUrl();
 
 export interface PaymentJSONData extends Omit<OrderResponseBody, 'payer'> {
   message: string;
   timestamp: string;
   capturedOrderPaypalID: CompletedTxInterface['capturedOrder']['id'];
+  // Django's payment-save API expects this wire key. The value is PayPal purchase-unit
+  // customId, which this checkout now sets to the local ledger orderToken.
   custom_id: string;
   amountReceived: string | null;
 
@@ -43,6 +45,7 @@ export interface PaymentSaveResponse {
   message: string;
   data: {
     id: string;
+    // Django payment-save custom ID. This is the value used for /orders/process/{custom_id}.
     custom_id: string;
     receipient_email: string;
     user: string | null;
@@ -56,7 +59,7 @@ export interface PaymentSavingActionProps extends Omit<CompletedTxInterface, 'ca
   capturedOrderPaypalID: string;
 }
 
-export const savePaymentDataToBackend = cache(async (encProps: string) => {
+export async function savePaymentDataToBackend(encProps: string) {
   // Main Destructuring (original comment)
   const {
     authData,
@@ -102,7 +105,7 @@ export const savePaymentDataToBackend = cache(async (encProps: string) => {
     (firstPurchaseUnit as {
       amount?: { currencyCode?: string; currency_code?: string; value?: string };
     }).amount ?? null;
-  const customId =
+  const paypalPurchaseUnitCustomId =
     (firstPurchaseUnit as { customId?: string; custom_id?: string }).customId ??
     (firstPurchaseUnit as { customId?: string; custom_id?: string }).custom_id ??
     null;
@@ -117,7 +120,7 @@ export const savePaymentDataToBackend = cache(async (encProps: string) => {
   const currencyCode = amount?.currencyCode ?? amount?.currency_code ?? null;
   const amountValue = amount?.value ?? null;
 
-  if (!customId) {
+  if (!paypalPurchaseUnitCustomId) {
     throw new Error('Missing PayPal customId/custom_id in authorize payload');
   }
 
@@ -128,7 +131,7 @@ export const savePaymentDataToBackend = cache(async (encProps: string) => {
         timestamp: new Date().toISOString(),
         capturedOrderPaypalID,
         paymentAuthID: authData.id,
-        custom_id: customId,
+        custom_id: paypalPurchaseUnitCustomId,
         amountReceived: amount ? `${amountValue} ${currencyCode}` : null,
         payer: payer
           ? {
@@ -190,4 +193,4 @@ export const savePaymentDataToBackend = cache(async (encProps: string) => {
       },
     };
   }
-});
+}

@@ -7,7 +7,7 @@ import { clearUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { redirect } from 'next/navigation';
 
 const axiosClient = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
+  baseURL: `${process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL}`,
 });
 
 export async function GET(req: NextRequest) {

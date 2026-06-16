@@ -18,20 +18,39 @@ export type PayPalWebhookEvent = {
   };
 };
 
+export type PayPalWebhookLedgerCorrelation =
+  | {
+      source: 'paypal_order_id';
+      paypalOrderId: string;
+      orderToken?: never;
+    }
+  | {
+      source: 'order_token';
+      orderToken: string;
+      paypalOrderId?: never;
+    };
+
 export function requiredHeader(req: Request, name: string) {
   const value = req.headers.get(name);
   if (!value) throw new Error(`Missing header: ${name}`);
   return value;
 }
 
-// PayPal webhook payloads are not fully uniform, so keep order correlation fallbacks here.
-export function getWebhookPaypalOrderId(event: PayPalWebhookEvent): string | undefined {
-  return (
-    event.resource?.supplementary_data?.related_ids?.order_id ||
-    event.resource?.custom_id ||
-    event.resource?.invoice_id ||
-    undefined
-  );
+// PayPal webhook payloads are not fully uniform, so keep ledger correlation fallbacks here.
+export function getWebhookLedgerCorrelation(
+  event: PayPalWebhookEvent,
+): PayPalWebhookLedgerCorrelation | undefined {
+  const paypalOrderId = event.resource?.supplementary_data?.related_ids?.order_id;
+  if (paypalOrderId) {
+    return { source: 'paypal_order_id', paypalOrderId };
+  }
+
+  const orderToken = event.resource?.custom_id || event.resource?.invoice_id;
+  if (orderToken) {
+    return { source: 'order_token', orderToken };
+  }
+
+  return undefined;
 }
 
 async function getPayPalAccessToken() {

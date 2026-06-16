@@ -4,8 +4,9 @@ import { FetcherError, FetcherOptions, universalFetcher } from '@/lib/utils/SWRf
 import { generateSignatureHeaders } from '@/lib/hooks/shopHooks/checkout/helpers/generateSignatureHeaders';
 import { returnReducedBackendError } from '@/lib/hooks/shopHooks/checkout/helpers/returnReducedBackendError';
 import { decryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
+import { getServerDjangoApiBaseUrl } from '@/lib/django/getServerDjangoApiBaseUrl';
 
-const baseURL = process.env.NEXT_PUBLIC_BASE_URL;
+const baseURL = getServerDjangoApiBaseUrl();
 
 interface OrderProcessingItem {
   product_id: string;
@@ -73,6 +74,8 @@ export const sendMerchizeOrderDetailsToBackend = async (encProps: string) => {
   }
 
   try {
+    // Django names this route segment `{custom_id}`. Locally it is always the
+    // payment-save custom ID returned by /orders/order-payment.
     const response = await universalFetcher<OrderProcessingAPIResponse, typeof payload>(
       `${baseURL}/orders/process/${djangoPaymentSaveCustomId}`,
       {

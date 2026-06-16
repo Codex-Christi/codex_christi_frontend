@@ -13,7 +13,7 @@ export const getUser = cache(async (): Promise<UserProfileDataInterface | undefi
   }
 
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/account/my-profile`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL}/account/my-profile`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${mainAccessToken}`,

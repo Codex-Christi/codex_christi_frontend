@@ -5,7 +5,7 @@ import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import {
   ensureWebhookDeliveryRecord,
-  getWebhookPaypalOrderId,
+  getWebhookLedgerCorrelation,
   markWebhookFailed,
   markWebhookIgnored,
   markWebhookProcessed,
@@ -26,16 +26,16 @@ const POST_CAPTURE_LEDGER_STATUSES = new Set<string>([
 ]);
 
 async function updateLedgerFromWebhook(args: {
-  paypalOrderId: string;
+  orderToken: string;
   eventType: string;
   currentStatus: string;
 }) {
-  const { paypalOrderId, eventType, currentStatus } = args;
+  const { orderToken, eventType, currentStatus } = args;
 
   switch (eventType) {
     case 'PAYMENT.AUTHORIZATION.CREATED':
       await paypalTxLedger.paypalIntent.update({
-        where: { paypalOrderId },
+        where: { orderToken },
         data: {
           status: PAYPAL_LEDGER_STATUS.AUTHORIZED,
           lastEventType: eventType,
@@ -45,7 +45,7 @@ async function updateLedgerFromWebhook(args: {
 
     case 'PAYMENT.CAPTURE.PENDING':
       await paypalTxLedger.paypalIntent.update({
-        where: { paypalOrderId },
+        where: { orderToken },
         data: {
           status: PAYPAL_LEDGER_STATUS.PENDING,
           lastEventType: eventType,
@@ -55,7 +55,7 @@ async function updateLedgerFromWebhook(args: {
 
     case 'PAYMENT.CAPTURE.DENIED':
       await paypalTxLedger.paypalIntent.update({
-        where: { paypalOrderId },
+        where: { orderToken },
         data: {
           status: PAYPAL_LEDGER_STATUS.ERROR,
           lastEventType: eventType,
@@ -67,7 +67,7 @@ async function updateLedgerFromWebhook(args: {
 
     case 'PAYMENT.CAPTURE.REFUNDED':
       await paypalTxLedger.paypalIntent.update({
-        where: { paypalOrderId },
+        where: { orderToken },
         data: {
           status: PAYPAL_LEDGER_STATUS.REFUNDED,
           lastEventType: eventType,
@@ -79,7 +79,7 @@ async function updateLedgerFromWebhook(args: {
       // Do not move the row backward if post-processing already advanced it.
       if (!POST_CAPTURE_LEDGER_STATUSES.has(currentStatus)) {
         await paypalTxLedger.paypalIntent.update({
-          where: { paypalOrderId },
+          where: { orderToken },
           data: {
             status: PAYPAL_LEDGER_STATUS.CAPTURED,
             lastEventType: eventType,
@@ -133,12 +133,13 @@ export async function POST(req: Request) {
       return new Response('Missing event metadata', { status: 400 });
     }
 
-    const paypalOrderId = getWebhookPaypalOrderId(event);
+    const correlation = getWebhookLedgerCorrelation(event);
 
     const delivery = await ensureWebhookDeliveryRecord({
       eventId: event.id,
       eventType: event.event_type,
-      paypalOrderId,
+      paypalOrderId:
+        correlation?.source === 'paypal_order_id' ? correlation.paypalOrderId : undefined,
       payload: event,
     });
 
@@ -146,13 +147,19 @@ export async function POST(req: Request) {
       return new Response('OK', { status: 200 });
     }
 
-    if (!paypalOrderId) {
-      await markWebhookIgnored(event.id, 'No correlatable PayPal order id in webhook payload');
+    if (!correlation) {
+      await markWebhookIgnored(
+        event.id,
+        'No correlatable PayPal order ID or order token in webhook payload',
+      );
       return new Response('OK', { status: 200 });
     }
 
     const row = await paypalTxLedger.paypalIntent.findUnique({
-      where: { paypalOrderId },
+      where:
+        correlation.source === 'paypal_order_id'
+          ? { paypalOrderId: correlation.paypalOrderId }
+          : { orderToken: correlation.orderToken },
     });
 
     // Ask PayPal to retry if the webhook beats ledger correlation.
@@ -167,7 +174,7 @@ export async function POST(req: Request) {
     }
 
     await updateLedgerFromWebhook({
-      paypalOrderId,
+      orderToken: row.orderToken,
       eventType: event.event_type,
       currentStatus: row.status,
     });

@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 const tokenClient = axios.create({
-	baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
+	baseURL: `${process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL}`,
 });
 
 type otpType = { email: string; otp: string };

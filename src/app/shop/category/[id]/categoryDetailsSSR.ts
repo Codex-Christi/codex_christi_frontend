@@ -52,7 +52,7 @@ type PaginationParams = {
   forceSnapshotRefresh?: boolean;
 };
 
-// const baseURL = process.env.NEXT_PUBLIC_BASE_URL!;
+// const baseURL = process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL!;
 
 type CategorySearchResponse = {
   data?: {

@@ -33,7 +33,7 @@ const updateShippingAddress = async (formData: ShippingAddressFormData) => {
   const mainAccessToken = (await getServerAccessToken()) ?? '';
 
   const client = axios.create({
-    baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}`,
+    baseURL: `${process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL}`,
   });
 
   try {

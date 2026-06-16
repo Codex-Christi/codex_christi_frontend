@@ -11,7 +11,6 @@ import { paypalClient } from '@/lib/paymentClients/paypalClient';
 import { getOrderFinalDetails } from '@/actions/shop/checkout/getOrderFinalDetails';
 import { PAYPAL_CURRENCY_CODES } from '@/datasets/shop_general/paypal_currency_specifics';
 import { removeOrKeepDecimalPrecision } from '@/actions/merchize/getMerchizeTotalWithShipping';
-import { randomUUID } from 'crypto';
 import { format } from 'date-fns';
 import type { CartVariant } from '@/stores/shop_stores/cartStore';
 import type { ShopCheckoutStoreInterface } from '@/stores/shop_stores/checkoutStore';
@@ -26,6 +25,7 @@ export interface BillingAddressInterface {
 }
 
 export interface CreateOrderActionInterface {
+  orderToken: string;
   cart: CartVariant[];
   customer: { name: string; email: string };
   country: string;
@@ -59,8 +59,12 @@ const shippingPreferenceForPaymentContext = {
 };
 
 export async function createPayPalOrder(body: CreateOrderActionInterface): Promise<Order> {
-  const { cart, customer, country, country_iso_3, initialCurrency, delivery_address } = body;
+  const { orderToken, cart, customer, country, country_iso_3, initialCurrency, delivery_address } =
+    body;
 
+  if (!orderToken) {
+    throw new Error('Missing order token');
+  }
   if (!cart) {
     throw new Error('Missing cart');
   }
@@ -197,7 +201,9 @@ export async function createPayPalOrder(body: CreateOrderActionInterface): Promi
 
               emailAddress: customer.email,
             },
-            customId: randomUUID() ?? customer?.email ?? '',
+            // PayPal echoes this as custom_id in some webhooks. Locally it is the ledger orderToken,
+            // not Django's payment-save custom_id.
+            customId: orderToken,
             items: payPalSupportsCurrency
               ? // && !currencyCodesWithoutDecimalPrecision.includes(currencyCode)
                 resolvedCartItems
