@@ -1,7 +1,7 @@
 // app/not-found.tsx
 import { ShoppingCart } from 'lucide-react';
 import Cube from '@/components/UI/Shop/404PageComponents/Cube';
-import Link from 'next/link';
+import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 
 export default function NotFound() {
   return (
@@ -35,14 +35,14 @@ export default function NotFound() {
 
           {/* Return button */}
           <div className='shop-not-found-link flex justify-center'>
-            <Link
+            <CustomShopLink
               href='/'
               className={`bg-transparent rounded-2xl !border-cyan-400/50 border
 				 text-cyan-400 hover:bg-cyan-400/30 hover:text-white
 			font-ocr !font-bold px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base`}
             >
               Return to Home
-            </Link>
+            </CustomShopLink>
           </div>
         </div>
       </div>
