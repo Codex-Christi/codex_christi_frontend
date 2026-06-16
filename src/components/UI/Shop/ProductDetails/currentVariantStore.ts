@@ -159,31 +159,38 @@ export function setupVariantAutoMatching(variants: Variants) {
     if (name && name !== 'product') requiredAttributes.add(name);
   });
 
-  return useCurrentVariant.subscribe(
-    (s) => s.currentVariantOptions,
-    (currentOptions) => {
-      const activeKeys = Object.entries(currentOptions)
-        .filter(([, v]) => v !== null && v !== '')
-        .map(([k]) => k);
+  const syncMatchingVariant = (currentOptions: VariantSelectionState) => {
+    const activeKeys = Object.entries(currentOptions)
+      .filter(([, v]) => v !== null && v !== '')
+      .map(([k]) => k);
 
-      const hasAllRequired = Array.from(requiredAttributes).every((attr) => {
-        const v = currentOptions[attr];
-        return typeof v === 'string' && v.length > 0;
-      });
+    const hasAllRequired = Array.from(requiredAttributes).every((attr) => {
+      const v = currentOptions[attr];
+      return typeof v === 'string' && v.length > 0;
+    });
 
-      const state = useCurrentVariant.getState();
+    const state = useCurrentVariant.getState();
 
-      // If no active selection or not all required attributes are selected yet,
-      // we do not attempt a match and clear any previous match.
-      if (!hasAllRequired || activeKeys.length === 0) {
-        if (state.matchingVariant !== null) {
-          state.setMatchingVariant(null);
-        }
-        return;
+    // If no active selection or not all required attributes are selected yet,
+    // we do not attempt a match and clear any previous match.
+    if (!hasAllRequired || activeKeys.length === 0) {
+      if (state.matchingVariant !== null) {
+        state.setMatchingVariant(null);
       }
+      return;
+    }
 
-      state.findMatchingVariant(variants);
-    },
+    state.findMatchingVariant(variants);
+  };
+
+  const unsubscribe = useCurrentVariant.subscribe(
+    (s) => s.currentVariantOptions,
+    syncMatchingVariant,
     { equalityFn: shallow },
   );
+
+  // A dynamic consumer can mount after the customer already selected an option.
+  syncMatchingVariant(useCurrentVariant.getState().currentVariantOptions);
+
+  return unsubscribe;
 }

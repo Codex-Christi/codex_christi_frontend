@@ -53,7 +53,6 @@ export default function ShopProfileAvatarHydrated({
       sizes={`${width}px`}
       quality={75}
       loading='lazy'
-      priority={false}
     />
   );
 }

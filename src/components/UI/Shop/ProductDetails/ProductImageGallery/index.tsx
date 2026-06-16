@@ -6,10 +6,12 @@ import { ProductDetailsContext } from '..';
 import { toMerchizeImageUrl } from '@/lib/merchizeStorefront/imageUrls';
 import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
 import { imagePreventDefaults } from './galleryShared';
+import { useCurrentVariant } from '../currentVariantStore';
 
 type ProductImageGalleryProps = {
   productMetaData?: BasicProductInterface['data'];
   initialImageUrls?: string[];
+  initialOpen?: boolean;
 };
 
 type InteractiveGalleryComponent = ComponentType<ProductImageGalleryProps>;
@@ -28,7 +30,14 @@ function resolveInitialImages(
 function ProductImageGalleryPreview({
   productMetaData,
   initialImageUrls,
-}: ProductImageGalleryProps) {
+  onOpenFullscreen,
+  onRequestInteractive,
+  onShare,
+}: ProductImageGalleryProps & {
+  onOpenFullscreen: () => void;
+  onRequestInteractive: () => void;
+  onShare: () => void;
+}) {
   const images = resolveInitialImages(productMetaData, initialImageUrls);
   const firstImageSrc = images[0];
   const title = productMetaData?.title || 'Product image';
@@ -51,7 +60,7 @@ function ProductImageGalleryPreview({
               src={firstImageSrc}
               width={80}
               height={80}
-              quality={70}
+              quality={75}
               loading='lazy'
             />
           )}
@@ -60,7 +69,19 @@ function ProductImageGalleryPreview({
 
       <div className='flex flex-col items-start w-full h-full gap-4 sm:flex-row sm:gap-8 sm:order-2'>
         <div className='rounded-[20px] w-full h-full relative sm:w-[95%]'>
-          <div className='relative size-full aspect-[16/18] md:aspect-[16/13] rounded-[20px] overflow-hidden bg-black/10'>
+          <div
+            className='relative size-full aspect-[16/18] md:aspect-[16/13] rounded-[20px] overflow-hidden bg-black/10'
+            role='button'
+            tabIndex={0}
+            aria-label='Open product image gallery'
+            onPointerDown={onRequestInteractive}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onOpenFullscreen();
+              }
+            }}
+          >
             {firstImageSrc ? (
               <Image
                 {...imagePreventDefaults}
@@ -83,10 +104,39 @@ function ProductImageGalleryPreview({
           </div>
         </div>
 
-        <div className='grid grid-cols-3 gap-6 sm:grid-cols-1 sm:gap-8' aria-hidden='true'>
-          <span className='block h-6 w-6 rounded-full bg-white/15' />
-          <span className='block h-6 w-6 rounded-full bg-white/15' />
-          <span className='block h-6 w-6 rounded-full bg-white/15' />
+        <div className='grid grid-cols-2 gap-6 sm:grid-cols-1 sm:gap-8'>
+          <button
+            type='button'
+            name='Fullscreen button'
+            aria-label='Open fullscreen'
+            className='grid size-7 place-items-center bg-transparent p-0'
+            onClick={onOpenFullscreen}
+          >
+            <svg width='26' height='26' viewBox='0 0 26 26' fill='none' aria-hidden='true'>
+              <path
+                d='M24.4 1H15.5M24.4 1v8.8M24.4 1l-9.2 9.2M1.3 15.8v8.8m0 0h8.9m-8.9 0 9.3-9.3'
+                stroke='currentColor'
+                strokeWidth='2'
+                strokeLinecap='round'
+                strokeLinejoin='round'
+              />
+            </svg>
+          </button>
+
+          <button
+            type='button'
+            name='Share Product button'
+            aria-label='Share this product'
+            className='grid size-7 place-items-center bg-transparent p-0'
+            onClick={onShare}
+          >
+            <svg width='22' height='26' viewBox='0 0 22 26' fill='none' aria-hidden='true'>
+              <circle cx='17.5' cy='4' r='3' stroke='currentColor' strokeWidth='2' />
+              <circle cx='5.5' cy='13' r='4' stroke='currentColor' strokeWidth='2' />
+              <circle cx='17.5' cy='22' r='3' stroke='currentColor' strokeWidth='2' />
+              <path d='m8.7 10.6 6.4-4.8M8.7 15.4l6.4 4.8' stroke='currentColor' strokeWidth='2' />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
@@ -99,16 +149,21 @@ export const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
 }) => {
   const productDetailsContext = useContext(ProductDetailsContext);
   const metadata = productMetaData ?? productDetailsContext?.productMetaData;
+  const hasVariantSelection = useCurrentVariant((state) =>
+    Object.values(state.currentVariantOptions).some(Boolean),
+  );
   const stableInitialImageUrls = useMemo(
     () => initialImageUrls ?? productDetailsContext?.initialImageUrls ?? EMPTY_IMAGE_URLS,
     [initialImageUrls, productDetailsContext?.initialImageUrls],
   );
   const [interactiveRequested, setInteractiveRequested] = useState(false);
+  const [openInteractiveOnLoad, setOpenInteractiveOnLoad] = useState(false);
   const [InteractiveGallery, setInteractiveGallery] =
     useState<InteractiveGalleryComponent | null>(null);
+  const shouldLoadInteractive = interactiveRequested || hasVariantSelection;
 
   useEffect(() => {
-    if (interactiveRequested) return;
+    if (shouldLoadInteractive) return;
 
     const requestInteractiveGallery = () => setInteractiveRequested(true);
     const listenerOptions = { once: true, passive: true } as const;
@@ -118,10 +173,10 @@ export const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
     return () => {
       window.removeEventListener('scroll', requestInteractiveGallery);
     };
-  }, [interactiveRequested]);
+  }, [shouldLoadInteractive]);
 
   useEffect(() => {
-    if (!interactiveRequested || InteractiveGallery) return;
+    if (!shouldLoadInteractive || InteractiveGallery) return;
 
     let cancelled = false;
 
@@ -134,30 +189,57 @@ export const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [InteractiveGallery, interactiveRequested]);
+  }, [InteractiveGallery, shouldLoadInteractive]);
 
   const preview = useMemo(
     () => (
       <ProductImageGalleryPreview
         productMetaData={metadata}
         initialImageUrls={stableInitialImageUrls}
+        onOpenFullscreen={() => {
+          setOpenInteractiveOnLoad(true);
+          setInteractiveRequested(true);
+        }}
+        onRequestInteractive={() => setInteractiveRequested(true)}
+        onShare={() => {
+          void shareProduct(metadata?.title ?? 'Product');
+        }}
       />
     ),
     [metadata, stableInitialImageUrls],
   );
 
-  if (!InteractiveGallery) {
-    return (
-      <div
-        onFocusCapture={() => setInteractiveRequested(true)}
-        onPointerDown={() => setInteractiveRequested(true)}
-      >
-        {preview}
-      </div>
-    );
-  }
+  if (!InteractiveGallery) return preview;
 
   return (
-    <InteractiveGallery productMetaData={metadata} initialImageUrls={stableInitialImageUrls} />
+    <InteractiveGallery
+      productMetaData={metadata}
+      initialImageUrls={stableInitialImageUrls}
+      initialOpen={openInteractiveOnLoad}
+    />
   );
 };
+
+async function shareProduct(productTitle: string) {
+  const shareData = {
+    title: `${productTitle} | Codex Christi Shop`,
+    text: 'Check out this merch from Codex Christi.',
+    url: window.location.href,
+  };
+
+  try {
+    if (navigator.share) {
+      await navigator.share(shareData);
+      return;
+    }
+
+    await navigator.clipboard.writeText(shareData.url);
+    const { default: successToast } = await import('@/lib/success-toast');
+    successToast({ message: 'Product URL copied to clipboard.' });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
+
+    const { default: errorToast } = await import('@/lib/error-toast');
+    errorToast({ message: 'Unable to share this product right now.' });
+  }
+}

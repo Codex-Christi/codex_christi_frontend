@@ -2,7 +2,6 @@
 
 import { useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { usePathname } from 'next/navigation';
 import { ProductDetailsContext } from '..';
 import { useCurrentVariant } from '../currentVariantStore';
 import ThumbsPanel from './ThumbsPanel';
@@ -62,6 +61,7 @@ function useImageListLoader(urls: string[]) {
 type ProductImageGalleryProps = {
   productMetaData?: BasicProductInterface['data'];
   initialImageUrls?: string[];
+  initialOpen?: boolean;
 };
 
 const EMPTY_IMAGE_URLS: string[] = [];
@@ -69,23 +69,22 @@ const EMPTY_IMAGE_URLS: string[] = [];
 export const InteractiveProductImageGallery: React.FC<ProductImageGalleryProps> = ({
   productMetaData,
   initialImageUrls,
+  initialOpen = false,
 }) => {
   const [currentItem, setCurrentItem] = useState(0);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [api, setApi] = useState<CarouselApi | null>(null);
 
   // Back button support while fullscreen
   useLightboxHistory(open, () => setOpen(false));
 
-  const { matchingVariant, setMatchingVariant } = useCurrentVariant((s) => s);
+  const matchingVariant = useCurrentVariant((s) => s.matchingVariant);
   const productDetailsContext = useContext(ProductDetailsContext);
   const metadata = productMetaData ?? productDetailsContext?.productMetaData;
   const stableInitialImageUrls = useMemo(
     () => initialImageUrls ?? productDetailsContext?.initialImageUrls ?? EMPTY_IMAGE_URLS,
     [initialImageUrls, productDetailsContext?.initialImageUrls],
   );
-
-  const pathname = usePathname();
 
   // Build image URLs (unchanged from your template)
   const images = useMemo(() => {
@@ -134,16 +133,6 @@ export const InteractiveProductImageGallery: React.FC<ProductImageGalleryProps> 
       img.src = src;
     });
   }, [imageKey, images, open]);
-
-  // URL-driven reset (unchanged)
-  useEffect(() => {
-    const resetTimer = window.setTimeout(() => {
-      setCurrentItem(0);
-      setMatchingVariant(null);
-    }, 0);
-
-    return () => window.clearTimeout(resetTimer);
-  }, [pathname, setMatchingVariant]);
 
   // Embla -> React state
   useEffect(() => {
