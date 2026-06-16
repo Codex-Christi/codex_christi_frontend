@@ -47,9 +47,9 @@ function MainStage({
   }, [imageKey]);
 
   return (
-    <div className='rounded-[20px] w-full h-full relative sm:w-[95%]'>
+    <div className='relative w-full min-w-0 rounded-[20px] sm:flex-1'>
       <Carousel
-        className='w-full'
+        className='w-full min-w-0'
         opts={{ align: 'start', watchDrag: true, loop: true }}
         setApi={setApi}
       >
@@ -60,7 +60,7 @@ function MainStage({
             return (
               <CarouselItem key={i} className='basis-full'>
                 <div
-                  className='relative size-full aspect-[16/18] md:aspect-[16/13] rounded-[20px] overflow-hidden cursor-zoom-in'
+                  className='relative w-full aspect-[16/18] md:aspect-[16/13] rounded-[20px] overflow-hidden cursor-zoom-in'
                   onClick={() => setOpen(true)}
                 >
                   {shouldRenderImage ? (

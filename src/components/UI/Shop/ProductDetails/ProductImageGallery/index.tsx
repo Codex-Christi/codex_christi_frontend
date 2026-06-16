@@ -44,11 +44,11 @@ function ProductImageGalleryPreview({
 
   return (
     <div
-      className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-2 lg:p-8 flex flex-col gap-8 items-start sm:gap-12 sm:flex-row lg:flex-col-reverse xl:flex-row'
+      className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-2 lg:p-8 flex w-full min-w-0 max-w-full flex-col gap-8 items-start sm:gap-12 sm:flex-row lg:flex-col-reverse xl:flex-row'
       id='mainGallery'
     >
       <div
-        className='grid gap-4 grid-cols-5 order-2 sm:grid-cols-1 sm:order-1 lg:grid-cols-5 xl:grid-cols-1 xl:order-1'
+        className='grid w-full min-w-0 grid-cols-5 gap-4 order-2 sm:w-auto sm:grid-cols-1 sm:order-1 lg:w-full lg:grid-cols-5 xl:w-auto xl:grid-cols-1 xl:order-1'
         aria-hidden='true'
       >
         <div className='rounded-[18px] sm:rounded-[20px] size-16 sm:size-20 border-[2.5px] border-white shadow-md shadow-gray-300 overflow-hidden bg-black/10'>
@@ -67,10 +67,10 @@ function ProductImageGalleryPreview({
         </div>
       </div>
 
-      <div className='flex flex-col items-start w-full h-full gap-4 sm:flex-row sm:gap-8 sm:order-2'>
-        <div className='rounded-[20px] w-full h-full relative sm:w-[95%]'>
+      <div className='flex w-full min-w-0 flex-col items-start gap-4 sm:flex-1 sm:flex-row sm:gap-8 sm:order-2'>
+        <div className='relative w-full min-w-0 rounded-[20px] sm:flex-1'>
           <div
-            className='relative size-full aspect-[16/18] md:aspect-[16/13] rounded-[20px] overflow-hidden bg-black/10'
+            className='relative w-full aspect-[16/18] md:aspect-[16/13] rounded-[20px] overflow-hidden bg-black/10'
             role='button'
             tabIndex={0}
             aria-label='Open product image gallery'
@@ -104,12 +104,12 @@ function ProductImageGalleryPreview({
           </div>
         </div>
 
-        <div className='grid grid-cols-2 gap-6 sm:grid-cols-1 sm:gap-8'>
+        <div className='grid min-w-[30px] grid-cols-3 gap-6 sm:grid-cols-1 sm:gap-8'>
           <button
             type='button'
             name='Fullscreen button'
             aria-label='Open fullscreen'
-            className='grid size-7 place-items-center bg-transparent p-0'
+            className='grid h-10 w-[30px] place-items-center bg-transparent p-0'
             onClick={onOpenFullscreen}
           >
             <svg width='26' height='26' viewBox='0 0 26 26' fill='none' aria-hidden='true'>
@@ -127,7 +127,7 @@ function ProductImageGalleryPreview({
             type='button'
             name='Share Product button'
             aria-label='Share this product'
-            className='grid size-7 place-items-center bg-transparent p-0'
+            className='grid h-10 w-[30px] place-items-center bg-transparent p-0'
             onClick={onShare}
           >
             <svg width='22' height='26' viewBox='0 0 22 26' fill='none' aria-hidden='true'>

@@ -21,7 +21,7 @@ function ThumbsPanel({
 }) {
   return (
     <div
-      className='grid gap-4 grid-cols-5 order-2 sm:grid-cols-1 sm:order-1 lg:grid-cols-5 xl:grid-cols-1 xl:order-1'
+      className='grid w-full min-w-0 grid-cols-5 gap-4 order-2 sm:w-auto sm:grid-cols-1 sm:order-1 lg:w-full lg:grid-cols-5 xl:w-auto xl:grid-cols-1 xl:order-1'
     >
       {images.map((image, index) => (
         <button

@@ -46,8 +46,8 @@ export default function ProductDetailsShell({
   descriptionSection,
 }: ProductDetailsShellProps) {
   return (
-    <div className='grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-6 xl:grid-cols-3'>
-      <div className='grid gap-4 lg:col-span-4 xl:col-span-2'>
+    <div className='grid min-w-0 gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-6 xl:grid-cols-3'>
+      <div className='grid min-w-0 gap-4 lg:col-span-4 xl:col-span-2'>
         <ProductImageGallery
           productMetaData={fetchedProductData.productMetaData}
           initialImageUrls={initialImageUrls}

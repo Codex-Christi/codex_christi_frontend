@@ -165,7 +165,7 @@ export const InteractiveProductImageGallery: React.FC<ProductImageGalleryProps> 
 
   return (
     <div
-      className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-2 lg:p-8 flex flex-col gap-8 items-start sm:gap-12 sm:flex-row lg:flex-col-reverse xl:flex-row'
+      className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-2 lg:p-8 flex w-full min-w-0 max-w-full flex-col gap-8 items-start sm:gap-12 sm:flex-row lg:flex-col-reverse xl:flex-row'
       id='mainGallery'
     >
       {/* Thumbnails */}
@@ -178,7 +178,7 @@ export const InteractiveProductImageGallery: React.FC<ProductImageGalleryProps> 
       />
 
       {/* Main image + side actions */}
-      <div className='flex flex-col items-start w-full h-full gap-4 sm:flex-row sm:gap-8 sm:order-2'>
+      <div className='flex w-full min-w-0 flex-col items-start gap-4 sm:flex-1 sm:flex-row sm:gap-8 sm:order-2'>
         <MainStage
           images={images}
           metaTitle={metadata?.title}

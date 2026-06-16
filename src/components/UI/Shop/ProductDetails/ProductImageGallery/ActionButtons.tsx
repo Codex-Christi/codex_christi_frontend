@@ -76,12 +76,12 @@ export default function ActionButtons({
   /* Action buttons (share / wishlist / inspect) */
   return (
     // Fullscreen button
-    <div className='grid grid-cols-3 gap-6 sm:grid-cols-1 sm:gap-8'>
+    <div className='grid min-w-[30px] grid-cols-3 gap-6 sm:grid-cols-1 sm:gap-8'>
       <Button
         name='Fullsreen button'
         aria-label='Open fullscreen'
         onClick={() => setOpen(true)}
-        className='p-0 bg-transparent'
+        className='h-10 w-[30px] p-0 bg-transparent'
       >
         <svg width='26' height='26' viewBox='0 0 26 26' fill='none'>
           <path
@@ -102,7 +102,7 @@ export default function ActionButtons({
         <Button
           name='Add to favorites'
           type='button'
-          className='p-0 bg-transparent'
+          className='h-10 w-[30px] p-0 bg-transparent'
           onClick={async () => {
             await addWishlistItem(id as string);
           }}
@@ -124,7 +124,7 @@ export default function ActionButtons({
         onClick={shareContent}
         name='Share Product button'
         aria-label='Share this product'
-        className='p-0 bg-transparent'
+        className='h-10 w-[30px] p-0 bg-transparent'
       >
         <svg width='22' height='26' viewBox='0 0 22 26' fill='none'>
           <path
