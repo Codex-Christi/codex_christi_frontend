@@ -189,7 +189,7 @@ export const InteractiveProductImageGallery: React.FC<ProductImageGalleryProps> 
       />
 
       {/* Main image + side actions */}
-      <div className='flex items-start w-full h-full gap-4 sm:gap-8 sm:order-2'>
+      <div className='flex flex-col items-start w-full h-full gap-4 sm:flex-row sm:gap-8 sm:order-2'>
         <MainStage
           images={images}
           metaTitle={metadata?.title}

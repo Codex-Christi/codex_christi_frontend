@@ -47,7 +47,7 @@ function MainStage({
   }, [imageKey]);
 
   return (
-    <div className='rounded-[20px] w-[95%] h-full relative'>
+    <div className='rounded-[20px] w-full h-full relative sm:w-[95%]'>
       <Carousel
         className='w-full'
         opts={{ align: 'start', watchDrag: true, loop: true }}

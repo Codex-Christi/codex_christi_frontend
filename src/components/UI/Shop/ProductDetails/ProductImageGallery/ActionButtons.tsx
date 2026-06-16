@@ -76,7 +76,7 @@ export default function ActionButtons({
   /* Action buttons (share / wishlist / inspect) */
   return (
     // Fullscreen button
-    <div className='grid gap-8'>
+    <div className='grid grid-cols-3 gap-6 sm:grid-cols-1 sm:gap-8'>
       <Button
         name='Fullsreen button'
         aria-label='Open fullscreen'

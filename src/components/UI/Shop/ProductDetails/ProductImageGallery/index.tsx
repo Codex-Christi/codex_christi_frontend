@@ -59,8 +59,8 @@ function ProductImageGalleryPreview({
         </div>
       </div>
 
-      <div className='flex items-start w-full h-full gap-4 sm:gap-8 sm:order-2'>
-        <div className='rounded-[20px] w-[95%] h-full relative'>
+      <div className='flex flex-col items-start w-full h-full gap-4 sm:flex-row sm:gap-8 sm:order-2'>
+        <div className='rounded-[20px] w-full h-full relative sm:w-[95%]'>
           <div className='relative size-full aspect-[16/18] md:aspect-[16/13] rounded-[20px] overflow-hidden bg-black/10'>
             {firstImageSrc ? (
               <Image
@@ -84,7 +84,7 @@ function ProductImageGalleryPreview({
           </div>
         </div>
 
-        <div className='grid gap-8' aria-hidden='true'>
+        <div className='grid grid-cols-3 gap-6 sm:grid-cols-1 sm:gap-8' aria-hidden='true'>
           <span className='block h-6 w-6 rounded-full bg-white/15' />
           <span className='block h-6 w-6 rounded-full bg-white/15' />
           <span className='block h-6 w-6 rounded-full bg-white/15' />
