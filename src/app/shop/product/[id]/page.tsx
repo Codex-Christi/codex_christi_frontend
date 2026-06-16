@@ -2,7 +2,7 @@
 // import Calendar from '@/assets/img/calendar.png';
 import ProductDetailsClientComponent from '@/components/UI/Shop/ProductDetails';
 import { Metadata } from 'next';
-import { getProductDetailsSSR, getProductMetaDataOnly } from './productDetailsSSR';
+import { getProductMetaDataOnly } from './productDetailsSSR';
 import { notFound } from 'next/navigation';
 import serialize from 'serialize-javascript';
 import { extractProductMetaDescriptionFromHtml } from '@/lib/utils/extract-plain-text-from-html';
@@ -75,27 +75,32 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 const ProductDetails = async ({ params }: PageProps) => {
   const { id: productID } = await params;
 
-  //   Main SSR generator
-  const productData = await getProductDetailsSSR(productID)
+  const productMetaData = await getProductMetaDataOnly(productID)
     .then((data) => data)
     .catch((error) => {
       console.error('Error fetching product details:', error);
       return notFound(); // or handle the error as needed
     });
 
-  const {
-    productMetaData: { description, title, retail_price },
-    productVariants,
-  } = productData;
+  const { description, title, retail_price } = productMetaData;
 
-  const LDImageURL = `https://d2dytk4tvgwhb4.cloudfront.net/${productVariants[0].image_uris[0]}`;
+  const productData = {
+    productMetaData,
+    productVariants: [],
+  };
+  const firstImageUrl = resolveProductImageUrl(productMetaData.image);
+  const initialImageUrls = firstImageUrl ? [firstImageUrl] : [];
+  const clientProductMetaData = {
+    ...productMetaData,
+    description: '',
+  };
   const trimmedDescription = extractProductMetaDescriptionFromHtml(description, title);
 
   const JSON_LD_Data = serialize({
     '@context': 'https://schema.org/',
     '@type': 'Product',
     name: title,
-    image: LDImageURL,
+    ...(firstImageUrl ? { image: firstImageUrl } : {}),
     description: trimmedDescription,
     brand: {
       '@type': 'Brand',
@@ -116,7 +121,9 @@ const ProductDetails = async ({ params }: PageProps) => {
   return (
     <>
       <ProductDetailsClientComponent
-        fetchedProductData={productData}
+        productId={productID}
+        fetchedProductData={{ ...productData, productMetaData: clientProductMetaData }}
+        initialImageUrls={initialImageUrls}
         descriptionSection={<ProductDescriptionSection description={description} />}
       />
       <ProductFeedbackSection />

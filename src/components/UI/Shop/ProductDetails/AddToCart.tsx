@@ -50,16 +50,18 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
 
   // Debounce state: blocks rapid repeat clicks for 600ms
   const [isBusy, setIsBusy] = useState(false);
+  const isLoadingVariants = props.isLoadingVariants ?? ctx?.variantLoadState === 'loading';
 
   // Use the cleaned array for messaging & indexing
   const selectOptionsMessage = useMemo(() => {
+    if (isLoadingVariants) return 'Product options are still loading.';
     if (cleanVariants.length === 0) return 'This item is unavailable.';
     return hasColorAndSize(cleanVariants[0]?.options ?? [])
       ? 'Please select a size and color before adding to cart.'
       : 'Please select a size before adding to cart.';
-  }, [cleanVariants]);
+  }, [cleanVariants, isLoadingVariants]);
 
-  const canSubmit = Boolean(matchingVariant?._id);
+  const canSubmit = Boolean(matchingVariant?._id) && !isLoadingVariants;
 
   const addToCartHandler = useCallback(async () => {
     // leading-edge debounce
@@ -150,6 +152,8 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
 
   // Subscribes with a proper Variant[]; auto-unsub on deps change/unmount.
   useEffect(() => {
+    if (cleanVariants.length === 0) return;
+
     // Adapt local Variant[] to the shape expected by setupVariantAutoMatching
     const unsubscribe = setupVariantAutoMatching(
       cleanVariants as Parameters<typeof setupVariantAutoMatching>[0],
@@ -170,7 +174,13 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
       disabled={!canSubmit || isBusy}
     >
       <h3 className='font-bold text-xl text-black text-center inline-block mx-auto'>
-        {!canSubmit ? 'Select Options' : isBusy ? 'Adding…' : 'Add to Cart'}
+        {isLoadingVariants
+          ? 'Loading Options…'
+          : !canSubmit
+            ? 'Select Options'
+            : isBusy
+              ? 'Adding…'
+              : 'Add to Cart'}
       </h3>
 
       <svg width='28' height='26' viewBox='0 0 28 26' aria-hidden='true' fill='none'>

@@ -1,21 +1,39 @@
 'use client';
-import { ProductResult } from '@/lib/merchizeStorefront/productTypes';
+import { ProductResult, ProductVariantsInterface } from '@/lib/merchizeStorefront/productTypes';
 import ProductSummary from './ProductSummary';
-import { createContext, useContext, FC, ReactNode, useMemo } from 'react';
+import { createContext, useContext, FC, ReactNode, useEffect, useMemo, useState } from 'react';
 
 export interface ProductDetailsProps {
   // Define any props if needed
+  productId: string;
   fetchedProductData: ProductResult;
+  initialImageUrls: string[];
   descriptionSection: ReactNode;
 }
 
 export interface OptionalProductVariantProps {
   variants: Partial<ProductDetailsProps['fetchedProductData']['productVariants']>;
   productMetaData?: { title: string; slug: string };
+  isLoadingVariants?: boolean;
 }
 
+type VariantLoadState = 'loading' | 'ready' | 'error';
+type IdleWindow = Window & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
 // Use ProductResult directly as the context type
-export const ProductDetailsContext = createContext<ProductResult | undefined>(undefined);
+export type ProductDetailsContextValue = ProductResult & {
+  productId: string;
+  initialImageUrls: string[];
+  variantLoadState: VariantLoadState;
+  variantLoadError: string | null;
+};
+
+export const ProductDetailsContext = createContext<ProductDetailsContextValue | undefined>(
+  undefined,
+);
 
 export const useProductDetailsContext = () => {
   const context = useContext(ProductDetailsContext);
@@ -25,11 +43,106 @@ export const useProductDetailsContext = () => {
   return context;
 };
 
-const ProductDetails: FC<ProductDetailsProps> = ({ fetchedProductData, descriptionSection }) => {
+const ProductDetails: FC<ProductDetailsProps> = ({
+  productId,
+  fetchedProductData,
+  initialImageUrls,
+  descriptionSection,
+}) => {
+  const [productVariants, setProductVariants] = useState<ProductVariantsInterface['data']>(
+    fetchedProductData.productVariants,
+  );
+  const [variantLoadState, setVariantLoadState] = useState<VariantLoadState>(
+    fetchedProductData.productVariants.length > 0 ? 'ready' : 'loading',
+  );
+  const [variantLoadError, setVariantLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setProductVariants(fetchedProductData.productVariants);
+    setVariantLoadState(fetchedProductData.productVariants.length > 0 ? 'ready' : 'loading');
+    setVariantLoadError(null);
+  }, [fetchedProductData.productVariants, productId]);
+
+  useEffect(() => {
+    if (productVariants.length > 0) return;
+
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof window.setTimeout> | null = null;
+    let idleId: number | null = null;
+    const controller = new AbortController();
+    const idleWindow = window as IdleWindow;
+
+    const loadVariants = async () => {
+      setVariantLoadState('loading');
+      setVariantLoadError(null);
+
+      try {
+        const res = await fetch(`/api/shop/products/${encodeURIComponent(productId)}/variants`, {
+          credentials: 'same-origin',
+          signal: controller.signal,
+        });
+        const json = (await res.json()) as {
+          data?: ProductVariantsInterface['data'];
+          error?: string;
+        };
+
+        if (!res.ok || !Array.isArray(json.data)) {
+          throw new Error(json.error || 'Unable to load product options.');
+        }
+
+        if (cancelled) return;
+
+        setProductVariants(json.data);
+        setVariantLoadState('ready');
+      } catch (err) {
+        if (cancelled || controller.signal.aborted) return;
+
+        setVariantLoadState('error');
+        setVariantLoadError(err instanceof Error ? err.message : 'Unable to load product options.');
+      }
+    };
+
+    const scheduleLoad = () => {
+      void loadVariants();
+    };
+
+    if (idleWindow.requestIdleCallback) {
+      idleId = idleWindow.requestIdleCallback(scheduleLoad, { timeout: 900 });
+    } else {
+      timeoutId = globalThis.setTimeout(scheduleLoad, 120);
+    }
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (idleId !== null) idleWindow.cancelIdleCallback?.(idleId);
+      if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
+    };
+  }, [productId, productVariants.length]);
+
+  const contextValue = useMemo<ProductDetailsContextValue>(
+    () => ({
+      productId,
+      initialImageUrls,
+      productMetaData: fetchedProductData.productMetaData,
+      productVariants,
+      variantLoadState,
+      variantLoadError,
+    }),
+    [
+      fetchedProductData.productMetaData,
+      initialImageUrls,
+      productId,
+      productVariants,
+      variantLoadError,
+      variantLoadState,
+    ],
+  );
+
   //   JSX
   return (
     // Main JSX
-    <ProductDetailsContext.Provider value={useMemo(() => fetchedProductData, [fetchedProductData])}>
+    <ProductDetailsContext.Provider value={contextValue}>
       <div className='grid gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-6 xl:grid-cols-3'>
         <ProductSummary descriptionSection={descriptionSection} />
       </div>

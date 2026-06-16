@@ -11,7 +11,14 @@ export async function GET(req: Request, ctx: { params: Params }) {
 
   try {
     const variants = await fetchProductVariants(id);
-    return NextResponse.json({ data: variants });
+    return NextResponse.json(
+      { data: variants },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+        },
+      },
+    );
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },

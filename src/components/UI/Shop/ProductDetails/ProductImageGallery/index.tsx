@@ -15,6 +15,7 @@ import { GalleryPrevButton } from '../GalleryPrevButton';
 import { GalleryNextButton } from '../GalleryNextButton';
 import type { ControllerRef, Plugin } from 'yet-another-react-lightbox';
 import { useLightboxHistory } from './useLightBoxHistory';
+import { toMerchizeImageUrl } from '@/lib/merchizeStorefront/imageUrls';
 
 const Lightbox = dynamic(() => import('yet-another-react-lightbox'), { ssr: false });
 
@@ -110,14 +111,30 @@ export const ProductImageGallery: React.FC = () => {
   // Build image URLs (unchanged from your template)
   const images = useMemo(() => {
     const image_uris = matchingVariant?.image_uris ?? [];
-    const initialImagesURIArr = productDetailsContext.productVariants[0].image_uris;
-    const initialImageURLs = initialImagesURIArr.map(
-      (img) => `https://d2dytk4tvgwhb4.cloudfront.net/${img}`,
+    if (image_uris.length > 0) {
+      return image_uris.map((uri) => toMerchizeImageUrl(uri)).filter(Boolean);
+    }
+
+    const defaultVariant = productDetailsContext.productVariants.find(
+      (variant) => variant.is_default,
     );
-    return image_uris && image_uris.length > 0
-      ? image_uris.map((uri) => `https://d2dytk4tvgwhb4.cloudfront.net/${uri}`)
-      : initialImageURLs;
-  }, [matchingVariant?.image_uris, productDetailsContext.productVariants]);
+    const initialImagesURIArr =
+      defaultVariant?.image_uris ?? productDetailsContext.productVariants[0]?.image_uris ?? [];
+    const variantImageURLs = initialImagesURIArr
+      .map((img) => toMerchizeImageUrl(img))
+      .filter(Boolean);
+
+    if (variantImageURLs.length > 0) return variantImageURLs;
+
+    return productDetailsContext.initialImageUrls.length > 0
+      ? productDetailsContext.initialImageUrls
+      : [toMerchizeImageUrl(metadata?.image)].filter(Boolean);
+  }, [
+    matchingVariant?.image_uris,
+    metadata?.image,
+    productDetailsContext.initialImageUrls,
+    productDetailsContext.productVariants,
+  ]);
 
   const loader = useImageListLoader(images);
   const imageKey = useMemo(() => images.join('|'), [images]);

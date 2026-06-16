@@ -3,6 +3,7 @@ import { useProductDetailsContext } from '.';
 import { useCurrentVariant } from './currentVariantStore';
 import { Suspense, useMemo } from 'react';
 import { PriceSkeleton } from '../GlobalShopComponents/GlobalProductPrice';
+import { Skeleton } from '../../primitives/skeleton';
 import {
   ProductVariantsInterface,
   SizeAttribute,
@@ -37,6 +38,8 @@ const ProductTitleAndSizesEtc = () => {
   const productDetailsContext = useProductDetailsContext();
   const matchingVariant = useCurrentVariant((state) => state.matchingVariant);
   const metadata = productDetailsContext.productMetaData;
+  const variantsAreLoading = productDetailsContext.variantLoadState === 'loading';
+  const variantsFailed = productDetailsContext.variantLoadState === 'error';
 
   const { title, retail_price } = useMemo(() => {
     if (!matchingVariant) {
@@ -86,19 +89,39 @@ const ProductTitleAndSizesEtc = () => {
         </div>
 
         {/* Size, Color and Label Selectors */}
-        {sizeAttrList.length > 0 && (
-          <VariantAttributeSelector title='Size:' attribute='size' options={sizeAttrList} />
-        )}
-        {colorAttrList.length > 0 && (
-          <VariantAttributeSelector title='Colors:' attribute='color' options={colorAttrList} />
-        )}
-        {labelAttrList.length > 0 && (
-          <VariantAttributeSelector title='Label:' attribute='label' options={labelAttrList} />
+        {variantsAreLoading ? (
+          <div className='space-y-3' aria-live='polite' aria-busy='true'>
+            <Skeleton className='h-5 w-28 bg-white/15' />
+            <div className='grid grid-cols-4 gap-2'>
+              {Array.from({ length: 4 }).map((_, index) => (
+                <Skeleton key={index} className='h-10 bg-white/10' />
+              ))}
+            </div>
+          </div>
+        ) : variantsFailed ? (
+          <p className='rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-white/80'>
+            Product options could not load. Refresh the page and try again.
+          </p>
+        ) : (
+          <>
+            {sizeAttrList.length > 0 && (
+              <VariantAttributeSelector title='Size:' attribute='size' options={sizeAttrList} />
+            )}
+            {colorAttrList.length > 0 && (
+              <VariantAttributeSelector title='Colors:' attribute='color' options={colorAttrList} />
+            )}
+            {labelAttrList.length > 0 && (
+              <VariantAttributeSelector title='Label:' attribute='label' options={labelAttrList} />
+            )}
+          </>
         )}
 
         {/* Add to Cart and Buy Now buttons */}
         <div className='space-y-4'>
-          <AddToCart variants={productDetailsContext.productVariants} />
+          <AddToCart
+            variants={productDetailsContext.productVariants}
+            isLoadingVariants={variantsAreLoading}
+          />
 
           <BuyNow />
         </div>
