@@ -77,5 +77,3 @@ echo "== deploy finished $(date -u +%FT%TZ) =="
 
 echo "Services started. Current status:"
 docker compose -f "$COMPOSE_FILE" ps
-
-docker compose 
