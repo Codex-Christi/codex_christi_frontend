@@ -2,12 +2,17 @@
 
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import AdminShell from './AdminShell';
+import AdminShopShell from './AdminShopShell';
 import OrderRecoveryQueuePanel from './dashboard/OrderRecoveryQueuePanel';
+import type { OrderRecoveryRow } from './dashboard/adminShopDashboardTypes';
 
-export default function AdminOrderRecoveryClient() {
+type AdminShopOrderRecoveryClientProps = {
+  rows: OrderRecoveryRow[];
+};
+
+export default function AdminShopOrderRecoveryClient({ rows }: AdminShopOrderRecoveryClientProps) {
   return (
-    <AdminShell
+    <AdminShopShell
       scope='shop-order-recovery'
       title='Order Recovery'
       subtitle='Provider-neutral queue for paid, paused, failed, and recoverable orders'
@@ -22,9 +27,9 @@ export default function AdminOrderRecoveryClient() {
             Shop dashboard
           </Link>
 
-          <OrderRecoveryQueuePanel mobileMode='full-list' />
+          <OrderRecoveryQueuePanel mobileMode='full-list' rows={rows} />
         </section>
       </div>
-    </AdminShell>
+    </AdminShopShell>
   );
 }

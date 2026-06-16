@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { adminNavItems } from './adminDashboardData';
-import type { AdminScope, NavItem } from './adminDashboardTypes';
+import { adminShopNavItems } from './adminShopDashboardData';
+import type { AdminShopScope, NavItem } from './adminShopDashboardTypes';
 
 type AdminNavigationListProps = {
-  scope: AdminScope;
+  scope: AdminShopScope;
   mode: 'desktop' | 'mobile';
   onNavigate?: () => void;
 };
@@ -21,7 +21,7 @@ export default function AdminNavigationList({
         mode === 'desktop' ? 'flex-1 flex-col overflow-visible px-3 py-3' : 'flex-col px-3 pb-4',
       )}
     >
-      {adminNavItems.map((item) => (
+      {adminShopNavItems.map((item) => (
         <AdminNavigationItem
           key={item.label}
           item={item}
@@ -81,7 +81,7 @@ function AdminNavigationItem({
   );
 }
 
-function isAdminNavItemActive(item: NavItem, scope: AdminScope) {
+function isAdminNavItemActive(item: NavItem, scope: AdminShopScope) {
   if (item.label === 'Shop Overview') {
     return scope === 'shop';
   }

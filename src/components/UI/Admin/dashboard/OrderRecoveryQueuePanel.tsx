@@ -10,26 +10,27 @@ import {
 import { cn } from '@/lib/utils';
 import AdminGlassPanel from './AdminGlassPanel';
 import { AdminOrderRecoveryStatusBadge } from './AdminStatusBadge';
-import { adminOrderRecoveryRows } from './adminDashboardData';
-import type { OrderRecoveryRow } from './adminDashboardTypes';
+import type { OrderRecoveryRow } from './adminShopDashboardTypes';
 
 type OrderRecoveryQueuePanelProps = {
   mobileMode?: 'summary-link' | 'full-list';
+  rows?: OrderRecoveryRow[];
 };
 
 export default function OrderRecoveryQueuePanel({
   mobileMode = 'full-list',
+  rows = [],
 }: OrderRecoveryQueuePanelProps) {
-  const failedCount = adminOrderRecoveryRows.filter((row) => row.status === 'failed').length;
-  const recoveryCount = adminOrderRecoveryRows.filter((row) => row.status === 'recovery').length;
-  const latestRow = adminOrderRecoveryRows[0];
+  const failedCount = rows.filter((row) => row.status === 'failed').length;
+  const recoveryCount = rows.filter((row) => row.status === 'recovery').length;
+  const latestRow = rows[0];
 
   return (
     <AdminGlassPanel className='overflow-hidden'>
       <div className='flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3'>
         <div>
           <h2 className='text-base font-semibold text-white'>Order Recovery Queue</h2>
-          <p className='mt-1 text-xs text-slate-500'>Sample UI scaffold until ledger data is wired.</p>
+          <p className='mt-1 text-xs text-slate-500'>Live ledger-backed paid order recovery queue.</p>
         </div>
         <div className={cn('items-center gap-2', mobileMode === 'summary-link' ? 'hidden md:flex' : 'flex')}>
           <button className='inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-200'>
@@ -67,7 +68,7 @@ export default function OrderRecoveryQueuePanel({
 
             <div className='mt-4 grid grid-cols-3 gap-2 text-xs'>
               <div className='rounded-md border border-white/10 bg-white/[0.035] p-2'>
-                <p className='text-lg font-semibold text-white'>{adminOrderRecoveryRows.length}</p>
+                <p className='text-lg font-semibold text-white'>{rows.length}</p>
                 <p className='mt-0.5 text-slate-500'>Rows</p>
               </div>
               <div className='rounded-md border border-rose-300/15 bg-rose-400/[0.06] p-2'>
@@ -83,15 +84,15 @@ export default function OrderRecoveryQueuePanel({
             <div className='mt-4 rounded-md border border-white/10 bg-slate-950/28 p-3 text-xs'>
               <p className='text-slate-500'>Latest</p>
               <div className='mt-2 flex items-center justify-between gap-3'>
-                <p className='truncate font-medium text-slate-200'>{latestRow.supportRef}</p>
-                <AdminOrderRecoveryStatusBadge status={latestRow.status} />
+                <p className='truncate font-medium text-slate-200'>{latestRow?.supportRef ?? '—'}</p>
+                {latestRow ? <AdminOrderRecoveryStatusBadge status={latestRow.status} /> : null}
               </div>
             </div>
           </Link>
         </div>
       ) : (
         <div className='divide-y divide-white/10 md:hidden'>
-          {adminOrderRecoveryRows.map((row) => (
+          {rows.map((row) => (
             <Link
               href={getOrderRecoveryDetailHref(row)}
               key={row.supportRef}
@@ -148,7 +149,7 @@ export default function OrderRecoveryQueuePanel({
             </tr>
           </thead>
           <tbody className='divide-y divide-white/10'>
-            {adminOrderRecoveryRows.map((row) => (
+            {rows.map((row) => (
               <tr key={row.supportRef} className='bg-slate-950/18 text-slate-300 transition hover:bg-cyan-300/[0.035]'>
                 <td className='px-4 py-3'>
                   <AdminOrderRecoveryStatusBadge status={row.status} />
@@ -181,7 +182,7 @@ export default function OrderRecoveryQueuePanel({
           mobileMode === 'summary-link' ? 'hidden md:flex' : 'flex',
         )}
       >
-        <span>Showing 1 to 8 of scaffold rows</span>
+        <span>Showing {rows.length ? `1 to ${rows.length}` : '0'} of {rows.length} rows</span>
         <div className='flex items-center gap-2'>
           <ArrowLeft size={15} />
           <span className='rounded-md border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-cyan-100'>1</span>

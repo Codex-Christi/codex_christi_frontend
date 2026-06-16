@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import AdminDashboardClient from '@/components/UI/Admin/AdminDashboardClient';
+import AdminShopDashboardClient from '@/components/UI/Admin/AdminShopDashboardClient';
 import CometsContainer from '@/components/UI/general/CometsContainer';
 
 export const metadata: Metadata = {
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function ShopAdminPage() {
   return (
     <CometsContainer>
-      <AdminDashboardClient scope='shop' />
+      <AdminShopDashboardClient scope='shop' />
     </CometsContainer>
   );
 }

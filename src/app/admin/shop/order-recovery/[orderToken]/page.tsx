@@ -2,11 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import AdminShell from '@/components/UI/Admin/AdminShell';
+import AdminShopShell from '@/components/UI/Admin/AdminShopShell';
 import OrderRecoveryDetailPanel from '@/components/UI/Admin/dashboard/OrderRecoveryDetailPanel';
-import { adminOrderRecoveryRows } from '@/components/UI/Admin/dashboard/adminDashboardData';
-import type { OrderRecoveryRow } from '@/components/UI/Admin/dashboard/adminDashboardTypes';
 import CometsContainer from '@/components/UI/general/CometsContainer';
+import { getAdminOrderRecoveryDetail } from '@/lib/paypal/txLedger/adminOrderRecovery';
 
 type OrderRecoveryDetailPageProps = {
   params: Promise<{ orderToken: string }>;
@@ -16,11 +15,11 @@ export async function generateMetadata({
   params,
 }: OrderRecoveryDetailPageProps): Promise<Metadata> {
   const { orderToken } = await params;
-  const recovery = findRecoveryRow(orderToken);
+  const recovery = await getAdminOrderRecoveryDetail(orderToken);
 
   return {
-    title: recovery
-      ? `${recovery.supportRef} | Order Recovery | Codex Christi Admin`
+    title: recovery?.row
+      ? `${recovery.row.supportRef} | Order Recovery | Codex Christi Admin`
       : 'Order Recovery Detail | Codex Christi Admin',
     description: 'Order recovery detail workspace for support and admin operations.',
   };
@@ -30,7 +29,7 @@ export default async function AdminOrderRecoveryDetailPage({
   params,
 }: OrderRecoveryDetailPageProps) {
   const { orderToken } = await params;
-  const recovery = findRecoveryRow(orderToken);
+  const recovery = await getAdminOrderRecoveryDetail(orderToken);
 
   if (!recovery) {
     notFound();
@@ -38,7 +37,7 @@ export default async function AdminOrderRecoveryDetailPage({
 
   return (
     <CometsContainer>
-      <AdminShell
+      <AdminShopShell
         scope='shop-order-recovery'
         title='Order Recovery Detail'
         subtitle='Inspect timeline, provider state, failure context, and admin recovery actions'
@@ -53,18 +52,22 @@ export default async function AdminOrderRecoveryDetailPage({
               Order recovery queue
             </Link>
 
-            <OrderRecoveryDetailPanel recovery={recovery} variant='page' />
+            <OrderRecoveryDetailPanel
+              recovery={recovery.row}
+              timeline={recovery.timeline}
+              notifications={recovery.notifications.map((notification) => ({
+                id: notification.id,
+                status: notification.status,
+                recipient: notification.recipient,
+                createdAt: notification.createdAt.toISOString(),
+                sentAt: notification.sentAt?.toISOString() ?? null,
+                lastErrorMessage: notification.lastErrorMessage,
+              }))}
+              variant='page'
+            />
           </section>
         </div>
-      </AdminShell>
+      </AdminShopShell>
     </CometsContainer>
-  );
-}
-
-function findRecoveryRow(orderToken: string): OrderRecoveryRow | undefined {
-  const decodedOrderToken = decodeURIComponent(orderToken);
-
-  return adminOrderRecoveryRows.find(
-    (row) => row.orderToken === decodedOrderToken || row.supportRef === decodedOrderToken,
   );
 }

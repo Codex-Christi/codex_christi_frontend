@@ -4,7 +4,7 @@ import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import AdminGlassPanel from './AdminGlassPanel';
 import { AdminToolStateBadge } from './AdminStatusBadge';
-import type { MetricCard, ToolTone } from './adminDashboardTypes';
+import type { MetricCard, ToolTone } from './adminShopDashboardTypes';
 
 const toneClass: Record<ToolTone, string> = {
   cyan: 'text-cyan-300',

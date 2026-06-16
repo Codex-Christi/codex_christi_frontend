@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import type { OrderRecoveryRow, ToolState } from './adminDashboardTypes';
+import type { OrderRecoveryRow, ToolState } from './adminShopDashboardTypes';
 
 const toolStateLabel: Record<ToolState, string> = {
   healthy: 'Healthy',

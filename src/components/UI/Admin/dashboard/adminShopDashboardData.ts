@@ -15,9 +15,9 @@ import {
   Store,
   TimerReset,
 } from 'lucide-react';
-import type { MetricCard, NavItem, OrderRecoveryRow, TimelineItem } from './adminDashboardTypes';
+import type { MetricCard, NavItem, OrderRecoveryRow, TimelineItem } from './adminShopDashboardTypes';
 
-export const adminNavItems: NavItem[] = [
+export const adminShopNavItems: NavItem[] = [
   { label: 'Site Root', href: '/', icon: ArrowUpLeft },
   { label: 'Shop Overview', href: '/admin/shop', icon: Home },
   { label: 'Order Recovery', href: '/admin/shop/order-recovery', icon: ClipboardList },
@@ -38,7 +38,7 @@ export const adminNavItems: NavItem[] = [
   { label: 'Settings', icon: Settings },
 ];
 
-export const adminMetricCards: MetricCard[] = [
+export const adminShopMetricCards: MetricCard[] = [
   {
     title: 'Order Recovery',
     metric: '1,248',

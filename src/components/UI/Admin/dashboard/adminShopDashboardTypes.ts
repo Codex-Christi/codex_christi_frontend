@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from 'react';
 
-export type AdminScope = 'shop' | 'shop-order-recovery' | 'shop-catalog-snapshots';
+export type AdminShopScope = 'shop' | 'shop-order-recovery' | 'shop-catalog-snapshots';
 export type ToolTone = 'cyan' | 'emerald' | 'amber' | 'rose' | 'violet' | 'blue';
 export type ToolState =
   | 'healthy'
@@ -50,6 +50,15 @@ export type TimelineItem = {
   label: string;
   time: string;
   state: 'done' | 'failed' | 'pending';
+};
+
+export type AdminNotificationHistoryItem = {
+  id: string;
+  status: string;
+  recipient: string | null;
+  createdAt: string;
+  sentAt: string | null;
+  lastErrorMessage: string | null;
 };
 
 export type AdminChildrenProps = {

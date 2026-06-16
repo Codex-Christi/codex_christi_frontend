@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useTransition, type ReactNode } from 'react';
 import { ArrowRight, Database, RefreshCw, Search, Store } from 'lucide-react';
-import AdminShell from '@/components/UI/Admin/AdminShell';
+import AdminShopShell from '@/components/UI/Admin/AdminShopShell';
 import AdminGlassPanel from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import type {
   SyncState,
@@ -218,7 +218,7 @@ export default function MerchizeCatalogSnapshotsAdminClient({
   };
 
   return (
-    <AdminShell
+    <AdminShopShell
       scope='shop-catalog-snapshots'
       title='Merchize Catalog & Snapshots'
       subtitle='Price, shipping, variant, and storefront fallback data'
@@ -397,7 +397,7 @@ export default function MerchizeCatalogSnapshotsAdminClient({
           </div>
         </AdminGlassPanel>
       </div>
-    </AdminShell>
+    </AdminShopShell>
   );
 }
 

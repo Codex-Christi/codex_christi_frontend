@@ -14,10 +14,10 @@ import {
 import { useRouteChangeAware } from '@/lib/hooks/useRouteChangeAware';
 import AdminGlassPanel from './AdminGlassPanel';
 import AdminNavigationList from './AdminNavigationList';
-import type { AdminScope } from './adminDashboardTypes';
+import type { AdminShopScope } from './adminShopDashboardTypes';
 
 type AdminMobileNavigationDrawerProps = {
-  scope: AdminScope;
+  scope: AdminShopScope;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };

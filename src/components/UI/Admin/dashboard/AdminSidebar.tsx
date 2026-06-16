@@ -3,9 +3,9 @@ import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
 import AdminGlassPanel from './AdminGlassPanel';
 import AdminNavigationList from './AdminNavigationList';
-import type { AdminScope } from './adminDashboardTypes';
+import type { AdminShopScope } from './adminShopDashboardTypes';
 
-export default function AdminSidebar({ scope }: { scope: AdminScope }) {
+export default function AdminSidebar({ scope }: { scope: AdminShopScope }) {
   return (
     <aside className='hidden border-r border-white/10 bg-slate-950/58 supports-[backdrop-filter]:backdrop-blur-xl lg:block lg:min-h-dvh'>
       <div className='flex h-full flex-col'>

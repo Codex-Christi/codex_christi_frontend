@@ -4,16 +4,16 @@ import { useState, type ReactNode } from 'react';
 import AdminMobileNavigationDrawer from './dashboard/AdminMobileNavigationDrawer';
 import AdminSidebar from './dashboard/AdminSidebar';
 import AdminTopBar from './dashboard/AdminTopBar';
-import type { AdminScope } from './dashboard/adminDashboardTypes';
+import type { AdminShopScope } from './dashboard/adminShopDashboardTypes';
 
-type AdminShellProps = {
-  scope: AdminScope;
+type AdminShopShellProps = {
+  scope: AdminShopScope;
   title: string;
   subtitle: string;
   children: ReactNode;
 };
 
-export default function AdminShell({ scope, title, subtitle, children }: AdminShellProps) {
+export default function AdminShopShell({ scope, title, subtitle, children }: AdminShopShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
