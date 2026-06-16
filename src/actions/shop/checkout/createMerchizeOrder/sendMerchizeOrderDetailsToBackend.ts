@@ -29,6 +29,7 @@ interface MerchizeFulfillmentProcessPayload {
   state: string;
   zip_code: string;
   country: string;
+  phone: string;
 }
 
 interface MerchizeFulfillmentProcessProps {
@@ -36,7 +37,7 @@ interface MerchizeFulfillmentProcessProps {
   payload: MerchizeFulfillmentProcessPayload;
 }
 
-interface OrderProcessingAPIResponse {
+export interface OrderProcessingAPIResponse {
   status: number;
   success: boolean;
   message: string;
@@ -64,6 +65,22 @@ interface OrderProcessingAPIResponse {
   };
 }
 
+function isDjangoFulfillmentBusinessSuccess(response: OrderProcessingAPIResponse) {
+  return (
+    response.success === true &&
+    response.data?.processing_status !== 'failed' &&
+    !response.data?.error_message
+  );
+}
+
+function getDjangoFulfillmentFailureMessage(response: OrderProcessingAPIResponse) {
+  return (
+    response.data?.error_message ||
+    response.message ||
+    'Django fulfillment processing returned a business failure'
+  );
+}
+
 export const sendMerchizeOrderDetailsToBackend = async (encProps: string) => {
   const { djangoPaymentSaveCustomId, payload } = JSON.parse(
     decryptForPostProcessingServerAction(encProps),
@@ -86,6 +103,18 @@ export const sendMerchizeOrderDetailsToBackend = async (encProps: string) => {
         } satisfies FetcherOptions,
       },
     );
+
+    if (!isDjangoFulfillmentBusinessSuccess(response)) {
+      return {
+        ok: false as const,
+        error: {
+          message: getDjangoFulfillmentFailureMessage(response),
+          status: response.status,
+          businessFailure: true as const,
+          responsePayload: response,
+        },
+      };
+    }
 
     return { ok: true as const, ...response };
   } catch (err: FetcherError | unknown) {

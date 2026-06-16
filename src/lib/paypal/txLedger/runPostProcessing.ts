@@ -10,7 +10,11 @@ import {
   savePaymentReceiptToCloud,
   type PaymentReceiptProps,
 } from '@/actions/shop/paypal/processAndUploadCompletedTx/savePaymentReceiptToCloud';
-import { sendMerchizeFulfillmentOrder } from '@/lib/paypal/txLedger/sendMerchizeFulfillmentOrder';
+import {
+  FulfillmentPayloadValidationError,
+  FulfillmentProviderRejectedError,
+  sendMerchizeFulfillmentOrder,
+} from '@/lib/paypal/txLedger/sendMerchizeFulfillmentOrder';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
@@ -24,6 +28,10 @@ function buildPaymentReceiptPayload(args: PaymentReceiptProps) {
 
 function buildPaymentSavePayload(args: PaymentSavingActionProps) {
   return encryptForPostProcessingServerAction(JSON.stringify(args));
+}
+
+function toLedgerJson(value: unknown) {
+  return JSON.parse(JSON.stringify(value ?? null));
 }
 
 async function clearLock(orderToken: string, lockId: string) {
@@ -174,14 +182,13 @@ export async function runPostProcessing(orderToken: string) {
       identifier: 'codexchristi-shop',
       currency: row.initialCurrency ?? 'USD',
       customerName: row.customerName,
+      countryIso2: row.countryIso2,
       fulfillmentAddress,
     });
 
     await updateLockedRow(orderToken, lockId, {
       status: PAYPAL_LEDGER_STATUS.COMPLETED,
-      merchizeFulfillmentRequestPayload: JSON.parse(
-        JSON.stringify(fulfillmentSend.requestPayload),
-      ),
+      merchizeFulfillmentRequestPayload: JSON.parse(JSON.stringify(fulfillmentSend.requestPayload)),
       merchizeFulfillmentResponsePayload: JSON.parse(
         JSON.stringify({
           ok: fulfillmentSend.ok,
@@ -203,6 +210,43 @@ export async function runPostProcessing(orderToken: string) {
     } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+
+    if (error instanceof FulfillmentPayloadValidationError) {
+      await updateLockedRow(orderToken, lockId, {
+        status: PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED,
+        lastErrorCode: 'FULFILLMENT_PAYLOAD_INVALID',
+        lastErrorMessage: message,
+        merchizeFulfillmentRequestPayload: toLedgerJson(error.requestPayload),
+        merchizeFulfillmentResponsePayload: toLedgerJson({
+          source: 'local_validation',
+          success: false,
+          issues: error.issues,
+        }),
+        postProcessingLockId: null,
+        postProcessingLockedAt: null,
+        postProcessingLockExpiresAt: null,
+      } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
+
+      return;
+    }
+
+    if (error instanceof FulfillmentProviderRejectedError) {
+      await updateLockedRow(orderToken, lockId, {
+        status: PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
+        lastErrorCode: 'FULFILLMENT_PROVIDER_REJECTED',
+        lastErrorMessage: message,
+        merchizeFulfillmentRequestPayload: toLedgerJson(error.requestPayload),
+        merchizeFulfillmentResponsePayload: toLedgerJson(error.responsePayload),
+        merchizeFulfillmentProcessingId: error.responsePayload.data?.id ?? null,
+        merchizeProviderOrderId: error.responsePayload.data?.provider_order_id ?? null,
+        merchizeProviderOrderCode: error.responsePayload.data?.provider_order_code ?? null,
+        postProcessingLockId: null,
+        postProcessingLockedAt: null,
+        postProcessingLockExpiresAt: null,
+      } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
+
+      return;
+    }
 
     await updateLockedRow(orderToken, lockId, {
       status: PAYPAL_LEDGER_STATUS.ERROR,

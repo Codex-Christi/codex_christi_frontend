@@ -22,7 +22,14 @@ export const dynamic = 'force-dynamic';
 const POST_CAPTURE_LEDGER_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED,
   PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
+  PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED,
+  PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
   PAYPAL_LEDGER_STATUS.COMPLETED,
+]);
+
+const FULFILLMENT_RECOVERY_STATUSES = new Set<string>([
+  PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED,
+  PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
 ]);
 
 async function updateLedgerFromWebhook(args: {
@@ -180,6 +187,11 @@ export async function POST(req: Request) {
     });
 
     if (event.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
+      if (FULFILLMENT_RECOVERY_STATUSES.has(row.status)) {
+        await markWebhookProcessed(event.id);
+        return new Response('OK', { status: 200 });
+      }
+
       // ACK fast so provider retries are driven by our DB state, not route latency.
       after(async () => {
         try {

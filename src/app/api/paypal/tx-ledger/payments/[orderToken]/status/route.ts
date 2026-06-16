@@ -44,11 +44,9 @@ export async function GET(_req: Request, { params }: PageProps) {
     });
   }
 
-  const effectiveStatus = row.lastErrorMessage ? PAYPAL_LEDGER_STATUS.ERROR : row.status;
-
   return NextResponse.json({
     orderToken: row.orderToken,
-    status: effectiveStatus,
+    status: row.status,
     lastEventType: row.lastEventType,
     receiptLink: row.receiptLink,
     receiptFile: row.receiptFile,

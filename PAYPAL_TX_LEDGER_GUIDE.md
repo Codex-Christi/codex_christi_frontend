@@ -5,6 +5,22 @@ It is a blueprint + implementation templates document (not yet applied runtime c
 
 Date verified against codebase: 2026-02-24
 
+Runtime checkpoint for false-success fulfillment handling: 2026-06-16
+
+Implemented in the current code checkpoint:
+
+- The Django fulfillment process endpoint is no longer treated as successful from HTTP 2xx alone.
+- A response body with `success: false`, `processing_status: "failed"`, or `error_message` is normalized to a fulfillment business failure.
+- False-success fulfillment failures end as `status = "fulfillment_failed"` with `lastErrorCode = "FULFILLMENT_PROVIDER_REJECTED"`.
+- Local fulfillment payload validation failures end as `status = "fulfillment_blocked"` with `lastErrorCode = "FULFILLMENT_PAYLOAD_INVALID"`.
+- The ledger stores the canonical fulfillment request payload and the raw/local failure response payload for both recovery states.
+- Automatic capture/webhook resume paths should not move `fulfillment_failed` or `fulfillment_blocked` rows backward to `captured`; admin recovery owns those rows.
+
+Not part of this checkpoint:
+
+- `AdminNotificationOutbox` table/helper/email delivery is still the next admin tooling step.
+- The admin dashboard revamp should consume these durable ledger states and payloads; it should not redesign the payment state machine.
+
 ---
 
 # Table of Contents
@@ -240,6 +256,10 @@ SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY="..."
 PAYPAL_TX_LEDGER_NEON_DB_STRING="postgresql://USER:PASSWORD@HOST/DB?sslmode=require"
 ADMIN_SECRET_KEY="long-random-secret"
 SHOP_SERVER_ACTIONS_CRYPTO_SECRET="long-random-secret"
+
+# Admin recovery notifications
+ORDER_RECOVERY_ADMIN_EMAILS="ops@example.com,support@example.com"
+ORDER_RECOVERY_NOTIFICATION_FROM_EMAIL="support@example.com"
 ```
 
 Notes:
@@ -258,6 +278,7 @@ Notes:
 - The root `prisma.config.ts` should switch datasource URLs based on the `--schema` target.
 - Django order-intent HMAC signing is server-only. The browser should call the local Next proxy routes and should never receive the signing secret.
 - Do **not** reuse `SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY` for webhook/server post-processing. Keep a separate server-only secret for those actions.
+- `ORDER_RECOVERY_ADMIN_EMAILS` receives internal alerts when a paid order needs admin recovery. Email delivery must be driven from a durable outbox row, not from an untracked fire-and-forget side effect.
 - This guide intentionally avoids requiring a second Prisma config file for the ledger.
 
 ---
@@ -353,17 +374,55 @@ model PaypalWebhookEvent {
   @@index([processedAt])
   @@index([createdAt])
 }
+
+model AdminNotificationOutbox {
+  id               String    @id @default(cuid())
+  orderToken       String?
+  paypalOrderId    String?
+  type             String
+  stage            String?
+  errorCode        String?
+  severity         String    @default("warning")
+  status           String    @default("pending")
+  dedupeKey        String    @unique
+  recipient        String?
+  payload          Json
+  attemptCount     Int       @default(0)
+  lastAttemptAt    DateTime?
+  sentAt           DateTime?
+  lastErrorMessage String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([orderToken])
+  @@index([paypalOrderId])
+  @@index([type])
+  @@index([stage])
+  @@index([errorCode])
+  @@index([severity])
+  @@index([status])
+  @@index([createdAt])
+}
 ```
+
+Admin notification intent:
+
+- This table is the durable email queue for configured admin recipients.
+- When a valid operational event occurs, create an outbox row for each configured recipient in `ORDER_RECOVERY_ADMIN_EMAILS`.
+- The sender then delivers email from the outbox row and updates `status`, `attemptCount`, `sentAt`, and `lastErrorMessage`.
+- The ledger/recovery state must not depend on email delivery succeeding. Email delivery is an alerting side effect with its own retry state.
 
 ## Why no Prisma relation between `PaypalIntent` and `PaypalWebhookEvent`?
 
 - PayPal webhook events may arrive before a ledger row is fully correlated.
 - Event dedupe only needs `eventId`.
 - A plain indexed `paypalOrderId` field is simpler and avoids relational coupling at this stage. A formal FK can be added when the schema stabilizes.
+- Admin notifications use an outbox table with searchable transaction context (`orderToken`, `paypalOrderId`, `stage`, `errorCode`). Do not make email delivery part of the payment transaction; persist the outbox row first, then send from the outbox.
 
 Why the extra tracking fields matter:
 - `PaypalWebhookEvent.processedAt` prevents false "already handled" acks when a prior attempt failed.
 - `PaypalIntent.postProcessingLock*` gives `runPostProcessing(...)` a DB-backed lease so only one worker can own side effects at a time.
+- `AdminNotificationOutbox.dedupeKey` prevents repeated webhook/retry attempts from spamming admins for the same unresolved paid-order condition.
 
 ---
 
@@ -450,6 +509,8 @@ export const PAYPAL_LEDGER_STATUS = {
   RECEIPT_UPLOADED: 'receipt_uploaded',
   PAYMENT_SAVED: 'payment_saved',
   COMPLETED: 'completed',
+  FULFILLMENT_BLOCKED: 'fulfillment_blocked',
+  FULFILLMENT_FAILED: 'fulfillment_failed',
   PENDING: 'pending',
   REFUNDED: 'refunded',
   ERROR: 'error',
@@ -461,6 +522,20 @@ export type PayPalLedgerStatus =
 
 Why this matters:
 - Prevents typos while keeping Prisma schema flexible.
+- `fulfillment_blocked` means the local payload is not fit to send or retry without admin repair, such as a missing address field or un-normalizable country.
+- `fulfillment_failed` means the fulfillment provider/Django process endpoint returned a business failure after transport succeeded.
+
+Error code defaults:
+
+```ts
+export const PAYPAL_LEDGER_ERROR_CODE = {
+  FULFILLMENT_PAYLOAD_INVALID: 'FULFILLMENT_PAYLOAD_INVALID',
+  FULFILLMENT_PROVIDER_REJECTED: 'FULFILLMENT_PROVIDER_REJECTED',
+  POST_PROCESSING_FAILED: 'POST_PROCESSING_FAILED',
+} as const;
+```
+
+Do not collapse fulfillment validation failures and provider business rejections into generic `POST_PROCESSING_FAILED`; admins need to know whether to repair local data or investigate the downstream provider.
 
 ---
 
@@ -2075,6 +2150,29 @@ Operational note:
 - Treat the ledger row as the single source of truth for what still needs to run. Do not rebuild required inputs from client stores at this stage.
 - Each step should be safely skippable if its success artifact already exists in the ledger row.
 
+Fulfillment validation and provider response handling:
+
+- Build the canonical Merchize/Django process payload before sending anything to Django.
+- Normalize `country` to ISO2 at the fulfillment boundary. Checkout/pricing may store ISO3 (`USA`), but `/orders/process/{custom_id}` must receive the provider-compatible value (`US`).
+- Validate required local payload fields before the provider call. Expected validation failures are not process crashes; they are paid-order recovery states.
+- On local validation failure:
+  - Set `status = fulfillment_blocked`.
+  - Set `lastErrorCode = FULFILLMENT_PAYLOAD_INVALID`.
+  - Set `lastErrorMessage` to a concise field-level summary.
+  - Save `merchizeFulfillmentRequestPayload` with the canonical attempted payload.
+  - Save `merchizeFulfillmentResponsePayload` as a local validation envelope, for example `{ source: "local_validation", success: false, issues: [...] }`.
+  - Clear the post-processing lease.
+  - Enqueue an `AdminNotificationOutbox` row with a deterministic `dedupeKey`.
+- A HTTP 2xx response from Django is only transport success. It is not fulfillment success.
+- On Django business failure, such as `{ success: false }` or `data.processing_status === "failed"`:
+  - Set `status = fulfillment_failed`.
+  - Set `lastErrorCode = FULFILLMENT_PROVIDER_REJECTED`.
+  - Set `lastErrorMessage` from `data.error_message ?? message`.
+  - Save both fulfillment request and response payloads.
+  - Clear the post-processing lease.
+  - Enqueue an admin notification outbox row.
+- Only set `status = completed` and `processingCompletedAt` after receipt upload, Django payment save, and fulfillment business success have all been confirmed.
+
 ---
 
 # 22) Merchize Fulfillment Helper
@@ -2124,6 +2222,52 @@ Why this matters:
 - The Django payment save custom ID is the fulfillment process path identifier.
 - The fulfillment request payload is saved back to the ledger as `merchizeFulfillmentRequestPayload`.
 - The fulfillment response payload is saved back to the ledger as `merchizeFulfillmentResponsePayload`.
+
+Required `/orders/process/{custom_id}` body shape:
+
+```ts
+type OrderProcessingRequest = {
+  identifier: string;
+  items: Array<{
+    product_id: string;
+    sku?: string;
+    merchize_sku: string;
+    quantity: number;
+    price: number;
+    currency: string;
+    image: string;
+  }>;
+  first_name?: string;
+  last_name?: string;
+  address?: string;
+  address_2?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  country?: string; // ISO2 for the current Django/Merchize process contract
+  phone?: string;
+};
+```
+
+Business success predicate:
+
+```ts
+function isFulfillmentBusinessSuccess(response: OrderProcessingAPIResponse) {
+  return (
+    response.success === true &&
+    response.data?.processing_status !== 'failed' &&
+    !response.data?.error_message
+  );
+}
+```
+
+Implementation rules:
+
+- `sendMerchizeOrderDetailsToBackend(...)` must return `ok: false` when the HTTP request succeeds but Django returns `success: false`, `processing_status: "failed"`, or `error_message`.
+- The helper should expose the raw Django response in the returned error object so `runPostProcessing(...)` can persist it.
+- Do not throw away provider response data just because the normalized result is `ok: false`.
+- Do not mark the ledger row `completed` from HTTP status alone.
+- For provider-accepted but asynchronous states, decide explicitly which `processing_status` values count as accepted. Treat unknown states as `FULFILLMENT_PROVIDER_REJECTED` until the Django contract is confirmed.
 
 ---
 
@@ -2181,6 +2325,9 @@ New files:
   - last error code/message
   - retry count
   - created/updated timestamps
+  - fulfillment validation issues
+  - provider business failure response
+  - admin notification outbox status/history
 
 ## Server actions template
 
@@ -2203,6 +2350,33 @@ export async function retryPostProcessing(orderToken: string) {
   await runPostProcessing(orderToken);
 }
 ```
+
+Notification and retry rules:
+
+- Admin notification rows are created when a transaction reaches a valid internal-alert event.
+- The admin UI should show whether an internal alert is pending, sent, failed, or suppressed.
+- Retry actions should not create unlimited duplicate alerts. Use an outbox `dedupeKey` based on order token, failure type, and current failing stage.
+- Fulfillment-only retry should rebuild and revalidate the fulfillment payload before sending to Django.
+- If retry succeeds, leave the previous outbox row for audit and optionally create a low-severity recovery notification.
+
+Valid internal-alert events:
+
+- `PAYPAL_INTENT_FAILED`: PayPal order creation failed after a ledger row exists.
+- `PAYPAL_AUTHORIZE_FAILED`: authorization failed or returned an unusable payload.
+- `PAYPAL_CAPTURE_FAILED`: capture failed, was denied, or returned an ambiguous state needing review.
+- `POST_PROCESSING_FAILED`: receipt upload, Django payment save, or another non-fulfillment post-processing step failed.
+- `FULFILLMENT_PAYLOAD_INVALID`: local fulfillment payload validation blocked a paid order before the provider call.
+- `FULFILLMENT_PROVIDER_REJECTED`: Django/Merchize returned transport success but business failure, including HTTP 200 with `success: false`, `processing_status: "failed"`, or `error_message`.
+- `PAID_ROW_STUCK`: a captured row remains unresolved beyond the configured recovery window.
+- `ADMIN_RETRY_FAILED`: an admin-triggered retry failed and still needs review.
+- `ADMIN_RETRY_RECOVERED`: an admin-triggered retry completed a previously unresolved paid order; use low severity.
+
+Email content rules:
+
+- Include support reference, order token, PayPal order ID when available, stage, error code, concise message, current status, and admin detail link.
+- Include a redacted issue summary for PII-heavy data. Do not put full raw PayPal/Django/Merchize payloads in email.
+- Link to `/admin/shop/order-recovery/[orderToken]` for full payload inspection.
+- Use one outbox row per recipient so delivery/retry state is recipient-specific.
 
 ## Query helpers for search/filter (server-side)
 
@@ -2580,9 +2754,10 @@ This is the missing operational sequence from earlier drafts.
 ## Step 1: Database foundation
 
 1. Add schema file.
-2. Run `prisma format` + `prisma validate`.
-3. Run ledger migrations.
-4. Generate ledger Prisma client.
+2. Add `AdminNotificationOutbox`.
+3. Run `prisma format` + `prisma validate`.
+4. Run ledger migrations.
+5. Generate ledger Prisma client.
 
 ## Step 2: Write-only ledger instrumentation (no behavior change yet)
 
@@ -2609,13 +2784,19 @@ At this point:
 1. Add webhook idempotency and status transitions.
 2. Add post-processing runner.
 3. Add fulfillment adapter isolation.
-4. Trigger post-processing from webhook.
+4. Add fulfillment payload validation with ISO2 country normalization.
+5. Add Django business-success inspection; HTTP 2xx alone must not complete fulfillment.
+6. Persist `fulfillment_blocked` and `fulfillment_failed` states with request/response payloads.
+7. Enqueue admin notification outbox rows for recoverable paid-order failures.
+8. Trigger post-processing from webhook.
 
 ## Step 5: Admin and recovery tooling
 
 1. Add admin auth helper.
-2. Add admin page + retry action.
-3. Add dev fallback trigger endpoint.
+2. Add admin notification outbox query/send/resend helpers.
+3. Add admin page + retry action.
+4. Show fulfillment validation/provider failure details on the order recovery detail page.
+5. Add dev fallback trigger endpoint.
 
 ## Step 6: Cleanup
 
@@ -2667,23 +2848,35 @@ Why this is safe:
   - receipt link/file saved
   - Django payment save custom ID saved
   - final status `completed`
+  - invalid fulfillment payload becomes `fulfillment_blocked`, not a thrown-only error
+  - Django `{ success: false }` with HTTP 200 becomes `fulfillment_failed`
+  - fulfillment request/response payloads are saved for both blocked and failed cases
+  - admin notification outbox row is created once per dedupe key
 
 ## Sandbox webhook testing
 
 - Enable webhook verification as needed.
 - Confirm webhook rows dedupe by `eventId`.
 - Confirm `completed` rows are not reprocessed.
+- Confirm repeated webhook/post-processing attempts do not spam duplicate admin alerts.
+- Confirm retry after `fulfillmentAddressOverride` can move a blocked/failed row to `completed`.
 
 ## Production readiness checks
 
 - Webhook verification ON.
 - `ADMIN_SECRET_KEY` set.
+- `ORDER_RECOVERY_ADMIN_EMAILS` set.
 - Dev fallback route blocked in production.
 - Monitoring/logs for:
   - `CREATE_ORDER_FAILED`
   - `AUTHORIZE_FAILED`
   - `CAPTURE_FAILED`
+  - `FULFILLMENT_PAYLOAD_INVALID`
+  - `FULFILLMENT_PROVIDER_REJECTED`
   - `POST_PROCESSING_FAILED`
+- Outbox monitoring for:
+  - pending admin notifications older than the expected send window
+  - failed notification send attempts
 
 ---
 

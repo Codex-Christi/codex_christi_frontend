@@ -5,6 +5,8 @@ export const PAYPAL_LEDGER_STATUS = {
   CAPTURED: 'captured',
   RECEIPT_UPLOADED: 'receipt_uploaded',
   PAYMENT_SAVED: 'payment_saved',
+  FULFILLMENT_BLOCKED: 'fulfillment_blocked',
+  FULFILLMENT_FAILED: 'fulfillment_failed',
   COMPLETED: 'completed',
   PENDING: 'pending',
   REFUNDED: 'refunded',

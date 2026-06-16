@@ -9,6 +9,13 @@ import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
 
 const payments = new PaymentsController(paypalClient);
 
+const POST_CAPTURE_RESUMABLE_STATUSES = new Set<string>([
+  PAYPAL_LEDGER_STATUS.CAPTURED,
+  PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED,
+  PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
+  PAYPAL_LEDGER_STATUS.ERROR,
+]);
+
 export async function POST(req: Request) {
   const requestId = randomUUID();
 
@@ -132,7 +139,7 @@ export async function POST(req: Request) {
     // If capture already succeeded earlier, resume server-side follow-up work instead of
     // attempting another PayPal capture. Webhooks may arrive late or not reach local dev tunnels.
     if (intent.capturePayload && intent.status !== PAYPAL_LEDGER_STATUS.REFUNDED) {
-      if (!intent.processingCompletedAt && intent.status !== PAYPAL_LEDGER_STATUS.COMPLETED) {
+      if (!intent.processingCompletedAt && POST_CAPTURE_RESUMABLE_STATUSES.has(intent.status)) {
         schedulePostProcessing(orderToken, 'stored_capture_payload');
       }
 

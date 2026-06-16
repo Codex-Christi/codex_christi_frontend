@@ -130,7 +130,13 @@ export function mapLedgerToProcessingState(
     };
   }
 
-  if (data.status === 'error' || data.status === 'refunded' || data.error?.message) {
+  if (
+    data.status === 'error' ||
+    data.status === 'refunded' ||
+    data.status === 'fulfillment_blocked' ||
+    data.status === 'fulfillment_failed' ||
+    data.error?.message
+  ) {
     return {
       ...shared,
       flowStatus: 'error',

@@ -1,9 +1,13 @@
 import 'server-only';
 
-import { sendMerchizeOrderDetailsToBackend } from '@/actions/shop/checkout/createMerchizeOrder/sendMerchizeOrderDetailsToBackend';
+import {
+  sendMerchizeOrderDetailsToBackend,
+  type OrderProcessingAPIResponse,
+} from '@/actions/shop/checkout/createMerchizeOrder/sendMerchizeOrderDetailsToBackend';
 import type { CartVariant } from '@/stores/shop_stores/cartStore';
 import type { PaymentSavingActionProps } from '@/actions/shop/paypal/processAndUploadCompletedTx/savePaymentDataToBackend';
 import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
+import { normalizeCountryToIso2 } from '@/lib/utils/shop/checkout/normalizeCountryToIso3';
 
 export type MerchizeFulfillmentOrderArgs = {
   cartSnapshot: CartVariant[];
@@ -11,6 +15,8 @@ export type MerchizeFulfillmentOrderArgs = {
   identifier: string;
   currency: string;
   customerName: string;
+  customerPhone?: string | null;
+  countryIso2?: string | null;
   fulfillmentAddress: PaymentSavingActionProps['delivery_address'];
 };
 
@@ -35,12 +41,65 @@ type MerchizeFulfillmentProcessPayload = {
   state: string;
   zip_code: string;
   country: string;
+  phone: string;
 };
 
 type MerchizeFulfillmentProcessProps = {
   djangoPaymentSaveCustomId: string;
   payload: MerchizeFulfillmentProcessPayload;
 };
+
+export type FulfillmentValidationIssue = {
+  field: string;
+  message: string;
+};
+
+export class FulfillmentPayloadValidationError extends Error {
+  issues: FulfillmentValidationIssue[];
+  requestPayload: MerchizeFulfillmentProcessPayload;
+
+  constructor(
+    issues: FulfillmentValidationIssue[],
+    requestPayload: MerchizeFulfillmentProcessPayload,
+  ) {
+    super(issues.map((issue) => `${issue.field}: ${issue.message}`).join('; '));
+    this.name = 'FulfillmentPayloadValidationError';
+    this.issues = issues;
+    this.requestPayload = requestPayload;
+  }
+}
+
+export class FulfillmentProviderRejectedError extends Error {
+  requestPayload: MerchizeFulfillmentProcessPayload;
+  responsePayload: OrderProcessingAPIResponse;
+
+  constructor(
+    message: string,
+    args: {
+      requestPayload: MerchizeFulfillmentProcessPayload;
+      responsePayload: OrderProcessingAPIResponse;
+    },
+  ) {
+    super(message);
+    this.name = 'FulfillmentProviderRejectedError';
+    this.requestPayload = args.requestPayload;
+    this.responsePayload = args.responsePayload;
+  }
+}
+
+function isFulfillmentBusinessFailure(error: unknown): error is {
+  businessFailure: true;
+  message: string;
+  responsePayload: OrderProcessingAPIResponse;
+} {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'businessFailure' in error &&
+    (error as { businessFailure?: unknown }).businessFailure === true &&
+    'responsePayload' in error
+  );
+}
 
 function mapCartToProcessingItems(cart: CartVariant[], currency: string): OrderProcessingItem[] {
   return cart.map((item) => ({
@@ -54,19 +113,65 @@ function mapCartToProcessingItems(cart: CartVariant[], currency: string): OrderP
   }));
 }
 
-function assertProcessingItems(items: OrderProcessingItem[]) {
+function getProcessingItemIssues(items: OrderProcessingItem[]) {
+  const issues: FulfillmentValidationIssue[] = [];
+
   for (const item of items) {
-    if (!item.product_id) throw new Error('Missing product_id for fulfillment item');
-    if (!item.merchize_sku) throw new Error('Missing merchize_sku for fulfillment item');
-    if (!item.image) throw new Error('Missing image for fulfillment item');
+    if (!item.product_id) {
+      issues.push({
+        field: 'items.product_id',
+        message: 'Missing product_id for fulfillment item',
+      });
+    }
+    if (!item.merchize_sku) {
+      issues.push({
+        field: 'items.merchize_sku',
+        message: 'Missing merchize_sku for fulfillment item',
+      });
+    }
+    if (!item.image) {
+      issues.push({ field: 'items.image', message: 'Missing image for fulfillment item' });
+    }
     if (!Number.isInteger(item.quantity) || item.quantity < 1) {
-      throw new Error('Invalid quantity for fulfillment item');
+      issues.push({ field: 'items.quantity', message: 'Invalid quantity for fulfillment item' });
     }
     if (typeof item.price !== 'number' || item.price < 0) {
-      throw new Error('Invalid price for fulfillment item');
+      issues.push({ field: 'items.price', message: 'Invalid price for fulfillment item' });
     }
-    if (!item.currency) throw new Error('Missing currency for fulfillment item');
+    if (!item.currency) {
+      issues.push({ field: 'items.currency', message: 'Missing currency for fulfillment item' });
+    }
   }
+
+  return issues;
+}
+
+function getFulfillmentPayloadIssues(payload: MerchizeFulfillmentProcessPayload) {
+  const issues: FulfillmentValidationIssue[] = [];
+
+  if (!payload.identifier) {
+    issues.push({ field: 'identifier', message: 'Missing identifier for fulfillment payload' });
+  }
+
+  const requiredFields: Array<keyof MerchizeFulfillmentProcessPayload> = [
+    'items',
+    'first_name',
+    'address',
+    'city',
+    'state',
+    'zip_code',
+    'country',
+  ];
+
+  for (const field of requiredFields) {
+    if (!payload[field]) {
+      issues.push({ field, message: `Missing ${field} for fulfillment payload` });
+    }
+  }
+
+  issues.push(...getProcessingItemIssues(payload.items));
+
+  return issues;
 }
 
 function splitCustomerName(fullName: string) {
@@ -83,6 +188,7 @@ function buildFulfillmentPayload(
 ): MerchizeFulfillmentProcessPayload {
   const { first_name, last_name } = splitCustomerName(args.customerName);
   const address = args.fulfillmentAddress;
+  const country = normalizeCountryToIso2(args.countryIso2 || address?.shipping_country);
 
   return {
     identifier: args.identifier,
@@ -94,14 +200,19 @@ function buildFulfillmentPayload(
     city: address?.shipping_city ?? '',
     state: address?.shipping_state ?? '',
     zip_code: address?.zip_code ?? '',
-    country: address?.shipping_country ?? '',
+    country: country ?? '',
+    phone: args.customerPhone ?? '',
   };
 }
 
 export async function sendMerchizeFulfillmentOrder(args: MerchizeFulfillmentOrderArgs) {
   const items = mapCartToProcessingItems(args.cartSnapshot, args.currency);
-  assertProcessingItems(items);
   const requestPayload = buildFulfillmentPayload(args, items);
+  const validationIssues = getFulfillmentPayloadIssues(requestPayload);
+
+  if (validationIssues.length > 0) {
+    throw new FulfillmentPayloadValidationError(validationIssues, requestPayload);
+  }
 
   const payload = {
     djangoPaymentSaveCustomId: args.djangoPaymentSaveCustomId,
@@ -113,6 +224,13 @@ export async function sendMerchizeFulfillmentOrder(args: MerchizeFulfillmentOrde
   );
 
   if (!response.ok) {
+    if (isFulfillmentBusinessFailure(response.error)) {
+      throw new FulfillmentProviderRejectedError(response.error.message, {
+        requestPayload,
+        responsePayload: response.error.responsePayload,
+      });
+    }
+
     throw new Error(response.error?.message ?? 'Fulfillment push failed');
   }
 
