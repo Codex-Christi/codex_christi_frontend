@@ -1,9 +1,10 @@
 'use client';
 
-import { ReactNode, FC } from 'react';
+import { FC } from 'react';
 import FaviconUpdater from '../general/Helpers/FaviconUpdater';
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
+import { useAfterInitialPageLoad } from '@/lib/hooks/useAfterInitialPageLoad';
 
 const LoggedinProvider = dynamic(() => import('./LoggedinProvider'));
 
@@ -15,17 +16,27 @@ const ResponsiveMediaProvider = dynamic(() => import('./ResponsiveMediaQueryProv
   ssr: false,
 });
 
-const AllRootProviders: FC<{ children: ReactNode }> = ({ children }) => {
+function DeferredToaster() {
+  const ready = useAfterInitialPageLoad(2200);
+  return ready ? <Toaster richColors /> : null;
+}
+
+function DeferredProgressProvider() {
+  const ready = useAfterInitialPageLoad(2200);
+  return ready ? <NextProgressProvider /> : null;
+}
+
+const AllRootProviders: FC = () => {
   const pathname = usePathname();
   const needsResponsiveMediaProvider = pathname.startsWith('/shop/checkout');
 
   return (
     <>
-      <LoggedinProvider>{children}</LoggedinProvider>
-      <Toaster richColors />
+      <LoggedinProvider />
+      <DeferredToaster />
       {needsResponsiveMediaProvider && <ResponsiveMediaProvider />}
       <FaviconUpdater />
-      <NextProgressProvider />
+      <DeferredProgressProvider />
     </>
   );
 };

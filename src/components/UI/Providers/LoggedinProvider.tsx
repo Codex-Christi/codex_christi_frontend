@@ -9,7 +9,7 @@ type WindowWithIdleCallback = Window & {
 };
 
 // Main Provider Component
-function LoggedinProvider({ children }: { children: ReactNode }) {
+function LoggedinProvider({ children }: { children?: ReactNode }) {
   // Hooks
   const autoUpDateSession = useAuthStore((state) => state.autoUpDateSession);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -41,7 +41,7 @@ function LoggedinProvider({ children }: { children: ReactNode }) {
   }, [autoUpDateSession, isAuthenticated]);
 
   // Main JSX
-  return <>{children}</>;
+  return <>{children ?? null}</>;
 }
 
 export default LoggedinProvider;

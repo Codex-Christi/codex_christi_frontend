@@ -1,21 +1,16 @@
-'use client';
+import { FC } from 'react';
+import dynamic from 'next/dynamic';
 
-import { FC, useMemo } from 'react';
-import { useCartStore } from '@/stores/shop_stores/cartStore';
-import { useHasMounted } from '@/lib/hooks/useHasMounted';
+const CartIconCount = dynamic(() => import('./CartIconCount'), {
+  ssr: false,
+  loading: () => (
+    <text fill='#000' fontSize={13} fontWeight='bold' transform='translate(19.5 11.7)'>
+      0
+    </text>
+  ),
+});
 
 export const CartIcon: FC = () => {
-  // Hooks
-  const { variants } = useCartStore();
-  const hasMounted = useHasMounted();
-  const approxCartItems = useMemo(() => {
-    if (!hasMounted) return 0;
-    return variants.length >= 9 ? '9+' : variants.length;
-  }, [hasMounted, variants.length]);
-
-  //   Bools
-  const cartIsMoreThanNine = approxCartItems === '9+';
-
   // JSX
   return (
     <svg
@@ -46,14 +41,7 @@ export const CartIcon: FC = () => {
           d='M0 7a7 7 0 1 1 14 0A7 7 0 0 1 0 7'
           transform='translate(16.855)'
         ></path>
-        <text
-          fill='#000'
-          fontSize={cartIsMoreThanNine ? 10 : 13}
-          fontWeight='bold'
-          transform={cartIsMoreThanNine ? 'translate(17.5 10)' : 'translate(19.5 11.7)'}
-        >
-          {approxCartItems}
-        </text>
+        <CartIconCount />
       </g>
     </svg>
   );

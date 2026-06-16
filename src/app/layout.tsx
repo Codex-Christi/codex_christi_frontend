@@ -67,7 +67,8 @@ export default function RootLayout({
           TradeWinds.variable,
         )}
       >
-        <AllRootProviders>{children}</AllRootProviders>
+        {children}
+        <AllRootProviders />
       </body>
     </html>
   );

@@ -6,8 +6,6 @@ import { useCartStore } from '@/stores/shop_stores/cartStore';
 import { setupVariantAutoMatching, useCurrentVariant } from './currentVariantStore';
 import { OptionalProductVariantProps, ProductDetailsContext } from '.';
 import { hasColorAndSize } from '@/lib/merchizeStorefront/productTypes';
-import errorToast from '@/lib/error-toast';
-import { toast } from 'sonner';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import { useShallow } from 'zustand/react/shallow';
 import { checkProductLineAvail } from '@/actions/shop/product/[each]/checkProdLineAvail';
@@ -71,12 +69,12 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
     setTimeout(() => setIsBusy(false), 600);
 
     try {
-      const fail = (message: string) => {
-        errorToast({ message });
+      const fail = async (message: string) => {
+        await showAddToCartErrorToast({ message });
       };
 
       if (!canSubmit || !matchingVariant) {
-        fail(selectOptionsMessage);
+        await fail(selectOptionsMessage);
         return;
       }
 
@@ -88,7 +86,7 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
 
       if (matchingVariantLineProductOption) {
         if (!ctx) {
-          fail('Unable to verify production availability right now. Please refresh and try again.');
+          await fail('Unable to verify production availability right now. Please refresh and try again.');
           return;
         }
 
@@ -99,7 +97,7 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
 
         // Hard gate: if we cannot verify, we do NOT proceed (prevents backend SKU-not-available surprises).
         if (!lineCheckResp?.ok) {
-          fail('We could not verify availability for production. Please try again in a moment.');
+          await fail('We could not verify availability for production. Please try again in a moment.');
           return;
         }
 
@@ -109,7 +107,7 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
             ? ` (possible naming drift: ${lineCheckResp.drift.suggested.key.color}/${lineCheckResp.drift.suggested.key.size})`
             : '';
 
-          fail(
+          await fail(
             `This exact variant is not available for production right now. Please pick a different color or size.${driftHint}`,
           );
           return;
@@ -124,11 +122,11 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
         slug,
       });
 
-      cartSuccessToast({ message: 'Item added to cart successfully.' });
+      await cartSuccessToast({ message: 'Item added to cart successfully.' });
 
       setMatchingVariant(null);
     } catch (err: unknown) {
-      errorToast({
+      await showAddToCartErrorToast({
         message:
           typeof err === 'string' ? err : err instanceof Error ? err.message : JSON.stringify(err),
       });
@@ -205,7 +203,12 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
 
 type Position = 'top-right';
 
-const cartSuccessToast = ({
+async function showAddToCartErrorToast({ message }: { message: string }) {
+  const { default: errorToast } = await import('@/lib/error-toast');
+  errorToast({ message });
+}
+
+const cartSuccessToast = async ({
   message,
   header = 'Action Successful!',
   position = 'top-right',
@@ -214,6 +217,7 @@ const cartSuccessToast = ({
   header?: string;
   position?: Position;
 }) => {
+  const { toast } = await import('sonner');
   const toastID = toast.success(header, {
     description: message,
     action: (
