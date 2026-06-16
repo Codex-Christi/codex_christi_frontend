@@ -5,7 +5,7 @@ export function ProductDescriptionSection({ description }: { description: string
   const sanitizedHTML = DOMPurify.sanitize(description, {
     FORBID_ATTR: ['style'],
   });
-  const responsiveHTML = wrapRemoteTables(sanitizedHTML);
+  const responsiveHTML = optimizeRemoteDescriptionImages(wrapRemoteTables(sanitizedHTML));
 
   return (
     <div
@@ -20,16 +20,69 @@ export function ProductDescriptionSection({ description }: { description: string
       [&_table]:min-w-[42rem] [&_table]:w-full [&_table]:border-collapse [&_table]:text-left [&_table]:text-sm
       [&_thead]:bg-slate-950/60 [&_tbody_tr:nth-child(even)]:bg-white/5
       [&_th]:!w-auto [&_th]:whitespace-nowrap [&_th]:border-b [&_th]:border-white/15 [&_th]:px-3 [&_th]:py-3 [&_th]:font-semibold [&_th]:text-white
-      [&_td]:whitespace-nowrap [&_td]:border-t [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-2.5 [&_td]:text-slate-100'
+      [&_td]:whitespace-nowrap [&_td]:border-t [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-2.5 [&_td]:text-slate-100
+      [&_img]:mx-auto [&_img]:h-auto [&_img]:w-full [&_img]:max-w-[500px] [&_img]:rounded-lg'
     >
       <h2 className='font-bold text-2xl'>Product Details</h2>
 
       <div
-        className='grid min-w-0 gap-3 overflow-hidden'
+        className='grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 overflow-hidden'
         dangerouslySetInnerHTML={{ __html: responsiveHTML }}
       />
     </div>
   );
+}
+
+const OPTIMIZED_DESCRIPTION_IMAGE_WIDTHS = [320, 480, 512, 640] as const;
+const OPTIMIZED_DESCRIPTION_IMAGE_QUALITY = 75;
+
+function isOptimizableDescriptionImage(src: string) {
+  try {
+    const url = new URL(src);
+    return (
+      url.protocol === 'https:' &&
+      (url.hostname === 'merchize.com' || url.hostname === 'www.merchize.com') &&
+      url.pathname.startsWith('/wp-content/uploads/')
+    );
+  } catch {
+    return false;
+  }
+}
+
+function optimizedImageUrl(src: string, width: number) {
+  return `/_next/image?url=${encodeURIComponent(src)}&amp;w=${width}&amp;q=${OPTIMIZED_DESCRIPTION_IMAGE_QUALITY}`;
+}
+
+function setHtmlAttribute(tag: string, name: string, value: string) {
+  const attributePattern = new RegExp(`\\s${name}\\s*=\\s*(["'])[^"']*\\1`, 'i');
+  const attribute = ` ${name}="${value}"`;
+
+  if (attributePattern.test(tag)) {
+    return tag.replace(attributePattern, attribute);
+  }
+
+  return tag.replace(/\s*\/?>$/, (ending) => `${attribute}${ending}`);
+}
+
+function optimizeRemoteDescriptionImages(html: string) {
+  return html.replace(/<img\b[^>]*>/gi, (tag) => {
+    const srcMatch = tag.match(/\ssrc\s*=\s*(["'])(.*?)\1/i);
+    const src = srcMatch?.[2];
+    if (!src || !isOptimizableDescriptionImage(src)) return tag;
+
+    const srcSet = OPTIMIZED_DESCRIPTION_IMAGE_WIDTHS.map(
+      (width) => `${optimizedImageUrl(src, width)} ${width}w`,
+    ).join(', ');
+
+    return [
+      ['src', optimizedImageUrl(src, 512)],
+      ['srcset', srcSet],
+      ['sizes', '(max-width: 548px) calc(100vw - 48px), 500px'],
+      ['loading', 'lazy'],
+      ['decoding', 'async'],
+      ['fetchpriority', 'low'],
+    ].reduce((updatedTag, [name, value]) => setHtmlAttribute(updatedTag, name, value), tag);
+  });
 }
 
 function wrapRemoteTables(html: string) {

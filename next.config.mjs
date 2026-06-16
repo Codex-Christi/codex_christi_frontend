@@ -16,6 +16,8 @@ const nextConfig = {
       new URL('https://d2dytk4tvgwhb4.cloudfront.net/v2/**'),
       new URL('https://d2dytk4tvgwhb4.cloudfront.net/**'),
       new URL('https://mainmedia.codexchristi.org/**'),
+      new URL('https://merchize.com/wp-content/uploads/**'),
+      new URL('https://www.merchize.com/wp-content/uploads/**'),
       new URL('https://purecatamphetamine.github.io/country-flag-icons/3x2/**'),
       {
         protocol: 'https',

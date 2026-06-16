@@ -9,6 +9,7 @@ export default function Logo() {
     <CustomShopLink
       redirectToParentSite={false}
       href='/'
+      prefetch={false}
       className='inline-block'
     >
       <picture>

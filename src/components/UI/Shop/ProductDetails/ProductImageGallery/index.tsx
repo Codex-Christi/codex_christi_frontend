@@ -3,7 +3,6 @@
 import Image from 'next/image';
 import { useContext, useEffect, useMemo, useState, type ComponentType } from 'react';
 import { ProductDetailsContext } from '..';
-import { useAfterInitialPageLoad } from '@/lib/hooks/useAfterInitialPageLoad';
 import { toMerchizeImageUrl } from '@/lib/merchizeStorefront/imageUrls';
 import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
 import { imagePreventDefaults } from './galleryShared';
@@ -104,12 +103,29 @@ export const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
     () => initialImageUrls ?? productDetailsContext?.initialImageUrls ?? EMPTY_IMAGE_URLS,
     [initialImageUrls, productDetailsContext?.initialImageUrls],
   );
-  const ready = useAfterInitialPageLoad(1800);
+  const [interactiveRequested, setInteractiveRequested] = useState(false);
   const [InteractiveGallery, setInteractiveGallery] =
     useState<InteractiveGalleryComponent | null>(null);
 
   useEffect(() => {
-    if (!ready || InteractiveGallery) return;
+    if (interactiveRequested) return;
+
+    const requestInteractiveGallery = () => setInteractiveRequested(true);
+    const listenerOptions = { once: true, passive: true } as const;
+
+    window.addEventListener('scroll', requestInteractiveGallery, listenerOptions);
+    window.addEventListener('pointerdown', requestInteractiveGallery, listenerOptions);
+    window.addEventListener('keydown', requestInteractiveGallery, { once: true });
+
+    return () => {
+      window.removeEventListener('scroll', requestInteractiveGallery);
+      window.removeEventListener('pointerdown', requestInteractiveGallery);
+      window.removeEventListener('keydown', requestInteractiveGallery);
+    };
+  }, [interactiveRequested]);
+
+  useEffect(() => {
+    if (!interactiveRequested || InteractiveGallery) return;
 
     let cancelled = false;
 
@@ -122,7 +138,7 @@ export const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [InteractiveGallery, ready]);
+  }, [InteractiveGallery, interactiveRequested]);
 
   const preview = useMemo(
     () => (
@@ -134,7 +150,16 @@ export const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
     [metadata, stableInitialImageUrls],
   );
 
-  if (!InteractiveGallery) return preview;
+  if (!InteractiveGallery) {
+    return (
+      <div
+        onFocusCapture={() => setInteractiveRequested(true)}
+        onPointerEnter={() => setInteractiveRequested(true)}
+      >
+        {preview}
+      </div>
+    );
+  }
 
   return (
     <InteractiveGallery productMetaData={metadata} initialImageUrls={stableInitialImageUrls} />
