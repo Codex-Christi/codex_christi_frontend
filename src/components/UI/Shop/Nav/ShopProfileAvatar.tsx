@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ComponentType } from 'react';
 import type { ImageProps } from 'next/image';
-import { useAfterInitialPageLoad } from '@/lib/hooks/useAfterInitialPageLoad';
+import { useDeferredClientEnhancement } from '@/lib/hooks/useDeferredClientEnhancement';
 
 type ShopProfileAvatarProps = Omit<ImageProps, 'src'> & {
   width: number;
@@ -42,7 +42,9 @@ function ShopProfileAvatarPlaceholder({
 }
 
 export default function ShopProfileAvatar(props: ShopProfileAvatarProps) {
-  const ready = useAfterInitialPageLoad(2400);
+  const { ready, requestReady } = useDeferredClientEnhancement({
+    fallbackDelay: 12000,
+  });
   const [HydratedAvatar, setHydratedAvatar] =
     useState<HydratedShopProfileAvatarComponent | null>(null);
 
@@ -64,6 +66,7 @@ export default function ShopProfileAvatar(props: ShopProfileAvatarProps) {
     <span
       className='inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full'
       style={{ width: props.width, height: props.height }}
+      onPointerMove={requestReady}
     >
       {HydratedAvatar ? (
         <HydratedAvatar {...props} />

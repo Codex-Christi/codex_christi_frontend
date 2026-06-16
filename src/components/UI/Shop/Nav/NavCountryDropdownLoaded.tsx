@@ -3,12 +3,17 @@
 import CountryDropdown from '@/components/UI/Shop/Index/CountryDropDownClientFloating';
 import { getDefaultISO3 } from '@/lib/utils/shop/geo/getDefaultISO3.client';
 
-export default function NavCountryDropdownLoaded() {
+export default function NavCountryDropdownLoaded({
+  initiallyOpen = false,
+}: {
+  initiallyOpen?: boolean;
+}) {
   const defaultISO3 = getDefaultISO3();
 
   return (
     <CountryDropdown
       initialIso3={defaultISO3}
+      initiallyOpen={initiallyOpen}
       slim
       chevronClassName='ml-2 shrink-0 opacity-100 size-[1.5rem] text-white'
       classNames={{

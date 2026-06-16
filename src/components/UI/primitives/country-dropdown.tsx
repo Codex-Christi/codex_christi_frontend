@@ -122,6 +122,7 @@ interface CountryDropdownProps {
    * Rendering inside the Drawer subtree avoids it being considered an outside click.
    */
   portalContainer?: HTMLElement | null;
+  initiallyOpen?: boolean;
 }
 
 const CountryDropdownComponent = (
@@ -143,11 +144,12 @@ const CountryDropdownComponent = (
     popoverModal = true,
     trapInsideDrawer = false,
     portalContainer,
+    initiallyOpen = false,
     ...restTriggerProps
   }: CountryDropdownProps,
   ref: React.ForwardedRef<HTMLButtonElement>,
 ) => {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const [searchRO, setSearchRO] = useState<boolean>(searchReadOnlyUntilInteract);
 
   // Prevent Radix (Popover) auto-generated IDs from being rendered on the server,

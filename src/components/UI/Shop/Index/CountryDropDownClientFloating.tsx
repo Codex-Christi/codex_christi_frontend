@@ -15,6 +15,7 @@ export type FloatingDropdownProps = {
   mobileBlockAutoFocus?: boolean;
   portalContainer?: HTMLElement | null | undefined;
   isMobileOverride?: boolean;
+  initiallyOpen?: boolean;
   /** Optional: control the outer wrapper when slim=true or to override defaults */
   wrapperClassName?: string;
   /** Optional: extra classes to style the chevron icon on the trigger (spacing/visibility). */
@@ -34,6 +35,7 @@ export default function CountryDropdownClientFloating({
   trapInsideDrawer,
   mobileBlockAutoFocus,
   portalContainer,
+  initiallyOpen,
 }: FloatingDropdownProps) {
   const iso3 = useCurrencyCookie((s) => s.iso3);
   const changeCountry = useCurrencyCookie((s) => s.changeCountry);
@@ -72,6 +74,7 @@ export default function CountryDropdownClientFloating({
         isMobileOverride={isMobileOverride}
         popoverModal={popoverModal}
         portalContainer={portalContainer}
+        initiallyOpen={initiallyOpen}
         unstyled={unstyled ?? true}
         classNames={{
           // Trigger defaults; caller can override freely (used for positioning/styling in slim mode)

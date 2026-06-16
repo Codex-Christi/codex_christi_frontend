@@ -67,7 +67,7 @@ function ProductImageGalleryPreview({
                 priority
                 fetchPriority='high'
                 loading='eager'
-                decoding='sync'
+                decoding='async'
                 className='size-full object-cover object-top'
                 fill
                 src={firstImageSrc}
@@ -114,13 +114,9 @@ export const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
     const listenerOptions = { once: true, passive: true } as const;
 
     window.addEventListener('scroll', requestInteractiveGallery, listenerOptions);
-    window.addEventListener('pointerdown', requestInteractiveGallery, listenerOptions);
-    window.addEventListener('keydown', requestInteractiveGallery, { once: true });
 
     return () => {
       window.removeEventListener('scroll', requestInteractiveGallery);
-      window.removeEventListener('pointerdown', requestInteractiveGallery);
-      window.removeEventListener('keydown', requestInteractiveGallery);
     };
   }, [interactiveRequested]);
 
@@ -154,7 +150,7 @@ export const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
     return (
       <div
         onFocusCapture={() => setInteractiveRequested(true)}
-        onPointerEnter={() => setInteractiveRequested(true)}
+        onPointerDown={() => setInteractiveRequested(true)}
       >
         {preview}
       </div>
