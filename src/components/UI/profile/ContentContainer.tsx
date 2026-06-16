@@ -15,7 +15,7 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <div className='w-full grid gap-4 md:gap-8'>
-      <div className='min-w-full w-full bg-[#0D0D0D] md:px-8 p-4 lg:px-[66px] flex items-center justify-between gap-4 sticky z-30 top-0 overflow-hidden relative isolate'>
+      <div className='min-w-full w-full bg-[#0D0D0D] md:px-8 p-4 lg:px-[66px] flex items-center justify-between gap-4 z-30 top-0 overflow-hidden relative isolate'>
         <BluePlanetImage
           alt='Blue Planet'
           aria-hidden='true'
@@ -35,12 +35,7 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
               </g>
               <defs>
                 <clipPath id='clip0_853_2213'>
-                  <rect
-                    width='32.1713'
-                    height='32'
-                    fill='white'
-                    transform='translate(0 0.5)'
-                  />
+                  <rect width='32.1713' height='32' fill='white' transform='translate(0 0.5)' />
                 </clipPath>
               </defs>
             </svg>
@@ -150,10 +145,7 @@ const ContentContainer = ({ children }: { children: React.ReactNode }) => {
         </div>
       </div>
 
-      <ProfileMobileNav
-        openState={navIsOpen}
-        openCloseController={setNavIsOpen}
-      />
+      <ProfileMobileNav openState={navIsOpen} openCloseController={setNavIsOpen} />
 
       <div className='md:flex grid items-start z-10 p-4 gap-4 md:gap-8 w-full lg:gap-[66px] lg:px-[66px] lg:py-6 md:flex-row'>
         <div className='w-full'>{children}</div>
