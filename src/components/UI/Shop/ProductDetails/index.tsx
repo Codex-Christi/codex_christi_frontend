@@ -77,7 +77,7 @@ const ProductDetails: FC<ProductDetailsProps> = ({
       setVariantLoadError(null);
 
       try {
-        const res = await fetch(`/api/shop/products/${encodeURIComponent(productId)}/variants`, {
+        const res = await fetch(`/next-api/shop/products/${encodeURIComponent(productId)}/variants`, {
           credentials: 'same-origin',
           signal: controller.signal,
         });
