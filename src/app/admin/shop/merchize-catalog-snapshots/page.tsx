@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   description: 'Shop admin tooling for Merchize price, shipping, and storefront snapshot data.',
 };
 
+export const dynamic = 'force-dynamic';
+
 async function getCatalogPageData() {
   try {
     const [syncState, sampleVariants, storefrontSnapshotStats] = await Promise.all([

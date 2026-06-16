@@ -54,7 +54,6 @@ const UserAvatar: FC<{
       height={height}
       quality={100}
       alt={altText}
-      priority
       {...rest}
     />
   );
