@@ -9,18 +9,18 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import AdminGlassPanel from './AdminGlassPanel';
-import { AdminOrderRecoveryStatusBadge } from './AdminStatusBadge';
-import type { OrderRecoveryRow } from './adminShopDashboardTypes';
+import { AdminPaidOrderRecoveryStatusBadge } from './AdminStatusBadge';
+import type { PaidOrderRecoveryRow } from './adminShopDashboardTypes';
 
-type OrderRecoveryQueuePanelProps = {
+type PaidOrderRecoveryQueuePanelProps = {
   mobileMode?: 'summary-link' | 'full-list';
-  rows?: OrderRecoveryRow[];
+  rows?: PaidOrderRecoveryRow[];
 };
 
-export default function OrderRecoveryQueuePanel({
+export default function PaidOrderRecoveryQueuePanel({
   mobileMode = 'full-list',
   rows = [],
-}: OrderRecoveryQueuePanelProps) {
+}: PaidOrderRecoveryQueuePanelProps) {
   const failedCount = rows.filter((row) => row.status === 'failed').length;
   const recoveryCount = rows.filter((row) => row.status === 'recovery').length;
   const latestRow = rows[0];
@@ -29,7 +29,7 @@ export default function OrderRecoveryQueuePanel({
     <AdminGlassPanel className='overflow-hidden'>
       <div className='flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3'>
         <div>
-          <h2 className='text-base font-semibold text-white'>Order Recovery Queue</h2>
+          <h2 className='text-base font-semibold text-white'>Paid Order Recovery Queue</h2>
           <p className='mt-1 text-xs text-slate-500'>Live ledger-backed paid order recovery queue.</p>
         </div>
         <div className={cn('items-center gap-2', mobileMode === 'summary-link' ? 'hidden md:flex' : 'flex')}>
@@ -39,7 +39,7 @@ export default function OrderRecoveryQueuePanel({
           </button>
           <button
             type='button'
-            aria-label='More order recovery actions'
+            aria-label='More paid order recovery actions'
             className='grid h-9 w-9 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200'
           >
             <MoreHorizontal size={16} />
@@ -50,13 +50,13 @@ export default function OrderRecoveryQueuePanel({
       {mobileMode === 'summary-link' ? (
         <div className='p-4 md:hidden'>
           <Link
-            href='/admin/shop/order-recovery'
-            data-testid='admin-mobile-order-recovery-queue-link'
+            href='/admin/shop/paid-order-recovery'
+            data-testid='admin-mobile-paid-order-recovery-queue-link'
             className='group block rounded-lg border border-cyan-300/18 bg-cyan-300/[0.05] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-cyan-300/35 hover:bg-cyan-300/[0.08]'
           >
             <div className='flex items-start justify-between gap-3'>
               <div>
-                <p className='text-sm font-semibold text-white'>Open order recovery</p>
+                <p className='text-sm font-semibold text-white'>Open paid order recovery</p>
                 <p className='mt-1 max-w-[18rem] text-xs leading-5 text-slate-400'>
                   Review paid, paused, failed, and provider-specific recovery rows.
                 </p>
@@ -85,7 +85,7 @@ export default function OrderRecoveryQueuePanel({
               <p className='text-slate-500'>Latest</p>
               <div className='mt-2 flex items-center justify-between gap-3'>
                 <p className='truncate font-medium text-slate-200'>{latestRow?.supportRef ?? '—'}</p>
-                {latestRow ? <AdminOrderRecoveryStatusBadge status={latestRow.status} /> : null}
+                {latestRow ? <AdminPaidOrderRecoveryStatusBadge status={latestRow.status} /> : null}
               </div>
             </div>
           </Link>
@@ -94,10 +94,10 @@ export default function OrderRecoveryQueuePanel({
         <div className='divide-y divide-white/10 md:hidden'>
           {rows.map((row) => (
             <Link
-              href={getOrderRecoveryDetailHref(row)}
+              href={getPaidOrderRecoveryDetailHref(row)}
               key={row.supportRef}
-              aria-label={`Open ${row.supportRef} order recovery details`}
-              data-testid={`admin-mobile-order-recovery-${row.supportRef}`}
+              aria-label={`Open ${row.supportRef} paid order recovery details`}
+              data-testid={`admin-mobile-paid-order-recovery-${row.supportRef}`}
               className='block w-full bg-slate-950/14 px-4 py-4 text-left transition hover:bg-white/[0.04]'
             >
               <div className='flex items-start justify-between gap-3'>
@@ -105,7 +105,7 @@ export default function OrderRecoveryQueuePanel({
                   <p className='truncate text-sm font-medium text-white'>{row.customer}</p>
                   <p className='mt-1 text-xs text-slate-500'>{row.supportRef}</p>
                 </div>
-                <AdminOrderRecoveryStatusBadge status={row.status} />
+                <AdminPaidOrderRecoveryStatusBadge status={row.status} />
               </div>
               <div className='mt-4 grid grid-cols-2 gap-3 text-xs'>
                 <div>
@@ -152,7 +152,7 @@ export default function OrderRecoveryQueuePanel({
             {rows.map((row) => (
               <tr key={row.supportRef} className='bg-slate-950/18 text-slate-300 transition hover:bg-cyan-300/[0.035]'>
                 <td className='px-4 py-3'>
-                  <AdminOrderRecoveryStatusBadge status={row.status} />
+                <AdminPaidOrderRecoveryStatusBadge status={row.status} />
                 </td>
                 <td className='px-4 py-3 font-medium text-slate-100'>{row.customer}</td>
                 <td className='px-4 py-3 whitespace-nowrap'>{row.amount}</td>
@@ -162,7 +162,7 @@ export default function OrderRecoveryQueuePanel({
                 <td className='px-4 py-3'>{row.updated}</td>
                 <td className='px-4 py-3'>
                   <Link
-                    href={getOrderRecoveryDetailHref(row)}
+              href={getPaidOrderRecoveryDetailHref(row)}
                     aria-label={`View ${row.supportRef}`}
                     className='inline-flex min-w-[78px] items-center justify-center gap-2 rounded-lg border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-2 text-xs font-medium whitespace-nowrap text-cyan-100 transition hover:border-cyan-300/40 hover:bg-cyan-300/10'
                   >
@@ -195,6 +195,6 @@ export default function OrderRecoveryQueuePanel({
   );
 }
 
-function getOrderRecoveryDetailHref(row: OrderRecoveryRow) {
-  return `/admin/shop/order-recovery/${encodeURIComponent(row.orderToken)}`;
+function getPaidOrderRecoveryDetailHref(row: PaidOrderRecoveryRow) {
+  return `/admin/shop/paid-order-recovery/${encodeURIComponent(row.orderToken)}`;
 }

@@ -8,7 +8,6 @@ import { ServerOrderDetailsContext } from '../ServerOrderDetailsComponent';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { usePayPalTXApproveCallback } from '@/lib/hooks/shopHooks/checkout/usePayPalTXApproveCallback';
 import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
-import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
 
 const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
@@ -21,7 +20,6 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
   const { first_name, last_name, email, delivery_address } = useShopCheckoutStore();
   const { mainPayPalApproveCallback } = usePayPalTXApproveCallback();
   const setIntent = usePayPalIntentStore((store) => store.setIntent);
-  const userId = useUserMainProfileStore((store) => store.userMainProfile?.id);
   const {
     djangoOrderIntentUuid,
     djangoOrderIntentOrderId,
@@ -60,7 +58,6 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
         customerEmail: email,
         delivery_address,
         cartItemCount: cart.length,
-        userId,
       });
 
       const response = await fetch('/next-api/paypal/tx-ledger/intent', {
@@ -76,7 +73,6 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
           country_iso_3: country_iso3 ?? 'USA',
           initialCurrency: currency ?? 'USD',
           delivery_address,
-          userId,
           djangoOrderIntentUuid,
           djangoOrderIntentOrderId,
           djangoOrderIntentPayload,
@@ -136,7 +132,6 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
     djangoOrderIntentPayload,
     djangoOrderIntentVerifyPayload,
     setIntent,
-    userId,
   ]);
 
   // Main JSX

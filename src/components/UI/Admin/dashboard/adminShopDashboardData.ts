@@ -15,13 +15,13 @@ import {
   Store,
   TimerReset,
 } from 'lucide-react';
-import type { MetricCard, NavItem, OrderRecoveryRow, TimelineItem } from './adminShopDashboardTypes';
+import type { MetricCard, NavItem, PaidOrderRecoveryRow, TimelineItem } from './adminShopDashboardTypes';
 
 export const adminShopNavItems: NavItem[] = [
   { label: 'Site Root', href: '/', icon: ArrowUpLeft },
   { label: 'Shop Overview', href: '/admin/shop', icon: Home },
-  { label: 'Order Recovery', href: '/admin/shop/order-recovery', icon: ClipboardList },
-  { label: 'Checkout Recovery', icon: LifeBuoy },
+  { label: 'Paid Order Recovery', href: '/admin/shop/paid-order-recovery', icon: ClipboardList },
+  { label: 'Checkout Recovery OTPs', icon: LifeBuoy },
   { label: 'Django OTP Intents', icon: ShieldCheck },
   { label: 'Merchize Fulfillment', icon: PackageCheck },
   { label: 'Failed Queue', icon: AlertTriangle, count: '12' },
@@ -40,17 +40,17 @@ export const adminShopNavItems: NavItem[] = [
 
 export const adminShopMetricCards: MetricCard[] = [
   {
-    title: 'Order Recovery',
+    title: 'Paid Order Recovery',
     metric: '1,248',
     caption: 'This month',
     action: 'Review Orders',
-    href: '/admin/shop/order-recovery',
+    href: '/admin/shop/paid-order-recovery',
     icon: ClipboardList,
     state: 'healthy',
     tone: 'blue',
   },
   {
-    title: 'Checkout Recovery',
+    title: 'Checkout Recovery OTPs',
     metric: '28',
     caption: 'Needs attention',
     action: 'Open Recoveries',
@@ -124,7 +124,7 @@ export const adminShopMetricCards: MetricCard[] = [
   },
 ];
 
-export const adminOrderRecoveryRows: OrderRecoveryRow[] = [
+export const adminPaidOrderRecoveryRows: PaidOrderRecoveryRow[] = [
   {
     orderToken: '45e493b8-c45b-4671-94dd-667dc8b0196b',
     status: 'failed',

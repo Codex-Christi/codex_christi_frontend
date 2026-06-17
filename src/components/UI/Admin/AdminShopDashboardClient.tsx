@@ -3,7 +3,7 @@
 import { useReducedMotion } from 'framer-motion';
 import AdminShopShell from './AdminShopShell';
 import AdminMetricCard from './dashboard/AdminMetricCard';
-import OrderRecoveryQueuePanel from './dashboard/OrderRecoveryQueuePanel';
+import PaidOrderRecoveryQueuePanel from './dashboard/PaidOrderRecoveryQueuePanel';
 import { adminShopMetricCards } from './dashboard/adminShopDashboardData';
 import type { AdminShopScope } from './dashboard/adminShopDashboardTypes';
 
@@ -33,7 +33,7 @@ export default function AdminShopDashboardClient({ scope }: AdminShopDashboardCl
             ))}
           </div>
 
-          <OrderRecoveryQueuePanel mobileMode='summary-link' />
+          <PaidOrderRecoveryQueuePanel mobileMode='summary-link' />
         </section>
       </div>
     </AdminShopShell>

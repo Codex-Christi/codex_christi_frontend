@@ -65,7 +65,7 @@ function getConfiguredAdminRecipients() {
 
 function buildAdminOrderRecoveryUrl(orderToken: string) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://codexchristi.org';
-  return `${baseUrl.replace(/\/+$/, '')}/admin/shop/order-recovery/${encodeURIComponent(orderToken)}`;
+  return `${baseUrl.replace(/\/+$/, '')}/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`;
 }
 
 function buildNotificationDedupeKey({

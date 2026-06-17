@@ -7,6 +7,7 @@ import {
   createPayPalOrder,
 } from '@/lib/paypal/createPayPalOrder';
 import { paypalRouteError, paypalRouteSuccess } from '@/lib/paypal/txLedger/routeResponses';
+import { getServerSessionState } from '@/lib/session/server-session';
 
 export async function POST(req: Request) {
   const requestId = randomUUID();
@@ -77,12 +78,13 @@ export async function POST(req: Request) {
       country_iso_3,
       initialCurrency,
       delivery_address,
-      userId,
       djangoOrderIntentUuid,
       djangoOrderIntentOrderId,
       djangoOrderIntentPayload,
       djangoOrderIntentVerifyPayload,
     } = body;
+    const sessionState = await getServerSessionState();
+    const authenticatedUserId = sessionState.isAuthenticated ? sessionState.userID : null;
 
     if (!Array.isArray(cart) || cart.length === 0) {
       return validationError('INVALID_CART', 'Cart required');
@@ -102,7 +104,7 @@ export async function POST(req: Request) {
         status: PAYPAL_LEDGER_STATUS.INTENT_CREATING,
         customerName: customer.name,
         customerEmail: customer.email,
-        userId: userId ?? null,
+        userId: authenticatedUserId,
         djangoOrderIntentUuid: djangoOrderIntentUuid ?? null,
         djangoOrderIntentOrderId: djangoOrderIntentOrderId ?? null,
         djangoOrderIntentPayload: djangoOrderIntentPayload ?? null,

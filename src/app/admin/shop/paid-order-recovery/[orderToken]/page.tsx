@@ -3,33 +3,33 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import AdminShopShell from '@/components/UI/Admin/AdminShopShell';
-import OrderRecoveryDetailPanel from '@/components/UI/Admin/dashboard/OrderRecoveryDetailPanel';
+import PaidOrderRecoveryDetailPanel from '@/components/UI/Admin/dashboard/PaidOrderRecoveryDetailPanel';
 import CometsContainer from '@/components/UI/general/CometsContainer';
-import { getAdminOrderRecoveryDetail } from '@/lib/paypal/txLedger/adminOrderRecovery';
+import { getAdminPaidOrderRecoveryDetail } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
 
-type OrderRecoveryDetailPageProps = {
+type PaidOrderRecoveryDetailPageProps = {
   params: Promise<{ orderToken: string }>;
 };
 
 export async function generateMetadata({
   params,
-}: OrderRecoveryDetailPageProps): Promise<Metadata> {
+}: PaidOrderRecoveryDetailPageProps): Promise<Metadata> {
   const { orderToken } = await params;
-  const recovery = await getAdminOrderRecoveryDetail(orderToken);
+  const recovery = await getAdminPaidOrderRecoveryDetail(orderToken);
 
   return {
     title: recovery?.row
-      ? `${recovery.row.supportRef} | Order Recovery | Codex Christi Admin`
-      : 'Order Recovery Detail | Codex Christi Admin',
-    description: 'Order recovery detail workspace for support and admin operations.',
+      ? `${recovery.row.supportRef} | Paid Order Recovery | Codex Christi Admin`
+      : 'Paid Order Recovery Detail | Codex Christi Admin',
+    description: 'Paid order recovery detail workspace for support and admin operations.',
   };
 }
 
-export default async function AdminOrderRecoveryDetailPage({
+export default async function AdminPaidOrderRecoveryDetailPage({
   params,
-}: OrderRecoveryDetailPageProps) {
+}: PaidOrderRecoveryDetailPageProps) {
   const { orderToken } = await params;
-  const recovery = await getAdminOrderRecoveryDetail(orderToken);
+  const recovery = await getAdminPaidOrderRecoveryDetail(orderToken);
 
   if (!recovery) {
     notFound();
@@ -38,22 +38,23 @@ export default async function AdminOrderRecoveryDetailPage({
   return (
     <CometsContainer>
       <AdminShopShell
-        scope='shop-order-recovery'
-        title='Order Recovery Detail'
+        scope='shop-paid-order-recovery'
+        title='Paid Order Recovery Detail'
         subtitle='Inspect timeline, provider state, failure context, and admin recovery actions'
       >
         <div className='px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
           <section className='mx-auto max-w-[1500px] space-y-4'>
             <Link
-              href='/admin/shop/order-recovery'
+              href='/admin/shop/paid-order-recovery'
               className='inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-200 transition hover:border-cyan-300/30 hover:text-cyan-100'
             >
               <ArrowLeft size={16} />
-              Order recovery queue
+              Paid order recovery queue
             </Link>
 
-            <OrderRecoveryDetailPanel
+            <PaidOrderRecoveryDetailPanel
               recovery={recovery.row}
+              detail={recovery.detail}
               timeline={recovery.timeline}
               notifications={recovery.notifications.map((notification) => ({
                 id: notification.id,

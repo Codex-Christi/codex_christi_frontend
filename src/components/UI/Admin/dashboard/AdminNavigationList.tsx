@@ -86,8 +86,8 @@ function isAdminNavItemActive(item: NavItem, scope: AdminShopScope) {
     return scope === 'shop';
   }
 
-  if (item.label === 'Order Recovery') {
-    return scope === 'shop-order-recovery';
+  if (item.label === 'Paid Order Recovery') {
+    return scope === 'shop-paid-order-recovery';
   }
 
   return scope === 'shop-catalog-snapshots' && item.label === 'Catalog & Snapshots';

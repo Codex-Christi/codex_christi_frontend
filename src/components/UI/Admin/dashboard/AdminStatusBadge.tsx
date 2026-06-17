@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import type { OrderRecoveryRow, ToolState } from './adminShopDashboardTypes';
+import type { PaidOrderRecoveryRow, ToolState } from './adminShopDashboardTypes';
 
 const toolStateLabel: Record<ToolState, string> = {
   healthy: 'Healthy',
@@ -23,7 +23,7 @@ const toolStateClass: Record<ToolState, string> = {
   warning: 'border-amber-300/20 bg-amber-400/12 text-amber-200',
 };
 
-const orderRecoveryStatusClass: Record<OrderRecoveryRow['status'], string> = {
+const paidOrderRecoveryStatusClass: Record<PaidOrderRecoveryRow['status'], string> = {
   failed: 'border-rose-300/20 bg-rose-400/12 text-rose-200',
   recovery: 'border-amber-300/20 bg-amber-400/12 text-amber-200',
   pending: 'border-blue-300/20 bg-blue-400/12 text-blue-200',
@@ -38,12 +38,16 @@ export function AdminToolStateBadge({ state }: { state: ToolState }) {
   );
 }
 
-export function AdminOrderRecoveryStatusBadge({ status }: { status: OrderRecoveryRow['status'] }) {
+export function AdminPaidOrderRecoveryStatusBadge({
+  status,
+}: {
+  status: PaidOrderRecoveryRow['status'];
+}) {
   return (
     <span
       className={cn(
         'rounded-md border px-2 py-1 text-[11px] uppercase whitespace-nowrap',
-        orderRecoveryStatusClass[status],
+        paidOrderRecoveryStatusClass[status],
       )}
     >
       {status}

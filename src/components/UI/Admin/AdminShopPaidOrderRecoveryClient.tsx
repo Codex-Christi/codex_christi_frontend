@@ -3,18 +3,20 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import AdminShopShell from './AdminShopShell';
-import OrderRecoveryQueuePanel from './dashboard/OrderRecoveryQueuePanel';
-import type { OrderRecoveryRow } from './dashboard/adminShopDashboardTypes';
+import PaidOrderRecoveryQueuePanel from './dashboard/PaidOrderRecoveryQueuePanel';
+import type { PaidOrderRecoveryRow } from './dashboard/adminShopDashboardTypes';
 
-type AdminShopOrderRecoveryClientProps = {
-  rows: OrderRecoveryRow[];
+type AdminShopPaidOrderRecoveryClientProps = {
+  rows: PaidOrderRecoveryRow[];
 };
 
-export default function AdminShopOrderRecoveryClient({ rows }: AdminShopOrderRecoveryClientProps) {
+export default function AdminShopPaidOrderRecoveryClient({
+  rows,
+}: AdminShopPaidOrderRecoveryClientProps) {
   return (
     <AdminShopShell
-      scope='shop-order-recovery'
-      title='Order Recovery'
+      scope='shop-paid-order-recovery'
+      title='Paid Order Recovery'
       subtitle='Provider-neutral queue for paid, paused, failed, and recoverable orders'
     >
       <div className='px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
@@ -27,7 +29,7 @@ export default function AdminShopOrderRecoveryClient({ rows }: AdminShopOrderRec
             Shop dashboard
           </Link>
 
-          <OrderRecoveryQueuePanel mobileMode='full-list' rows={rows} />
+          <PaidOrderRecoveryQueuePanel mobileMode='full-list' rows={rows} />
         </section>
       </div>
     </AdminShopShell>
