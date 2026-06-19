@@ -5,6 +5,7 @@ import AdminNotificationHistoryPanel from './AdminNotificationHistoryPanel';
 import AdminPaidOrderRecoveryActionsPanel from './AdminPaidOrderRecoveryActionsPanel';
 import { AdminPaidOrderRecoveryStatusBadge } from './AdminStatusBadge';
 import {
+  PaidOrderRecoveryActivitySection,
   PaidOrderRecoveryPrimaryContextSections,
   PaidOrderRecoverySecondaryContextSections,
 } from './PaidOrderRecoveryDetailSections';
@@ -105,12 +106,13 @@ export default function PaidOrderRecoveryDetailPanel({
               detail={detail}
               orderToken={recovery.orderToken}
             />
+            <PaidOrderRecoveryActivitySection detail={detail} />
+            <NotificationsPanel notifications={notifications} orderToken={recovery.orderToken} />
           </div>
 
           <div className='space-y-4'>
             <RecoveryActionsPanel recovery={recovery} detail={detail} />
             <PaidOrderRecoverySecondaryContextSections detail={detail} />
-            <NotificationsPanel notifications={notifications} orderToken={recovery.orderToken} />
           </div>
         </div>
       </div>

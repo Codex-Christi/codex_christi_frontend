@@ -34,9 +34,12 @@ export function PaidOrderRecoverySecondaryContextSections({
   return (
     <div className='space-y-4'>
       <ReferencePanel detail={detail} />
-      <ActivityPanel activity={detail.activity} />
     </div>
   );
+}
+
+export function PaidOrderRecoveryActivitySection({ detail }: { detail: PaidOrderRecoveryDetail }) {
+  return <ActivityPanel activity={detail.activity} />;
 }
 
 function OrderContextPanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
