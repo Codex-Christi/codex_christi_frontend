@@ -40,7 +40,6 @@ const Hero = () => {
           type='image/webp'
         />
         <source srcSet='/media/img/general/logo-main-384.webp' type='image/webp' />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           alt='Hero Logo Image'
           className='block h-auto w-[11rem] md:w-[18rem] lg:w-[22rem]'

@@ -59,12 +59,6 @@ const ProductDetails: FC<ProductDetailsProps> = ({
   const [variantLoadError, setVariantLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    setProductVariants(fetchedProductData.productVariants);
-    setVariantLoadState(fetchedProductData.productVariants.length > 0 ? 'ready' : 'loading');
-    setVariantLoadError(null);
-  }, [fetchedProductData.productVariants, productId]);
-
-  useEffect(() => {
     if (productVariants.length > 0) return;
 
     let cancelled = false;

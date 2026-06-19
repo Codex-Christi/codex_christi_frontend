@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CategoryProductDetail } from '@/app/shop/category/[id]/categoryDetailsSSR';
 import ProductCard from './ProductCard';
@@ -15,20 +15,15 @@ export default function ProductList({
   initialData: CategoryProductDetail[];
 }) {
   const router = useRouter();
-  const [data, setData] = useState(initialData);
   const [isPending, startTransition] = useTransition();
-
-  useEffect(() => {
-    setData(initialData);
-  }, [initialData]);
 
   return (
     <>
       <div className='mt-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 min-[900px]:grid-cols-3 xl:!grid-cols-4 gap-6'>
-        {isPending && !data.length ? (
+        {isPending && !initialData.length ? (
           <Skeleton count={count} />
         ) : (
-          data.map((product, index) => (
+          initialData.map((product, index) => (
             <ProductCard key={product._id} product={product} priority={index < 4} />
           ))
         )}

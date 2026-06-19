@@ -55,6 +55,7 @@ export default function ProductDetailsShell({
       </div>
 
       <ProductPurchasePanel
+        key={productId}
         productId={productId}
         fetchedProductData={fetchedProductData}
         initialImageUrls={initialImageUrls}
