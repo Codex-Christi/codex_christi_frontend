@@ -2,12 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useTransition, type ReactNode } from 'react';
-import {
-  CheckCircle2,
-  ClipboardList,
-  DatabaseZap,
-  RefreshCw,
-} from 'lucide-react';
+import { CheckCircle2, ClipboardList, DatabaseZap, RefreshCw, SearchCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import errorToast from '@/lib/error-toast';
 import loadingToast from '@/lib/loading-toast';
@@ -19,11 +14,13 @@ import type { AdminIcon } from './adminShopDashboardTypes';
 type AdminRecoveryActionsPanelProps = {
   orderToken: string;
   isCompleted: boolean;
+  needsProviderDetailSync: boolean;
 };
 
 export default function AdminPaidOrderRecoveryActionsPanel({
   orderToken,
   isCompleted,
+  needsProviderDetailSync,
 }: AdminRecoveryActionsPanelProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -65,14 +62,20 @@ export default function AdminPaidOrderRecoveryActionsPanel({
 
   return (
     <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2'>
-      <ActionButton
-        icon={RefreshCw}
-        tone='cyan'
-        disabled={isPending || isCompleted}
-        onClick={handleRetry}
-      >
-        {isCompleted ? 'Already Completed' : isPending ? 'Retrying...' : 'Retry Fulfillment'}
-      </ActionButton>
+      {needsProviderDetailSync ? (
+        <ActionButton icon={SearchCheck} tone='cyan' disabled>
+          Sync Provider Details
+        </ActionButton>
+      ) : (
+        <ActionButton
+          icon={RefreshCw}
+          tone='cyan'
+          disabled={isPending || isCompleted}
+          onClick={handleRetry}
+        >
+          {isCompleted ? 'Already Completed' : isPending ? 'Retrying...' : 'Retry Fulfillment'}
+        </ActionButton>
+      )}
 
       <ActionButton icon={DatabaseZap} disabled>
         View in Ledger
@@ -85,6 +88,13 @@ export default function AdminPaidOrderRecoveryActionsPanel({
       <ActionButton icon={CheckCircle2} disabled>
         Mark Resolved
       </ActionButton>
+
+      {needsProviderDetailSync ? (
+        <p className='sm:col-span-2 xl:col-span-1 2xl:col-span-2 rounded-lg border border-cyan-300/14 bg-cyan-300/[0.05] px-3 py-2 text-xs leading-5 text-cyan-50/80'>
+          Fulfillment was already accepted. Do not retry the full pipeline; reconcile the provider
+          order through Merchize detail sync.
+        </p>
+      ) : null}
     </div>
   );
 }

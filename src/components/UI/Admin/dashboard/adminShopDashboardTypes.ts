@@ -37,13 +37,14 @@ export type NavItem = {
 
 export type PaidOrderRecoveryRow = {
   orderToken: string;
-  status: 'failed' | 'recovery' | 'pending' | 'completed';
+  status: 'failed' | 'recovery' | 'pending' | 'completed' | 'sync';
   customer: string;
   amount: string;
   step: string;
   error: string;
   supportRef: string;
   updated: string;
+  needsProviderDetailSync?: boolean;
 };
 
 export type TimelineItem = {
@@ -98,6 +99,7 @@ export type PaidOrderRecoveryDetail = {
   references: PaidOrderRecoveryReference[];
   activity: PaidOrderRecoveryActivityItem[];
   rawDebug: Record<string, unknown>;
+  needsProviderDetailSync: boolean;
 };
 
 export type AdminNotificationHistoryItem = {

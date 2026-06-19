@@ -28,11 +28,22 @@ const paidOrderRecoveryStatusClass: Record<PaidOrderRecoveryRow['status'], strin
   recovery: 'border-amber-300/20 bg-amber-400/12 text-amber-200',
   pending: 'border-blue-300/20 bg-blue-400/12 text-blue-200',
   completed: 'border-emerald-300/20 bg-emerald-400/12 text-emerald-200',
+  sync: 'border-cyan-300/20 bg-cyan-400/12 text-cyan-100',
+};
+
+const paidOrderRecoveryStatusLabel: Record<PaidOrderRecoveryRow['status'], string> = {
+  failed: 'failed',
+  recovery: 'recovery',
+  pending: 'pending',
+  completed: 'completed',
+  sync: 'sync needed',
 };
 
 export function AdminToolStateBadge({ state }: { state: ToolState }) {
   return (
-    <span className={cn('rounded-md border px-2.5 py-1 text-xs font-medium', toolStateClass[state])}>
+    <span
+      className={cn('rounded-md border px-2.5 py-1 text-xs font-medium', toolStateClass[state])}
+    >
       {toolStateLabel[state]}
     </span>
   );
@@ -50,7 +61,7 @@ export function AdminPaidOrderRecoveryStatusBadge({
         paidOrderRecoveryStatusClass[status],
       )}
     >
-      {status}
+      {paidOrderRecoveryStatusLabel[status]}
     </span>
   );
 }

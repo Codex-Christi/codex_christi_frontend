@@ -101,6 +101,35 @@ function isFulfillmentBusinessFailure(error: unknown): error is {
   );
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function getStringPath(root: unknown, path: string[]) {
+  const value = path.reduce<unknown>((current, key) => asRecord(current)?.[key], root);
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+export function getMerchizeOrderIdentifiersFromDjangoProcessingResponse(
+  response: OrderProcessingAPIResponse,
+) {
+  const djangoData = response.data;
+  const responseData = djangoData?.response_data;
+  const wrappedMerchizeOrderId = getStringPath(responseData, ['data', 'data', 'order_id']);
+
+  return {
+    merchizeExternalOrderNumber:
+      wrappedMerchizeOrderId ??
+      djangoData?.order_intent_order_id ??
+      djangoData?.order_payment_custom_id,
+    merchizeProviderOrderId: djangoData?.provider_order_id ?? null,
+    merchizeProviderOrderCode: djangoData?.provider_order_code ?? wrappedMerchizeOrderId,
+    merchizeProviderStatus: getStringPath(responseData, ['data', 'status']),
+  };
+}
+
 function mapCartToProcessingItems(cart: CartVariant[], currency: string): OrderProcessingItem[] {
   return cart.map((item) => ({
     product_id: item.itemDetail.product ?? item.variantId,
@@ -234,5 +263,9 @@ export async function sendMerchizeFulfillmentOrder(args: MerchizeFulfillmentOrde
     throw new Error(response.error?.message ?? 'Fulfillment push failed');
   }
 
-  return { ...response, requestPayload };
+  return {
+    ...response,
+    requestPayload,
+    merchizeOrderIdentifiers: getMerchizeOrderIdentifiersFromDjangoProcessingResponse(response),
+  };
 }

@@ -36,6 +36,7 @@ export interface ShopCheckoutState extends ShopCheckoutStoreInterface {
   setShippingCountryISO3: (iso3: string | null) => void; // <-- NEW: single writer for country
   hydrateFromShopProfile: (profile: IUserShopProfile, fallbackEmail?: string | null) => void;
   clearCheckout: () => void;
+  resetCheckoutToStoreDefaults: () => void;
   resetCheckoutToInitial: () => void;
 }
 
@@ -87,24 +88,23 @@ const initialObj = {
   },
 };
 
+function getProfileBackedCheckoutDefaults(): ShopCheckoutStoreInterface {
+  const userProfile = useUserMainProfileStore.getState().userMainProfile;
+
+  return {
+    ...initialObj,
+    first_name: userProfile?.first_name ?? '',
+    last_name: userProfile?.last_name ?? '',
+    email: userProfile?.email ?? '',
+    payment_method: null,
+  };
+}
+
 export const useShopCheckoutStore = create<ShopCheckoutState>()(
   persist(
     (set) => {
-      // Always initialize with non-undefined values
-      const userProfile = useUserMainProfileStore.getState().userMainProfile;
       return {
-        first_name: userProfile?.first_name ?? '',
-        last_name: userProfile?.last_name ?? '',
-        email: userProfile?.email ?? '',
-        payment_method: null,
-        delivery_address: {
-          shipping_address_line_1: null,
-          shipping_address_line_2: null,
-          shipping_city: null,
-          shipping_state: null,
-          shipping_country: null,
-          zip_code: null,
-        },
+        ...getProfileBackedCheckoutDefaults(),
         setFirstName: (first_name) => set({ first_name }),
         setLastName: (last_name) => set({ last_name }),
         setEmail: (email) => set({ email }),
@@ -137,14 +137,11 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
           }));
         },
         clearCheckout: () => {
-          set({
-            ...initialObj,
-            first_name: useUserMainProfileStore.getState().userMainProfile?.first_name || '',
-            last_name: useUserMainProfileStore.getState().userMainProfile?.last_name || '',
-            email: useUserMainProfileStore.getState().userMainProfile?.email || '',
-            payment_method: null,
-          });
+          set(getProfileBackedCheckoutDefaults());
           localStorage.removeItem('checkout-storage');
+        },
+        resetCheckoutToStoreDefaults: () => {
+          set(getProfileBackedCheckoutDefaults());
         },
         resetCheckoutToInitial: () => {
           set({ ...initialObj });

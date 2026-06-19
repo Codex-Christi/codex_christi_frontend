@@ -24,6 +24,7 @@ const ADMIN_RECOVERY_STATUSES = [
 ] as const;
 
 type JsonRecord = Record<string, unknown>;
+const ACCEPTED_DJANGO_FULFILLMENT_INFO_MESSAGE = 'order created but details not available';
 
 function asRecord(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : null;
@@ -31,7 +32,8 @@ function asRecord(value: unknown): JsonRecord | null {
 
 function asNumber(value: unknown) {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value)))
+    return Number(value);
   return null;
 }
 
@@ -46,6 +48,35 @@ function getPath(root: unknown, path: Array<string | number>) {
   }, root);
 }
 
+function normalizeFulfillmentMessage(value: unknown) {
+  return asString(value)?.trim().toLowerCase() ?? '';
+}
+
+export function isAcceptedDjangoFulfillmentProcessResponse(payload: unknown) {
+  const response = asRecord(payload);
+  const data = asRecord(response?.data);
+  const status = asNumber(response?.status);
+  const errorMessage = normalizeFulfillmentMessage(data?.error_message);
+
+  return (
+    (status === 200 || status === 201) &&
+    response?.success === true &&
+    normalizeFulfillmentMessage(data?.processing_status) === 'completed' &&
+    (!errorMessage || errorMessage === ACCEPTED_DJANGO_FULFILLMENT_INFO_MESSAGE)
+  );
+}
+
+function needsProviderDetailSync(payload: unknown, merchizeProviderOrderId?: string | null) {
+  return isAcceptedDjangoFulfillmentProcessResponse(payload) && !merchizeProviderOrderId;
+}
+
+function getMerchizeOrderCodeFromFulfillmentResponse(payload: unknown) {
+  return (
+    asString(getPath(payload, ['data', 'response_data', 'data', 'data', 'order_id'])) ??
+    asString(getPath(payload, ['response_data', 'data', 'data', 'order_id']))
+  );
+}
+
 function getCaptureAmount(capturePayload: unknown, fallbackCurrency?: string | null) {
   const amountPaths = [
     ['amount'],
@@ -58,7 +89,8 @@ function getCaptureAmount(capturePayload: unknown, fallbackCurrency?: string | n
   for (const path of amountPaths) {
     const amount = asRecord(getPath(capturePayload, path));
     const value = asNumber(amount?.value);
-    const currency = asString(amount?.currencyCode) ?? asString(amount?.currency_code) ?? fallbackCurrency;
+    const currency =
+      asString(amount?.currencyCode) ?? asString(amount?.currency_code) ?? fallbackCurrency;
 
     if (value !== null && currency) {
       try {
@@ -84,7 +116,10 @@ function mapLedgerStatusToAdminStatus(status: string): PaidOrderRecoveryRow['sta
   ) {
     return 'failed';
   }
-  if (status === PAYPAL_LEDGER_STATUS.CAPTURED || status === PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED) {
+  if (
+    status === PAYPAL_LEDGER_STATUS.CAPTURED ||
+    status === PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED
+  ) {
     return 'recovery';
   }
   return 'pending';
@@ -120,19 +155,29 @@ function mapLedgerRowToPaidOrderRecoveryRow(row: {
   status: string;
   capturePayload: unknown;
   initialCurrency: string | null;
+  merchizeFulfillmentResponsePayload: unknown;
+  merchizeProviderOrderId?: string | null;
   lastErrorCode: string | null;
   lastErrorMessage: string | null;
   updatedAt: Date;
 }): PaidOrderRecoveryRow {
+  const providerDetailSyncNeeded = needsProviderDetailSync(
+    row.merchizeFulfillmentResponsePayload,
+    row.merchizeProviderOrderId,
+  );
+
   return {
     orderToken: row.orderToken,
-    status: mapLedgerStatusToAdminStatus(row.status),
+    status: providerDetailSyncNeeded ? 'sync' : mapLedgerStatusToAdminStatus(row.status),
     customer: row.customerEmail || row.customerName,
     amount: getCaptureAmount(row.capturePayload, row.initialCurrency),
-    step: getStepLabel(row.status),
-    error: getErrorLabel(row.lastErrorCode, row.lastErrorMessage),
+    step: providerDetailSyncNeeded ? 'Provider Detail Sync' : getStepLabel(row.status),
+    error: providerDetailSyncNeeded
+      ? 'Fulfillment accepted; sync provider details'
+      : getErrorLabel(row.lastErrorCode, row.lastErrorMessage),
     supportRef: row.orderToken.slice(0, 8).toUpperCase(),
     updated: formatUpdated(row.updatedAt),
+    needsProviderDetailSync: providerDetailSyncNeeded,
   };
 }
 
@@ -144,10 +189,14 @@ function buildTimeline(row: {
   receiptLink: string | null;
   djangoPaymentSaveCustomId: string | null;
   lastErrorCode: string | null;
+  merchizeFulfillmentResponsePayload: unknown;
+  merchizeProviderOrderId: string | null;
 }) {
   const created = formatTimelineDate(row.createdAt);
   const updated = formatTimelineDate(row.updatedAt);
-  const completed = row.processingCompletedAt ? formatTimelineDate(row.processingCompletedAt) : 'Pending';
+  const completed = row.processingCompletedAt
+    ? formatTimelineDate(row.processingCompletedAt)
+    : 'Pending';
 
   const items: TimelineItem[] = [
     { label: 'Payment Ledger Created', time: created, state: 'done' },
@@ -164,6 +213,14 @@ function buildTimeline(row: {
   ];
 
   if (
+    needsProviderDetailSync(row.merchizeFulfillmentResponsePayload, row.merchizeProviderOrderId)
+  ) {
+    items.push({
+      label: 'Fulfillment Accepted; Provider Details Pending',
+      time: updated,
+      state: 'pending',
+    });
+  } else if (
     row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED ||
     row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED ||
     row.status === PAYPAL_LEDGER_STATUS.ERROR
@@ -244,7 +301,8 @@ function getCartItems(cartSnapshot: unknown, currency: string | null): PaidOrder
     return {
       id: asString(record?.variantId) ?? `item-${index}`,
       title: asString(record?.title) ?? asString(itemDetail?.title) ?? 'Untitled item',
-      variant: variant || asString(itemDetail?.sku) || asString(itemDetail?.sku_seller) || 'Standard',
+      variant:
+        variant || asString(itemDetail?.sku) || asString(itemDetail?.sku_seller) || 'Standard',
       quantity: asNumber(record?.quantity) ?? 1,
       unitPrice: formatCurrency(unitPrice, currency),
       image:
@@ -308,7 +366,8 @@ function buildActivity(row: {
   if (row.fulfillmentAddressOverriddenAt) {
     activity.push({
       label: 'Fulfillment address overridden',
-      description: row.fulfillmentAddressOverrideReason ?? 'Admin saved a fulfillment address override.',
+      description:
+        row.fulfillmentAddressOverrideReason ?? 'Admin saved a fulfillment address override.',
       time: formatLongDate(row.fulfillmentAddressOverriddenAt),
       tone: 'amber',
     });
@@ -352,6 +411,7 @@ function buildDetail(row: {
   djangoOrderIntentUuid: string | null;
   djangoOrderIntentOrderId: string | null;
   djangoPaymentSaveCustomId: string | null;
+  merchizeFulfillmentResponsePayload: unknown;
   merchizeFulfillmentProcessingId: string | null;
   merchizeProviderOrderId: string | null;
   merchizeProviderOrderCode: string | null;
@@ -364,6 +424,14 @@ function buildDetail(row: {
   const originalAddress = normalizeAddress(row.shippingSnapshot);
   const overrideAddress = normalizeAddress(row.fulfillmentAddressOverride);
   const activeAddress = overrideAddress ?? originalAddress;
+  const merchizeProviderOrderId = row.merchizeProviderOrderId;
+  const merchizeExternalOrderNumber =
+    row.merchizeProviderOrderCode ??
+    getMerchizeOrderCodeFromFulfillmentResponse(row.merchizeFulfillmentResponsePayload);
+  const providerDetailSyncNeeded = needsProviderDetailSync(
+    row.merchizeFulfillmentResponsePayload,
+    merchizeProviderOrderId,
+  );
 
   return {
     customerName: row.customerName,
@@ -388,10 +456,11 @@ function buildDetail(row: {
       { label: 'Django order intent order ID', value: row.djangoOrderIntentOrderId },
       { label: 'Django payment save custom ID', value: row.djangoPaymentSaveCustomId },
       { label: 'Merchize processing ID', value: row.merchizeFulfillmentProcessingId },
-      { label: 'Merchize provider order ID', value: row.merchizeProviderOrderId },
-      { label: 'Merchize provider order code', value: row.merchizeProviderOrderCode },
+      { label: 'Merchize platform order ID', value: merchizeProviderOrderId },
+      { label: 'Merchize external order number', value: merchizeExternalOrderNumber },
     ],
     activity: buildActivity(row),
+    needsProviderDetailSync: providerDetailSyncNeeded,
     rawDebug: {
       orderToken: row.orderToken,
       userId: row.userId,
@@ -404,8 +473,9 @@ function buildDetail(row: {
       djangoOrderIntentOrderId: row.djangoOrderIntentOrderId,
       djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
       merchizeFulfillmentProcessingId: row.merchizeFulfillmentProcessingId,
-      merchizeProviderOrderId: row.merchizeProviderOrderId,
-      merchizeProviderOrderCode: row.merchizeProviderOrderCode,
+      merchizeProviderOrderId,
+      merchizeExternalOrderNumber,
+      needsProviderDetailSync: providerDetailSyncNeeded,
     },
   };
 }
@@ -428,6 +498,8 @@ export async function listAdminPaidOrderRecoveryRows() {
       status: true,
       capturePayload: true,
       initialCurrency: true,
+      merchizeFulfillmentResponsePayload: true,
+      merchizeProviderOrderId: true,
       lastErrorCode: true,
       lastErrorMessage: true,
       updatedAt: true,
@@ -441,10 +513,7 @@ export async function getAdminPaidOrderRecoveryDetail(orderToken: string) {
   const decodedOrderToken = decodeURIComponent(orderToken);
   const row = await paypalTxLedger.paypalIntent.findFirst({
     where: {
-      OR: [
-        { orderToken: decodedOrderToken },
-        { orderToken: { startsWith: decodedOrderToken } },
-      ],
+      OR: [{ orderToken: decodedOrderToken }, { orderToken: { startsWith: decodedOrderToken } }],
     },
   });
 

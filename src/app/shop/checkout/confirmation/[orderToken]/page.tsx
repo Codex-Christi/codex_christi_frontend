@@ -58,9 +58,12 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
   const [hasHydratedFromLedger, setHasHydratedFromLedger] = useState(false);
   const [processingState, setProcessingState] = useState<MappedProcessingState | null>(null);
   const clearCart = useCartStore((store) => store.clearCart);
-  const resetCheckoutToInitial = useShopCheckoutStore((store) => store.resetCheckoutToInitial);
+  const resetCheckoutToStoreDefaults = useShopCheckoutStore(
+    (store) => store.resetCheckoutToStoreDefaults,
+  );
   const clearVerifiedEmails = useVerifiedEmailsStore((store) => store.clearStore);
   const clearDjangoOrderIntent = useDjangoOrderIntentStore((store) => store.clearDjangoOrderIntent);
+  const activeLocalOrderToken = usePayPalIntentStore((store) => store.orderToken);
   const clearIntent = usePayPalIntentStore((store) => store.clearIntent);
   const flowStatus = processingState?.flowStatus ?? 'processing';
   const steps =
@@ -147,17 +150,21 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
   }, [canDownloadReceipt, receiptFileName, receiptLink]);
 
   const resetCheckoutRelatedStoresAndVars = useCallback(() => {
+    if (!routeOrderToken || activeLocalOrderToken !== routeOrderToken) return;
+
     clearIntent();
     clearVerifiedEmails();
     clearDjangoOrderIntent();
     clearCart();
-    resetCheckoutToInitial();
+    resetCheckoutToStoreDefaults();
   }, [
     clearCart,
     clearIntent,
     clearDjangoOrderIntent,
     clearVerifiedEmails,
-    resetCheckoutToInitial,
+    resetCheckoutToStoreDefaults,
+    activeLocalOrderToken,
+    routeOrderToken,
   ]);
 
   const copySupportReference = useCallback(async () => {

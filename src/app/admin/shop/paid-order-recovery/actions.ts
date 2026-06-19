@@ -6,11 +6,10 @@ import {
   suppressAdminRecoveryNotification,
 } from '@/lib/paypal/txLedger/adminNotificationOutbox';
 import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
+import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 
-type AdminNotificationActionResult =
-  | { ok: true; message: string }
-  | { ok: false; error: string };
+type AdminNotificationActionResult = { ok: true; message: string } | { ok: false; error: string };
 
 export async function resendAdminRecoveryNotificationAction({
   notificationId,
@@ -79,6 +78,7 @@ export async function retryAdminPaidOrderRecoveryAction({
         status: true,
         processingCompletedAt: true,
         postProcessingLockExpiresAt: true,
+        merchizeFulfillmentResponsePayload: true,
       },
     });
 
@@ -100,6 +100,14 @@ export async function retryAdminPaidOrderRecoveryAction({
       return {
         ok: false,
         error: 'This order is already being processed.',
+      };
+    }
+
+    if (isAcceptedDjangoFulfillmentProcessResponse(existing.merchizeFulfillmentResponsePayload)) {
+      return {
+        ok: false,
+        error:
+          'Fulfillment was already accepted. Sync Merchize provider details instead of retrying full post-processing.',
       };
     }
 
@@ -167,7 +175,13 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
       };
     }
 
-    if (!address.line1.trim() || !address.city.trim() || !address.state.trim() || !address.postalCode.trim() || !address.country.trim()) {
+    if (
+      !address.line1.trim() ||
+      !address.city.trim() ||
+      !address.state.trim() ||
+      !address.postalCode.trim() ||
+      !address.country.trim()
+    ) {
       return {
         ok: false,
         error: 'Address line, city, state, postal code, and country are required.',

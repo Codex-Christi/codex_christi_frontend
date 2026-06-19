@@ -65,16 +65,53 @@ export interface OrderProcessingAPIResponse {
   };
 }
 
+const ACCEPTED_INFORMATIONAL_MESSAGES = new Set(['order created but details not available']);
+const IDEMPOTENT_PROVIDER_MESSAGES = new Set(['order is duplicated']);
+
+function normalizeProviderMessage(message: string | null | undefined) {
+  return message?.trim().toLowerCase() ?? '';
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function getNestedProviderErrorMessage(response: OrderProcessingAPIResponse) {
+  const responseData = asRecord(response.data?.response_data);
+  const providerData = asRecord(responseData?.data);
+  const nestedError = providerData?.error;
+
+  return typeof nestedError === 'string' ? nestedError : null;
+}
+
+function isAcceptedInformationalMessage(message: string | null | undefined) {
+  return ACCEPTED_INFORMATIONAL_MESSAGES.has(normalizeProviderMessage(message));
+}
+
+function isIdempotentProviderMessage(message: string | null | undefined) {
+  return IDEMPOTENT_PROVIDER_MESSAGES.has(normalizeProviderMessage(message));
+}
+
 function isDjangoFulfillmentBusinessSuccess(response: OrderProcessingAPIResponse) {
+  const nestedProviderError = getNestedProviderErrorMessage(response);
+
+  if (isIdempotentProviderMessage(nestedProviderError)) {
+    return response.success === true;
+  }
+
+  if (response.success !== true) return false;
+  if (response.data?.processing_status === 'failed') return false;
+
   return (
-    response.success === true &&
-    response.data?.processing_status !== 'failed' &&
-    !response.data?.error_message
+    !response.data?.error_message || isAcceptedInformationalMessage(response.data.error_message)
   );
 }
 
 function getDjangoFulfillmentFailureMessage(response: OrderProcessingAPIResponse) {
   return (
+    getNestedProviderErrorMessage(response) ||
     response.data?.error_message ||
     response.message ||
     'Django fulfillment processing returned a business failure'

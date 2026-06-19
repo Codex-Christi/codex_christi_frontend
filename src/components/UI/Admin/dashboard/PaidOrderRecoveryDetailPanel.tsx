@@ -1,14 +1,9 @@
-import {
-  ArrowDownLeft,
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-  X,
-} from 'lucide-react';
+import { ArrowDownLeft, ArrowLeft, ArrowRight, CheckCircle2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import AdminGlassPanel from './AdminGlassPanel';
 import AdminNotificationHistoryPanel from './AdminNotificationHistoryPanel';
 import AdminPaidOrderRecoveryActionsPanel from './AdminPaidOrderRecoveryActionsPanel';
+import { AdminPaidOrderRecoveryStatusBadge } from './AdminStatusBadge';
 import { PaidOrderRecoveryContextSections } from './PaidOrderRecoveryDetailSections';
 import type {
   AdminNotificationHistoryItem,
@@ -67,13 +62,13 @@ export default function PaidOrderRecoveryDetailPanel({
           <div className='rounded-xl border border-white/10 bg-white/[0.025] p-4'>
             <div className='flex flex-wrap items-start justify-between gap-3'>
               <div>
-                <p className='text-xs uppercase tracking-[0.12em] text-slate-500'>Support reference</p>
+                <p className='text-xs uppercase tracking-[0.12em] text-slate-500'>
+                  Support reference
+                </p>
                 <h2 className='mt-2 text-2xl font-semibold text-white'>{recovery.supportRef}</h2>
                 <p className='mt-2 text-sm text-slate-400'>{detail.customerEmail}</p>
               </div>
-              <span className='rounded-md border border-rose-300/20 bg-rose-400/12 px-2.5 py-1 text-xs font-medium capitalize text-rose-200'>
-                {recovery.status}
-              </span>
+              <AdminPaidOrderRecoveryStatusBadge status={recovery.status} />
             </div>
 
             <div className='mt-5 grid gap-3 sm:grid-cols-3'>
@@ -103,7 +98,9 @@ export default function PaidOrderRecoveryDetailPanel({
           <AdminGlassPanel className='overflow-hidden'>
             <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
               <h3 className='text-sm font-semibold text-white'>Timeline</h3>
-              <p className='mt-1 text-xs text-slate-500'>Core server-side processing checkpoints.</p>
+              <p className='mt-1 text-xs text-slate-500'>
+                Core server-side processing checkpoints.
+              </p>
             </div>
             <div className='space-y-4 p-4 sm:p-5'>
               {timeline.map((item) => (
@@ -116,7 +113,9 @@ export default function PaidOrderRecoveryDetailPanel({
             <AdminGlassPanel className='overflow-hidden'>
               <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
                 <h3 className='text-sm font-semibold text-white'>Notifications</h3>
-                <p className='mt-1 text-xs text-slate-500'>Internal recovery alerts for this paid order.</p>
+                <p className='mt-1 text-xs text-slate-500'>
+                  Internal recovery alerts for this paid order.
+                </p>
               </div>
               <div className='p-4 sm:p-5'>
                 <AdminNotificationHistoryPanel
@@ -129,12 +128,15 @@ export default function PaidOrderRecoveryDetailPanel({
             <AdminGlassPanel className='overflow-hidden'>
               <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
                 <h3 className='text-sm font-semibold text-white'>Recovery Actions</h3>
-                <p className='mt-1 text-xs text-slate-500'>Operator controls for this paid order.</p>
+                <p className='mt-1 text-xs text-slate-500'>
+                  Operator controls for this paid order.
+                </p>
               </div>
               <div className='p-4 sm:p-5'>
                 <AdminPaidOrderRecoveryActionsPanel
                   orderToken={recovery.orderToken}
                   isCompleted={recovery.status === 'completed'}
+                  needsProviderDetailSync={detail.needsProviderDetailSync}
                 />
                 <button
                   type='button'
