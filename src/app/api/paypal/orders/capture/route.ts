@@ -1,14 +1,12 @@
 import { randomUUID } from 'crypto';
 import { after } from 'next/server';
 import { PaymentsController, type CapturedPayment } from '@paypal/paypal-server-sdk';
-import { paypalClient } from '@/lib/paymentClients/paypalClient';
+import { getPayPalClient } from '@/lib/paymentClients/paypalClient';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { createPayPalRouteResponders } from '@/lib/paypal/txLedger/routeResponses';
 import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
 import { isCaptureRouteRunnerEnabled } from '@/lib/paypal/txLedger/processingPolicy';
-
-const payments = new PaymentsController(paypalClient);
 
 const POST_CAPTURE_RESUMABLE_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.CAPTURED,
@@ -175,6 +173,7 @@ export async function POST(req: Request) {
     }
 
     // Main Paymnet Capture from SDK
+    const payments = new PaymentsController(getPayPalClient());
     const { result } = await payments.captureAuthorizedPayment({
       authorizationId,
       // A stable request id lets PayPal dedupe retried capture requests.

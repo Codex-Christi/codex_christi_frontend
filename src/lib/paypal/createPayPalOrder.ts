@@ -7,7 +7,7 @@ import {
   Item,
   Order,
 } from '@paypal/paypal-server-sdk';
-import { paypalClient } from '@/lib/paymentClients/paypalClient';
+import { getPayPalClient } from '@/lib/paymentClients/paypalClient';
 import { getOrderFinalDetails } from '@/actions/shop/checkout/getOrderFinalDetails';
 import { PAYPAL_CURRENCY_CODES } from '@/datasets/shop_general/paypal_currency_specifics';
 import { removeOrKeepDecimalPrecision } from '@/actions/merchize/getMerchizeTotalWithShipping';
@@ -47,9 +47,6 @@ export class CheckoutLivePricingUnavailableError extends Error {
   }
 }
 
-// Import the OrdersController from PayPal SDK
-const orders = new OrdersController(paypalClient);
-
 // Define the no shipping preference for PayPal
 const shippingPreferenceForPaymentContext = {
   experienceContext: {
@@ -77,7 +74,11 @@ export async function createPayPalOrder(body: CreateOrderActionInterface): Promi
   if (cart.length === 0) {
     throw new Error('Cart cannot be empty');
   }
-  if (!cart.every((item) => item && typeof item === 'object' && 'variantId' in item && 'quantity' in item)) {
+  if (
+    !cart.every(
+      (item) => item && typeof item === 'object' && 'variantId' in item && 'quantity' in item,
+    )
+  ) {
     throw new Error('Each cart item must be a valid CartVariant with id and quantity');
   }
   if (!customer) {
@@ -232,6 +233,7 @@ export async function createPayPalOrder(body: CreateOrderActionInterface): Promi
     };
 
     // Order Creation time...
+    const orders = new OrdersController(getPayPalClient());
     const { result } = await orders.createOrder(payload);
 
     return result;

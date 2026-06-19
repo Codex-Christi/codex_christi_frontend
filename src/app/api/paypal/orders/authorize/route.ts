@@ -1,12 +1,15 @@
 // POST /api/paypal/authorize
 import { randomUUID } from 'crypto';
-import { OrdersController, type Order, type OrderAuthorizeResponse } from '@paypal/paypal-server-sdk';
-import { paypalClient } from '@/lib/paymentClients/paypalClient';
+import {
+  OrdersController,
+  type Order,
+  type OrderAuthorizeResponse,
+} from '@paypal/paypal-server-sdk';
+import { getPayPalClient } from '@/lib/paymentClients/paypalClient';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { createPayPalRouteResponders } from '@/lib/paypal/txLedger/routeResponses';
 
-const orders = new OrdersController(paypalClient);
 const NON_AUTHORIZABLE_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.CAPTURED,
   PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED,
@@ -25,7 +28,10 @@ function getAuthorizationId(payload?: {
   return payload?.purchaseUnits?.[0]?.payments?.authorizations?.[0]?.id ?? null;
 }
 
-async function persistAuthorizedResult(orderToken: string, payload: OrderAuthorizeResponse | Order) {
+async function persistAuthorizedResult(
+  orderToken: string,
+  payload: OrderAuthorizeResponse | Order,
+) {
   const paypalAuthorizationId = getAuthorizationId(payload);
 
   await paypalTxLedger.paypalIntent.update({
@@ -39,6 +45,7 @@ async function persistAuthorizedResult(orderToken: string, payload: OrderAuthori
 }
 
 async function syncExistingAuthorization(orderID: string, orderToken: string) {
+  const orders = new OrdersController(getPayPalClient());
   const { result } = await orders.getOrder({ id: orderID });
 
   if (!getAuthorizationId(result)) return null;
@@ -177,6 +184,7 @@ export async function POST(req: Request) {
       });
     }
 
+    const orders = new OrdersController(getPayPalClient());
     const { result } = await orders.authorizeOrder({
       id: orderID,
       prefer: 'return=representation',
