@@ -2,6 +2,7 @@ import 'server-only';
 
 import { formatDistanceToNowStrict } from 'date-fns';
 
+import { getRecoveryScannerMinAgeMinutes } from '@/lib/paypal/txLedger/processingPolicy';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import type {
@@ -10,6 +11,7 @@ import type {
   PaidOrderRecoveryDetail,
   PaidOrderRecoveryLineItem,
   PaidOrderRecoveryRow,
+  PaidOrderRecoveryWebhookEvent,
   TimelineItem,
 } from '@/components/UI/Admin/dashboard/adminShopDashboardTypes';
 
@@ -25,6 +27,11 @@ const ADMIN_RECOVERY_STATUSES = [
 
 type JsonRecord = Record<string, unknown>;
 const ACCEPTED_DJANGO_FULFILLMENT_INFO_MESSAGE = 'order created but details not available';
+const SCANNER_RECOVERABLE_STATUSES = new Set<string>([
+  PAYPAL_LEDGER_STATUS.CAPTURED,
+  PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED,
+  PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
+]);
 
 function asRecord(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : null;
@@ -335,6 +342,7 @@ function buildActivity(row: {
   processingCompletedAt: Date | null;
   status: string;
   lastErrorMessage: string | null;
+  webhookEvents: PaidOrderRecoveryWebhookEvent[];
 }): PaidOrderRecoveryActivityItem[] {
   const activity: PaidOrderRecoveryActivityItem[] = [
     {
@@ -351,6 +359,16 @@ function buildActivity(row: {
       description: 'Customer receipt was generated and attached to the order record.',
       time: formatLongDate(row.updatedAt),
       tone: 'cyan',
+    });
+  }
+
+  const latestWebhook = row.webhookEvents[0];
+  if (latestWebhook) {
+    activity.push({
+      label: 'Webhook observed',
+      description: `${latestWebhook.eventType} is ${latestWebhook.processingStatus}.`,
+      time: latestWebhook.processedAt ?? latestWebhook.lastAttemptAt ?? latestWebhook.createdAt,
+      tone: latestWebhook.processingStatus === 'processed' ? 'emerald' : 'amber',
     });
   }
 
@@ -392,6 +410,60 @@ function buildActivity(row: {
   return activity;
 }
 
+function mapWebhookEvent(event: {
+  eventId: string;
+  eventType: string;
+  processingStatus: string;
+  attemptCount: number;
+  createdAt: Date;
+  processedAt: Date | null;
+  lastAttemptAt: Date | null;
+  lastErrorMessage: string | null;
+}): PaidOrderRecoveryWebhookEvent {
+  return {
+    eventId: event.eventId,
+    eventType: event.eventType,
+    processingStatus: event.processingStatus,
+    attemptCount: event.attemptCount,
+    createdAt: formatLongDate(event.createdAt),
+    processedAt: event.processedAt ? formatLongDate(event.processedAt) : null,
+    lastAttemptAt: event.lastAttemptAt ? formatLongDate(event.lastAttemptAt) : null,
+    lastErrorMessage: event.lastErrorMessage,
+  };
+}
+
+function getScannerState(row: {
+  status: string;
+  capturePayload: unknown;
+  processingCompletedAt: Date | null;
+  postProcessingLockExpiresAt: Date | null;
+  updatedAt: Date;
+}) {
+  if (row.processingCompletedAt) {
+    return { eligible: false, reason: 'Processing is already completed.' };
+  }
+
+  if (!SCANNER_RECOVERABLE_STATUSES.has(row.status)) {
+    return { eligible: false, reason: `Status ${row.status} is not automatic-scanner eligible.` };
+  }
+
+  if (!row.capturePayload) {
+    return { eligible: false, reason: 'Capture payload is missing.' };
+  }
+
+  if (row.postProcessingLockExpiresAt && row.postProcessingLockExpiresAt > new Date()) {
+    return { eligible: false, reason: 'A post-processing lock is active.' };
+  }
+
+  const minAgeMinutes = getRecoveryScannerMinAgeMinutes();
+  const ageMs = Date.now() - row.updatedAt.getTime();
+  if (ageMs < minAgeMinutes * 60_000) {
+    return { eligible: false, reason: `Row is newer than ${minAgeMinutes} minutes.` };
+  }
+
+  return { eligible: true, reason: 'Eligible for automatic scanner recovery.' };
+}
+
 function buildDetail(row: {
   orderToken: string;
   customerName: string;
@@ -400,6 +472,7 @@ function buildDetail(row: {
   createdAt: Date;
   updatedAt: Date;
   receiptLink: string | null;
+  capturePayload: unknown;
   shippingSnapshot: unknown;
   fulfillmentAddressOverride: unknown;
   fulfillmentAddressOverrideReason: string | null;
@@ -416,10 +489,12 @@ function buildDetail(row: {
   merchizeProviderOrderId: string | null;
   merchizeProviderOrderCode: string | null;
   processingCompletedAt: Date | null;
+  postProcessingLockExpiresAt: Date | null;
   status: string;
   lastErrorMessage: string | null;
   lastErrorCode: string | null;
   lastEventType: string | null;
+  webhookEvents: PaidOrderRecoveryWebhookEvent[];
 }): PaidOrderRecoveryDetail {
   const originalAddress = normalizeAddress(row.shippingSnapshot);
   const overrideAddress = normalizeAddress(row.fulfillmentAddressOverride);
@@ -458,8 +533,16 @@ function buildDetail(row: {
       { label: 'Merchize processing ID', value: row.merchizeFulfillmentProcessingId },
       { label: 'Merchize platform order ID', value: merchizeProviderOrderId },
       { label: 'Merchize external order number', value: merchizeExternalOrderNumber },
+      { label: 'Latest PayPal webhook event', value: row.webhookEvents[0]?.eventType ?? null },
+      {
+        label: 'Latest webhook delivery status',
+        value: row.webhookEvents[0]?.processingStatus ?? null,
+      },
+      { label: 'Scanner eligibility', value: getScannerState(row).reason },
     ],
     activity: buildActivity(row),
+    webhookEvents: row.webhookEvents,
+    scannerState: getScannerState(row),
     needsProviderDetailSync: providerDetailSyncNeeded,
     rawDebug: {
       orderToken: row.orderToken,
@@ -476,6 +559,8 @@ function buildDetail(row: {
       merchizeProviderOrderId,
       merchizeExternalOrderNumber,
       needsProviderDetailSync: providerDetailSyncNeeded,
+      scannerState: getScannerState(row),
+      webhookEvents: row.webhookEvents,
     },
   };
 }
@@ -523,10 +608,18 @@ export async function getAdminPaidOrderRecoveryDetail(orderToken: string) {
     where: { orderToken: row.orderToken },
     orderBy: { createdAt: 'desc' },
   });
+  const webhookEvents = row.paypalOrderId
+    ? await paypalTxLedger.paypalWebhookEvent.findMany({
+        where: { paypalOrderId: row.paypalOrderId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      })
+    : [];
+  const mappedWebhookEvents = webhookEvents.map(mapWebhookEvent);
 
   return {
     row: mapLedgerRowToPaidOrderRecoveryRow(row),
-    detail: buildDetail(row),
+    detail: buildDetail({ ...row, webhookEvents: mappedWebhookEvents }),
     raw: row,
     timeline: buildTimeline(row),
     notifications,

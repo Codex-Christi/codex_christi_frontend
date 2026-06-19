@@ -9,7 +9,7 @@ type AdminTopBarProps = {
 
 export default function AdminTopBar({ title, subtitle, onOpenMobileNav }: AdminTopBarProps) {
   return (
-    <header className='flex min-h-20 flex-wrap items-center gap-3 border-b border-white/10 bg-slate-950/42 px-3 py-3 supports-[backdrop-filter]:backdrop-blur-xl sm:gap-4 sm:px-5'>
+    <header className='sticky top-0 z-40 flex min-h-20 flex-wrap items-center gap-3 border-b border-white/10 bg-slate-950/74 px-3 py-3 supports-[backdrop-filter]:backdrop-blur-xl sm:gap-4 sm:px-5'>
       <button
         type='button'
         aria-label='Open admin navigation'

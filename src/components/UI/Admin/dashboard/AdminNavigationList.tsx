@@ -9,16 +9,14 @@ type AdminNavigationListProps = {
   onNavigate?: () => void;
 };
 
-export default function AdminNavigationList({
-  scope,
-  mode,
-  onNavigate,
-}: AdminNavigationListProps) {
+export default function AdminNavigationList({ scope, mode, onNavigate }: AdminNavigationListProps) {
   return (
     <nav
       className={cn(
         'flex gap-1',
-        mode === 'desktop' ? 'flex-1 flex-col overflow-visible px-3 py-3' : 'flex-col px-3 pb-4',
+        mode === 'desktop'
+          ? 'min-h-0 flex-1 flex-col overflow-y-auto px-3 py-3'
+          : 'flex-col px-3 pb-4',
       )}
     >
       {adminShopNavItems.map((item) => (

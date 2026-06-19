@@ -76,11 +76,27 @@ export type PaidOrderRecoveryReference = {
   value: string | null;
 };
 
+export type PaidOrderRecoveryWebhookEvent = {
+  eventId: string;
+  eventType: string;
+  processingStatus: string;
+  attemptCount: number;
+  createdAt: string;
+  processedAt: string | null;
+  lastAttemptAt: string | null;
+  lastErrorMessage: string | null;
+};
+
 export type PaidOrderRecoveryActivityItem = {
   label: string;
   description: string;
   time: string;
   tone: 'slate' | 'emerald' | 'amber' | 'rose' | 'cyan';
+};
+
+export type PaidOrderRecoveryScannerState = {
+  eligible: boolean;
+  reason: string;
 };
 
 export type PaidOrderRecoveryDetail = {
@@ -98,6 +114,8 @@ export type PaidOrderRecoveryDetail = {
   items: PaidOrderRecoveryLineItem[];
   references: PaidOrderRecoveryReference[];
   activity: PaidOrderRecoveryActivityItem[];
+  webhookEvents: PaidOrderRecoveryWebhookEvent[];
+  scannerState: PaidOrderRecoveryScannerState;
   rawDebug: Record<string, unknown>;
   needsProviderDetailSync: boolean;
 };

@@ -1,13 +1,4 @@
-import {
-  Clock3,
-  Copy,
-  ExternalLink,
-  MapPin,
-  Package,
-  ReceiptText,
-  ShieldAlert,
-  UserRound,
-} from 'lucide-react';
+import { Clock3, Copy, ExternalLink, MapPin, Package, ReceiptText, UserRound } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import AdminGlassPanel from './AdminGlassPanel';
@@ -20,7 +11,7 @@ import type {
   PaidOrderRecoveryReference,
 } from './adminShopDashboardTypes';
 
-export function PaidOrderRecoveryContextSections({
+export function PaidOrderRecoveryPrimaryContextSections({
   detail,
   orderToken,
 }: {
@@ -28,16 +19,22 @@ export function PaidOrderRecoveryContextSections({
   orderToken: string;
 }) {
   return (
-    <div className='grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]'>
-      <div className='space-y-4'>
-        <OrderContextPanel detail={detail} />
-        <DeliveryContextPanel detail={detail} orderToken={orderToken} />
-      </div>
+    <div className='space-y-4'>
+      <OrderContextPanel detail={detail} />
+      <DeliveryContextPanel detail={detail} orderToken={orderToken} />
+    </div>
+  );
+}
 
-      <div className='space-y-4'>
-        <ReferencePanel detail={detail} />
-        <ActivityPanel activity={detail.activity} />
-      </div>
+export function PaidOrderRecoverySecondaryContextSections({
+  detail,
+}: {
+  detail: PaidOrderRecoveryDetail;
+}) {
+  return (
+    <div className='space-y-4'>
+      <ReferencePanel detail={detail} />
+      <ActivityPanel activity={detail.activity} />
     </div>
   );
 }
@@ -66,7 +63,12 @@ function OrderContextPanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
 
       <div className='grid gap-4 p-4 sm:p-5'>
         <div className='grid gap-3 sm:grid-cols-3'>
-          <MiniInfo icon={UserRound} label='Customer' value={detail.customerName || '—'} subvalue={detail.customerEmail} />
+          <MiniInfo
+            icon={UserRound}
+            label='Customer'
+            value={detail.customerName || '—'}
+            subvalue={detail.customerEmail}
+          />
           <MiniInfo icon={Clock3} label='Created' value={detail.createdAt} />
           <MiniInfo icon={Clock3} label='Last updated' value={detail.updatedAt} />
         </div>
@@ -76,7 +78,8 @@ function OrderContextPanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
             <div>
               <p className='text-sm font-medium text-white'>Items</p>
               <p className='mt-1 text-xs text-slate-500'>
-                {detail.items.length} line item{detail.items.length === 1 ? '' : 's'} in this paid order.
+                {detail.items.length} line item{detail.items.length === 1 ? '' : 's'} in this paid
+                order.
               </p>
             </div>
           </div>
@@ -90,7 +93,13 @@ function OrderContextPanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
                 >
                   <div className='relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-white/10 bg-slate-900'>
                     {item.image ? (
-                      <Image src={item.image} alt={item.title} fill className='object-cover' sizes='56px' />
+                      <Image
+                        src={item.image}
+                        alt={item.title}
+                        fill
+                        className='object-cover'
+                        sizes='56px'
+                      />
                     ) : (
                       <div className='grid h-full w-full place-items-center text-slate-600'>
                         <Package size={18} />
@@ -128,10 +137,12 @@ function DeliveryContextPanel({
 }) {
   return (
     <AdminGlassPanel className='overflow-hidden'>
-      <div className='flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-5'>
+      <div className='flex flex-wrap items-start justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5'>
         <div>
           <h3 className='text-sm font-semibold text-white'>Fulfillment Address</h3>
-          <p className='mt-1 text-xs text-slate-500'>Address currently used for the fulfillment retry.</p>
+          <p className='mt-1 text-xs text-slate-500'>
+            Address currently used for the fulfillment retry.
+          </p>
         </div>
         {detail.hasAddressOverride ? (
           <span className='rounded-md border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.08em] text-amber-200'>
@@ -143,7 +154,11 @@ function DeliveryContextPanel({
       <div className='grid gap-4 p-4 sm:p-5'>
         <div className='grid gap-4 md:grid-cols-2'>
           <AddressBlock
-            label={detail.hasAddressOverride ? 'Active fulfillment address' : 'Original fulfillment address'}
+            label={
+              detail.hasAddressOverride
+                ? 'Active fulfillment address'
+                : 'Original fulfillment address'
+            }
             address={detail.activeAddress}
             emphasized
           />
@@ -151,33 +166,33 @@ function DeliveryContextPanel({
           {detail.hasAddressOverride ? (
             <AddressBlock label='Original checkout address' address={detail.originalAddress} />
           ) : (
-            <div className='rounded-lg border border-white/10 bg-white/[0.025] p-3'>
-              <div className='flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-slate-500'>
-                <ShieldAlert size={13} />
-                No override saved
-              </div>
-              <p className='mt-3 text-sm leading-6 text-slate-400'>
-                The original checkout address is still the active fulfillment address.
-              </p>
-            </div>
+            <PaidOrderRecoveryAddressOverrideForm
+              orderToken={orderToken}
+              initialAddress={detail.activeAddress ?? detail.originalAddress}
+              hasExistingOverride={detail.hasAddressOverride}
+            />
           )}
         </div>
 
         {detail.hasAddressOverride ? (
-          <div className='rounded-lg border border-amber-300/14 bg-amber-300/[0.04] p-3'>
-            <p className='text-xs uppercase tracking-[0.08em] text-amber-200'>Override note</p>
-            <p className='mt-2 text-sm text-slate-200'>{detail.addressOverrideReason ?? 'No reason recorded.'}</p>
-            <p className='mt-2 text-xs text-slate-500'>
-              {detail.addressOverriddenBy ?? 'admin'} · {detail.addressOverriddenAt ?? 'time unavailable'}
-            </p>
+          <div className='grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(240px,0.72fr)]'>
+            <div className='rounded-lg border border-amber-300/14 bg-amber-300/[0.04] p-3'>
+              <p className='text-xs uppercase tracking-[0.08em] text-amber-200'>Override note</p>
+              <p className='mt-2 text-sm text-slate-200'>
+                {detail.addressOverrideReason ?? 'No reason recorded.'}
+              </p>
+              <p className='mt-2 text-xs text-slate-500'>
+                {detail.addressOverriddenBy ?? 'admin'} ·{' '}
+                {detail.addressOverriddenAt ?? 'time unavailable'}
+              </p>
+            </div>
+            <PaidOrderRecoveryAddressOverrideForm
+              orderToken={orderToken}
+              initialAddress={detail.activeAddress ?? detail.originalAddress}
+              hasExistingOverride={detail.hasAddressOverride}
+            />
           </div>
         ) : null}
-
-        <PaidOrderRecoveryAddressOverrideForm
-          orderToken={orderToken}
-          initialAddress={detail.activeAddress ?? detail.originalAddress}
-          hasExistingOverride={detail.hasAddressOverride}
-        />
       </div>
     </AdminGlassPanel>
   );
@@ -189,7 +204,9 @@ function ReferencePanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
       <div className='flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-5'>
         <div>
           <h3 className='text-sm font-semibold text-white'>References</h3>
-          <p className='mt-1 text-xs text-slate-500'>Cross-system identifiers for escalation and support.</p>
+          <p className='mt-1 text-xs text-slate-500'>
+            Cross-system identifiers for escalation and support.
+          </p>
         </div>
         <PaidOrderRecoveryRawLedgerDialog rawDebug={detail.rawDebug} />
       </div>
@@ -213,7 +230,10 @@ function ActivityPanel({ activity }: { activity: PaidOrderRecoveryActivityItem[]
 
       <div className='space-y-0 px-4 py-4 sm:px-5'>
         {activity.map((item, index) => (
-          <div key={`${item.label}-${item.time}`} className='relative grid grid-cols-[16px_minmax(0,1fr)] gap-3 pb-5 last:pb-0'>
+          <div
+            key={`${item.label}-${item.time}`}
+            className='relative grid grid-cols-[16px_minmax(0,1fr)] gap-3 pb-5 last:pb-0'
+          >
             {index < activity.length - 1 ? (
               <span className='absolute left-[7px] top-4 h-[calc(100%-16px)] w-px bg-white/10' />
             ) : null}
@@ -254,9 +274,7 @@ function AddressBlock({
     <div
       className={cn(
         'rounded-lg border p-3',
-        emphasized
-          ? 'border-cyan-300/18 bg-cyan-300/[0.045]'
-          : 'border-white/10 bg-white/[0.025]',
+        emphasized ? 'border-cyan-300/18 bg-cyan-300/[0.045]' : 'border-white/10 bg-white/[0.025]',
       )}
     >
       <div className='flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-slate-500'>
@@ -267,9 +285,7 @@ function AddressBlock({
         <div className='mt-3 space-y-1 text-sm leading-5 text-slate-200'>
           <p>{address.line1}</p>
           {address.line2 ? <p>{address.line2}</p> : null}
-          <p>
-            {[address.city, address.state, address.postalCode].filter(Boolean).join(', ')}
-          </p>
+          <p>{[address.city, address.state, address.postalCode].filter(Boolean).join(', ')}</p>
           <p>{address.country}</p>
         </div>
       ) : (

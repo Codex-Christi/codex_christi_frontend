@@ -7,9 +7,12 @@ import type { AdminShopScope } from './adminShopDashboardTypes';
 
 export default function AdminSidebar({ scope }: { scope: AdminShopScope }) {
   return (
-    <aside className='hidden border-r border-white/10 bg-slate-950/58 supports-[backdrop-filter]:backdrop-blur-xl lg:block lg:min-h-dvh'>
-      <div className='flex h-full flex-col'>
-        <Link href='/admin/shop' className='flex h-20 items-center gap-3 border-b border-white/10 px-5'>
+    <aside className='hidden border-r border-white/10 bg-slate-950/58 supports-[backdrop-filter]:backdrop-blur-xl lg:sticky lg:top-0 lg:z-30 lg:block lg:h-dvh lg:min-h-dvh'>
+      <div className='flex h-full min-h-0 flex-col'>
+        <Link
+          href='/admin/shop'
+          className='flex h-20 items-center gap-3 border-b border-white/10 px-5'
+        >
           <Image
             src='/media/img/general/logo.svg'
             alt='Codex Christi'
@@ -25,7 +28,7 @@ export default function AdminSidebar({ scope }: { scope: AdminShopScope }) {
 
         <AdminNavigationList scope={scope} mode='desktop' />
 
-        <div className='hidden border-t border-white/10 p-3 lg:block'>
+        <div className='hidden shrink-0 border-t border-white/10 p-3 lg:block'>
           <AdminGlassPanel className='p-3'>
             <p className='text-[11px] text-slate-400'>Environment</p>
             <div className='mt-2 flex items-center gap-2 text-sm text-slate-100'>

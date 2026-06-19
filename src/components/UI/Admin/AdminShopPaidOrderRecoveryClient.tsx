@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import AdminShopShell from './AdminShopShell';
+import AdminPaidOrderRecoveryScannerPanel from './dashboard/AdminPaidOrderRecoveryScannerPanel';
 import PaidOrderRecoveryQueuePanel from './dashboard/PaidOrderRecoveryQueuePanel';
 import type { PaidOrderRecoveryRow } from './dashboard/adminShopDashboardTypes';
 
@@ -28,6 +29,8 @@ export default function AdminShopPaidOrderRecoveryClient({
             <ArrowLeft size={16} />
             Shop dashboard
           </Link>
+
+          <AdminPaidOrderRecoveryScannerPanel />
 
           <PaidOrderRecoveryQueuePanel mobileMode='full-list' rows={rows} />
         </section>

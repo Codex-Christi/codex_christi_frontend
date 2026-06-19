@@ -4,7 +4,11 @@ import AdminGlassPanel from './AdminGlassPanel';
 import AdminNotificationHistoryPanel from './AdminNotificationHistoryPanel';
 import AdminPaidOrderRecoveryActionsPanel from './AdminPaidOrderRecoveryActionsPanel';
 import { AdminPaidOrderRecoveryStatusBadge } from './AdminStatusBadge';
-import { PaidOrderRecoveryContextSections } from './PaidOrderRecoveryDetailSections';
+import {
+  PaidOrderRecoveryPrimaryContextSections,
+  PaidOrderRecoverySecondaryContextSections,
+} from './PaidOrderRecoveryDetailSections';
+import PaidOrderRecoveryWebhookScannerSummary from './PaidOrderRecoveryWebhookScannerSummary';
 import type {
   AdminNotificationHistoryItem,
   PaidOrderRecoveryDetail,
@@ -92,63 +96,90 @@ export default function PaidOrderRecoveryDetailPanel({
           </div>
         </section>
 
-        <PaidOrderRecoveryContextSections detail={detail} orderToken={recovery.orderToken} />
+        <PaidOrderRecoveryWebhookScannerSummary detail={detail} />
 
-        <div className='grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.72fr)]'>
-          <AdminGlassPanel className='overflow-hidden'>
-            <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
-              <h3 className='text-sm font-semibold text-white'>Timeline</h3>
-              <p className='mt-1 text-xs text-slate-500'>
-                Core server-side processing checkpoints.
-              </p>
-            </div>
-            <div className='space-y-4 p-4 sm:p-5'>
-              {timeline.map((item) => (
-                <TimelineRow key={item.label} item={item} />
-              ))}
-            </div>
-          </AdminGlassPanel>
+        <div className='grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]'>
+          <div className='space-y-4'>
+            <TimelinePanel timeline={timeline} />
+            <PaidOrderRecoveryPrimaryContextSections
+              detail={detail}
+              orderToken={recovery.orderToken}
+            />
+          </div>
 
           <div className='space-y-4'>
-            <AdminGlassPanel className='overflow-hidden'>
-              <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
-                <h3 className='text-sm font-semibold text-white'>Notifications</h3>
-                <p className='mt-1 text-xs text-slate-500'>
-                  Internal recovery alerts for this paid order.
-                </p>
-              </div>
-              <div className='p-4 sm:p-5'>
-                <AdminNotificationHistoryPanel
-                  notifications={notifications}
-                  orderToken={recovery.orderToken}
-                />
-              </div>
-            </AdminGlassPanel>
-
-            <AdminGlassPanel className='overflow-hidden'>
-              <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
-                <h3 className='text-sm font-semibold text-white'>Recovery Actions</h3>
-                <p className='mt-1 text-xs text-slate-500'>
-                  Operator controls for this paid order.
-                </p>
-              </div>
-              <div className='p-4 sm:p-5'>
-                <AdminPaidOrderRecoveryActionsPanel
-                  orderToken={recovery.orderToken}
-                  isCompleted={recovery.status === 'completed'}
-                  needsProviderDetailSync={detail.needsProviderDetailSync}
-                />
-                <button
-                  type='button'
-                  className='mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-rose-300/30 bg-rose-400/8 px-3 py-3 text-sm font-medium text-rose-200'
-                >
-                  <ArrowDownLeft size={16} />
-                  Add Internal Note
-                </button>
-              </div>
-            </AdminGlassPanel>
+            <RecoveryActionsPanel recovery={recovery} detail={detail} />
+            <PaidOrderRecoverySecondaryContextSections detail={detail} />
+            <NotificationsPanel notifications={notifications} orderToken={recovery.orderToken} />
           </div>
         </div>
+      </div>
+    </AdminGlassPanel>
+  );
+}
+
+function TimelinePanel({ timeline }: { timeline: TimelineItem[] }) {
+  return (
+    <AdminGlassPanel className='overflow-hidden'>
+      <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
+        <h3 className='text-sm font-semibold text-white'>Timeline</h3>
+        <p className='mt-1 text-xs text-slate-500'>Core server-side processing checkpoints.</p>
+      </div>
+      <div className='space-y-4 p-4 sm:p-5'>
+        {timeline.map((item) => (
+          <TimelineRow key={item.label} item={item} />
+        ))}
+      </div>
+    </AdminGlassPanel>
+  );
+}
+
+function NotificationsPanel({
+  notifications,
+  orderToken,
+}: {
+  notifications: AdminNotificationHistoryItem[];
+  orderToken: string;
+}) {
+  return (
+    <AdminGlassPanel className='overflow-hidden'>
+      <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
+        <h3 className='text-sm font-semibold text-white'>Notifications</h3>
+        <p className='mt-1 text-xs text-slate-500'>Internal recovery alerts for this paid order.</p>
+      </div>
+      <div className='p-4 sm:p-5'>
+        <AdminNotificationHistoryPanel notifications={notifications} orderToken={orderToken} />
+      </div>
+    </AdminGlassPanel>
+  );
+}
+
+function RecoveryActionsPanel({
+  recovery,
+  detail,
+}: {
+  recovery: PaidOrderRecoveryRow;
+  detail: PaidOrderRecoveryDetail;
+}) {
+  return (
+    <AdminGlassPanel className='overflow-hidden'>
+      <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
+        <h3 className='text-sm font-semibold text-white'>Recovery Actions</h3>
+        <p className='mt-1 text-xs text-slate-500'>Operator controls for this paid order.</p>
+      </div>
+      <div className='p-4 sm:p-5'>
+        <AdminPaidOrderRecoveryActionsPanel
+          orderToken={recovery.orderToken}
+          isCompleted={recovery.status === 'completed'}
+          needsProviderDetailSync={detail.needsProviderDetailSync}
+        />
+        <button
+          type='button'
+          className='mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-rose-300/30 bg-rose-400/8 px-3 py-3 text-sm font-medium text-rose-200'
+        >
+          <ArrowDownLeft size={16} />
+          Add Internal Note
+        </button>
       </div>
     </AdminGlassPanel>
   );

@@ -5,11 +5,96 @@ import {
   resendAdminRecoveryNotification,
   suppressAdminRecoveryNotification,
 } from '@/lib/paypal/txLedger/adminNotificationOutbox';
+import {
+  runPayPalRecoveryScanner,
+  runSelectedPayPalRecoveryScanner,
+  type PayPalRecoveryScannerRunResult,
+} from '@/lib/paypal/txLedger/recoveryScanner';
 import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 
 type AdminNotificationActionResult = { ok: true; message: string } | { ok: false; error: string };
+
+export type AdminRecoveryScannerActionResult =
+  | {
+      ok: true;
+      message: string;
+      scan: PayPalRecoveryScannerRunResult;
+    }
+  | {
+      ok: false;
+      error: string;
+      scan?: PayPalRecoveryScannerRunResult;
+    };
+
+export async function scanAdminPaidOrderRecoveryCandidatesAction(): Promise<AdminRecoveryScannerActionResult> {
+  try {
+    const scan = await runPayPalRecoveryScanner({ dryRun: true });
+    const candidateCount = scan.candidates.length;
+
+    return {
+      ok: true,
+      message: candidateCount
+        ? `Found ${candidateCount} recoverable row${candidateCount === 1 ? '' : 's'}.`
+        : 'No recoverable rows found.',
+      scan,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Recovery scan failed.',
+    };
+  }
+}
+
+export async function runSelectedAdminPaidOrderRecoveryAction({
+  orderTokens,
+}: {
+  orderTokens: string[];
+}): Promise<AdminRecoveryScannerActionResult> {
+  try {
+    if (!orderTokens.length) {
+      return {
+        ok: false,
+        error: 'Select at least one recovery row.',
+      };
+    }
+
+    const scan = await runSelectedPayPalRecoveryScanner({ orderTokens });
+
+    revalidatePath('/admin/shop/paid-order-recovery');
+    for (const orderToken of orderTokens) {
+      revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+    }
+
+    const completedCount = scan.results.filter((result) => result.ok).length;
+
+    if (!scan.ok) {
+      return {
+        ok: false,
+        error:
+          completedCount > 0
+            ? `${completedCount} row${completedCount === 1 ? '' : 's'} completed; review remaining results.`
+            : 'Selected recovery did not complete.',
+        scan,
+      };
+    }
+
+    return {
+      ok: true,
+      message: completedCount
+        ? `Completed ${completedCount} recovery row${completedCount === 1 ? '' : 's'}.`
+        : 'No selected rows required recovery.',
+      scan,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Selected recovery failed.',
+    };
+  }
+}
 
 export async function resendAdminRecoveryNotificationAction({
   notificationId,
