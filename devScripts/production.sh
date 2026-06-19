@@ -6,7 +6,7 @@ set -euo pipefail
 # - Reuses an existing buildx builder with the *docker* driver (e.g. "default")
 # - Only creates a builder if none exists
 # - Builds services in parallel with layer cache
-# - Starts stack with up -d (all services, including app)
+# - Starts stack with up -d (migrate + the single app runtime)
 ##############################################################################
 
 APP_DIR="/root/apps/codexchristi"          # <-- adjust if needed
@@ -61,9 +61,9 @@ echo "Running one-off catalog migration/volume permission repair…"
 docker compose -f "$COMPOSE_FILE" rm -fsv migrate
 docker compose -f "$COMPOSE_FILE" up --force-recreate --no-deps migrate
 
-# Recreate the two runtime containers after the shared catalog volume is repaired.
+# Recreate the runtime container after the shared catalog volume is repaired.
 echo "Starting runtime services…"
-docker compose -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans app app_shop
+docker compose -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans app
 
 # Aggressively clean unused Docker objects after deploy to protect small VPS disks.
 # Set SKIP_DOCKER_PRUNE=1 only when you intentionally want to keep old images/cache.
