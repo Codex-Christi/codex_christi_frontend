@@ -6,6 +6,7 @@ import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { createPayPalRouteResponders } from '@/lib/paypal/txLedger/routeResponses';
 import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
+import { isCaptureRouteRunnerEnabled } from '@/lib/paypal/txLedger/processingPolicy';
 
 const payments = new PaymentsController(paypalClient);
 
@@ -90,6 +91,8 @@ export async function POST(req: Request) {
   };
 
   const schedulePostProcessing = (token: string, reason: string) => {
+    if (!isCaptureRouteRunnerEnabled()) return;
+
     after(async () => {
       try {
         await runPostProcessing(token);

@@ -247,6 +247,14 @@ PAYPAL_LIVE_CLIENT_SECRET="..."
 PAYPAL_SANDBOX_WEBHOOK_ID="..."
 PAYPAL_LIVE_WEBHOOK_ID="..."
 
+# PayPal TX ledger processing policy
+PAYPAL_TX_LEDGER_ENABLE_STATUS_ROUTE_RESUME="false"
+PAYPAL_TX_LEDGER_ENABLE_CAPTURE_ROUTE_RUNNER="false"
+PAYPAL_TX_LEDGER_RECOVERY_SCANNER_ENABLED="true"
+PAYPAL_TX_LEDGER_RECOVERY_SCANNER_MIN_AGE_MINUTES="15"
+PAYPAL_TX_LEDGER_RECOVERY_SCANNER_BATCH_SIZE="5"
+PAYPAL_TX_LEDGER_RECOVERY_SCANNER_SECRET="..."
+
 # Browser-reachable Django backend base URL
 NEXT_PUBLIC_DJANGO_API_BASE_URL="..."
 
@@ -283,6 +291,8 @@ Notes:
 - For clean deployments, keep `PAYPAL_PAYMENT_MODE` and `NEXT_PUBLIC_PAYPAL_PAYMENT_MODE` aligned.
 - Use `PAYPAL_PAYMENT_MODE="sandbox"` on production deployments while you are still testing sandbox payments.
 - Switch to `PAYPAL_PAYMENT_MODE="live"` only when real payments and the live webhook registration are ready.
+- The recovery scanner cron endpoint is `/next-api/jobs/paypal-tx-ledger-recovery-scan`.
+- Call the recovery scanner with `x-cron-secret: PAYPAL_TX_LEDGER_RECOVERY_SCANNER_SECRET`.
 - Browser code uses `NEXT_PUBLIC_DJANGO_API_BASE_URL`.
 - Server-only Django calls may use `DJANGO_INTERNAL_BASE_URL` when Next and Django share a private Docker network; otherwise they fall back to the public Django API base.
 - Merchize SQLite continues to use your existing `prisma.config.ts`.

@@ -143,10 +143,10 @@ Decision needed:
 - Keep capture-route post-processing as the intentional immediate server trigger, with webhook as backup.
 - Or make webhook/scheduled recovery the only automatic post-capture trigger.
 
-Recommended beta default:
+Recommended current default:
 
-- Keep capture-route runner because it gives fast customer completion and reduces stuck local transactions.
-- Document it explicitly.
+- Keep capture-route runner disabled so post-payment work stays backend-runner driven.
+- Use webhook delivery plus the recovery scanner as the automatic completion paths.
 - Keep the webhook registered and verified because it is still needed when the capture route fails, the user leaves, or PayPal sends later capture/refund/dispute events.
 
 Recommended hardened production target:
@@ -348,15 +348,20 @@ The long-term rule:
 Add clear env flags:
 
 ```txt
-PAYPAL_TX_LEDGER_ENABLE_CAPTURE_ROUTE_RUNNER=true
+PAYPAL_TX_LEDGER_ENABLE_CAPTURE_ROUTE_RUNNER=false
 PAYPAL_TX_LEDGER_ENABLE_STATUS_ROUTE_RESUME=false
+PAYPAL_TX_LEDGER_RECOVERY_SCANNER_ENABLED=true
+PAYPAL_TX_LEDGER_RECOVERY_SCANNER_MIN_AGE_MINUTES=15
+PAYPAL_TX_LEDGER_RECOVERY_SCANNER_BATCH_SIZE=5
+PAYPAL_TX_LEDGER_RECOVERY_SCANNER_SECRET=...
 ```
 
-Recommended beta behavior:
+Recommended behavior:
 
-- Capture route runner enabled.
+- Capture route runner disabled by default.
 - Webhook runner enabled.
-- Status route resume disabled in production, optionally enabled in local dev.
+- Recovery scanner enabled.
+- Status route resume disabled.
 
 ### Step 2 - Gate Status Route Resume
 
@@ -434,17 +439,38 @@ PAYPAL_WEBHOOK_SIGNATURE_VERIFICATION=required
 
 ### Step 5 - Add Recovery Scanner
 
-Add a scheduled recovery path that scans for rows stuck in:
+Add a scheduled recovery path:
+
+```txt
+src/app/api/jobs/paypal-tx-ledger-recovery-scan/route.ts
+```
+
+The route is protected by:
+
+```txt
+x-cron-secret: PAYPAL_TX_LEDGER_RECOVERY_SCANNER_SECRET
+```
+
+Recommended VPS cron cadence:
+
+```txt
+every 30 minutes
+```
+
+The first automatic scanner version should scan for rows stuck in:
 
 ```txt
 captured
 receipt_uploaded
 payment_saved
-error
 ```
 
 Rules:
 
+- Pick rows older than `PAYPAL_TX_LEDGER_RECOVERY_SCANNER_MIN_AGE_MINUTES`.
+- Process at most `PAYPAL_TX_LEDGER_RECOVERY_SCANNER_BATCH_SIZE` rows.
+- Process sequentially.
+- Do not auto-run generic `error` rows. Show those for admin review first.
 - Do not auto-run rows in `fulfillment_blocked`.
 - Do not auto-run rows in `fulfillment_failed` when the saved fulfillment response is an accepted 201 that needs provider detail sync instead.
 - Respect active `postProcessingLockExpiresAt`.

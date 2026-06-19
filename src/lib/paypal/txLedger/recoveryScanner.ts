@@ -1,0 +1,179 @@
+import 'server-only';
+
+import {
+  getRecoveryScannerBatchSize,
+  getRecoveryScannerMinAgeMinutes,
+  isRecoveryScannerEnabled,
+} from '@/lib/paypal/txLedger/processingPolicy';
+import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
+import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
+import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+
+const AUTOMATIC_RECOVERY_STATUSES = [
+  PAYPAL_LEDGER_STATUS.CAPTURED,
+  PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED,
+  PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
+] as const;
+
+const MAX_BATCH_SIZE = 25;
+
+export type PayPalRecoveryScanCandidate = {
+  orderToken: string;
+  status: string;
+  customerEmail: string;
+  createdAt: string;
+  updatedAt: string;
+  reason: string;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+};
+
+export type PayPalRecoveryScanResult = {
+  orderToken: string;
+  previousStatus: string;
+  status: string | null;
+  processingCompletedAt: string | null;
+  ok: boolean;
+  error: string | null;
+};
+
+export type PayPalRecoveryScannerRunResult = {
+  ok: boolean;
+  enabled: boolean;
+  dryRun: boolean;
+  minAgeMinutes: number;
+  batchSize: number;
+  scannedAt: string;
+  candidates: PayPalRecoveryScanCandidate[];
+  results: PayPalRecoveryScanResult[];
+};
+
+function clampBatchSize(batchSize: number) {
+  return Math.min(batchSize, MAX_BATCH_SIZE);
+}
+
+function toCandidate(row: {
+  orderToken: string;
+  status: string;
+  customerEmail: string;
+  createdAt: Date;
+  updatedAt: Date;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+}) {
+  return {
+    orderToken: row.orderToken,
+    status: row.status,
+    customerEmail: row.customerEmail,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    reason: `Post-capture ledger row is still ${row.status}.`,
+    lastErrorCode: row.lastErrorCode,
+    lastErrorMessage: row.lastErrorMessage,
+  };
+}
+
+export async function findPayPalRecoveryCandidates(args?: {
+  batchSize?: number;
+  minAgeMinutes?: number;
+  now?: Date;
+}) {
+  const now = args?.now ?? new Date();
+  const minAgeMinutes = args?.minAgeMinutes ?? getRecoveryScannerMinAgeMinutes();
+  const batchSize = clampBatchSize(args?.batchSize ?? getRecoveryScannerBatchSize());
+  const cutoff = new Date(now.getTime() - minAgeMinutes * 60_000);
+
+  const rows = await paypalTxLedger.paypalIntent.findMany({
+    where: {
+      status: { in: [...AUTOMATIC_RECOVERY_STATUSES] },
+      processingCompletedAt: null,
+      updatedAt: { lte: cutoff },
+      OR: [{ postProcessingLockExpiresAt: null }, { postProcessingLockExpiresAt: { lt: now } }],
+    },
+    orderBy: [{ updatedAt: 'asc' }, { createdAt: 'asc' }],
+    take: batchSize * 3,
+    select: {
+      orderToken: true,
+      status: true,
+      customerEmail: true,
+      capturePayload: true,
+      createdAt: true,
+      updatedAt: true,
+      lastErrorCode: true,
+      lastErrorMessage: true,
+    },
+  });
+
+  return rows
+    .filter((row) => row.capturePayload)
+    .slice(0, batchSize)
+    .map((row) => toCandidate(row));
+}
+
+export async function runPayPalRecoveryScanner(args?: {
+  dryRun?: boolean;
+  batchSize?: number;
+  minAgeMinutes?: number;
+}) {
+  const enabled = isRecoveryScannerEnabled();
+  const minAgeMinutes = args?.minAgeMinutes ?? getRecoveryScannerMinAgeMinutes();
+  const batchSize = clampBatchSize(args?.batchSize ?? getRecoveryScannerBatchSize());
+  const scannedAt = new Date();
+  const candidates = enabled
+    ? await findPayPalRecoveryCandidates({ batchSize, minAgeMinutes, now: scannedAt })
+    : [];
+
+  const result: PayPalRecoveryScannerRunResult = {
+    ok: true,
+    enabled,
+    dryRun: args?.dryRun ?? false,
+    minAgeMinutes,
+    batchSize,
+    scannedAt: scannedAt.toISOString(),
+    candidates,
+    results: [],
+  };
+
+  if (!enabled || result.dryRun) return result;
+
+  for (const candidate of candidates) {
+    try {
+      await runPostProcessing(candidate.orderToken);
+
+      const updated = await paypalTxLedger.paypalIntent.findUnique({
+        where: { orderToken: candidate.orderToken },
+        select: {
+          status: true,
+          processingCompletedAt: true,
+          lastErrorMessage: true,
+        },
+      });
+      const rowCompleted = Boolean(updated?.processingCompletedAt);
+
+      if (!rowCompleted) {
+        result.ok = false;
+      }
+
+      result.results.push({
+        orderToken: candidate.orderToken,
+        previousStatus: candidate.status,
+        status: updated?.status ?? null,
+        processingCompletedAt: updated?.processingCompletedAt?.toISOString() ?? null,
+        ok: rowCompleted,
+        error: updated?.lastErrorMessage ?? null,
+      });
+    } catch (error) {
+      result.ok = false;
+      result.results.push({
+        orderToken: candidate.orderToken,
+        previousStatus: candidate.status,
+        status: null,
+        processingCompletedAt: null,
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return result;
+}

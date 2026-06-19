@@ -1,4 +1,5 @@
 import { after, NextResponse } from 'next/server';
+import { isStatusRouteResumeEnabled } from '@/lib/paypal/txLedger/processingPolicy';
 import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
@@ -15,6 +16,7 @@ const RESUMABLE_POST_PROCESSING_STATUSES = new Set<string>([
 
 export async function GET(_req: Request, { params }: PageProps) {
   const { orderToken } = await params;
+  const statusRouteResumeEnabled = isStatusRouteResumeEnabled();
 
   const row = await paypalTxLedger.paypalIntent.findUnique({ where: { orderToken } });
   if (!row) {
@@ -25,6 +27,7 @@ export async function GET(_req: Request, { params }: PageProps) {
   const lockIsActive =
     row.postProcessingLockExpiresAt && row.postProcessingLockExpiresAt.getTime() > now.getTime();
   const shouldResumePostProcessing =
+    statusRouteResumeEnabled &&
     row.capturePayload &&
     !row.lastErrorMessage &&
     !row.processingCompletedAt &&
