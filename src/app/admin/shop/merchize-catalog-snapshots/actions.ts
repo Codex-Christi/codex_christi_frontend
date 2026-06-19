@@ -2,6 +2,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { requireAdminAction } from '@/lib/admin/require-admin';
 import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
 import { refreshMerchizeCatalog } from '@/lib/merchizeCatalog/sync';
 import { STOREFRONT_SNAPSHOT_CATEGORY_SLUGS } from '@/lib/merchizeStorefront/categories';
@@ -26,6 +27,8 @@ import { getCategoryPagePath } from '@/lib/utils/shop/categoryPagePath';
 // console.log('>>> Inspect variant FBJSVN000000AA02', v);
 
 export async function getStorefrontSnapshotStats() {
+  await requireAdminAction('shop');
+
   const [productCount, categoryCount, variantAgg, latestProduct, latestCategory] =
     await Promise.all([
       merchizeCatalogPrisma.storefrontProductSnapshot.count(),
@@ -55,6 +58,8 @@ export async function getStorefrontSnapshotStats() {
 
 export async function refreshPriceShippingCatalogAction() {
   try {
+    await requireAdminAction('shop');
+
     const result = await refreshMerchizeCatalog();
 
     const syncState = await merchizeCatalogPrisma.syncState.findUnique({
@@ -78,6 +83,8 @@ export async function refreshPriceShippingCatalogAction() {
 }
 
 export async function refreshStorefrontSnapshotsAction() {
+  await requireAdminAction('shop');
+
   const pageSize = 50;
   const failures: Array<{ category: string; message: string }> = [];
   const categoryTotalPages = new Map<string, number>();
@@ -215,6 +222,8 @@ function revalidateStorefrontSnapshotPaths({
 }
 
 export async function searchPriceShippingCatalogBySku(query: string) {
+  await requireAdminAction('shop');
+
   const q = query.trim();
   if (!q) {
     return { ok: false as const, message: 'Enter a SKU or partial SKU' };

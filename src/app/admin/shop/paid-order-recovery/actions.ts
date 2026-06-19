@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { requireAdminAction } from '@/lib/admin/require-admin';
 import {
   resendAdminRecoveryNotification,
   suppressAdminRecoveryNotification,
@@ -30,6 +31,8 @@ export type AdminRecoveryScannerActionResult =
 
 export async function scanAdminPaidOrderRecoveryCandidatesAction(): Promise<AdminRecoveryScannerActionResult> {
   try {
+    await requireAdminAction('shop');
+
     const scan = await runPayPalRecoveryScanner({ dryRun: true });
     const candidateCount = scan.candidates.length;
 
@@ -54,6 +57,8 @@ export async function runSelectedAdminPaidOrderRecoveryAction({
   orderTokens: string[];
 }): Promise<AdminRecoveryScannerActionResult> {
   try {
+    await requireAdminAction('shop');
+
     if (!orderTokens.length) {
       return {
         ok: false,
@@ -104,6 +109,8 @@ export async function resendAdminRecoveryNotificationAction({
   orderToken: string;
 }): Promise<AdminNotificationActionResult> {
   try {
+    await requireAdminAction('shop');
+
     const result = await resendAdminRecoveryNotification(notificationId);
 
     revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
@@ -135,6 +142,8 @@ export async function suppressAdminRecoveryNotificationAction({
   orderToken: string;
 }): Promise<AdminNotificationActionResult> {
   try {
+    await requireAdminAction('shop');
+
     await suppressAdminRecoveryNotification(notificationId);
 
     revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
@@ -157,6 +166,8 @@ export async function retryAdminPaidOrderRecoveryAction({
   orderToken: string;
 }): Promise<AdminNotificationActionResult> {
   try {
+    await requireAdminAction('shop');
+
     const existing = await paypalTxLedger.paypalIntent.findUnique({
       where: { orderToken },
       select: {
@@ -253,6 +264,8 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
   reason: string;
 }): Promise<AdminNotificationActionResult> {
   try {
+    await requireAdminAction('shop');
+
     if (!reason.trim()) {
       return {
         ok: false,

@@ -7,6 +7,7 @@ import axios, { AxiosResponse } from 'axios';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
+import { getSafeAdminReturnPath } from '@/lib/admin/admin-paths';
 import errorToast from '@/lib/error-toast';
 import loadingToast from '@/lib/loading-toast';
 import successToast from '@/lib/success-toast';
@@ -46,6 +47,7 @@ export const useLogin = () => {
   // State values
   const [isClient, setIsClient] = useState(false);
   const [referer, setReferer] = useState<string | null>(null);
+  const [loginReturnPath, setLoginReturnPath] = useState<string | null>(null);
 
   // State for login process
   const [loginProcessState, setLoginProcessState] = useState<SignInHookInterface>(
@@ -61,6 +63,9 @@ export const useLogin = () => {
     if (typeof window !== 'undefined') {
       setIsClient(true);
       setReferer(document.referrer ? document.referrer.split(window.location.hostname)[1] : null);
+      setLoginReturnPath(
+        getSafeAdminReturnPath(new URLSearchParams(window.location.search).get('next')),
+      );
     }
     // run once on mount
   }, []);
@@ -124,7 +129,9 @@ export const useLogin = () => {
             });
 
             // Redirect logic
-            if (isCodexChristiShop) {
+            if (loginReturnPath) {
+              router.push(loginReturnPath);
+            } else if (isCodexChristiShop) {
               if (referer && typeof referer === 'string') {
                 router.push(referer);
               } else {
@@ -174,7 +181,7 @@ export const useLogin = () => {
         return String(err);
       }
     },
-    [autoUpDateSession, isCodexChristiShop, referer, router],
+    [autoUpDateSession, isCodexChristiShop, loginReturnPath, referer, router],
   );
 
   return { ...loginProcessState, login };

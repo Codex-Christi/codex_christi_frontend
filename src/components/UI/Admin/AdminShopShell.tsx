@@ -33,10 +33,10 @@ export default function AdminShopShell({ scope, title, subtitle, children }: Adm
         onOpenChange={setMobileNavOpen}
       />
 
-      <div className='relative z-10 grid min-h-dvh lg:grid-cols-[250px_minmax(0,1fr)]'>
+      <div className='relative z-10 min-h-dvh lg:pl-[250px]'>
         <AdminSidebar scope={scope} />
 
-        <section className='min-w-0'>
+        <section className='min-w-0 lg:min-h-dvh lg:pt-20'>
           <AdminTopBar
             title={title}
             subtitle={subtitle}

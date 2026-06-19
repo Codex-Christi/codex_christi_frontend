@@ -20,7 +20,8 @@
     "paypal-ledger:recovery-demo:create": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts create",
     "paypal-ledger:recovery-demo:list": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts list",
     "paypal-ledger:recovery-demo:cleanup": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts cleanup",
-    "paypal-ledger:recovery-demo:cleanup-all": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts cleanup-all"
+    "paypal-ledger:recovery-demo:cleanup-all": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts cleanup-all",
+    "admin:hash-password": "tsx scripts/hash_admin_password.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1026.0",
@@ -47,6 +48,7 @@
     "@types/crypto-js": "^4.2.2",
     "@types/pdfkit": "^0.17.0",
     "@types/serialize-javascript": "^5.0.4",
+    "argon2": "^0.44.0",
     "axios": "^1.15.0",
     "better-sqlite3": "^12.4.6",
     "class-variance-authority": "^0.7.1",

@@ -5,30 +5,27 @@ import { ArrowLeft } from 'lucide-react';
 import AdminShopShell from '@/components/UI/Admin/AdminShopShell';
 import PaidOrderRecoveryDetailPanel from '@/components/UI/Admin/dashboard/PaidOrderRecoveryDetailPanel';
 import CometsContainer from '@/components/UI/general/CometsContainer';
+import { requireAdminPage } from '@/lib/admin/require-admin';
 import { getAdminPaidOrderRecoveryDetail } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
 
 type PaidOrderRecoveryDetailPageProps = {
   params: Promise<{ orderToken: string }>;
 };
 
-export async function generateMetadata({
-  params,
-}: PaidOrderRecoveryDetailPageProps): Promise<Metadata> {
-  const { orderToken } = await params;
-  const recovery = await getAdminPaidOrderRecoveryDetail(orderToken);
-
-  return {
-    title: recovery?.row
-      ? `${recovery.row.supportRef} | Paid Order Recovery | Codex Christi Admin`
-      : 'Paid Order Recovery Detail | Codex Christi Admin',
-    description: 'Paid order recovery detail workspace for support and admin operations.',
-  };
-}
+export const metadata: Metadata = {
+  title: 'Paid Order Recovery Detail | Codex Christi Admin',
+  description: 'Paid order recovery detail workspace for support and admin operations.',
+};
 
 export default async function AdminPaidOrderRecoveryDetailPage({
   params,
 }: PaidOrderRecoveryDetailPageProps) {
   const { orderToken } = await params;
+  await requireAdminPage({
+    scope: 'shop',
+    returnPath: `/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`,
+  });
+
   const recovery = await getAdminPaidOrderRecoveryDetail(orderToken);
 
   if (!recovery) {

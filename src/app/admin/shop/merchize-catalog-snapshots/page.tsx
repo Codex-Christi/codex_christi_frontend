@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
 import MerchizeCatalogSnapshotsAdminClient from './MerchizeCatalogSnapshotsAdminClient';
 import CometsContainer from '@/components/UI/general/CometsContainer';
+import { requireAdminPage } from '@/lib/admin/require-admin';
 import { getStorefrontSnapshotStats } from './actions';
 
 export const metadata: Metadata = {
@@ -34,6 +35,11 @@ async function getCatalogPageData() {
 }
 
 export default async function MerchizeCatalogSnapshotsAdminPage() {
+  await requireAdminPage({
+    scope: 'shop',
+    returnPath: '/admin/shop/merchize-catalog-snapshots',
+  });
+
   const pageData = await getCatalogPageData();
 
   return (

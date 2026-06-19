@@ -2,6 +2,7 @@ import { createNEMO } from '@rescale/nemo';
 import {
   redirectLoggedInUserToProfileMiddleware,
   redirectExpSessionToLoginPage,
+  protectAdminRouteMiddleware,
 } from './lib/middlewares/auth-middleware';
 import { authVerifierAndRouteProtector } from './lib/middlewares/codexchristi.shop/authVerifierAndRouteProtector';
 
@@ -10,6 +11,8 @@ import { authVerifierAndRouteProtector } from './lib/middlewares/codexchristi.sh
 //   /^\/(_next(?:\/[^ ]*)*(?:\?[^ ]*)?|media(?:\/[^ ]*)?(?:\?[^ ]*)?)/;
 
 export const proxy = createNEMO({
+  '/admin': [protectAdminRouteMiddleware],
+  '/admin/(.*)': [protectAdminRouteMiddleware],
   // Protected shop routes
   '/shop/account-overview': [redirectExpSessionToLoginPage],
   '/shop/account-overview/(.*)': [redirectExpSessionToLoginPage],
@@ -30,5 +33,6 @@ export const config = {
     '/auth/sign-in',
     '/auth/signup',
     '/profile/:path*',
+    '/admin/:path*',
   ],
 };

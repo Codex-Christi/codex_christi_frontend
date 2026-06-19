@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSafeAdminReturnPath } from '@/lib/admin/admin-paths';
 import { getRequestSessionState } from './request-session';
 
 export const basicRedirect = (destination: string, req: NextRequest) => {
@@ -11,7 +12,11 @@ export const redirectLoggedInUserToProfile = async (req: NextRequest) => {
   const sessionState = await getRequestSessionState(req);
 
   if (sessionState.isAuthenticated) {
-    return basicRedirect('/profile?from-login-page=true', req);
+    return basicRedirect(
+      getSafeAdminReturnPath(req.nextUrl.searchParams.get('next')) ??
+        '/profile?from-login-page=true',
+      req,
+    );
   }
 
   return NextResponse.next();
