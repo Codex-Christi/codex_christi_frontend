@@ -26,8 +26,11 @@ services:
     container_name: codex-con-app-start
     env_file:
       - .env.production
+    mem_limit: 768m #change_later
+    memswap_limit: 1g #change_later
     environment:
       MERCHIZE_OFFLINE_CATALOG_DATABASE_URL: file:/app/data/db/shop/merchizeCatalog.db
+      NODE_OPTIONS: --max-old-space-size=512
     depends_on:
       migrate:
         condition: service_completed_successfully

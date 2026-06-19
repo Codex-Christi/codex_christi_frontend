@@ -44,7 +44,7 @@ WORKDIR /app
 COPY . .
 
 # More heap for Next build (3 GB) to prevent OOM on small VPS
-ENV NODE_OPTIONS="--max-old-space-size=3072"
+ENV NODE_OPTIONS="--max-old-space-size=1536"
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Generate Prisma client for Merchize catalog schema so imports like
@@ -69,6 +69,7 @@ RUN apt-get update -y \
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
 # Next.js standalone output already includes the minimal node_modules it needs.
 # Copy only what the running server needs.
