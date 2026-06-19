@@ -44,7 +44,7 @@ WORKDIR /app
 COPY . .
 
 # More heap for Next build (3 GB) to prevent OOM on small VPS
-ENV NODE_OPTIONS="--max-old-space-size=1536"
+ENV NODE_OPTIONS="--max-old-space-size=1792"
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Generate Prisma client for Merchize catalog schema so imports like
