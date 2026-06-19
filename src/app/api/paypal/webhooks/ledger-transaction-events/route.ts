@@ -32,6 +32,17 @@ const FULFILLMENT_RECOVERY_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
 ]);
 
+function shouldVerifyWebhookSignature() {
+  const configured = (process.env.PAYPAL_WEBHOOK_SIGNATURE_VERIFICATION ?? '').toLowerCase();
+
+  if (configured === 'required') return true;
+  if (configured === 'disabled') return false;
+
+  throw new Error(
+    'Invalid PAYPAL_WEBHOOK_SIGNATURE_VERIFICATION. Expected "required" or "disabled".',
+  );
+}
+
 async function updateLedgerFromWebhook(args: {
   orderToken: string;
   eventType: string;
@@ -105,10 +116,7 @@ export async function POST(req: Request) {
 
   try {
     const config = getServerPayPalConfig();
-
-    const shouldVerify =
-      (process.env.PAYPAL_WEBHOOK_VERIFY ??
-        (process.env.NODE_ENV === 'production' ? 'true' : 'false')) === 'true';
+    const shouldVerify = shouldVerifyWebhookSignature();
 
     const raw = await req.text();
     const event = JSON.parse(raw) as PayPalWebhookEvent;
@@ -116,7 +124,7 @@ export async function POST(req: Request) {
 
     if (shouldVerify) {
       if (!config.webhookId) {
-        throw new Error('Missing PayPal webhook ID for the selected environment.');
+        throw new Error('Missing PayPal webhook ID for the selected payment mode.');
       }
 
       const ok = await verifyWebhookSignature({

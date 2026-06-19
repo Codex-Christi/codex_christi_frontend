@@ -117,13 +117,13 @@ require_command sed
 echo "PayPal webhook setup"
 echo
 
-# Choose which PayPal environment this operation will hit.
+# Choose which PayPal payment mode this operation will hit.
 # This works from your local machine for either sandbox or live.
-read -r -p "Environment [sandbox/live] (default: sandbox): " environment
-environment="$(trim "${environment:-sandbox}")"
+read -r -p "Payment mode [sandbox/live] (default: sandbox): " payment_mode
+payment_mode="$(trim "${payment_mode:-sandbox}")"
 
-if [[ "$environment" != "sandbox" && "$environment" != "live" ]]; then
-  echo "Environment must be 'sandbox' or 'live'." >&2
+if [[ "$payment_mode" != "sandbox" && "$payment_mode" != "live" ]]; then
+  echo "Payment mode must be 'sandbox' or 'live'." >&2
   exit 1
 fi
 
@@ -140,7 +140,8 @@ client_id="$(prompt_required "PayPal client ID")"
 client_secret="$(prompt_secret_with_mode "PayPal client secret")"
 
 # Let the caller choose the exact listener URL target.
-# For sandbox this can be ngrok; for live this can be your production domain.
+# Payment mode selects the PayPal API/app. The listener URL is separate.
+# Sandbox mode can target ngrok or a deployed HTTPS URL; live mode should target the stable production URL.
 echo
 echo "Webhook base URL input examples:"
 echo "- Full base URL: https://codexchristi.org"
@@ -174,14 +175,14 @@ print_token="$(tr '[:upper:]' '[:lower:]' <<< "${print_token:-n}")"
 read -r -p "Print raw PayPal API response? [y/N]: " print_response
 print_response="$(tr '[:upper:]' '[:lower:]' <<< "${print_response:-n}")"
 
-if [[ "$environment" == "live" ]]; then
+if [[ "$payment_mode" == "live" ]]; then
   api_base="https://api-m.paypal.com"
 else
   api_base="https://api-m.sandbox.paypal.com"
 fi
 
 echo
-echo "Requesting access token from $environment..."
+echo "Requesting access token from $payment_mode..."
 
 token_response="$(
   curl -sS -X POST "$api_base/v1/oauth2/token" \
@@ -228,17 +229,17 @@ result_webhook_id="${webhook_id:-$(json_get_string "$webhook_response" "id")}"
 
 echo
 echo "Done."
-echo "Environment: $environment"
+echo "Payment mode: $payment_mode"
 echo "Webhook URL: $webhook_url"
 
 if [[ -n "$result_webhook_id" ]]; then
   echo "Webhook ID: $result_webhook_id"
 fi
 
-if [[ "$environment" == "sandbox" ]]; then
-  echo "Suggested env: PAYPAL_WEBHOOK_ID_SANDBOX=$result_webhook_id"
+if [[ "$payment_mode" == "sandbox" ]]; then
+  echo "Suggested env: PAYPAL_SANDBOX_WEBHOOK_ID=$result_webhook_id"
 else
-  echo "Suggested env: PAYPAL_WEBHOOK_ID_LIVE=$result_webhook_id"
+  echo "Suggested env: PAYPAL_LIVE_WEBHOOK_ID=$result_webhook_id"
 fi
 
 if [[ "$print_token" == "y" || "$print_token" == "yes" ]]; then
@@ -252,5 +253,5 @@ fi
 
 echo
 echo "Simulator note:"
-echo "- Use PAYPAL_WEBHOOK_VERIFY=false only for simulator events."
-echo "- Use PAYPAL_WEBHOOK_VERIFY=true for real sandbox/live webhook deliveries."
+echo "- Use PAYPAL_WEBHOOK_SIGNATURE_VERIFICATION=disabled only for simulator events."
+echo "- Use PAYPAL_WEBHOOK_SIGNATURE_VERIFICATION=required for real sandbox/live webhook deliveries."

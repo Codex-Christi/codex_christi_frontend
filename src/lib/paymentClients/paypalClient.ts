@@ -14,7 +14,7 @@ export const paypalClient = new Client({
     oAuthClientSecret: config.clientSecret,
   },
   timeout: 0,
-  environment: config.environment === 'live' ? Environment.Production : Environment.Sandbox,
+  environment: config.paymentMode === 'live' ? Environment.Production : Environment.Sandbox,
   logging: {
     logLevel: LogLevel.Debug,
     logRequest: { logBody: true },
