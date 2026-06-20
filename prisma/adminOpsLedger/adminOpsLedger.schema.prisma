@@ -28,6 +28,7 @@ model AdminUser {
 
   unlockAttempts       AdminUnlockAttempt[]
   auditLogs            AdminAuditLog[] @relation("ActorAdminAuditLogs")
+  masterTransferChallenges AdminMasterTransferChallenge[] @relation("ActorAdminMasterTransferChallenges")
 }
 
 model AdminUnlockAttempt {
@@ -60,5 +61,23 @@ model AdminAuditLog {
   userAgentHash     String?
   createdAt         DateTime  @default(now())
 
+  @@index([createdAt])
+}
+
+model AdminMasterTransferChallenge {
+  id                 String    @id @default(cuid())
+  actorAdminUserId   String?
+  actorAdminUser     AdminUser? @relation("ActorAdminMasterTransferChallenges", fields: [actorAdminUserId], references: [id], onDelete: SetNull)
+  actorCodexUserId   String
+  targetCodexUserId  String
+  targetEmail        String
+  targetPasswordHash String
+  otpHash            String
+  expiresAt          DateTime
+  consumedAt         DateTime?
+  attemptCount       Int       @default(0)
+  createdAt          DateTime  @default(now())
+
+  @@index([actorAdminUserId, consumedAt, expiresAt])
   @@index([createdAt])
 }

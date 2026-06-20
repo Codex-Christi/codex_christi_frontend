@@ -302,6 +302,7 @@ export type AdminUserWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"AdminUser"> | Date | string
   unlockAttempts?: Prisma.AdminUnlockAttemptListRelationFilter
   auditLogs?: Prisma.AdminAuditLogListRelationFilter
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeListRelationFilter
 }
 
 export type AdminUserOrderByWithRelationInput = {
@@ -323,6 +324,7 @@ export type AdminUserOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   unlockAttempts?: Prisma.AdminUnlockAttemptOrderByRelationAggregateInput
   auditLogs?: Prisma.AdminAuditLogOrderByRelationAggregateInput
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeOrderByRelationAggregateInput
 }
 
 export type AdminUserWhereUniqueInput = Prisma.AtLeast<{
@@ -347,6 +349,7 @@ export type AdminUserWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"AdminUser"> | Date | string
   unlockAttempts?: Prisma.AdminUnlockAttemptListRelationFilter
   auditLogs?: Prisma.AdminAuditLogListRelationFilter
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeListRelationFilter
 }, "id" | "codexUserId" | "email">
 
 export type AdminUserOrderByWithAggregationInput = {
@@ -414,6 +417,7 @@ export type AdminUserCreateInput = {
   updatedAt?: Date | string
   unlockAttempts?: Prisma.AdminUnlockAttemptCreateNestedManyWithoutAdminUserInput
   auditLogs?: Prisma.AdminAuditLogCreateNestedManyWithoutActorAdminUserInput
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeCreateNestedManyWithoutActorAdminUserInput
 }
 
 export type AdminUserUncheckedCreateInput = {
@@ -435,6 +439,7 @@ export type AdminUserUncheckedCreateInput = {
   updatedAt?: Date | string
   unlockAttempts?: Prisma.AdminUnlockAttemptUncheckedCreateNestedManyWithoutAdminUserInput
   auditLogs?: Prisma.AdminAuditLogUncheckedCreateNestedManyWithoutActorAdminUserInput
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeUncheckedCreateNestedManyWithoutActorAdminUserInput
 }
 
 export type AdminUserUpdateInput = {
@@ -456,6 +461,7 @@ export type AdminUserUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   unlockAttempts?: Prisma.AdminUnlockAttemptUpdateManyWithoutAdminUserNestedInput
   auditLogs?: Prisma.AdminAuditLogUpdateManyWithoutActorAdminUserNestedInput
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeUpdateManyWithoutActorAdminUserNestedInput
 }
 
 export type AdminUserUncheckedUpdateInput = {
@@ -477,6 +483,7 @@ export type AdminUserUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   unlockAttempts?: Prisma.AdminUnlockAttemptUncheckedUpdateManyWithoutAdminUserNestedInput
   auditLogs?: Prisma.AdminAuditLogUncheckedUpdateManyWithoutActorAdminUserNestedInput
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeUncheckedUpdateManyWithoutActorAdminUserNestedInput
 }
 
 export type AdminUserCreateManyInput = {
@@ -677,6 +684,22 @@ export type AdminUserUpdateOneWithoutAuditLogsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.AdminUserUpdateToOneWithWhereWithoutAuditLogsInput, Prisma.AdminUserUpdateWithoutAuditLogsInput>, Prisma.AdminUserUncheckedUpdateWithoutAuditLogsInput>
 }
 
+export type AdminUserCreateNestedOneWithoutMasterTransferChallengesInput = {
+  create?: Prisma.XOR<Prisma.AdminUserCreateWithoutMasterTransferChallengesInput, Prisma.AdminUserUncheckedCreateWithoutMasterTransferChallengesInput>
+  connectOrCreate?: Prisma.AdminUserCreateOrConnectWithoutMasterTransferChallengesInput
+  connect?: Prisma.AdminUserWhereUniqueInput
+}
+
+export type AdminUserUpdateOneWithoutMasterTransferChallengesNestedInput = {
+  create?: Prisma.XOR<Prisma.AdminUserCreateWithoutMasterTransferChallengesInput, Prisma.AdminUserUncheckedCreateWithoutMasterTransferChallengesInput>
+  connectOrCreate?: Prisma.AdminUserCreateOrConnectWithoutMasterTransferChallengesInput
+  upsert?: Prisma.AdminUserUpsertWithoutMasterTransferChallengesInput
+  disconnect?: Prisma.AdminUserWhereInput | boolean
+  delete?: Prisma.AdminUserWhereInput | boolean
+  connect?: Prisma.AdminUserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AdminUserUpdateToOneWithWhereWithoutMasterTransferChallengesInput, Prisma.AdminUserUpdateWithoutMasterTransferChallengesInput>, Prisma.AdminUserUncheckedUpdateWithoutMasterTransferChallengesInput>
+}
+
 export type AdminUserCreateWithoutUnlockAttemptsInput = {
   id?: string
   codexUserId: string
@@ -695,6 +718,7 @@ export type AdminUserCreateWithoutUnlockAttemptsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   auditLogs?: Prisma.AdminAuditLogCreateNestedManyWithoutActorAdminUserInput
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeCreateNestedManyWithoutActorAdminUserInput
 }
 
 export type AdminUserUncheckedCreateWithoutUnlockAttemptsInput = {
@@ -715,6 +739,7 @@ export type AdminUserUncheckedCreateWithoutUnlockAttemptsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   auditLogs?: Prisma.AdminAuditLogUncheckedCreateNestedManyWithoutActorAdminUserInput
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeUncheckedCreateNestedManyWithoutActorAdminUserInput
 }
 
 export type AdminUserCreateOrConnectWithoutUnlockAttemptsInput = {
@@ -751,6 +776,7 @@ export type AdminUserUpdateWithoutUnlockAttemptsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   auditLogs?: Prisma.AdminAuditLogUpdateManyWithoutActorAdminUserNestedInput
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeUpdateManyWithoutActorAdminUserNestedInput
 }
 
 export type AdminUserUncheckedUpdateWithoutUnlockAttemptsInput = {
@@ -771,6 +797,7 @@ export type AdminUserUncheckedUpdateWithoutUnlockAttemptsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   auditLogs?: Prisma.AdminAuditLogUncheckedUpdateManyWithoutActorAdminUserNestedInput
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeUncheckedUpdateManyWithoutActorAdminUserNestedInput
 }
 
 export type AdminUserCreateWithoutAuditLogsInput = {
@@ -791,6 +818,7 @@ export type AdminUserCreateWithoutAuditLogsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   unlockAttempts?: Prisma.AdminUnlockAttemptCreateNestedManyWithoutAdminUserInput
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeCreateNestedManyWithoutActorAdminUserInput
 }
 
 export type AdminUserUncheckedCreateWithoutAuditLogsInput = {
@@ -811,6 +839,7 @@ export type AdminUserUncheckedCreateWithoutAuditLogsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   unlockAttempts?: Prisma.AdminUnlockAttemptUncheckedCreateNestedManyWithoutAdminUserInput
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeUncheckedCreateNestedManyWithoutActorAdminUserInput
 }
 
 export type AdminUserCreateOrConnectWithoutAuditLogsInput = {
@@ -847,6 +876,7 @@ export type AdminUserUpdateWithoutAuditLogsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   unlockAttempts?: Prisma.AdminUnlockAttemptUpdateManyWithoutAdminUserNestedInput
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeUpdateManyWithoutActorAdminUserNestedInput
 }
 
 export type AdminUserUncheckedUpdateWithoutAuditLogsInput = {
@@ -867,6 +897,107 @@ export type AdminUserUncheckedUpdateWithoutAuditLogsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   unlockAttempts?: Prisma.AdminUnlockAttemptUncheckedUpdateManyWithoutAdminUserNestedInput
+  masterTransferChallenges?: Prisma.AdminMasterTransferChallengeUncheckedUpdateManyWithoutActorAdminUserNestedInput
+}
+
+export type AdminUserCreateWithoutMasterTransferChallengesInput = {
+  id?: string
+  codexUserId: string
+  email?: string | null
+  displayName?: string | null
+  passwordHash: string
+  role?: string
+  scopes?: Prisma.AdminUserCreatescopesInput | string[]
+  status?: string
+  sessionVersion?: number
+  lastUnlockedAt?: Date | string | null
+  disabledAt?: Date | string | null
+  disabledReason?: string | null
+  createdByCodexUserId?: string | null
+  updatedByCodexUserId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  unlockAttempts?: Prisma.AdminUnlockAttemptCreateNestedManyWithoutAdminUserInput
+  auditLogs?: Prisma.AdminAuditLogCreateNestedManyWithoutActorAdminUserInput
+}
+
+export type AdminUserUncheckedCreateWithoutMasterTransferChallengesInput = {
+  id?: string
+  codexUserId: string
+  email?: string | null
+  displayName?: string | null
+  passwordHash: string
+  role?: string
+  scopes?: Prisma.AdminUserCreatescopesInput | string[]
+  status?: string
+  sessionVersion?: number
+  lastUnlockedAt?: Date | string | null
+  disabledAt?: Date | string | null
+  disabledReason?: string | null
+  createdByCodexUserId?: string | null
+  updatedByCodexUserId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  unlockAttempts?: Prisma.AdminUnlockAttemptUncheckedCreateNestedManyWithoutAdminUserInput
+  auditLogs?: Prisma.AdminAuditLogUncheckedCreateNestedManyWithoutActorAdminUserInput
+}
+
+export type AdminUserCreateOrConnectWithoutMasterTransferChallengesInput = {
+  where: Prisma.AdminUserWhereUniqueInput
+  create: Prisma.XOR<Prisma.AdminUserCreateWithoutMasterTransferChallengesInput, Prisma.AdminUserUncheckedCreateWithoutMasterTransferChallengesInput>
+}
+
+export type AdminUserUpsertWithoutMasterTransferChallengesInput = {
+  update: Prisma.XOR<Prisma.AdminUserUpdateWithoutMasterTransferChallengesInput, Prisma.AdminUserUncheckedUpdateWithoutMasterTransferChallengesInput>
+  create: Prisma.XOR<Prisma.AdminUserCreateWithoutMasterTransferChallengesInput, Prisma.AdminUserUncheckedCreateWithoutMasterTransferChallengesInput>
+  where?: Prisma.AdminUserWhereInput
+}
+
+export type AdminUserUpdateToOneWithWhereWithoutMasterTransferChallengesInput = {
+  where?: Prisma.AdminUserWhereInput
+  data: Prisma.XOR<Prisma.AdminUserUpdateWithoutMasterTransferChallengesInput, Prisma.AdminUserUncheckedUpdateWithoutMasterTransferChallengesInput>
+}
+
+export type AdminUserUpdateWithoutMasterTransferChallengesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  codexUserId?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  role?: Prisma.StringFieldUpdateOperationsInput | string
+  scopes?: Prisma.AdminUserUpdatescopesInput | string[]
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  lastUnlockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disabledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disabledReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdByCodexUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  updatedByCodexUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  unlockAttempts?: Prisma.AdminUnlockAttemptUpdateManyWithoutAdminUserNestedInput
+  auditLogs?: Prisma.AdminAuditLogUpdateManyWithoutActorAdminUserNestedInput
+}
+
+export type AdminUserUncheckedUpdateWithoutMasterTransferChallengesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  codexUserId?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  displayName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  role?: Prisma.StringFieldUpdateOperationsInput | string
+  scopes?: Prisma.AdminUserUpdatescopesInput | string[]
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  lastUnlockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disabledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disabledReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdByCodexUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  updatedByCodexUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  unlockAttempts?: Prisma.AdminUnlockAttemptUncheckedUpdateManyWithoutAdminUserNestedInput
+  auditLogs?: Prisma.AdminAuditLogUncheckedUpdateManyWithoutActorAdminUserNestedInput
 }
 
 
@@ -877,11 +1008,13 @@ export type AdminUserUncheckedUpdateWithoutAuditLogsInput = {
 export type AdminUserCountOutputType = {
   unlockAttempts: number
   auditLogs: number
+  masterTransferChallenges: number
 }
 
 export type AdminUserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   unlockAttempts?: boolean | AdminUserCountOutputTypeCountUnlockAttemptsArgs
   auditLogs?: boolean | AdminUserCountOutputTypeCountAuditLogsArgs
+  masterTransferChallenges?: boolean | AdminUserCountOutputTypeCountMasterTransferChallengesArgs
 }
 
 /**
@@ -908,6 +1041,13 @@ export type AdminUserCountOutputTypeCountAuditLogsArgs<ExtArgs extends runtime.T
   where?: Prisma.AdminAuditLogWhereInput
 }
 
+/**
+ * AdminUserCountOutputType without action
+ */
+export type AdminUserCountOutputTypeCountMasterTransferChallengesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.AdminMasterTransferChallengeWhereInput
+}
+
 
 export type AdminUserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -928,6 +1068,7 @@ export type AdminUserSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   updatedAt?: boolean
   unlockAttempts?: boolean | Prisma.AdminUser$unlockAttemptsArgs<ExtArgs>
   auditLogs?: boolean | Prisma.AdminUser$auditLogsArgs<ExtArgs>
+  masterTransferChallenges?: boolean | Prisma.AdminUser$masterTransferChallengesArgs<ExtArgs>
   _count?: boolean | Prisma.AdminUserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["adminUser"]>
 
@@ -992,6 +1133,7 @@ export type AdminUserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs 
 export type AdminUserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   unlockAttempts?: boolean | Prisma.AdminUser$unlockAttemptsArgs<ExtArgs>
   auditLogs?: boolean | Prisma.AdminUser$auditLogsArgs<ExtArgs>
+  masterTransferChallenges?: boolean | Prisma.AdminUser$masterTransferChallengesArgs<ExtArgs>
   _count?: boolean | Prisma.AdminUserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type AdminUserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -1002,6 +1144,7 @@ export type $AdminUserPayload<ExtArgs extends runtime.Types.Extensions.InternalA
   objects: {
     unlockAttempts: Prisma.$AdminUnlockAttemptPayload<ExtArgs>[]
     auditLogs: Prisma.$AdminAuditLogPayload<ExtArgs>[]
+    masterTransferChallenges: Prisma.$AdminMasterTransferChallengePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1416,6 +1559,7 @@ export interface Prisma__AdminUserClient<T, Null = never, ExtArgs extends runtim
   readonly [Symbol.toStringTag]: "PrismaPromise"
   unlockAttempts<T extends Prisma.AdminUser$unlockAttemptsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AdminUser$unlockAttemptsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AdminUnlockAttemptPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   auditLogs<T extends Prisma.AdminUser$auditLogsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AdminUser$auditLogsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AdminAuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  masterTransferChallenges<T extends Prisma.AdminUser$masterTransferChallengesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AdminUser$masterTransferChallengesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AdminMasterTransferChallengePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1899,6 +2043,30 @@ export type AdminUser$auditLogsArgs<ExtArgs extends runtime.Types.Extensions.Int
   take?: number
   skip?: number
   distinct?: Prisma.AdminAuditLogScalarFieldEnum | Prisma.AdminAuditLogScalarFieldEnum[]
+}
+
+/**
+ * AdminUser.masterTransferChallenges
+ */
+export type AdminUser$masterTransferChallengesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AdminMasterTransferChallenge
+   */
+  select?: Prisma.AdminMasterTransferChallengeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the AdminMasterTransferChallenge
+   */
+  omit?: Prisma.AdminMasterTransferChallengeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AdminMasterTransferChallengeInclude<ExtArgs> | null
+  where?: Prisma.AdminMasterTransferChallengeWhereInput
+  orderBy?: Prisma.AdminMasterTransferChallengeOrderByWithRelationInput | Prisma.AdminMasterTransferChallengeOrderByWithRelationInput[]
+  cursor?: Prisma.AdminMasterTransferChallengeWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.AdminMasterTransferChallengeScalarFieldEnum | Prisma.AdminMasterTransferChallengeScalarFieldEnum[]
 }
 
 /**

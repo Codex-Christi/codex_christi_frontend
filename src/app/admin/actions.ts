@@ -1,21 +1,38 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import {
   upsertAdminUserFromDashboard,
   writeAdminAuditLog,
 } from '@/lib/admin/admin-auth-ledger';
+import {
+  completeMasterAdminTransfer,
+  startMasterAdminTransfer,
+  type MasterTransferChallengeSummary,
+} from '@/lib/admin/admin-master-transfer';
 import {
   isMasterAdminRole,
   normalizeAdminRole,
   normalizeAdminScopes,
   type AdminStatus,
 } from '@/lib/admin/admin-config';
+import { deleteAdminSession } from '@/lib/admin/admin-session-server';
 import { requireMasterAdminAction } from '@/lib/admin/require-admin';
+import { deleteSession } from '@/lib/session/main-session';
 
 export type AdminUserProvisionActionState = {
   error: string | null;
   success: string | null;
+};
+
+export type MasterAdminTransferStartActionState = {
+  error: string | null;
+  challenge: MasterTransferChallengeSummary | null;
+};
+
+export type MasterAdminTransferCompleteActionState = {
+  error: string | null;
 };
 
 export async function provisionAdminUserAction(
@@ -96,6 +113,62 @@ export async function provisionAdminUserAction(
       success: null,
     };
   }
+}
+
+export async function startMasterAdminTransferAction(
+  _prevState: MasterAdminTransferStartActionState,
+  formData: FormData,
+): Promise<MasterAdminTransferStartActionState> {
+  const actor = await requireMasterAdminAction();
+  const currentAdminPassword = String(formData.get('currentAdminPassword') ?? '');
+  const targetCodexUserId = String(formData.get('targetCodexUserId') ?? '');
+  const targetEmail = String(formData.get('targetEmail') ?? '');
+  const targetAdminPassword = String(formData.get('targetAdminPassword') ?? '');
+
+  try {
+    const challenge = await startMasterAdminTransfer({
+      actor,
+      currentAdminPassword,
+      targetCodexUserId,
+      targetEmail,
+      targetAdminPassword,
+    });
+
+    return {
+      error: null,
+      challenge,
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Unable to start master transfer.',
+      challenge: null,
+    };
+  }
+}
+
+export async function completeMasterAdminTransferAction(
+  _prevState: MasterAdminTransferCompleteActionState,
+  formData: FormData,
+): Promise<MasterAdminTransferCompleteActionState> {
+  const actor = await requireMasterAdminAction();
+  const challengeId = String(formData.get('challengeId') ?? '');
+  const otp = String(formData.get('otp') ?? '').trim();
+
+  try {
+    await completeMasterAdminTransfer({
+      actor,
+      challengeId,
+      otp,
+    });
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Unable to complete master transfer.',
+    };
+  }
+
+  await deleteAdminSession();
+  await deleteSession();
+  redirect('/auth/sign-in?from-master-transfer=true');
 }
 
 function normalizeOptionalString(value: FormDataEntryValue | null) {

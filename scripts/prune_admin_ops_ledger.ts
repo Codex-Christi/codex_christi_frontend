@@ -7,6 +7,7 @@ dotenv.config();
 
 const DEFAULT_UNLOCK_ATTEMPT_RETENTION_HOURS = 24;
 const DEFAULT_AUDIT_LOG_RETENTION_DAYS = 30;
+const DEFAULT_MASTER_TRANSFER_CHALLENGE_RETENTION_HOURS = 24;
 
 function getConnectionString() {
   const connectionString =
@@ -44,6 +45,10 @@ async function main() {
     'ADMIN_AUDIT_LOG_RETENTION_DAYS',
     DEFAULT_AUDIT_LOG_RETENTION_DAYS,
   );
+  const masterTransferChallengeRetentionHours = getPositiveNumberEnv(
+    'ADMIN_MASTER_TRANSFER_CHALLENGE_RETENTION_HOURS',
+    DEFAULT_MASTER_TRANSFER_CHALLENGE_RETENTION_HOURS,
+  );
   const adapter = new PrismaPg({ connectionString: getConnectionString() });
   const prisma = new PrismaClient({ adapter });
   const now = Date.now();
@@ -51,8 +56,11 @@ async function main() {
     now - unlockAttemptRetentionHours * 60 * 60 * 1000,
   );
   const auditLogCutoff = new Date(now - auditLogRetentionDays * 24 * 60 * 60 * 1000);
+  const masterTransferChallengeCutoff = new Date(
+    now - masterTransferChallengeRetentionHours * 60 * 60 * 1000,
+  );
 
-  const [unlockAttempts, auditLogs] = await prisma.$transaction([
+  const [unlockAttempts, auditLogs, masterTransferChallenges] = await prisma.$transaction([
     prisma.adminUnlockAttempt.deleteMany({
       where: {
         createdAt: {
@@ -67,6 +75,13 @@ async function main() {
         },
       },
     }),
+    prisma.adminMasterTransferChallenge.deleteMany({
+      where: {
+        createdAt: {
+          lt: masterTransferChallengeCutoff,
+        },
+      },
+    }),
   ]);
 
   await prisma.$disconnect();
@@ -78,10 +93,12 @@ async function main() {
         retention: {
           unlockAttemptRetentionHours,
           auditLogRetentionDays,
+          masterTransferChallengeRetentionHours,
         },
         deleted: {
           unlockAttempts: unlockAttempts.count,
           auditLogs: auditLogs.count,
+          masterTransferChallenges: masterTransferChallenges.count,
         },
       },
       null,

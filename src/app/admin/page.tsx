@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { listAdminUsersForDashboard } from '@/lib/admin/admin-auth-ledger';
 import { isAdminScopeAllowed, isMasterAdminRole } from '@/lib/admin/admin-config';
+import AdminMasterTransferForm from '@/components/UI/Admin/AdminMasterTransferForm';
 import AdminUserProvisioningForm from '@/components/UI/Admin/AdminUserProvisioningForm';
 import CometsContainer from '@/components/UI/general/CometsContainer';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
@@ -166,6 +167,15 @@ export default async function AdminPage() {
                         Create Operational Admin
                       </h3>
                       <AdminUserProvisioningForm />
+                    </div>
+                  ) : null}
+
+                  {canManageAdmins ? (
+                    <div className='mt-4 border-t border-white/10 pt-4'>
+                      <h3 className='mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400'>
+                        Transfer Master Admin
+                      </h3>
+                      <AdminMasterTransferForm />
                     </div>
                   ) : null}
 

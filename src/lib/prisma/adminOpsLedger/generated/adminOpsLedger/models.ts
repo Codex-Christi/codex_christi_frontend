@@ -11,4 +11,5 @@
 export type * from './models/AdminUser'
 export type * from './models/AdminUnlockAttempt'
 export type * from './models/AdminAuditLog'
+export type * from './models/AdminMasterTransferChallenge'
 export type * from './commonInputTypes'

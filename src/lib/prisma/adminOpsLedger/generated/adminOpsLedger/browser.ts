@@ -32,3 +32,8 @@ export type AdminUnlockAttempt = Prisma.AdminUnlockAttemptModel
  * 
  */
 export type AdminAuditLog = Prisma.AdminAuditLogModel
+/**
+ * Model AdminMasterTransferChallenge
+ * 
+ */
+export type AdminMasterTransferChallenge = Prisma.AdminMasterTransferChallengeModel

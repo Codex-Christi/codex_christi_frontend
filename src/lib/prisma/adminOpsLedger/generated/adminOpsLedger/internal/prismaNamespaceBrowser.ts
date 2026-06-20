@@ -53,7 +53,8 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   AdminUser: 'AdminUser',
   AdminUnlockAttempt: 'AdminUnlockAttempt',
-  AdminAuditLog: 'AdminAuditLog'
+  AdminAuditLog: 'AdminAuditLog',
+  AdminMasterTransferChallenge: 'AdminMasterTransferChallenge'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -124,6 +125,23 @@ export const AdminAuditLogScalarFieldEnum = {
 } as const
 
 export type AdminAuditLogScalarFieldEnum = (typeof AdminAuditLogScalarFieldEnum)[keyof typeof AdminAuditLogScalarFieldEnum]
+
+
+export const AdminMasterTransferChallengeScalarFieldEnum = {
+  id: 'id',
+  actorAdminUserId: 'actorAdminUserId',
+  actorCodexUserId: 'actorCodexUserId',
+  targetCodexUserId: 'targetCodexUserId',
+  targetEmail: 'targetEmail',
+  targetPasswordHash: 'targetPasswordHash',
+  otpHash: 'otpHash',
+  expiresAt: 'expiresAt',
+  consumedAt: 'consumedAt',
+  attemptCount: 'attemptCount',
+  createdAt: 'createdAt'
+} as const
+
+export type AdminMasterTransferChallengeScalarFieldEnum = (typeof AdminMasterTransferChallengeScalarFieldEnum)[keyof typeof AdminMasterTransferChallengeScalarFieldEnum]
 
 
 export const SortOrder = {

@@ -386,7 +386,8 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   AdminUser: 'AdminUser',
   AdminUnlockAttempt: 'AdminUnlockAttempt',
-  AdminAuditLog: 'AdminAuditLog'
+  AdminAuditLog: 'AdminAuditLog',
+  AdminMasterTransferChallenge: 'AdminMasterTransferChallenge'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -402,7 +403,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "adminUser" | "adminUnlockAttempt" | "adminAuditLog"
+    modelProps: "adminUser" | "adminUnlockAttempt" | "adminAuditLog" | "adminMasterTransferChallenge"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -628,6 +629,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    AdminMasterTransferChallenge: {
+      payload: Prisma.$AdminMasterTransferChallengePayload<ExtArgs>
+      fields: Prisma.AdminMasterTransferChallengeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AdminMasterTransferChallengeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminMasterTransferChallengePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AdminMasterTransferChallengeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminMasterTransferChallengePayload>
+        }
+        findFirst: {
+          args: Prisma.AdminMasterTransferChallengeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminMasterTransferChallengePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AdminMasterTransferChallengeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminMasterTransferChallengePayload>
+        }
+        findMany: {
+          args: Prisma.AdminMasterTransferChallengeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminMasterTransferChallengePayload>[]
+        }
+        create: {
+          args: Prisma.AdminMasterTransferChallengeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminMasterTransferChallengePayload>
+        }
+        createMany: {
+          args: Prisma.AdminMasterTransferChallengeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AdminMasterTransferChallengeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminMasterTransferChallengePayload>[]
+        }
+        delete: {
+          args: Prisma.AdminMasterTransferChallengeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminMasterTransferChallengePayload>
+        }
+        update: {
+          args: Prisma.AdminMasterTransferChallengeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminMasterTransferChallengePayload>
+        }
+        deleteMany: {
+          args: Prisma.AdminMasterTransferChallengeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AdminMasterTransferChallengeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AdminMasterTransferChallengeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminMasterTransferChallengePayload>[]
+        }
+        upsert: {
+          args: Prisma.AdminMasterTransferChallengeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminMasterTransferChallengePayload>
+        }
+        aggregate: {
+          args: Prisma.AdminMasterTransferChallengeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAdminMasterTransferChallenge>
+        }
+        groupBy: {
+          args: Prisma.AdminMasterTransferChallengeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AdminMasterTransferChallengeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AdminMasterTransferChallengeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AdminMasterTransferChallengeCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -719,6 +794,23 @@ export const AdminAuditLogScalarFieldEnum = {
 } as const
 
 export type AdminAuditLogScalarFieldEnum = (typeof AdminAuditLogScalarFieldEnum)[keyof typeof AdminAuditLogScalarFieldEnum]
+
+
+export const AdminMasterTransferChallengeScalarFieldEnum = {
+  id: 'id',
+  actorAdminUserId: 'actorAdminUserId',
+  actorCodexUserId: 'actorCodexUserId',
+  targetCodexUserId: 'targetCodexUserId',
+  targetEmail: 'targetEmail',
+  targetPasswordHash: 'targetPasswordHash',
+  otpHash: 'otpHash',
+  expiresAt: 'expiresAt',
+  consumedAt: 'consumedAt',
+  attemptCount: 'attemptCount',
+  createdAt: 'createdAt'
+} as const
+
+export type AdminMasterTransferChallengeScalarFieldEnum = (typeof AdminMasterTransferChallengeScalarFieldEnum)[keyof typeof AdminMasterTransferChallengeScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -957,6 +1049,7 @@ export type GlobalOmitConfig = {
   adminUser?: Prisma.AdminUserOmit
   adminUnlockAttempt?: Prisma.AdminUnlockAttemptOmit
   adminAuditLog?: Prisma.AdminAuditLogOmit
+  adminMasterTransferChallenge?: Prisma.AdminMasterTransferChallengeOmit
 }
 
 /* Types for Logging */
