@@ -1,0 +1,166 @@
+datasource db {
+  provider = "postgresql"
+  // URL is set in prisma.config.ts (Prisma 7 style)
+}
+
+generator merchizeFulfillmentOps {
+  provider = "prisma-client"
+  output   = "../../../src/lib/prisma/shop/merchizeFulfillmentOps/generated/merchizeFulfillmentOps"
+}
+
+model MerchizeFulfillmentOrder {
+  id String @id @default(cuid())
+
+  // Correlation with the PayPal TX ledger. Keep these as correlation keys while
+  // this schema is physically separate from the payment ledger database.
+  orderToken                String
+  paypalOrderId             String?
+  djangoOrderIntentUuid     String?
+  djangoOrderIntentOrderId  String?
+  djangoPaymentSaveCustomId String
+
+  // Merchize identity. merchizeOrderId is populated only from the external-number
+  // lookup response data._id, not from Django's wrapped process response.
+  merchizeExternalOrderNumber String   @unique
+  merchizeOrderId             String?
+  merchizeOrderCode           String?
+  merchizeIdentifier          String?
+  merchizeStatus              String?
+  merchizeSubStatus           String?
+  merchizeIsEnqueued          Boolean?
+  merchizeIsDeleted           Boolean?
+  merchizeHidden              Boolean?
+
+  // Normalized, admin-safe scan fields.
+  customerEmailRedacted String?
+  shippingCity          String?
+  shippingState         String?
+  shippingCountry       String?
+  itemCount             Int     @default(0)
+  totalQuantity         Int     @default(0)
+  orderCurrency         String?
+
+  // Production gate state.
+  productionGateStatus   String?
+  addressReviewStatus    String?
+  costReviewStatus       String?
+  progressStatus         String?
+  deliveryStatus         String?
+  releasedToProductionAt DateTime?
+  heldAt                 DateTime?
+  lastAddressCheckAt     DateTime?
+  lastCostCheckAt        DateTime?
+  lastProgressSyncAt     DateTime?
+  lastHistorySyncAt      DateTime?
+
+  // Access-controlled raw provider snapshots.
+  djangoProcessResponsePayload      Json?
+  merchizeExternalLookupPayload     Json?
+  merchizeInDepthOrderDetailPayload Json?
+  merchizeAddressSuggestionPayload  Json?
+  merchizeFulfillmentCostPayload    Json?
+  merchizeTransactionFeePayload     Json?
+  merchizeProgressPayload           Json?
+  merchizeHistoryPayload            Json?
+
+  // Operational state.
+  syncStatus           String
+  lastSyncErrorCode    String?
+  lastSyncErrorMessage String?
+  lastLookupAt         DateTime?
+  lastDetailSyncAt     DateTime?
+  duplicateDetectedAt  DateTime?
+  manuallyLinkedAt     DateTime?
+  manuallyLinkedBy     String?
+  manualLinkReason     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items        MerchizeFulfillmentItem[]
+  syncAttempts MerchizeFulfillmentSyncAttempt[]
+  adminActions MerchizeFulfillmentAdminAction[]
+
+  @@index([orderToken])
+  @@index([djangoPaymentSaveCustomId])
+  @@index([merchizeOrderId])
+  @@index([merchizeOrderCode])
+  @@index([merchizeStatus])
+  @@index([syncStatus])
+  @@index([productionGateStatus])
+  @@index([addressReviewStatus])
+  @@index([costReviewStatus])
+  @@index([progressStatus])
+  @@index([deliveryStatus])
+  @@index([updatedAt])
+}
+
+model MerchizeFulfillmentItem {
+  id                         String                   @id @default(cuid())
+  merchizeFulfillmentOrderId String
+  merchizeFulfillmentOrder   MerchizeFulfillmentOrder @relation(fields: [merchizeFulfillmentOrderId], references: [id], onDelete: Cascade)
+
+  merchizeLineItemId String?
+  productId          String?
+  merchizeSku        String?
+  sellerSku          String?
+  title              String?
+  quantity           Int
+  currency           String?
+  unitPrice          Decimal?
+  imageUrl           String?
+  variantSummary     String?
+
+  itemPayload Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([merchizeFulfillmentOrderId])
+  @@index([merchizeSku])
+  @@index([sellerSku])
+  @@index([productId])
+}
+
+model MerchizeFulfillmentSyncAttempt {
+  id                         String                    @id @default(cuid())
+  merchizeFulfillmentOrderId String?
+  merchizeFulfillmentOrder   MerchizeFulfillmentOrder? @relation(fields: [merchizeFulfillmentOrderId], references: [id], onDelete: SetNull)
+
+  orderToken      String
+  action          String
+  status          String
+  errorCode       String?
+  errorMessage    String?
+  requestSummary  Json?
+  responseSummary Json?
+  startedAt       DateTime  @default(now())
+  finishedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([merchizeFulfillmentOrderId])
+  @@index([orderToken])
+  @@index([action])
+  @@index([status])
+  @@index([startedAt])
+}
+
+model MerchizeFulfillmentAdminAction {
+  id                         String                    @id @default(cuid())
+  merchizeFulfillmentOrderId String?
+  merchizeFulfillmentOrder   MerchizeFulfillmentOrder? @relation(fields: [merchizeFulfillmentOrderId], references: [id], onDelete: SetNull)
+
+  orderToken   String
+  action       String
+  actor        String?
+  reason       String?
+  status       String
+  errorMessage String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([merchizeFulfillmentOrderId])
+  @@index([orderToken])
+  @@index([action])
+  @@index([status])
+  @@index([createdAt])
+}

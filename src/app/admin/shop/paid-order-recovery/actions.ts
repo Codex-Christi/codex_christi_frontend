@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { writeAdminAuditLog } from '@/lib/admin/admin-auth-ledger';
 import { requireAdminAction } from '@/lib/admin/require-admin';
 import {
   resendAdminRecoveryNotification,
@@ -14,6 +15,9 @@ import {
 import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+import { registerAcceptedMerchizeFulfillmentPush } from '@/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentPush';
+import { syncMerchizeFulfillmentOrder } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOrder';
+import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/lib/merchizeFulfillmentOps/merchizeMapper';
 
 type AdminNotificationActionResult = { ok: true; message: string } | { ok: false; error: string };
 
@@ -31,7 +35,12 @@ export type AdminRecoveryScannerActionResult =
 
 export async function scanAdminPaidOrderRecoveryCandidatesAction(): Promise<AdminRecoveryScannerActionResult> {
   try {
-    await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop');
+    await writeAdminAuditLog({
+      actor: admin,
+      action: 'shop.paid_order_recovery.scan_candidates',
+      outcome: 'started',
+    });
 
     const scan = await runPayPalRecoveryScanner({ dryRun: true });
     const candidateCount = scan.candidates.length;
@@ -57,7 +66,14 @@ export async function runSelectedAdminPaidOrderRecoveryAction({
   orderTokens: string[];
 }): Promise<AdminRecoveryScannerActionResult> {
   try {
-    await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop');
+    await writeAdminAuditLog({
+      actor: admin,
+      action: 'shop.paid_order_recovery.run_selected',
+      targetType: 'orderTokenBatch',
+      outcome: 'started',
+      metadata: { count: orderTokens.length },
+    });
 
     if (!orderTokens.length) {
       return {
@@ -109,7 +125,15 @@ export async function resendAdminRecoveryNotificationAction({
   orderToken: string;
 }): Promise<AdminNotificationActionResult> {
   try {
-    await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop');
+    await writeAdminAuditLog({
+      actor: admin,
+      action: 'shop.paid_order_recovery.notification_resend',
+      targetType: 'adminNotification',
+      targetId: notificationId,
+      outcome: 'started',
+      metadata: { orderToken },
+    });
 
     const result = await resendAdminRecoveryNotification(notificationId);
 
@@ -142,7 +166,15 @@ export async function suppressAdminRecoveryNotificationAction({
   orderToken: string;
 }): Promise<AdminNotificationActionResult> {
   try {
-    await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop');
+    await writeAdminAuditLog({
+      actor: admin,
+      action: 'shop.paid_order_recovery.notification_suppress',
+      targetType: 'adminNotification',
+      targetId: notificationId,
+      outcome: 'started',
+      metadata: { orderToken },
+    });
 
     await suppressAdminRecoveryNotification(notificationId);
 
@@ -166,7 +198,14 @@ export async function retryAdminPaidOrderRecoveryAction({
   orderToken: string;
 }): Promise<AdminNotificationActionResult> {
   try {
-    await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop');
+    await writeAdminAuditLog({
+      actor: admin,
+      action: 'shop.paid_order_recovery.retry',
+      targetType: 'orderToken',
+      targetId: orderToken,
+      outcome: 'started',
+    });
 
     const existing = await paypalTxLedger.paypalIntent.findUnique({
       where: { orderToken },
@@ -247,6 +286,118 @@ export async function retryAdminPaidOrderRecoveryAction({
   }
 }
 
+export async function syncAdminMerchizeProviderDetailsAction({
+  orderToken,
+}: {
+  orderToken: string;
+}): Promise<AdminNotificationActionResult> {
+  try {
+    const admin = await requireAdminAction('shop');
+    await writeAdminAuditLog({
+      actor: admin,
+      action: 'shop.paid_order_recovery.sync_merchize_provider_details',
+      targetType: 'orderToken',
+      targetId: orderToken,
+      outcome: 'started',
+    });
+
+    const existing = await paypalTxLedger.paypalIntent.findUnique({
+      where: { orderToken },
+      select: {
+        orderToken: true,
+        paypalOrderId: true,
+        djangoOrderIntentUuid: true,
+        djangoOrderIntentOrderId: true,
+        djangoPaymentSaveCustomId: true,
+        customerEmail: true,
+        shippingSnapshot: true,
+        fulfillmentAddressOverride: true,
+        cartSnapshot: true,
+        merchizeFulfillmentResponsePayload: true,
+        merchizeProviderOrderCode: true,
+      },
+    });
+
+    if (!existing) {
+      return {
+        ok: false,
+        error: 'Recovery row was not found.',
+      };
+    }
+
+    if (!isAcceptedDjangoFulfillmentProcessResponse(existing.merchizeFulfillmentResponsePayload)) {
+      return {
+        ok: false,
+        error: 'This row does not have an accepted Django fulfillment process response.',
+      };
+    }
+
+    if (!existing.djangoPaymentSaveCustomId) {
+      return {
+        ok: false,
+        error: 'Django payment save custom ID is missing.',
+      };
+    }
+
+    const merchizeExternalOrderNumber = extractMerchizeExternalOrderNumberFromDjangoProcessResponse(
+      existing.merchizeFulfillmentResponsePayload,
+      existing.djangoOrderIntentOrderId,
+    );
+
+    if (!merchizeExternalOrderNumber) {
+      return {
+        ok: false,
+        error: 'Merchize external order number could not be extracted from the accepted response.',
+      };
+    }
+
+    const registration = await registerAcceptedMerchizeFulfillmentPush({
+      orderToken: existing.orderToken,
+      paypalOrderId: existing.paypalOrderId,
+      djangoOrderIntentUuid: existing.djangoOrderIntentUuid,
+      djangoOrderIntentOrderId: existing.djangoOrderIntentOrderId,
+      djangoPaymentSaveCustomId: existing.djangoPaymentSaveCustomId,
+      merchizeExternalOrderNumber,
+      merchizeOrderId: null,
+      merchizeOrderCode: existing.merchizeProviderOrderCode ?? merchizeExternalOrderNumber,
+      merchizeStatus: null,
+      djangoProcessResponsePayload: existing.merchizeFulfillmentResponsePayload,
+      customerEmail: existing.customerEmail,
+      shippingSnapshot: existing.fulfillmentAddressOverride ?? existing.shippingSnapshot,
+      cartSnapshot: existing.cartSnapshot,
+    });
+
+    if (!registration.ok) {
+      return {
+        ok: false,
+        error: 'Merchize Fulfillment Ops database is not configured.',
+      };
+    }
+
+    const sync = await syncMerchizeFulfillmentOrder(existing.orderToken);
+
+    revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+    revalidatePath('/admin/shop/paid-order-recovery');
+
+    if (!sync.ok) {
+      return {
+        ok: false,
+        error: sync.errorMessage,
+      };
+    }
+
+    return {
+      ok: true,
+      message: `Merchize provider details synced for ${sync.merchizeOrderId}.`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Merchize provider detail sync failed.',
+    };
+  }
+}
+
 export async function savePaidOrderFulfillmentAddressOverrideAction({
   orderToken,
   address,
@@ -264,7 +415,15 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
   reason: string;
 }): Promise<AdminNotificationActionResult> {
   try {
-    await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop');
+    await writeAdminAuditLog({
+      actor: admin,
+      action: 'shop.paid_order_recovery.address_override_save',
+      targetType: 'orderToken',
+      targetId: orderToken,
+      outcome: 'started',
+      metadata: { hasReason: Boolean(reason.trim()), country: address.country.trim() },
+    });
 
     if (!reason.trim()) {
       return {

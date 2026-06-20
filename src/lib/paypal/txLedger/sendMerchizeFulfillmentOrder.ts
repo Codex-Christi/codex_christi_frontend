@@ -121,10 +121,11 @@ export function getMerchizeOrderIdentifiersFromDjangoProcessingResponse(
 
   return {
     merchizeExternalOrderNumber:
-      wrappedMerchizeOrderId ??
-      djangoData?.order_intent_order_id ??
-      djangoData?.order_payment_custom_id,
-    merchizeProviderOrderId: djangoData?.provider_order_id ?? null,
+      wrappedMerchizeOrderId ?? djangoData?.order_intent_order_id ?? null,
+    // The actionable Merchize platform ID comes from the external-number lookup
+    // response data._id in Merchize Fulfillment Ops, not from this Django process
+    // response wrapper.
+    merchizeProviderOrderId: null,
     merchizeProviderOrderCode: djangoData?.provider_order_code ?? wrappedMerchizeOrderId,
     merchizeProviderStatus: getStringPath(responseData, ['data', 'status']),
   };

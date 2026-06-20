@@ -14,6 +14,13 @@ const schemas = {
   adminOpsLedger: path.join(root, 'prisma', 'adminOpsLedger', 'adminOpsLedger.schema.prisma'),
   merchize: path.join(root, 'prisma', 'shop', 'merchize', 'priceCatalog.prisma'),
   paypal: path.join(root, 'prisma', 'shop', 'paypal', 'paypalTXLedger.schema.prisma'),
+  merchizeFulfillmentOps: path.join(
+    root,
+    'prisma',
+    'shop',
+    'merchizeFulfillmentOps',
+    'merchizeFulfillmentOps.schema.prisma',
+  ),
 } as const;
 
 // ── Parse --schema from argv ──────────────────────────────────
@@ -81,6 +88,30 @@ function resolve(): { schema: string; url: string } {
         : process.env.PAYPAL_TX_LEDGER_NEON_DB_DEV_STRING;
     if (!url) throw new Error(`Missing Neon DB string for PayPal ${target} branch.`);
     return { schema: './prisma/shop/paypal/paypalTXLedger.schema.prisma', url };
+  }
+
+  if (schemaPath === schemas.merchizeFulfillmentOps) {
+    const target = process.env.MERCHIZE_FULFILLMENT_OPS_NEON_BRANCH;
+    if (target === 'dev' || target === 'prod') {
+      const url =
+        target === 'prod'
+          ? process.env.MERCHIZE_FULFILLMENT_OPS_NEON_DB_STRING
+          : process.env.MERCHIZE_FULFILLMENT_OPS_NEON_DB_DEV_STRING;
+      if (!url)
+        throw new Error(`Missing Neon DB string for Merchize Fulfillment Ops ${target} branch.`);
+      return {
+        schema: './prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOps.schema.prisma',
+        url,
+      };
+    }
+
+    return {
+      schema: './prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOps.schema.prisma',
+      url:
+        process.env.MERCHIZE_FULFILLMENT_OPS_DATABASE_URL ??
+        process.env.MERCHIZE_FULFILLMENT_OPS_NEON_DB_DEV_STRING ??
+        'postgresql://user:password@localhost:5432/merchize_fulfillment_ops?schema=public',
+    };
   }
 
   throw new Error(`Unknown schema: ${schemaPath}\nAdd it to prisma.config.ts.`);

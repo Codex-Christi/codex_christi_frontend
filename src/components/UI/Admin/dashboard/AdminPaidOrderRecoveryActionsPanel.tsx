@@ -8,7 +8,10 @@ import errorToast from '@/lib/error-toast';
 import loadingToast from '@/lib/loading-toast';
 import successToast from '@/lib/success-toast';
 import { cn } from '@/lib/utils';
-import { retryAdminPaidOrderRecoveryAction } from '@/app/admin/shop/paid-order-recovery/actions';
+import {
+  retryAdminPaidOrderRecoveryAction,
+  syncAdminMerchizeProviderDetailsAction,
+} from '@/app/admin/shop/paid-order-recovery/actions';
 import type { AdminIcon } from './adminShopDashboardTypes';
 
 type AdminRecoveryActionsPanelProps = {
@@ -24,6 +27,41 @@ export default function AdminPaidOrderRecoveryActionsPanel({
 }: AdminRecoveryActionsPanelProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  const handleProviderDetailSync = () => {
+    startTransition(async () => {
+      const toastId = loadingToast({
+        header: 'Syncing provider details',
+        message: 'Looking up the accepted Merchize order and refreshing detail snapshots.',
+      });
+
+      try {
+        const result = await syncAdminMerchizeProviderDetailsAction({ orderToken });
+        toast.dismiss(toastId);
+
+        if (!result.ok) {
+          errorToast({
+            header: 'Sync did not complete',
+            message: result.error,
+          });
+          router.refresh();
+          return;
+        }
+
+        successToast({
+          header: 'Provider details synced',
+          message: result.message,
+        });
+        router.refresh();
+      } catch (error) {
+        toast.dismiss(toastId);
+        errorToast({
+          header: 'Sync failed',
+          message: error instanceof Error ? error.message : 'Provider detail sync failed.',
+        });
+      }
+    });
+  };
 
   const handleRetry = () => {
     startTransition(async () => {
@@ -63,8 +101,13 @@ export default function AdminPaidOrderRecoveryActionsPanel({
   return (
     <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2'>
       {needsProviderDetailSync ? (
-        <ActionButton icon={SearchCheck} tone='cyan' disabled>
-          Sync Provider Details
+        <ActionButton
+          icon={SearchCheck}
+          tone='cyan'
+          disabled={isPending}
+          onClick={handleProviderDetailSync}
+        >
+          {isPending ? 'Syncing...' : 'Sync Provider Details'}
         </ActionButton>
       ) : (
         <ActionButton

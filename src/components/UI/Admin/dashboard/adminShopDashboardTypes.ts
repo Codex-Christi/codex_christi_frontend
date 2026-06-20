@@ -94,6 +94,17 @@ export type PaidOrderRecoveryActivityItem = {
   tone: 'slate' | 'emerald' | 'amber' | 'rose' | 'cyan';
 };
 
+export type MerchizeFulfillmentOpsAdminSummary = {
+  syncStatus: string;
+  merchizeExternalOrderNumber: string;
+  merchizeOrderId: string | null;
+  merchizeStatus: string | null;
+  itemCount: number;
+  lastLookupAt: string | null;
+  lastDetailSyncAt: string | null;
+  lastSyncErrorMessage: string | null;
+};
+
 export type PaidOrderRecoveryScannerState = {
   eligible: boolean;
   reason: string;
@@ -116,6 +127,7 @@ export type PaidOrderRecoveryDetail = {
   activity: PaidOrderRecoveryActivityItem[];
   webhookEvents: PaidOrderRecoveryWebhookEvent[];
   scannerState: PaidOrderRecoveryScannerState;
+  merchizeFulfillmentOps: MerchizeFulfillmentOpsAdminSummary | null;
   rawDebug: Record<string, unknown>;
   needsProviderDetailSync: boolean;
 };

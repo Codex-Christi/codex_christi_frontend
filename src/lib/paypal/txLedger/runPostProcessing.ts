@@ -15,6 +15,8 @@ import {
   FulfillmentProviderRejectedError,
   sendMerchizeFulfillmentOrder,
 } from '@/lib/paypal/txLedger/sendMerchizeFulfillmentOrder';
+import { registerAcceptedMerchizeFulfillmentPush } from '@/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentPush';
+import { safeLogErrorMessage } from '@/lib/merchizeFulfillmentOps/redaction';
 import {
   enqueueAdminRecoveryNotification,
   sendPendingAdminRecoveryNotificationsForOrder,
@@ -189,19 +191,18 @@ export async function runPostProcessing(orderToken: string) {
       countryIso2: row.countryIso2,
       fulfillmentAddress,
     });
+    const fulfillmentResponsePayload = {
+      ok: fulfillmentSend.ok,
+      status: fulfillmentSend.status,
+      success: fulfillmentSend.success,
+      message: fulfillmentSend.message,
+      data: fulfillmentSend.data,
+    };
 
     await updateLockedRow(orderToken, lockId, {
       status: PAYPAL_LEDGER_STATUS.COMPLETED,
       merchizeFulfillmentRequestPayload: JSON.parse(JSON.stringify(fulfillmentSend.requestPayload)),
-      merchizeFulfillmentResponsePayload: JSON.parse(
-        JSON.stringify({
-          ok: fulfillmentSend.ok,
-          status: fulfillmentSend.status,
-          success: fulfillmentSend.success,
-          message: fulfillmentSend.message,
-          data: fulfillmentSend.data,
-        }),
-      ),
+      merchizeFulfillmentResponsePayload: JSON.parse(JSON.stringify(fulfillmentResponsePayload)),
       merchizeFulfillmentProcessingId: fulfillmentSend.data?.id ?? null,
       merchizeProviderOrderId: fulfillmentSend.merchizeOrderIdentifiers.merchizeProviderOrderId,
       merchizeProviderOrderCode: fulfillmentSend.merchizeOrderIdentifiers.merchizeProviderOrderCode,
@@ -212,6 +213,40 @@ export async function runPostProcessing(orderToken: string) {
       lastErrorCode: null,
       lastErrorMessage: null,
     } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
+
+    const merchizeExternalOrderNumber =
+      fulfillmentSend.merchizeOrderIdentifiers.merchizeExternalOrderNumber;
+    if (merchizeExternalOrderNumber) {
+      await registerAcceptedMerchizeFulfillmentPush(
+        {
+          orderToken,
+          paypalOrderId: row.paypalOrderId,
+          djangoOrderIntentUuid: row.djangoOrderIntentUuid,
+          djangoOrderIntentOrderId: row.djangoOrderIntentOrderId,
+          djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
+          merchizeExternalOrderNumber,
+          merchizeOrderId: null,
+          merchizeOrderCode: fulfillmentSend.merchizeOrderIdentifiers.merchizeProviderOrderCode,
+          merchizeStatus: fulfillmentSend.merchizeOrderIdentifiers.merchizeProviderStatus,
+          djangoProcessResponsePayload: fulfillmentResponsePayload,
+          customerEmail: row.customerEmail,
+          shippingSnapshot: fulfillmentAddress,
+          cartSnapshot: row.cartSnapshot,
+        },
+        { syncImmediately: true },
+      ).catch((opsError) => {
+        console.error('[merchize.fulfillment_ops.registration_failed]', {
+          orderToken,
+          merchizeExternalOrderNumber,
+          error: safeLogErrorMessage(opsError),
+        });
+      });
+    } else {
+      console.error('[merchize.fulfillment_ops.registration_skipped]', {
+        orderToken,
+        reason: 'missing_merchize_external_order_number',
+      });
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 
@@ -253,7 +288,9 @@ export async function runPostProcessing(orderToken: string) {
         console.error('[AdminNotificationOutbox] failed to send fulfillment blocked alert', {
           orderToken,
           error:
-            notificationError instanceof Error ? notificationError.message : String(notificationError),
+            notificationError instanceof Error
+              ? notificationError.message
+              : String(notificationError),
         });
       });
 
@@ -297,7 +334,9 @@ export async function runPostProcessing(orderToken: string) {
         console.error('[AdminNotificationOutbox] failed to send fulfillment failed alert', {
           orderToken,
           error:
-            notificationError instanceof Error ? notificationError.message : String(notificationError),
+            notificationError instanceof Error
+              ? notificationError.message
+              : String(notificationError),
         });
       });
 

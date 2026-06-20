@@ -5,7 +5,14 @@ import { formatDistanceToNowStrict } from 'date-fns';
 import { getRecoveryScannerMinAgeMinutes } from '@/lib/paypal/txLedger/processingPolicy';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+import {
+  getMerchizeFulfillmentOpsPrisma,
+  isMerchizeFulfillmentOpsDatabaseConfigured,
+} from '@/lib/prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOpsPrisma';
+import { MERCHIZE_FULFILLMENT_SYNC_STATUS } from '@/lib/merchizeFulfillmentOps/status';
+import { safeLogErrorMessage } from '@/lib/merchizeFulfillmentOps/redaction';
 import type {
+  MerchizeFulfillmentOpsAdminSummary,
   PaidOrderRecoveryActivityItem,
   PaidOrderRecoveryAddress,
   PaidOrderRecoveryDetail,
@@ -73,8 +80,11 @@ export function isAcceptedDjangoFulfillmentProcessResponse(payload: unknown) {
   );
 }
 
-function needsProviderDetailSync(payload: unknown, merchizeProviderOrderId?: string | null) {
-  return isAcceptedDjangoFulfillmentProcessResponse(payload) && !merchizeProviderOrderId;
+function needsProviderDetailSync(payload: unknown, merchizeOpsSyncStatus?: string | null) {
+  return (
+    isAcceptedDjangoFulfillmentProcessResponse(payload) &&
+    merchizeOpsSyncStatus !== MERCHIZE_FULFILLMENT_SYNC_STATUS.DETAIL_SYNCED
+  );
 }
 
 function getMerchizeOrderCodeFromFulfillmentResponse(payload: unknown) {
@@ -163,14 +173,14 @@ function mapLedgerRowToPaidOrderRecoveryRow(row: {
   capturePayload: unknown;
   initialCurrency: string | null;
   merchizeFulfillmentResponsePayload: unknown;
-  merchizeProviderOrderId?: string | null;
+  merchizeFulfillmentOpsSyncStatus?: string | null;
   lastErrorCode: string | null;
   lastErrorMessage: string | null;
   updatedAt: Date;
 }): PaidOrderRecoveryRow {
   const providerDetailSyncNeeded = needsProviderDetailSync(
     row.merchizeFulfillmentResponsePayload,
-    row.merchizeProviderOrderId,
+    row.merchizeFulfillmentOpsSyncStatus,
   );
 
   return {
@@ -197,7 +207,8 @@ function buildTimeline(row: {
   djangoPaymentSaveCustomId: string | null;
   lastErrorCode: string | null;
   merchizeFulfillmentResponsePayload: unknown;
-  merchizeProviderOrderId: string | null;
+  merchizeFulfillmentOpsSyncStatus?: string | null;
+  merchizeFulfillmentOpsLastDetailSyncAt?: string | null;
 }) {
   const created = formatTimelineDate(row.createdAt);
   const updated = formatTimelineDate(row.updatedAt);
@@ -220,12 +231,23 @@ function buildTimeline(row: {
   ];
 
   if (
-    needsProviderDetailSync(row.merchizeFulfillmentResponsePayload, row.merchizeProviderOrderId)
+    needsProviderDetailSync(
+      row.merchizeFulfillmentResponsePayload,
+      row.merchizeFulfillmentOpsSyncStatus,
+    )
   ) {
     items.push({
       label: 'Fulfillment Accepted; Provider Details Pending',
       time: updated,
       state: 'pending',
+    });
+  } else if (
+    row.merchizeFulfillmentOpsSyncStatus === MERCHIZE_FULFILLMENT_SYNC_STATUS.DETAIL_SYNCED
+  ) {
+    items.push({
+      label: 'Merchize Provider Details Synced',
+      time: row.merchizeFulfillmentOpsLastDetailSyncAt ?? updated,
+      state: 'done',
     });
   } else if (
     row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED ||
@@ -270,6 +292,66 @@ function formatLongDate(date: Date | null | undefined) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
+}
+
+function mapMerchizeFulfillmentOpsSummary(row: {
+  syncStatus: string;
+  merchizeExternalOrderNumber: string;
+  merchizeOrderId: string | null;
+  merchizeStatus: string | null;
+  itemCount: number;
+  lastLookupAt: Date | null;
+  lastDetailSyncAt: Date | null;
+  lastSyncErrorMessage: string | null;
+}): MerchizeFulfillmentOpsAdminSummary {
+  return {
+    syncStatus: row.syncStatus,
+    merchizeExternalOrderNumber: row.merchizeExternalOrderNumber,
+    merchizeOrderId: row.merchizeOrderId,
+    merchizeStatus: row.merchizeStatus,
+    itemCount: row.itemCount,
+    lastLookupAt: row.lastLookupAt ? formatLongDate(row.lastLookupAt) : null,
+    lastDetailSyncAt: row.lastDetailSyncAt ? formatLongDate(row.lastDetailSyncAt) : null,
+    lastSyncErrorMessage: row.lastSyncErrorMessage,
+  };
+}
+
+async function getMerchizeFulfillmentOpsSummaries(orderTokens: string[]) {
+  const summaries = new Map<string, MerchizeFulfillmentOpsAdminSummary>();
+  if (!orderTokens.length || !isMerchizeFulfillmentOpsDatabaseConfigured()) {
+    return summaries;
+  }
+
+  try {
+    const prisma = getMerchizeFulfillmentOpsPrisma();
+    const rows = await prisma.merchizeFulfillmentOrder.findMany({
+      where: { orderToken: { in: orderTokens } },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        orderToken: true,
+        syncStatus: true,
+        merchizeExternalOrderNumber: true,
+        merchizeOrderId: true,
+        merchizeStatus: true,
+        itemCount: true,
+        lastLookupAt: true,
+        lastDetailSyncAt: true,
+        lastSyncErrorMessage: true,
+      },
+    });
+
+    for (const row of rows) {
+      if (!summaries.has(row.orderToken)) {
+        summaries.set(row.orderToken, mapMerchizeFulfillmentOpsSummary(row));
+      }
+    }
+  } catch (error) {
+    console.error('[merchize.fulfillment_ops.admin_summary_failed]', {
+      error: safeLogErrorMessage(error),
+    });
+  }
+
+  return summaries;
 }
 
 function normalizeAddress(value: unknown): PaidOrderRecoveryAddress | null {
@@ -495,6 +577,7 @@ function buildDetail(row: {
   lastErrorCode: string | null;
   lastEventType: string | null;
   webhookEvents: PaidOrderRecoveryWebhookEvent[];
+  merchizeFulfillmentOps: MerchizeFulfillmentOpsAdminSummary | null;
 }): PaidOrderRecoveryDetail {
   const originalAddress = normalizeAddress(row.shippingSnapshot);
   const overrideAddress = normalizeAddress(row.fulfillmentAddressOverride);
@@ -505,7 +588,7 @@ function buildDetail(row: {
     getMerchizeOrderCodeFromFulfillmentResponse(row.merchizeFulfillmentResponsePayload);
   const providerDetailSyncNeeded = needsProviderDetailSync(
     row.merchizeFulfillmentResponsePayload,
-    merchizeProviderOrderId,
+    row.merchizeFulfillmentOps?.syncStatus,
   );
 
   return {
@@ -531,8 +614,15 @@ function buildDetail(row: {
       { label: 'Django order intent order ID', value: row.djangoOrderIntentOrderId },
       { label: 'Django payment save custom ID', value: row.djangoPaymentSaveCustomId },
       { label: 'Merchize processing ID', value: row.merchizeFulfillmentProcessingId },
-      { label: 'Merchize platform order ID', value: merchizeProviderOrderId },
+      {
+        label: 'Merchize platform order ID',
+        value: row.merchizeFulfillmentOps?.merchizeOrderId ?? merchizeProviderOrderId,
+      },
       { label: 'Merchize external order number', value: merchizeExternalOrderNumber },
+      {
+        label: 'Merchize Ops sync status',
+        value: row.merchizeFulfillmentOps?.syncStatus ?? null,
+      },
       { label: 'Latest PayPal webhook event', value: row.webhookEvents[0]?.eventType ?? null },
       {
         label: 'Latest webhook delivery status',
@@ -543,6 +633,7 @@ function buildDetail(row: {
     activity: buildActivity(row),
     webhookEvents: row.webhookEvents,
     scannerState: getScannerState(row),
+    merchizeFulfillmentOps: row.merchizeFulfillmentOps,
     needsProviderDetailSync: providerDetailSyncNeeded,
     rawDebug: {
       orderToken: row.orderToken,
@@ -558,6 +649,7 @@ function buildDetail(row: {
       merchizeFulfillmentProcessingId: row.merchizeFulfillmentProcessingId,
       merchizeProviderOrderId,
       merchizeExternalOrderNumber,
+      merchizeFulfillmentOps: row.merchizeFulfillmentOps,
       needsProviderDetailSync: providerDetailSyncNeeded,
       scannerState: getScannerState(row),
       webhookEvents: row.webhookEvents,
@@ -590,8 +682,16 @@ export async function listAdminPaidOrderRecoveryRows() {
       updatedAt: true,
     },
   });
+  const merchizeOpsSummaries = await getMerchizeFulfillmentOpsSummaries(
+    rows.map((row) => row.orderToken),
+  );
 
-  return rows.map(mapLedgerRowToPaidOrderRecoveryRow);
+  return rows.map((row) =>
+    mapLedgerRowToPaidOrderRecoveryRow({
+      ...row,
+      merchizeFulfillmentOpsSyncStatus: merchizeOpsSummaries.get(row.orderToken)?.syncStatus,
+    }),
+  );
 }
 
 export async function getAdminPaidOrderRecoveryDetail(orderToken: string) {
@@ -616,12 +716,25 @@ export async function getAdminPaidOrderRecoveryDetail(orderToken: string) {
       })
     : [];
   const mappedWebhookEvents = webhookEvents.map(mapWebhookEvent);
+  const merchizeOpsSummary =
+    (await getMerchizeFulfillmentOpsSummaries([row.orderToken])).get(row.orderToken) ?? null;
 
   return {
-    row: mapLedgerRowToPaidOrderRecoveryRow(row),
-    detail: buildDetail({ ...row, webhookEvents: mappedWebhookEvents }),
+    row: mapLedgerRowToPaidOrderRecoveryRow({
+      ...row,
+      merchizeFulfillmentOpsSyncStatus: merchizeOpsSummary?.syncStatus,
+    }),
+    detail: buildDetail({
+      ...row,
+      webhookEvents: mappedWebhookEvents,
+      merchizeFulfillmentOps: merchizeOpsSummary,
+    }),
     raw: row,
-    timeline: buildTimeline(row),
+    timeline: buildTimeline({
+      ...row,
+      merchizeFulfillmentOpsSyncStatus: merchizeOpsSummary?.syncStatus,
+      merchizeFulfillmentOpsLastDetailSyncAt: merchizeOpsSummary?.lastDetailSyncAt,
+    }),
     notifications,
   };
 }
