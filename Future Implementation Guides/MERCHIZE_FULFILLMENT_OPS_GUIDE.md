@@ -29,10 +29,10 @@ The previous wording treated Merchize Fulfillment Ops as beginning only after an
 The corrected domain is:
 
 ```txt
-runPaidOrderFulfillmentProcessing(orderToken)
+runPaidFulfillmentProcessing(orderToken)
 ```
 
-This is the semantic replacement for the older `runPostProcessing(orderToken)` name. Do not keep `runPostProcessing` as an alias-only fallback. Either migrate callers to `runPaidOrderFulfillmentProcessing`, or keep `runPostProcessing` only if it remains the real parent orchestrator that runs the paid order fulfillment stages.
+This is the semantic replacement for the older `runPostProcessing(orderToken)` name. Do not keep `runPostProcessing` as an alias-only fallback. Runtime callers should use `runPaidFulfillmentProcessing`.
 
 Paid order fulfillment processing starts when PayPal capture already exists and the server has enough ledger state to continue without the shopper's browser. It includes:
 
@@ -1318,10 +1318,10 @@ Rules:
 The integration point is the paid order fulfillment runner:
 
 ```txt
-runPaidOrderFulfillmentProcessing(orderToken)
+runPaidFulfillmentProcessing(orderToken)
 ```
 
-The existing `runPostProcessing(orderToken)` name should not stay as an alias-only fallback. If it remains, it must be the real parent orchestration entrypoint and should call clearly named internal stages.
+The old `runPostProcessing(orderToken)` name should not stay as an alias-only fallback. `runPaidFulfillmentProcessing(orderToken)` is the canonical parent orchestration entrypoint and should call clearly named internal stages.
 
 The target stage sequence:
 
@@ -1345,7 +1345,7 @@ Completion rule:
 Recommended function boundary:
 
 ```txt
-src/lib/paidOrderFulfillment/runPaidOrderFulfillmentProcessing.ts
+src/lib/paypal/txLedger/runPaidFulfillmentProcessing.ts
 src/lib/paidOrderFulfillment/stages/pushMerchizeOrderToFulfillment.ts
 src/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentPush.ts
 ```
@@ -2080,7 +2080,7 @@ Before starting Merchize Fulfillment Ops DB implementation:
 
 These decisions supersede the older open-question framing.
 
-1. The semantic runner is `runPaidOrderFulfillmentProcessing(orderToken)`. `runPostProcessing(orderToken)` should either be renamed out of call sites or remain only as the real parent orchestrator, not as an alias-only fallback.
+1. The semantic runner is `runPaidFulfillmentProcessing(orderToken)`. The older `runPostProcessing(orderToken)` entrypoint should stay out of call sites and must not return as an alias-only fallback.
 
 2. Push-to-fulfillment acceptance is the final provider write boundary for paid order fulfillment completion.
 
@@ -2120,7 +2120,7 @@ Unless explicitly changed:
 # 22) Implementation Steps
 
 1. Update documentation and names around paid order fulfillment processing.
-2. Rename or reshape `runPostProcessing(orderToken)` into the semantic paid-order fulfillment runner. Do not add a second parallel orchestrator.
+2. Keep `runPaidFulfillmentProcessing(orderToken)` as the semantic paid-order fulfillment runner. Do not add a second parallel orchestrator.
 3. Extract stage helpers for receipt upload, Django payment save, fulfillment payload validation, catalog import/process, push-to-fulfillment, provider lookup, attention checks, address review, availability checks, tracking sync, and reconciliation.
 4. Add or adapt server-only Merchize adapter methods for:
    - `POST /order/external/orders/catalog`

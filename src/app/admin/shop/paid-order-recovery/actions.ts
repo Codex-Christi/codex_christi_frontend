@@ -12,7 +12,7 @@ import {
   runSelectedPayPalRecoveryScanner,
   type PayPalRecoveryScannerRunResult,
 } from '@/lib/paypal/txLedger/recoveryScanner';
-import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
+import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { registerAcceptedMerchizeFulfillmentPush } from '@/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentPush';
@@ -246,7 +246,7 @@ export async function retryAdminPaidOrderRecoveryAction({
       };
     }
 
-    await runPostProcessing(orderToken);
+    await runPaidFulfillmentProcessing(orderToken);
 
     revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
     revalidatePath('/admin/shop/paid-order-recovery');

@@ -1,7 +1,7 @@
 import { after } from 'next/server';
 
 import { getServerPayPalConfig } from '@/lib/paypal/serverPayPalConfig';
-import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
+import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import {
   ensureWebhookDeliveryRecord,
@@ -203,7 +203,7 @@ export async function POST(req: Request) {
       // ACK fast so provider retries are driven by our DB state, not route latency.
       after(async () => {
         try {
-          await runPostProcessing(row.orderToken);
+          await runPaidFulfillmentProcessing(row.orderToken);
           await markWebhookProcessed(event.id);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);

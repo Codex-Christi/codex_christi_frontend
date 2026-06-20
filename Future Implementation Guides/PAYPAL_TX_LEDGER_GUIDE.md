@@ -17,7 +17,7 @@ Implemented in the current code checkpoint:
 - Local fulfillment payload validation failures end as `status = "fulfillment_blocked"` with `lastErrorCode = "FULFILLMENT_PAYLOAD_INVALID"`.
 - The ledger stores the canonical fulfillment request payload and the raw/local failure response payload for both recovery states.
 - Automatic capture/webhook resume paths should not move `fulfillment_failed` or `fulfillment_blocked` rows backward to `captured`; admin recovery owns those rows.
-- `runPostProcessing(orderToken)` should be renamed or reshaped around `runPaidOrderFulfillmentProcessing(orderToken)` semantics. Do not keep an alias-only fallback.
+- `runPaidFulfillmentProcessing(orderToken)` is the canonical paid-order fulfillment runner. Do not keep `runPostProcessing(orderToken)` as an alias-only fallback.
 - The paid order fulfillment runner may orchestrate receipt upload and Django payment save, but it must not replay PayPal capture or repeat completed side effects.
 
 Not part of this checkpoint:
@@ -133,7 +133,7 @@ The old browser-owned completion path used these server actions directly:
 Current state:
 
 - `usePayPalTXApproveCallback.ts` is a status/redirect consumer after PayPal approval.
-- Server-side post-processing is ledger-driven through webhook/capture resume paths and `runPostProcessing(orderToken)`.
+- Server-side post-processing is ledger-driven through webhook/capture resume paths and `runPaidFulfillmentProcessing(orderToken)`.
 - The browser should not be the durable owner of receipt upload, Django payment save, or fulfillment push.
 
 ## 2.5 Webhook
@@ -185,7 +185,7 @@ flowchart TD
   K --> L["Frontend becomes a status consumer and starts polling /next-api/paypal/tx-ledger/payments/[orderToken]/status"]
   M["PayPal Webhook PAYMENT.CAPTURE.COMPLETED"] --> N["Webhook dedupe + ledger lookup"]
   N --> |"200 OK immediately"| N2["after() callback"]
-  N2 --> O["runPostProcessing(orderToken)"]
+  N2 --> O["runPaidFulfillmentProcessing(orderToken)"]
   O --> P["Receipt -> Payment Save -> Fulfillment"]
   P --> Q["Ledger: completed"]
   Q --> R["Polling UI shows success"]
@@ -276,7 +276,8 @@ PAYPAL_TX_LEDGER_NEON_POOLED_DB_STRING="postgresql://USER:PASSWORD@HOST/PROD_DB?
 SHOP_SERVER_ACTIONS_CRYPTO_SECRET="long-random-secret"
 
 # Internal alert fallback recipients
-# Primary recipient routing should live in the Admin Ops ledger `InternalAlert*` tables.
+# Primary paid-order routing now reads Admin Ops `AdminNotificationRecipientGroup`
+# key `paid_order_fulfillment_issues`; this env list is bootstrap/emergency fallback.
 ORDER_RECOVERY_ADMIN_EMAILS="ops@example.com,support@example.com"
 ORDER_RECOVERY_NOTIFICATION_FROM_EMAIL="support@example.com"
 ```
@@ -302,7 +303,7 @@ Notes:
 - The root `prisma.config.ts` should switch datasource URLs based on the `--schema` target.
 - Django order-intent HMAC signing is server-only. The browser should call the local Next proxy routes and should never receive the signing secret.
 - Do **not** reuse `SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY` for webhook/server post-processing. Keep a separate server-only secret for those actions.
-- Admin Ops ledger `InternalAlert*` routing should receive internal alerts when a paid order needs admin recovery. `ORDER_RECOVERY_ADMIN_EMAILS` is a bootstrap/fallback list only. Email delivery must be driven from a durable outbox row, not from an untracked fire-and-forget side effect.
+- Admin Ops ledger `AdminNotificationRecipientGroup` routing now resolves paid-order fulfillment alert recipients for the existing PayPal `AdminNotificationOutbox`. `ORDER_RECOVERY_ADMIN_EMAILS` is a bootstrap/fallback list only. Email delivery must be driven from a durable outbox row, not from an untracked fire-and-forget side effect.
 - This guide intentionally avoids requiring a second Prisma config file for the ledger.
 - Runtime code uses the pooled PayPal ledger URLs. Prisma CLI commands use the non-pooled URLs selected by `PAYPAL_TX_LEDGER_NEON_BRANCH`.
 
@@ -449,7 +450,7 @@ Admin notification intent:
 Why the extra tracking fields matter:
 
 - `PaypalWebhookEvent.processedAt` prevents false "already handled" acks when a prior attempt failed.
-- `PaypalIntent.postProcessingLock*` gives `runPostProcessing(...)` a DB-backed lease so only one worker can own side effects at a time.
+- `PaypalIntent.postProcessingLock*` gives `runPaidFulfillmentProcessing(...)` a DB-backed lease so only one worker can own side effects at a time.
 - `InternalAlertOutbox.dedupeKey` prevents repeated webhook/retry attempts from spamming admins for the same unresolved paid-order condition.
 
 ---
@@ -1717,7 +1718,7 @@ The confirmation page should not clear checkout/order state on first render. Cle
 If the user's browser closes after capture but before `completed`:
 
 1. The ledger row already exists with status `captured` (or later).
-2. The webhook will still fire and trigger `runPaidOrderFulfillmentProcessing` through the current wrapper.
+2. The webhook will still fire and trigger `runPaidFulfillmentProcessing`.
 3. If the user returns, the confirmation page URL (bookmarked or in history) still has `orderToken` in the path — polling resumes automatically.
 4. If the user lost the URL entirely, admin can look up by `customerEmail` and share status or receipt link.
 
@@ -1738,12 +1739,12 @@ Keep your existing signature verification and raw-body handling.
 1. Delivery tracking by `PaypalWebhookEvent.eventId` plus `processedAt` / `attemptCount`
 2. Robust PayPal order id extraction
 3. Retry when the ledger row is not yet correlated
-4. `runPaidOrderFulfillmentProcessing(orderToken)` trigger on `PAYMENT.CAPTURE.COMPLETED`, through the current wrapper until migration finishes
+4. `runPaidFulfillmentProcessing(orderToken)` trigger on `PAYMENT.CAPTURE.COMPLETED`
 5. ACK fast; do not let the webhook route become the place where long receipt/backend/fulfillment work blocks the provider response
 
 ## Why `after()` for post-processing (Next.js 15+)
 
-PayPal expects a response within ~10 seconds. If `runPaidOrderFulfillmentProcessing` takes longer (receipt upload, Merchize API, payment save), the webhook times out and PayPal marks the delivery as failed, triggering retries that overlap with your still-running work.
+PayPal expects a response within ~10 seconds. If `runPaidFulfillmentProcessing` takes longer (receipt upload, Merchize API, payment save), the webhook times out and PayPal marks the delivery as failed, triggering retries that overlap with your still-running work.
 
 `after()` from `next/server` solves this: the webhook handler responds 200 immediately, and the post-processing callback runs in the same Node.js process after the response is sent. Your VPS runs Node.js directly (not edge/serverless), so `after()` is fully supported.
 
@@ -1794,7 +1795,7 @@ Note:
 import { after } from 'next/server';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
-import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
+import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 
 // after verification + parsed `event`
 const eventId = event.id;
@@ -1924,10 +1925,10 @@ try {
 
       // Schedule post-processing to run AFTER the response is sent to PayPal.
       // This prevents webhook timeouts under load. The DB-backed lease in
-      // runPostProcessing prevents duplicate work if a retry overlaps.
+      // runPaidFulfillmentProcessing prevents duplicate work if a retry overlaps.
       after(async () => {
         try {
-          await runPostProcessing(row.orderToken);
+          await runPaidFulfillmentProcessing(row.orderToken);
 
           await paypalTxLedger.paypalWebhookEvent.update({
             where: { eventId },
@@ -2019,8 +2020,8 @@ This is the core server-only replacement for client post-processing. The target 
 
 Target files:
 
-- `src/lib/paidOrderFulfillment/runPaidOrderFulfillmentProcessing.ts`
-- `src/lib/paypal/txLedger/runPostProcessing.ts` only if it remains the real parent orchestrator; otherwise migrate callers to the semantic path
+- `src/lib/paypal/txLedger/runPaidFulfillmentProcessing.ts`
+- `src/lib/paypal/txLedger/runPaidFulfillmentProcessing.ts` only if it remains the real parent orchestrator; otherwise migrate callers to the semantic path
 
 Important:
 
@@ -2072,7 +2073,7 @@ import { sendMerchizeFulfillmentOrder } from '@/lib/paypal/txLedger/sendMerchize
 
 const POST_PROCESSING_LEASE_MS = 5 * 60_000;
 
-export async function runPostProcessing(orderToken: string) {
+export async function runPaidFulfillmentProcessing(orderToken: string) {
   const now = new Date();
   const leaseExpiresAt = new Date(now.getTime() + POST_PROCESSING_LEASE_MS);
   const lockId = randomUUID();
@@ -2361,7 +2362,7 @@ Implementation rules:
 - `sendMerchizeOrderDetailsToBackend(...)` must return `ok: false` when the HTTP request succeeds but Django returns `success: false`, a non-idempotent `processing_status: "failed"`, or an unknown provider error.
 - Do not classify the known Django informational message `Order created but details not available` as a failure when the response is otherwise successful and completed.
 - Do not classify a provider duplicate response as a new failure when it means the provider already accepted an order for the same external number; that should move into Merchize detail lookup/reconciliation.
-- The helper should expose the raw Django response in the returned error object so `runPostProcessing(...)` can persist it.
+- The helper should expose the raw Django response in the returned error object so `runPaidFulfillmentProcessing(...)` can persist it.
 - Do not throw away provider response data just because the normalized result is `ok: false`.
 - Do not mark the ledger row `completed` from HTTP status alone.
 - For provider-accepted but asynchronous states, decide explicitly which `processing_status` values count as accepted. Treat unknown states as `FULFILLMENT_PROVIDER_REJECTED` until the Django contract is confirmed.
@@ -2486,7 +2487,7 @@ Current route files:
 'use server';
 
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
-import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
+import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 
 export async function retryPostProcessing(orderToken: string) {
   const row = await paypalTxLedger.paypalIntent.findUnique({ where: { orderToken } });
@@ -2497,7 +2498,7 @@ export async function retryPostProcessing(orderToken: string) {
     data: { retryCount: { increment: 1 } },
   });
 
-  await runPostProcessing(orderToken);
+  await runPaidFulfillmentProcessing(orderToken);
 }
 ```
 
@@ -2861,7 +2862,7 @@ New file:
 
 ```ts
 import { NextResponse } from 'next/server';
-import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
+import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 
 export async function POST(req: Request) {
   if (process.env.NODE_ENV === 'production') {
@@ -2873,7 +2874,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing orderToken' }, { status: 400 });
   }
 
-  await runPostProcessing(orderToken);
+  await runPaidFulfillmentProcessing(orderToken);
   return NextResponse.json({ ok: true });
 }
 ```
@@ -2981,7 +2982,7 @@ Why this is safe:
 - Create intent from checkout.
 - Authorize/capture routes write ledger payloads.
 - Poll order status endpoint.
-- Use dev fallback endpoint to trigger `runPostProcessing(orderToken)`.
+- Use dev fallback endpoint to trigger `runPaidFulfillmentProcessing(orderToken)`.
 - Verify:
   - receipt link/file saved
   - Django payment save custom ID saved
@@ -3031,7 +3032,7 @@ These defaults are implemented in this guide’s templates. Items marked **(defe
 
 2. Webhook + sandbox testing mode
 
-- Add dev-only fallback endpoint for `runPostProcessing(orderToken)`
+- Add dev-only fallback endpoint for `runPaidFulfillmentProcessing(orderToken)`
 - Disabled in production
 
 3. Admin auth transport **(tracked in admin tooling guide)**
@@ -3100,7 +3101,7 @@ Use this section only if you intentionally want to diverge from Section 30.
 
 5. Provider coupling override
 
-- Inline Merchize calls directly in `runPostProcessing` (not recommended).
+- Inline Merchize calls directly in `runPaidFulfillmentProcessing` (not recommended).
 
 ---
 
@@ -3161,7 +3162,7 @@ Redis Pub/Sub works across all Node processes and servers. Every worker subscrib
 npm install ioredis
 ```
 
-Publisher (inside `runPostProcessing` or `after()` callback, after status update):
+Publisher (inside `runPaidFulfillmentProcessing` or `after()` callback, after status update):
 
 ```ts
 import Redis from 'ioredis';

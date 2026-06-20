@@ -1,6 +1,6 @@
 import { after, NextResponse } from 'next/server';
 import { isStatusRouteResumeEnabled } from '@/lib/paypal/txLedger/processingPolicy';
-import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
+import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 
@@ -37,7 +37,7 @@ export async function GET(_req: Request, { params }: PageProps) {
   if (shouldResumePostProcessing) {
     after(async () => {
       try {
-        await runPostProcessing(row.orderToken);
+        await runPaidFulfillmentProcessing(row.orderToken);
       } catch (error) {
         console.error('[paypal.status.post_processing_resume_failed]', {
           orderToken: row.orderToken,

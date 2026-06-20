@@ -5,7 +5,7 @@ import {
   getRecoveryScannerMinAgeMinutes,
   isRecoveryScannerEnabled,
 } from '@/lib/paypal/txLedger/processingPolicy';
-import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
+import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 
@@ -146,7 +146,7 @@ export async function runPayPalRecoveryScanner(args?: {
 
   for (const candidate of candidates) {
     try {
-      await runPostProcessing(candidate.orderToken);
+      await runPaidFulfillmentProcessing(candidate.orderToken);
 
       const updated = await paypalTxLedger.paypalIntent.findUnique({
         where: { orderToken: candidate.orderToken },
@@ -224,7 +224,7 @@ export async function runSelectedPayPalRecoveryScanner(args: {
 
   for (const candidate of candidates) {
     try {
-      await runPostProcessing(candidate.orderToken);
+      await runPaidFulfillmentProcessing(candidate.orderToken);
 
       const updated = await paypalTxLedger.paypalIntent.findUnique({
         where: { orderToken: candidate.orderToken },

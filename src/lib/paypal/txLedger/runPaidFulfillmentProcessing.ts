@@ -62,7 +62,7 @@ async function updateLockedRow(
   });
 }
 
-export async function runPostProcessing(orderToken: string) {
+export async function runPaidFulfillmentProcessing(orderToken: string) {
   const now = new Date();
   const lockId = randomUUID();
   const leaseExpiresAt = new Date(now.getTime() + POST_PROCESSING_LEASE_MS);

@@ -17,16 +17,16 @@ The repository currently has a ledger-backed PayPal flow, but post-payment proce
 The current post-payment runner is:
 
 ```txt
-src/lib/paypal/txLedger/runPostProcessing.ts
+src/lib/paypal/txLedger/runPaidFulfillmentProcessing.ts
 ```
 
 Target semantic name:
 
 ```txt
-src/lib/paidOrderFulfillment/runPaidOrderFulfillmentProcessing.ts
+src/lib/paypal/txLedger/runPaidFulfillmentProcessing.ts
 ```
 
-Do not keep `runPostProcessing(orderToken)` as an alias-only fallback. Either migrate trigger callers to `runPaidOrderFulfillmentProcessing(orderToken)`, or keep `runPostProcessing` as the real parent orchestrator that executes the paid order fulfillment stages.
+Do not keep `runPostProcessing(orderToken)` as an alias-only fallback. Trigger callers should use `runPaidFulfillmentProcessing(orderToken)`, the real parent orchestrator that executes the paid order fulfillment stages.
 
 That runner performs these follow-up steps after PayPal capture already exists:
 
@@ -113,8 +113,8 @@ The current flow has important protections:
 
 - PayPal capture uses a stable `paypalRequestId` based on `orderToken`.
 - If a ledger row already has `capturePayload`, the capture route returns the stored capture payload instead of capturing again.
-- `runPaidOrderFulfillmentProcessing(...)` uses a DB-backed lease through `postProcessingLockId` and `postProcessingLockExpiresAt`.
-- If the old `runPostProcessing(...)` entrypoint remains, it must be the real parent orchestrator, not an alias-only delegate.
+- `runPaidFulfillmentProcessing(...)` uses a DB-backed lease through `postProcessingLockId` and `postProcessingLockExpiresAt`.
+- The old `runPostProcessing(...)` entrypoint should not remain as an alias-only delegate.
 - Webhook events are deduped by PayPal `eventId`.
 - `fulfillment_blocked` and `fulfillment_failed` rows are not automatically moved backward by webhook capture events.
 - Existing Django/Merchize fulfillment responses are persisted for admin inspection.
@@ -336,7 +336,7 @@ flowchart TD
   D["PayPal webhook"] --> E["Verify signature"]
   E --> F["Persist webhook event"]
   F --> C
-  C --> G["runPaidOrderFulfillmentProcessing with DB lease"]
+  C --> G["runPaidFulfillmentProcessing with DB lease"]
   G --> H["Receipt upload"]
   H --> I["Django payment save"]
   I --> J["Catalog-backed fulfillment process"]
@@ -350,7 +350,7 @@ flowchart TD
 The long-term rule:
 
 - Capture route, webhook route, scheduled worker, and admin action may all request post-processing.
-- `runPaidOrderFulfillmentProcessing(...)` and the ledger lease decide whether work should actually run.
+- `runPaidFulfillmentProcessing(...)` and the ledger lease decide whether work should actually run.
 - Customer status polling should not be the main production recovery mechanism.
 
 ## Recommended Next Implementation Steps
@@ -386,7 +386,7 @@ src/app/api/paypal/tx-ledger/payments/[orderToken]/status/route.ts
 Behavior:
 
 - Always return status.
-- Only schedule `runPostProcessing(...)` when `PAYPAL_TX_LEDGER_ENABLE_STATUS_ROUTE_RESUME=true`.
+- Only schedule `runPaidFulfillmentProcessing(...)` when `PAYPAL_TX_LEDGER_ENABLE_STATUS_ROUTE_RESUME=true`.
 - Include a response field such as `recoveryResumeScheduled` only if useful for debugging.
 
 ### Step 3 - Register Sandbox Webhook
@@ -487,7 +487,7 @@ Rules:
 - Do not auto-run rows in `fulfillment_failed` unless the saved stage state proves the failure is in a safe, idempotent remaining stage.
 - Accepted push-to-fulfillment rows should move to provider lookup/status/reconciliation, not full payment-side replay.
 - Respect active `postProcessingLockExpiresAt`.
-- Use the same `runPaidOrderFulfillmentProcessing(orderToken)` entrypoint only when the row is genuinely incomplete.
+- Use the same `runPaidFulfillmentProcessing(orderToken)` entrypoint only when the row is genuinely incomplete.
 
 ### Step 6 - Add Webhook Operations Visibility
 

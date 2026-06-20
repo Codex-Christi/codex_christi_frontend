@@ -1,5 +1,9 @@
 import 'server-only';
 
+import {
+  ADMIN_NOTIFICATION_RECIPIENT_GROUP_KEY,
+  resolveAdminNotificationRecipients,
+} from '@/lib/admin/admin-notification-recipients';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 
 const DEFAULT_PENDING_SEND_LIMIT = 25;
@@ -54,6 +58,7 @@ type EnqueueAdminRecoveryNotificationProps = {
   type?: (typeof ADMIN_NOTIFICATION_TYPE)[keyof typeof ADMIN_NOTIFICATION_TYPE];
   stage?: (typeof ADMIN_NOTIFICATION_STAGE)[keyof typeof ADMIN_NOTIFICATION_STAGE];
   severity?: (typeof ADMIN_NOTIFICATION_SEVERITY)[keyof typeof ADMIN_NOTIFICATION_SEVERITY];
+  recipientGroupKey?: string;
 };
 
 function getConfiguredAdminRecipients() {
@@ -203,8 +208,12 @@ export async function enqueueAdminRecoveryNotification({
   type = ADMIN_NOTIFICATION_TYPE.PAID_ORDER_RECOVERY_REQUIRED,
   stage = ADMIN_NOTIFICATION_STAGE.FULFILLMENT,
   severity = ADMIN_NOTIFICATION_SEVERITY.CRITICAL,
+  recipientGroupKey = ADMIN_NOTIFICATION_RECIPIENT_GROUP_KEY.PAID_ORDER_FULFILLMENT_ISSUES,
 }: EnqueueAdminRecoveryNotificationProps) {
-  const recipients = getConfiguredAdminRecipients();
+  const recipients = await resolveAdminNotificationRecipients({
+    groupKey: recipientGroupKey,
+    fallbackEmails: getConfiguredAdminRecipients(),
+  });
 
   if (recipients.length === 0) {
     return { created: 0, skipped: true as const };

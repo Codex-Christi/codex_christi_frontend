@@ -387,7 +387,8 @@ export const ModelName = {
   AdminUser: 'AdminUser',
   AdminUnlockAttempt: 'AdminUnlockAttempt',
   AdminAuditLog: 'AdminAuditLog',
-  AdminMasterTransferChallenge: 'AdminMasterTransferChallenge'
+  AdminMasterTransferChallenge: 'AdminMasterTransferChallenge',
+  AdminNotificationRecipientGroup: 'AdminNotificationRecipientGroup'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -403,7 +404,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "adminUser" | "adminUnlockAttempt" | "adminAuditLog" | "adminMasterTransferChallenge"
+    modelProps: "adminUser" | "adminUnlockAttempt" | "adminAuditLog" | "adminMasterTransferChallenge" | "adminNotificationRecipientGroup"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -703,6 +704,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    AdminNotificationRecipientGroup: {
+      payload: Prisma.$AdminNotificationRecipientGroupPayload<ExtArgs>
+      fields: Prisma.AdminNotificationRecipientGroupFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AdminNotificationRecipientGroupFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationRecipientGroupPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AdminNotificationRecipientGroupFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationRecipientGroupPayload>
+        }
+        findFirst: {
+          args: Prisma.AdminNotificationRecipientGroupFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationRecipientGroupPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AdminNotificationRecipientGroupFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationRecipientGroupPayload>
+        }
+        findMany: {
+          args: Prisma.AdminNotificationRecipientGroupFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationRecipientGroupPayload>[]
+        }
+        create: {
+          args: Prisma.AdminNotificationRecipientGroupCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationRecipientGroupPayload>
+        }
+        createMany: {
+          args: Prisma.AdminNotificationRecipientGroupCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AdminNotificationRecipientGroupCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationRecipientGroupPayload>[]
+        }
+        delete: {
+          args: Prisma.AdminNotificationRecipientGroupDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationRecipientGroupPayload>
+        }
+        update: {
+          args: Prisma.AdminNotificationRecipientGroupUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationRecipientGroupPayload>
+        }
+        deleteMany: {
+          args: Prisma.AdminNotificationRecipientGroupDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AdminNotificationRecipientGroupUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AdminNotificationRecipientGroupUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationRecipientGroupPayload>[]
+        }
+        upsert: {
+          args: Prisma.AdminNotificationRecipientGroupUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminNotificationRecipientGroupPayload>
+        }
+        aggregate: {
+          args: Prisma.AdminNotificationRecipientGroupAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAdminNotificationRecipientGroup>
+        }
+        groupBy: {
+          args: Prisma.AdminNotificationRecipientGroupGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AdminNotificationRecipientGroupGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AdminNotificationRecipientGroupCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AdminNotificationRecipientGroupCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -811,6 +886,23 @@ export const AdminMasterTransferChallengeScalarFieldEnum = {
 } as const
 
 export type AdminMasterTransferChallengeScalarFieldEnum = (typeof AdminMasterTransferChallengeScalarFieldEnum)[keyof typeof AdminMasterTransferChallengeScalarFieldEnum]
+
+
+export const AdminNotificationRecipientGroupScalarFieldEnum = {
+  id: 'id',
+  key: 'key',
+  label: 'label',
+  description: 'description',
+  recipientEmails: 'recipientEmails',
+  includeMasterAdmins: 'includeMasterAdmins',
+  enabled: 'enabled',
+  createdByCodexUserId: 'createdByCodexUserId',
+  updatedByCodexUserId: 'updatedByCodexUserId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AdminNotificationRecipientGroupScalarFieldEnum = (typeof AdminNotificationRecipientGroupScalarFieldEnum)[keyof typeof AdminNotificationRecipientGroupScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -1050,6 +1142,7 @@ export type GlobalOmitConfig = {
   adminUnlockAttempt?: Prisma.AdminUnlockAttemptOmit
   adminAuditLog?: Prisma.AdminAuditLogOmit
   adminMasterTransferChallenge?: Prisma.AdminMasterTransferChallengeOmit
+  adminNotificationRecipientGroup?: Prisma.AdminNotificationRecipientGroupOmit
 }
 
 /* Types for Logging */

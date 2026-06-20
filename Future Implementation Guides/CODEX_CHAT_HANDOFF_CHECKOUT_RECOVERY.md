@@ -224,7 +224,7 @@ Fix direction:
 Relevant files:
 
 ```txt
-src/lib/paypal/txLedger/runPostProcessing.ts
+src/lib/paypal/txLedger/runPaidFulfillmentProcessing.ts
 src/actions/shop/paypal/processAndUploadCompletedTx/savePaymentReceiptToCloud.ts
 src/actions/shop/paypal/createShopInvoicePDF.ts
 ```

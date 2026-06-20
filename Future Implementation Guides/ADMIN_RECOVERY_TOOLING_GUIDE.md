@@ -24,10 +24,10 @@ The runtime payment ledger now owns the payment evidence and retry guards. The c
 Use the semantic runner name:
 
 ```txt
-runPaidOrderFulfillmentProcessing(orderToken)
+runPaidFulfillmentProcessing(orderToken)
 ```
 
-Do not keep `runPostProcessing(orderToken)` as an alias-only fallback. Either migrate callers to the semantic runner or keep `runPostProcessing` as the real parent orchestrator that runs the paid order fulfillment stages.
+Do not keep `runPostProcessing(orderToken)` as an alias-only fallback. Callers should use `runPaidFulfillmentProcessing`, the real parent orchestrator that runs the paid order fulfillment stages.
 
 Implemented before the dashboard revamp continues:
 
@@ -77,6 +77,14 @@ sendPendingInternalAlerts
 resendInternalAlert
 suppressInternalAlert
 ```
+
+Current implementation checkpoint:
+
+- `AdminNotificationRecipientGroup` is the first Admin Ops ledger slice for reusable alert routing.
+- The current paid-order recovery sender still uses the PayPal ledger `AdminNotificationOutbox` for durable delivery rows.
+- `paid_order_fulfillment_issues` is the current recipient group key for fulfillment recovery alerts.
+- `ORDER_RECOVERY_ADMIN_EMAILS` remains a bootstrap/emergency fallback when the Admin Ops group is absent or the Admin Ops ledger is unavailable.
+- The broader `InternalAlert*` tables remain the target shape for a later cross-domain alert outbox.
 
 Recipient sources:
 
@@ -528,7 +536,7 @@ Rules:
 - Do not replay PayPal capture.
 - Do not replay receipt upload or Django payment save when their success artifacts already exist.
 - Do not treat catalog import as final success unless push-to-fulfillment has also been accepted.
-- Use `runPaidOrderFulfillmentProcessing(orderToken)` as the semantic core operation. If `runPostProcessing(orderToken)` remains, it must be the real parent orchestrator, not an alias-only delegate.
+- Use `runPaidFulfillmentProcessing(orderToken)` as the semantic core operation. The older `runPostProcessing(orderToken)` name should not remain as an alias-only delegate.
 - Do not rebuild required paid-order data from browser stores.
 - Treat existing artifacts as step completion markers.
 - Increment or record retry metadata.
@@ -687,7 +695,7 @@ flowchart TD
   B -->|"Yes"| D{"processingCompletedAt is null?"}
   D -->|"No"| E["Do not retry completed row"]
   D -->|"Yes"| F{"Which action is selected?"}
-  F -->|"Run remaining pipeline"| G["runPaidOrderFulfillmentProcessing(orderToken)"]
+  F -->|"Run remaining pipeline"| G["runPaidFulfillmentProcessing(orderToken)"]
   G --> H["Skip receipt if receiptLink + receiptFile exist"]
   H --> I["Skip Django payment save if djangoPaymentSaveCustomId exists"]
   I --> J["Build and validate Merchize fulfillment payload"]
@@ -1231,6 +1239,7 @@ Beta requirement:
 Migration note:
 
 - The existing PayPal-ledger `AdminNotificationOutbox` is a legacy first implementation.
+- `AdminNotificationRecipientGroup` is now the first Admin Ops ledger routing table used by that legacy outbox.
 - New broad alert routing should live in the Admin Ops ledger under the `InternalAlert*` names.
 - Existing helper behavior can be ported rather than discarded.
 

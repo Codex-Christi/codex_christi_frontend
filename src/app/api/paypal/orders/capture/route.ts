@@ -5,7 +5,7 @@ import { getPayPalClient } from '@/lib/paymentClients/paypalClient';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { createPayPalRouteResponders } from '@/lib/paypal/txLedger/routeResponses';
-import { runPostProcessing } from '@/lib/paypal/txLedger/runPostProcessing';
+import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 import { isCaptureRouteRunnerEnabled } from '@/lib/paypal/txLedger/processingPolicy';
 
 const POST_CAPTURE_RESUMABLE_STATUSES = new Set<string>([
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
 
     after(async () => {
       try {
-        await runPostProcessing(token);
+        await runPaidFulfillmentProcessing(token);
       } catch (error) {
         console.error('[paypal.capture.post_processing_failed]', {
           requestId,

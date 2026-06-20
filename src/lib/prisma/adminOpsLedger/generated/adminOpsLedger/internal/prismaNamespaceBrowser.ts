@@ -54,7 +54,8 @@ export const ModelName = {
   AdminUser: 'AdminUser',
   AdminUnlockAttempt: 'AdminUnlockAttempt',
   AdminAuditLog: 'AdminAuditLog',
-  AdminMasterTransferChallenge: 'AdminMasterTransferChallenge'
+  AdminMasterTransferChallenge: 'AdminMasterTransferChallenge',
+  AdminNotificationRecipientGroup: 'AdminNotificationRecipientGroup'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -142,6 +143,23 @@ export const AdminMasterTransferChallengeScalarFieldEnum = {
 } as const
 
 export type AdminMasterTransferChallengeScalarFieldEnum = (typeof AdminMasterTransferChallengeScalarFieldEnum)[keyof typeof AdminMasterTransferChallengeScalarFieldEnum]
+
+
+export const AdminNotificationRecipientGroupScalarFieldEnum = {
+  id: 'id',
+  key: 'key',
+  label: 'label',
+  description: 'description',
+  recipientEmails: 'recipientEmails',
+  includeMasterAdmins: 'includeMasterAdmins',
+  enabled: 'enabled',
+  createdByCodexUserId: 'createdByCodexUserId',
+  updatedByCodexUserId: 'updatedByCodexUserId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AdminNotificationRecipientGroupScalarFieldEnum = (typeof AdminNotificationRecipientGroupScalarFieldEnum)[keyof typeof AdminNotificationRecipientGroupScalarFieldEnum]
 
 
 export const SortOrder = {
