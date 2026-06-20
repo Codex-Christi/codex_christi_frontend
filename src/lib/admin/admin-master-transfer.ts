@@ -50,11 +50,11 @@ export async function startMasterAdminTransfer({
   const normalizedTargetEmail = normalizeAdminTransferEmail(targetEmail);
 
   if (!normalizedTargetCodexUserId) {
-    throw new Error('Enter the target Codex user ID.');
+    throw new Error('Enter the target Codex Christi user ID.');
   }
 
   if (normalizedTargetCodexUserId === actor.userID) {
-    throw new Error('Choose a different target Codex user ID.');
+    throw new Error('Choose a different target Codex Christi user ID.');
   }
 
   if (!isValidEmail(normalizedTargetEmail)) {

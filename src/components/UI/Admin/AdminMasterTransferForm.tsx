@@ -39,7 +39,7 @@ export default function AdminMasterTransferForm() {
           autoComplete='current-password'
           required
         />
-        <TextField label='Target Codex user ID' name='targetCodexUserId' required />
+        <TextField label='Target Codex Christi user ID' name='targetCodexUserId' required />
         <TextField
           label='Target email'
           name='targetEmail'

@@ -37,7 +37,7 @@ export default function AdminUserProvisioningForm() {
     <form action={formAction} className='space-y-3'>
       <div className='grid gap-3'>
         <TextField
-          label='Codex user ID'
+          label='Codex Christi user ID'
           name='codexUserId'
           autoComplete='off'
           required

@@ -22,7 +22,7 @@ export default async function AdminPaidOrderRecoveryDetailPage({
 }: PaidOrderRecoveryDetailPageProps) {
   const { orderToken } = await params;
   await requireAdminPage({
-    scope: 'shop',
+    scope: 'shop.view',
     returnPath: `/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`,
   });
 

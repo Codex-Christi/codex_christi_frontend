@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default async function AdminPaidOrderRecoveryPage() {
   await requireAdminPage({
-    scope: 'shop',
+    scope: 'shop.view',
     returnPath: '/admin/shop/paid-order-recovery',
   });
 

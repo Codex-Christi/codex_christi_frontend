@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Clock3,
   Lock,
+  ScrollText,
   ShoppingBag,
   Sparkles,
   Store,
@@ -42,6 +43,7 @@ export default async function AdminPage() {
   });
   const canManageAdmins = isMasterAdminRole(admin.role);
   const canAccessShop = isAdminScopeAllowed(admin.scopes, 'shop', admin.role);
+  const canViewAuditLogs = isAdminScopeAllowed(admin.scopes, 'audit.view', admin.role);
 
   const [profile, recoveryRows] = await Promise.all([
     getUser().catch(() => undefined),
@@ -116,6 +118,16 @@ export default async function AdminPage() {
                     icon={UserRoundCog}
                     status='Master only'
                     attention='Access management'
+                  />
+                ) : null}
+                {canViewAuditLogs && !canManageAdmins ? (
+                  <ProductCard
+                    title='Audit Logs'
+                    description='Review admin actions, outcomes, targets, and request fingerprints.'
+                    href='/admin/admin-ops/audit-logs'
+                    icon={ScrollText}
+                    status='Audit'
+                    attention='Recent activity'
                   />
                 ) : null}
                 <ProductCard

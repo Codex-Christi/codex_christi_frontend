@@ -36,7 +36,7 @@ async function getCatalogPageData() {
 
 export default async function MerchizeCatalogSnapshotsAdminPage() {
   await requireAdminPage({
-    scope: 'shop',
+    scope: 'shop.view',
     returnPath: '/admin/shop/merchize-catalog-snapshots',
   });
 

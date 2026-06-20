@@ -49,7 +49,7 @@ export function isAdminScopeAllowed(scopes: AdminScope[], scope?: AdminScope, ro
   if (isMasterAdminRole(role)) return true;
   if (scopes.includes(scope)) return true;
 
-  if (scope.startsWith('shop.')) {
+  if (scope === 'shop.view') {
     return scopes.includes('shop');
   }
 

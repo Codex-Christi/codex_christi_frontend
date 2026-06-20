@@ -28,7 +28,7 @@ import { getCategoryPagePath } from '@/lib/utils/shop/categoryPagePath';
 // console.log('>>> Inspect variant FBJSVN000000AA02', v);
 
 export async function getStorefrontSnapshotStats() {
-  await requireAdminAction('shop');
+  await requireAdminAction('shop.view');
 
   const [productCount, categoryCount, variantAgg, latestProduct, latestCategory] =
     await Promise.all([
@@ -59,7 +59,7 @@ export async function getStorefrontSnapshotStats() {
 
 export async function refreshPriceShippingCatalogAction() {
   try {
-    const admin = await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop.catalog.refresh');
     await writeAdminAuditLog({
       actor: admin,
       action: 'shop.catalog.refresh_price_shipping',
@@ -89,7 +89,7 @@ export async function refreshPriceShippingCatalogAction() {
 }
 
 export async function refreshStorefrontSnapshotsAction() {
-  const admin = await requireAdminAction('shop');
+  const admin = await requireAdminAction('shop.catalog.refresh');
   await writeAdminAuditLog({
     actor: admin,
     action: 'shop.catalog.refresh_storefront_snapshots',
@@ -234,7 +234,7 @@ function revalidateStorefrontSnapshotPaths({
 }
 
 export async function searchPriceShippingCatalogBySku(query: string) {
-  const admin = await requireAdminAction('shop');
+  const admin = await requireAdminAction('shop.view');
 
   const q = query.trim();
   if (!q) {

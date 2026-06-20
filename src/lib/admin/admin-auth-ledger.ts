@@ -42,6 +42,26 @@ export type AdminUserSummary = {
   updatedAt: Date;
 };
 
+export type AdminAuditLogSummary = {
+  id: string;
+  actorCodexUserId: string | null;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  outcome: string;
+  metadata: unknown;
+  ipHash: string | null;
+  userAgentHash: string | null;
+  createdAt: Date;
+};
+
+export type AdminAuditLogFilters = {
+  action?: string;
+  actorCodexUserId?: string;
+  outcome?: string;
+  targetId?: string;
+};
+
 export type AdminUserProvisionInput = {
   codexUserId: string;
   email: string | null;
@@ -209,6 +229,58 @@ export async function listAdminUsersForDashboard(): Promise<AdminUserSummary[]> 
   }));
 }
 
+export async function listAdminAuditLogsForDashboard({
+  filters = {},
+  take = 100,
+}: {
+  filters?: AdminAuditLogFilters;
+  take?: number;
+} = {}): Promise<AdminAuditLogSummary[]> {
+  const where: Prisma.AdminAuditLogWhereInput = {};
+  const action = filters.action?.trim();
+  const actorCodexUserId = filters.actorCodexUserId?.trim();
+  const targetId = filters.targetId?.trim();
+  const outcome = normalizeAuditOutcome(filters.outcome);
+
+  if (action) {
+    where.action = { contains: action.slice(0, 128) };
+  }
+
+  if (actorCodexUserId) {
+    where.actorCodexUserId = actorCodexUserId.slice(0, 128);
+  }
+
+  if (targetId) {
+    where.targetId = { contains: targetId.slice(0, 128) };
+  }
+
+  if (outcome) {
+    where.outcome = outcome;
+  }
+
+  const rows = await getAdminOpsLedgerPrisma().adminAuditLog.findMany({
+    where,
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: Math.min(Math.max(take, 1), 250),
+    select: {
+      id: true,
+      actorCodexUserId: true,
+      action: true,
+      targetType: true,
+      targetId: true,
+      outcome: true,
+      metadata: true,
+      ipHash: true,
+      userAgentHash: true,
+      createdAt: true,
+    },
+  });
+
+  return rows;
+}
+
 export async function upsertAdminUserFromDashboard({
   actor,
   input,
@@ -344,4 +416,12 @@ function normalizeAdminUserAuthRecord(row: unknown): AdminUserAuthRecord | null 
 
 function toJsonObject(value: Record<string, unknown>): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function normalizeAuditOutcome(value: string | null | undefined) {
+  const outcome = value?.trim();
+
+  return ['success', 'failure', 'blocked', 'started'].includes(outcome ?? '')
+    ? outcome
+    : undefined;
 }

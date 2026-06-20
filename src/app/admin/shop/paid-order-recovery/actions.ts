@@ -35,7 +35,7 @@ export type AdminRecoveryScannerActionResult =
 
 export async function scanAdminPaidOrderRecoveryCandidatesAction(): Promise<AdminRecoveryScannerActionResult> {
   try {
-    const admin = await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop.recovery.run');
     await writeAdminAuditLog({
       actor: admin,
       action: 'shop.paid_order_recovery.scan_candidates',
@@ -66,7 +66,7 @@ export async function runSelectedAdminPaidOrderRecoveryAction({
   orderTokens: string[];
 }): Promise<AdminRecoveryScannerActionResult> {
   try {
-    const admin = await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop.recovery.run');
     await writeAdminAuditLog({
       actor: admin,
       action: 'shop.paid_order_recovery.run_selected',
@@ -125,7 +125,7 @@ export async function resendAdminRecoveryNotificationAction({
   orderToken: string;
 }): Promise<AdminNotificationActionResult> {
   try {
-    const admin = await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop.recovery.run');
     await writeAdminAuditLog({
       actor: admin,
       action: 'shop.paid_order_recovery.notification_resend',
@@ -166,7 +166,7 @@ export async function suppressAdminRecoveryNotificationAction({
   orderToken: string;
 }): Promise<AdminNotificationActionResult> {
   try {
-    const admin = await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop.recovery.run');
     await writeAdminAuditLog({
       actor: admin,
       action: 'shop.paid_order_recovery.notification_suppress',
@@ -198,7 +198,7 @@ export async function retryAdminPaidOrderRecoveryAction({
   orderToken: string;
 }): Promise<AdminNotificationActionResult> {
   try {
-    const admin = await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop.recovery.run');
     await writeAdminAuditLog({
       actor: admin,
       action: 'shop.paid_order_recovery.retry',
@@ -292,7 +292,7 @@ export async function syncAdminMerchizeProviderDetailsAction({
   orderToken: string;
 }): Promise<AdminNotificationActionResult> {
   try {
-    const admin = await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop.recovery.run');
     await writeAdminAuditLog({
       actor: admin,
       action: 'shop.paid_order_recovery.sync_merchize_provider_details',
@@ -415,7 +415,7 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
   reason: string;
 }): Promise<AdminNotificationActionResult> {
   try {
-    const admin = await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop.recovery.run');
     await writeAdminAuditLog({
       actor: admin,
       action: 'shop.paid_order_recovery.address_override_save',

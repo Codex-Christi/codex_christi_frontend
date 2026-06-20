@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BadgeCheck,
   KeyRound,
+  ScrollText,
   ShieldCheck,
   ShieldPlus,
   UserRoundCog,
@@ -87,7 +88,7 @@ export default async function AdminOpsPage() {
                   <div>
                     <h2 className='text-base font-semibold text-white'>Master Transfer</h2>
                     <p className='mt-1 text-sm leading-6 text-slate-400'>
-                      Move master privileges to another Codex user after password and OTP confirmation.
+                      Move master privileges to another Codex Christi user after password and OTP confirmation.
                     </p>
                   </div>
                   <span className='grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-rose-300/20 bg-rose-300/10 text-rose-100'>
@@ -97,6 +98,27 @@ export default async function AdminOpsPage() {
                 <AdminMasterTransferForm />
               </section>
             </section>
+
+            <Link
+              href='/admin/admin-ops/audit-logs'
+              className='group rounded-lg border border-white/10 bg-slate-950/72 p-4 transition hover:border-cyan-300/30 hover:bg-slate-900/72 supports-[backdrop-filter]:backdrop-blur-xl sm:p-5'
+            >
+              <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+                <div className='min-w-0'>
+                  <div className='mb-3 inline-flex items-center gap-2 rounded-lg border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100'>
+                    <ScrollText size={14} />
+                    Audit
+                  </div>
+                  <h2 className='text-base font-semibold text-white'>Audit Logs</h2>
+                  <p className='mt-1 max-w-3xl text-sm leading-6 text-slate-400'>
+                    Review admin actions, outcomes, targets, and request fingerprints from the Admin Ops Ledger.
+                  </p>
+                </div>
+                <span className='inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-cyan-100 transition group-hover:border-cyan-300/30'>
+                  Open Logs
+                </span>
+              </div>
+            </Link>
 
             <section className='rounded-lg border border-white/10 bg-slate-950/72 p-4 supports-[backdrop-filter]:backdrop-blur-xl sm:p-5'>
               <div className='mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>

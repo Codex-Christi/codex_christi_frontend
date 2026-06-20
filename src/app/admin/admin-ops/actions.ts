@@ -49,7 +49,7 @@ export async function provisionAdminUserAction(
   const status = normalizeAdminStatus(String(formData.get('status') ?? 'active'));
 
   if (!codexUserId) {
-    return { error: 'Enter the Codex user ID.', success: null };
+    return { error: 'Enter the Codex Christi user ID.', success: null };
   }
 
   if (!role) {
@@ -110,7 +110,7 @@ export async function provisionAdminUserAction(
       error:
         error instanceof Error && error.message.includes('requires an unlock password')
           ? error.message
-          : 'Unable to save admin user. Check that the Codex user ID and email are not already assigned.',
+          : 'Unable to save admin user. Check that the Codex Christi user ID and email are not already assigned.',
       success: null,
     };
   }
