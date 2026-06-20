@@ -5,23 +5,24 @@ It is a living implementation guide. Older template sections are kept only where
 
 Date verified against codebase: 2026-06-17
 
-Runtime checkpoint for Django/Merchize fulfillment acceptance and detail sync: 2026-06-17
+Runtime checkpoint for paid order fulfillment processing naming and push-to-fulfillment scope: 2026-06-20
 
 Implemented in the current code checkpoint:
 
 - The Django fulfillment process endpoint is no longer treated as successful from HTTP 2xx alone.
 - A response body with `success: false` or a non-idempotent `processing_status: "failed"` is normalized to a fulfillment business failure.
-- A Django process response with `status: 200 | 201`, `success: true`, `processing_status: "completed"`, and the informational message `Order created but details not available` is treated as an accepted fulfillment push.
+- A Django process response with `status: 200 | 201`, `success: true`, `processing_status: "completed"`, and the informational message `Order created but details not available` is treated as an accepted fulfillment-processing response. It is final completion only when the Django contract proves push-to-fulfillment was accepted.
 - A provider duplicate response such as `Order is duplicated` is treated as an idempotent accepted state that should be reconciled through Merchize lookup rather than treated as a new failure.
 - False-success fulfillment failures end as `status = "fulfillment_failed"` with `lastErrorCode = "FULFILLMENT_PROVIDER_REJECTED"`.
 - Local fulfillment payload validation failures end as `status = "fulfillment_blocked"` with `lastErrorCode = "FULFILLMENT_PAYLOAD_INVALID"`.
 - The ledger stores the canonical fulfillment request payload and the raw/local failure response payload for both recovery states.
 - Automatic capture/webhook resume paths should not move `fulfillment_failed` or `fulfillment_blocked` rows backward to `captured`; admin recovery owns those rows.
+- `runPostProcessing(orderToken)` should be renamed or reshaped around `runPaidOrderFulfillmentProcessing(orderToken)` semantics. Do not keep an alias-only fallback.
+- The paid order fulfillment runner may orchestrate receipt upload and Django payment save, but it must not replay PayPal capture or repeat completed side effects.
 
 Not part of this checkpoint:
 
-- Dedicated `MerchizeFulfillmentOrder` and `MerchizeFulfillmentItem` tables belong to the next Merchize Ops phase.
-- The next Merchize phase should perform provider lookup by external number, fetch in-depth order details by provider order ID, and persist those snapshots without redesigning the payment state machine.
+- Dedicated fulfillment state tables, provider lookup, attention checks, address checks, tracking sync, and issue reconciliation belong to the paid order fulfillment / Merchize Ops phase.
 - The Merchize-specific post-push plan now lives in `MERCHIZE_FULFILLMENT_OPS_GUIDE.md`.
 - PayPal webhook registration, domain strategy, and trigger-policy cleanup now live in `PAYPAL_WEBHOOK_REGISTRATION_AND_RECOVERY_GUIDE.md`.
 
@@ -274,7 +275,8 @@ PAYPAL_TX_LEDGER_NEON_POOLED_DB_STRING="postgresql://USER:PASSWORD@HOST/PROD_DB?
 
 SHOP_SERVER_ACTIONS_CRYPTO_SECRET="long-random-secret"
 
-# Admin recovery notifications
+# Internal alert fallback recipients
+# Primary recipient routing should live in the Admin Ops ledger `InternalAlert*` tables.
 ORDER_RECOVERY_ADMIN_EMAILS="ops@example.com,support@example.com"
 ORDER_RECOVERY_NOTIFICATION_FROM_EMAIL="support@example.com"
 ```
@@ -300,7 +302,7 @@ Notes:
 - The root `prisma.config.ts` should switch datasource URLs based on the `--schema` target.
 - Django order-intent HMAC signing is server-only. The browser should call the local Next proxy routes and should never receive the signing secret.
 - Do **not** reuse `SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY` for webhook/server post-processing. Keep a separate server-only secret for those actions.
-- `ORDER_RECOVERY_ADMIN_EMAILS` receives internal alerts when a paid order needs admin recovery. Email delivery must be driven from a durable outbox row, not from an untracked fire-and-forget side effect.
+- Admin Ops ledger `InternalAlert*` routing should receive internal alerts when a paid order needs admin recovery. `ORDER_RECOVERY_ADMIN_EMAILS` is a bootstrap/fallback list only. Email delivery must be driven from a durable outbox row, not from an untracked fire-and-forget side effect.
 - This guide intentionally avoids requiring a second Prisma config file for the ledger.
 - Runtime code uses the pooled PayPal ledger URLs. Prisma CLI commands use the non-pooled URLs selected by `PAYPAL_TX_LEDGER_NEON_BRANCH`.
 
@@ -431,8 +433,9 @@ model AdminNotificationOutbox {
 
 Admin notification intent:
 
-- This table is the durable email queue for configured admin recipients.
-- When a valid operational event occurs, create an outbox row for each configured recipient in `ORDER_RECOVERY_ADMIN_EMAILS`.
+- This table is the legacy PayPal-ledger-local durable email queue for configured admin recipients.
+- New broad alert routing should move to Admin Ops ledger `InternalAlertOutbox`.
+- When a valid operational event occurs, create an outbox row for each resolved recipient from Internal Alerts routing. Use `ORDER_RECOVERY_ADMIN_EMAILS` only as bootstrap/fallback.
 - The sender then delivers email from the outbox row and updates `status`, `attemptCount`, `sentAt`, and `lastErrorMessage`.
 - The ledger/recovery state must not depend on email delivery succeeding. Email delivery is an alerting side effect with its own retry state.
 
@@ -441,13 +444,13 @@ Admin notification intent:
 - PayPal webhook events may arrive before a ledger row is fully correlated.
 - Event dedupe only needs `eventId`.
 - A plain indexed `paypalOrderId` field is simpler and avoids relational coupling at this stage. A formal FK can be added when the schema stabilizes.
-- Admin notifications use an outbox table with searchable transaction context (`orderToken`, `paypalOrderId`, `stage`, `errorCode`). Do not make email delivery part of the payment transaction; persist the outbox row first, then send from the outbox.
+- Internal Alerts use an outbox table with searchable transaction context (`orderToken`, `paypalOrderId`, `stage`, `errorCode`). Do not make email delivery part of the payment transaction; persist the outbox row first, then send from the outbox.
 
 Why the extra tracking fields matter:
 
 - `PaypalWebhookEvent.processedAt` prevents false "already handled" acks when a prior attempt failed.
 - `PaypalIntent.postProcessingLock*` gives `runPostProcessing(...)` a DB-backed lease so only one worker can own side effects at a time.
-- `AdminNotificationOutbox.dedupeKey` prevents repeated webhook/retry attempts from spamming admins for the same unresolved paid-order condition.
+- `InternalAlertOutbox.dedupeKey` prevents repeated webhook/retry attempts from spamming admins for the same unresolved paid-order condition.
 
 ---
 
@@ -1714,7 +1717,7 @@ The confirmation page should not clear checkout/order state on first render. Cle
 If the user's browser closes after capture but before `completed`:
 
 1. The ledger row already exists with status `captured` (or later).
-2. The webhook will still fire and trigger `runPostProcessing`.
+2. The webhook will still fire and trigger `runPaidOrderFulfillmentProcessing` through the current wrapper.
 3. If the user returns, the confirmation page URL (bookmarked or in history) still has `orderToken` in the path — polling resumes automatically.
 4. If the user lost the URL entirely, admin can look up by `customerEmail` and share status or receipt link.
 
@@ -1735,12 +1738,12 @@ Keep your existing signature verification and raw-body handling.
 1. Delivery tracking by `PaypalWebhookEvent.eventId` plus `processedAt` / `attemptCount`
 2. Robust PayPal order id extraction
 3. Retry when the ledger row is not yet correlated
-4. `runPostProcessing(orderToken)` trigger on `PAYMENT.CAPTURE.COMPLETED`
+4. `runPaidOrderFulfillmentProcessing(orderToken)` trigger on `PAYMENT.CAPTURE.COMPLETED`, through the current wrapper until migration finishes
 5. ACK fast; do not let the webhook route become the place where long receipt/backend/fulfillment work blocks the provider response
 
 ## Why `after()` for post-processing (Next.js 15+)
 
-PayPal expects a response within ~10 seconds. If `runPostProcessing` takes longer (receipt upload, Merchize API, payment save), the webhook times out and PayPal marks the delivery as failed — triggering retries that overlap with your still-running work.
+PayPal expects a response within ~10 seconds. If `runPaidOrderFulfillmentProcessing` takes longer (receipt upload, Merchize API, payment save), the webhook times out and PayPal marks the delivery as failed, triggering retries that overlap with your still-running work.
 
 `after()` from `next/server` solves this: the webhook handler responds 200 immediately, and the post-processing callback runs in the same Node.js process after the response is sent. Your VPS runs Node.js directly (not edge/serverless), so `after()` is fully supported.
 
@@ -2012,11 +2015,12 @@ Operational rule:
 
 # 21) Server Post-Processing Runner (ledger-driven)
 
-This is the core server-only replacement for client post-processing.
+This is the core server-only replacement for client post-processing. The target semantic name is paid order fulfillment processing.
 
-New file:
+Target files:
 
-- `src/lib/paypal/txLedger/runPostProcessing.ts`
+- `src/lib/paidOrderFulfillment/runPaidOrderFulfillmentProcessing.ts`
+- `src/lib/paypal/txLedger/runPostProcessing.ts` only if it remains the real parent orchestrator; otherwise migrate callers to the semantic path
 
 Important:
 
@@ -2024,6 +2028,9 @@ Important:
 - Provider-specific fulfillment logic is delegated (see Section 22).
 - The runner must be restart-safe and retry-safe.
 - The runner must be able to finish the order from ledger state alone, without any browser-only context.
+- The runner must not replay PayPal capture.
+- Completed prerequisites such as receipt upload and Django payment save must be detected by persisted artifacts and skipped.
+- Fulfillment completion means push-to-fulfillment accepted, not merely catalog import accepted.
 
 **Important: server-only crypto**
 
@@ -2235,9 +2242,10 @@ Fulfillment validation and provider response handling:
   - Save `merchizeFulfillmentRequestPayload` with the canonical attempted payload.
   - Save `merchizeFulfillmentResponsePayload` as a local validation envelope, for example `{ source: "local_validation", success: false, issues: [...] }`.
   - Clear the post-processing lease.
-  - Enqueue an `AdminNotificationOutbox` row with a deterministic `dedupeKey`.
+  - Enqueue an `InternalAlertOutbox` row with a deterministic `dedupeKey`.
 - A HTTP 2xx response from Django is only transport success. It is not fulfillment success by itself.
 - Treat Django `status: 200 | 201`, `success: true`, and `data.processing_status === "completed"` as accepted even when `data.error_message` is the known informational message `Order created but details not available`.
+- Treat that accepted response as final paid-order fulfillment completion only if Django's process contract includes push-to-fulfillment. If it only imports/creates the catalog order, run the explicit Merchize push stage before completion.
 - Treat provider duplicate responses such as `Order is duplicated` as idempotent accepted states when the payload confirms the provider already has an order for the same external number.
 - On Django business failure, such as `{ success: false }`, a non-idempotent `data.processing_status === "failed"`, or an unknown provider error:
   - Set `status = fulfillment_failed`.
@@ -2245,14 +2253,15 @@ Fulfillment validation and provider response handling:
   - Set `lastErrorMessage` from `data.error_message ?? message`.
   - Save both fulfillment request and response payloads.
   - Clear the post-processing lease.
-  - Enqueue an admin notification outbox row.
-- Only set `status = completed` and `processingCompletedAt` after receipt upload, Django payment save, and fulfillment business success have all been confirmed.
-- After a provider-accepted fulfillment push, a separate Merchize sync phase should:
+  - Enqueue an internal alert outbox row.
+- Only set `status = completed` and `processingCompletedAt` after receipt upload, Django payment save, catalog/import acceptance, and push-to-fulfillment acceptance have all been confirmed.
+- After push-to-fulfillment acceptance, the paid order fulfillment domain can continue with independent operational stages:
   - Query Merchize by external number.
   - Read the provider `_id` from the external-number lookup result at `resp.data._id`.
   - Query in-depth order details by provider `_id`.
   - Treat that external-lookup `_id` as the canonical Merchize platform order ID for later POD actions.
   - Persist the provider order and item snapshots in dedicated tables.
+  - Check attention-required, address review, product/item availability, tracking, and reconciliation status.
 
 ---
 

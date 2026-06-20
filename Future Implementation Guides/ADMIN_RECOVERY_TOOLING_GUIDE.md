@@ -1,6 +1,6 @@
 # Admin And Recovery Tooling Guide
 
-Last updated: 2026-06-17
+Last updated: 2026-06-20
 
 This guide isolates the admin and checkout recovery work from the broader PayPal TX ledger guide. Use it as the source of truth for the next implementation phase: admin visibility, support recovery, retry operations, and maintenance tooling.
 
@@ -17,14 +17,22 @@ The checkout customer-side recovery flow exists. A paid but unresolved PayPal le
 
 The next major phase is admin and support tooling.
 
-### Current Checkpoint: Fulfillment Acceptance And Merchize Detail Sync
+### Current Checkpoint: Paid Order Fulfillment Processing And Internal Alerts
 
-The runtime payment ledger now owns the distinction between Django transport success, Django business acceptance, and later Merchize provider detail reconciliation.
+The runtime payment ledger now owns the payment evidence and retry guards. The corrected fulfillment scope is broader than detail sync: paid order fulfillment processing runs from captured-payment prerequisites through Django payment save, Merchize catalog import, push-to-fulfillment, provider issue checks, and admin reconciliation.
+
+Use the semantic runner name:
+
+```txt
+runPaidOrderFulfillmentProcessing(orderToken)
+```
+
+Do not keep `runPostProcessing(orderToken)` as an alias-only fallback. Either migrate callers to the semantic runner or keep `runPostProcessing` as the real parent orchestrator that runs the paid order fulfillment stages.
 
 Implemented before the dashboard revamp continues:
 
 - `success: false`, non-idempotent `processing_status: failed`, or unknown provider errors from Django/Merchize become `fulfillment_failed`, not `completed`.
-- Django `status: 200 | 201`, `success: true`, `processing_status: completed`, and the known informational message `Order created but details not available` is an accepted fulfillment push.
+- Django `status: 200 | 201`, `success: true`, `processing_status: completed`, and the known informational message `Order created but details not available` is an accepted fulfillment-processing response. It can satisfy completion only when the Django contract proves push-to-fulfillment was accepted.
 - Provider duplicate responses such as `Order is duplicated` are idempotent recovery signals and should be reconciled through Merchize lookup rather than treated as a fresh failure.
 - Local fulfillment payload validation failure becomes `fulfillment_blocked`.
 - Request and response payloads are persisted on the ledger row for admin inspection.
@@ -36,15 +44,62 @@ Dashboard/admin work should continue from these states:
 - Show `lastErrorCode`, `lastErrorMessage`, `merchizeFulfillmentRequestPayload`, and `merchizeFulfillmentResponsePayload`.
 - Show the Merchize external order number from the wrapped Django process response when present.
 - Show Merchize provider detail IDs only after the external-number lookup returns them.
-- Use `AdminNotificationOutbox` persistence and email delivery for operational recovery alerts.
+- Use reusable Internal Alerts persistence and email delivery for operational recovery alerts.
 - Keep the payment state machine owned by the ledger runner; admin actions should call retry/override helpers instead of reinterpreting provider success.
 
 Next Merchize-specific admin phase:
 
-- Lookup provider order by external number after Django accepts fulfillment.
+- Confirm catalog import and push-to-fulfillment status.
+- Lookup provider order by external number.
 - Fetch in-depth provider order details by the Merchize platform order `_id` returned from the external-number lookup response.
 - Persist provider order and item snapshots in dedicated `MerchizeFulfillmentOrder` / `MerchizeFulfillmentItem` tables.
-- Add admin actions for provider detail refresh, duplicate-order reconciliation, fulfillment status refresh, item-level inspection, and future provider actions such as change product, change processing, and tracking sync.
+- Add admin actions for running the remaining fulfillment pipeline, push-to-fulfillment, provider detail refresh, attention checks, address review, duplicate-order reconciliation, fulfillment status refresh, tracking sync, item-level inspection, and future provider actions such as change product and change processing.
+
+### Internal Alerts Naming
+
+Use `Internal Alerts` for the reusable notification domain. Do not name the feature after the database.
+
+Recommended models in the Admin Ops ledger:
+
+```txt
+InternalAlertRecipientGroup
+InternalAlertRecipient
+InternalAlertRule
+InternalAlertOutbox
+```
+
+Recommended helper names:
+
+```txt
+resolveInternalAlertRecipients
+enqueueInternalAlert
+sendPendingInternalAlerts
+resendInternalAlert
+suppressInternalAlert
+```
+
+Recipient sources:
+
+- Active master/admin user emails from `AdminUser`.
+- Editable extra recipients in `InternalAlertRecipient`.
+- Optional env fallback for bootstrap only.
+
+### Admin/Internal Alerts Implementation Steps
+
+1. Extend the Admin Ops ledger schema with `InternalAlertRecipientGroup`, `InternalAlertRecipient`, `InternalAlertRule`, and `InternalAlertOutbox`.
+2. Seed or bootstrap default groups such as `shop_fulfillment_ops`, `shop_payment_ops`, `admin_security`, and `checkout_recovery`.
+3. Resolve recipients by group/rule, including active master/admin emails where appropriate.
+4. Keep env recipient lists as fallback only when the DB has no active recipients for a required group.
+5. Port the existing PayPal `AdminNotificationOutbox` behavior into generic helpers:
+   - `resolveInternalAlertRecipients`
+   - `enqueueInternalAlert`
+   - `sendPendingInternalAlerts`
+   - `resendInternalAlert`
+   - `suppressInternalAlert`
+6. Use the existing ZeptoMail utility through the generic dispatcher. It already accepts an array of recipients.
+7. Update admin dashboard pages to manage alert recipients/groups and to display alert history on order recovery details.
+8. Add audit log entries for recipient changes, alert suppression, resend, and dangerous fulfillment actions.
+9. Add tests for recipient resolution, dedupe keys, fallback behavior, redaction, send failure persistence, resend, and suppress.
 
 ## Core Problem
 
@@ -213,23 +268,26 @@ Useful fields:
 - `attemptCount`
 - `createdAt`
 
-Operational notification table:
+Operational alert tables:
 
 ```txt
-AdminNotificationOutbox
+InternalAlertRecipientGroup
+InternalAlertRecipient
+InternalAlertRule
+InternalAlertOutbox
 ```
 
 Purpose:
 
-- Drive configured admin email alerts for transaction recovery events.
-- Create one row per configured recipient in `ORDER_RECOVERY_ADMIN_EMAILS`.
-- Preserve notification delivery state separately from the order ledger state.
-- Let admins see whether a valid event produced an email, whether it sent, and whether it needs resend.
+- Drive configured internal email alerts for fulfillment, payment, recovery, security, and future app-domain events.
+- Let the master admin email and editable recipient rows receive operational messages.
+- Preserve delivery state separately from payment and fulfillment state.
+- Let admins see whether a valid event produced an alert, whether it sent, and whether it needs resend/suppress.
+- Keep env recipients as bootstrap fallback only.
 
 Useful fields:
 
-- `orderToken`
-- `paypalOrderId`
+- `domain`
 - `type`
 - `stage`
 - `errorCode`
@@ -237,6 +295,10 @@ Useful fields:
 - `status`
 - `dedupeKey`
 - `recipient`
+- `targetType`
+- `targetId`
+- `orderToken`
+- `paypalOrderId`
 - `payload`
 - `attemptCount`
 - `lastAttemptAt`
@@ -453,19 +515,20 @@ Large JSON panels should be collapsed by default.
 
 ## Admin Actions
 
-### Retry Full Post-Processing
+### Run Remaining Paid Order Fulfillment Processing
 
 Purpose:
 
-- Resume the ledger-driven flow from the first incomplete step.
+- Resume the ledger-driven fulfillment flow from the first incomplete stage.
 
 Rules:
 
 - Only run against a paid row.
 - Do not run if the row is already `completed`.
-- Do not run if the saved Django process response is an accepted `200 | 201` fulfillment push.
-- Accepted fulfillment rows should move to Merchize provider detail sync instead of full post-processing replay.
-- Use `runPostProcessing(orderToken)` as the core operation.
+- Do not replay PayPal capture.
+- Do not replay receipt upload or Django payment save when their success artifacts already exist.
+- Do not treat catalog import as final success unless push-to-fulfillment has also been accepted.
+- Use `runPaidOrderFulfillmentProcessing(orderToken)` as the semantic core operation. If `runPostProcessing(orderToken)` remains, it must be the real parent orchestrator, not an alias-only delegate.
 - Do not rebuild required paid-order data from browser stores.
 - Treat existing artifacts as step completion markers.
 - Increment or record retry metadata.
@@ -475,17 +538,19 @@ Expected behavior:
 
 - If receipt already exists, skip receipt generation.
 - If `djangoPaymentSaveCustomId` already exists, skip Django payment save.
-- If fulfillment has not completed, send fulfillment.
-- If successful, set status to `completed`.
-- If local fulfillment payload validation fails, set `fulfillment_blocked`, persist the attempted payload and local validation envelope, and enqueue an admin notification.
-- If Django returns HTTP 2xx with `success: false`, `processing_status: failed`, or `error_message`, set `fulfillment_failed`, persist request/response payloads, and enqueue an admin notification.
+- If catalog import has not completed, run the catalog-backed fulfillment stage.
+- If push-to-fulfillment has not been accepted, run the push stage.
+- If push-to-fulfillment is accepted, set the paid checkout fulfillment runner to `completed`.
+- If local fulfillment payload validation fails, set `fulfillment_blocked`, persist the attempted payload and local validation envelope, and enqueue an internal alert.
+- If Django/Merchize returns HTTP 2xx with `success: false`, `processing_status: failed`, or an unsafe provider error, set `fulfillment_failed`, persist request/response payloads, and enqueue an internal alert.
 
-### Retry Merchize Fulfillment Only
+### Push Merchize Fulfillment Stage Only
 
 Purpose:
 
-- Retry only the final fulfillment push when receipt and Django payment save are already complete.
-- Do not use this for accepted `201` rows whose provider details are merely unsynced.
+- Retry or run only the provider fulfillment stages when receipt and Django payment save are already complete.
+- Use this for catalog-import/push-to-fulfillment repair, not for payment retry.
+- Do not use this for rows whose push-to-fulfillment is already accepted and whose provider details are merely unsynced.
 
 Required row fields:
 
@@ -505,7 +570,8 @@ Rules:
 - Save `merchizeFulfillmentResponsePayload`.
 - Save `merchizeFulfillmentProcessingId`, `merchizeProviderOrderId`, and `merchizeProviderOrderCode` when returned.
 - Treat HTTP success as transport success only. Fulfillment succeeds only when the response body indicates business success.
-- Treat accepted `200 | 201` responses with `processing_status: completed` as accepted handoff states.
+- Treat accepted `200 | 201` responses with `processing_status: completed` as accepted handoff states only when the process contract covers push-to-fulfillment.
+- If Django does not cover push-to-fulfillment, call the server-only Merchize push adapter before completion.
 - Store provider platform IDs only after the Merchize external-number lookup confirms them.
 - On validation/provider failure, keep the row unresolved and visible for repair/retry.
 
@@ -592,7 +658,7 @@ Rules:
 - Include support reference.
 - Do not include raw provider payloads or internal error messages.
 
-### Resend Or Suppress Admin Recovery Notification
+### Resend Or Suppress Internal Alert
 
 Purpose:
 
@@ -600,10 +666,10 @@ Purpose:
 
 Rules:
 
-- Operate on `AdminNotificationOutbox`, not the checkout ledger row directly.
+- Operate on `InternalAlertOutbox`, not the checkout ledger row directly.
 - Allow resend only for failed or sent rows when an admin confirms.
 - Allow suppress only with a reason.
-- Never delete notification rows during normal support work.
+- Never delete alert rows during normal support work.
 - Preserve the link to the `orderToken` and failure payload.
 
 ### Clear Expired Checkout Recovery OTP Challenges
@@ -621,16 +687,19 @@ flowchart TD
   B -->|"Yes"| D{"processingCompletedAt is null?"}
   D -->|"No"| E["Do not retry completed row"]
   D -->|"Yes"| F{"Which action is selected?"}
-  F -->|"Full retry"| G["runPostProcessing(orderToken)"]
+  F -->|"Run remaining pipeline"| G["runPaidOrderFulfillmentProcessing(orderToken)"]
   G --> H["Skip receipt if receiptLink + receiptFile exist"]
   H --> I["Skip Django payment save if djangoPaymentSaveCustomId exists"]
   I --> J["Build and validate Merchize fulfillment payload"]
-  J -->|"Invalid"| K["Set fulfillment_blocked and enqueue admin notification"]
-  J -->|"Valid"| L["Send Merchize fulfillment request"]
-  L --> M{"Django business success?"}
-  M -->|"No"| N["Set fulfillment_failed and enqueue admin notification"]
-  M -->|"Yes"| O["Set completed"]
-  F -->|"Fulfillment only"| R{"djangoPaymentSaveCustomId exists?"}
+  J -->|"Invalid"| K["Set fulfillment_blocked and enqueue internal alert"]
+  J -->|"Valid"| L["Catalog import or Django process"]
+  L --> M{"Catalog/import accepted?"}
+  M -->|"No"| N["Set fulfillment_failed and enqueue internal alert"]
+  M -->|"Yes"| O["Push to fulfillment"]
+  O --> S{"Push accepted?"}
+  S -->|"No"| T["Set fulfillment_failed and enqueue internal alert"]
+  S -->|"Yes"| U["Set completed and register fulfillment ops"]
+  F -->|"Fulfillment stage only"| R{"djangoPaymentSaveCustomId exists?"}
   R -->|"No"| P["Block fulfillment-only retry"]
   R -->|"Yes"| Q["Use fulfillmentAddressOverride when present"]
   Q --> J
@@ -771,8 +840,8 @@ Session rules:
 
 Step-up auth should be required for:
 
-- Retry full post-processing.
-- Retry Merchize fulfillment.
+- Run remaining paid order fulfillment processing.
+- Run/push Merchize fulfillment stage.
 - Regenerate receipt.
 - Save fulfillment address override.
 - Mark manually resolved.
@@ -833,16 +902,16 @@ src/lib/paypal/txLedger/adminNotificationOutbox.ts
 
 Functions:
 
-- `enqueueAdminRecoveryNotification`
-- `listAdminNotificationsForOrder`
-- `sendPendingAdminRecoveryNotifications`
-- `resendAdminRecoveryNotification`
-- `suppressAdminRecoveryNotification`
+- `enqueueInternalAlert`
+- `listInternalAlertsForTarget`
+- `sendPendingInternalAlerts`
+- `resendInternalAlert`
+- `suppressInternalAlert`
 
 Rules:
 
-- Insert the outbox row in the same transaction that marks a paid row `fulfillment_blocked` or `fulfillment_failed`.
-- For any valid transaction alert event, create one outbox row per configured recipient in `ORDER_RECOVERY_ADMIN_EMAILS`.
+- Insert the outbox row in the same transaction or durable stage transition that marks a paid row `fulfillment_blocked`, `fulfillment_failed`, `attention_required`, or another alert-worthy state.
+- Resolve recipients from Admin Ops ledger groups/rules, with env fallback only when configured groups are empty.
 - Use deterministic `dedupeKey` values so webhook retries and admin retries do not spam support.
 - Email sending can happen immediately after commit or from a scheduled worker, but the outbox row must exist first.
 - A mailer failure must not hide the ledger recovery state.
@@ -1149,15 +1218,21 @@ The initial customer-update flow can send simple customer update emails. Interna
 
 Beta requirement:
 
-- Use `AdminNotificationOutbox` for internal admin alerts.
-- Configure recipients with `ORDER_RECOVERY_ADMIN_EMAILS`.
-- Create one outbox row per configured recipient for each valid alert event.
+- Use `InternalAlertOutbox` for internal admin alerts.
+- Configure recipients with Admin Ops ledger recipient groups. Use `ORDER_RECOVERY_ADMIN_EMAILS` or a successor fallback env only for bootstrap/emergency fallback.
+- Create one outbox row per resolved recipient for each valid alert event.
 - Create outbox rows when fulfillment payload validation blocks an order.
 - Create outbox rows when Django/Merchize returns transport success but business failure.
 - Create outbox rows for failed transaction stages, including PayPal create-order, authorize, capture, receipt upload, Django payment save, and post-processing failures.
 - Create outbox rows when scheduled/recovery checks find paid rows stuck beyond the configured recovery window.
 - Show notification delivery status on the paid order recovery detail page.
 - Allow resend/suppress actions with admin confirmation and reason capture.
+
+Migration note:
+
+- The existing PayPal-ledger `AdminNotificationOutbox` is a legacy first implementation.
+- New broad alert routing should live in the Admin Ops ledger under the `InternalAlert*` names.
+- Existing helper behavior can be ported rather than discarded.
 
 Post-beta should extend this model to customer-facing notification records.
 

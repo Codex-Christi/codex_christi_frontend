@@ -1,6 +1,6 @@
 # PayPal Webhook Registration And Recovery Guide
 
-Last updated: 2026-06-17
+Last updated: 2026-06-20
 
 This guide documents the current PayPal webhook and post-payment recovery state in the repository, then defines the safe implementation path for webhook registration, sandbox/live payment-mode separation, and recovery behavior.
 
@@ -20,12 +20,22 @@ The current post-payment runner is:
 src/lib/paypal/txLedger/runPostProcessing.ts
 ```
 
+Target semantic name:
+
+```txt
+src/lib/paidOrderFulfillment/runPaidOrderFulfillmentProcessing.ts
+```
+
+Do not keep `runPostProcessing(orderToken)` as an alias-only fallback. Either migrate trigger callers to `runPaidOrderFulfillmentProcessing(orderToken)`, or keep `runPostProcessing` as the real parent orchestrator that executes the paid order fulfillment stages.
+
 That runner performs these follow-up steps after PayPal capture already exists:
 
 1. Generate and upload the receipt.
 2. Save payment details to the Django backend.
-3. Push the order to Django's Merchize fulfillment process endpoint.
-4. Persist request/response payloads and final ledger status.
+3. Build/validate the catalog-backed fulfillment payload.
+4. Create/import the Merchize catalog order through Django or a server-only adapter.
+5. Push the order to fulfillment.
+6. Persist request/response payloads, provider identifiers, issue state, and final ledger status.
 
 It does not authorize or capture PayPal money. Authorization and capture happen earlier in the PayPal approval/capture flow.
 
@@ -45,7 +55,7 @@ Current behavior:
 
 - Captures the authorized PayPal payment.
 - Persists `capturePayload` on the ledger row.
-- Schedules `runPostProcessing(orderToken)` with `after(...)`.
+- Schedules the real paid order fulfillment orchestrator with `after(...)`.
 - If the capture payload already exists, it does not capture again. It can still resume post-processing for resumable statuses.
 
 This means a checkout can complete even when the PayPal webhook is unavailable, as long as the Next.js server is running and the capture route finishes successfully.
@@ -65,7 +75,7 @@ Current behavior:
 - Stores webhook delivery records in `PaypalWebhookEvent`.
 - Correlates events to ledger rows using PayPal order ID first, then local `orderToken` from PayPal `custom_id` or `invoice_id`.
 - Updates ledger state for PayPal authorization/capture/refund events.
-- On `PAYMENT.CAPTURE.COMPLETED`, schedules `runPostProcessing(orderToken)` with `after(...)`.
+- On `PAYMENT.CAPTURE.COMPLETED`, schedules the real paid order fulfillment orchestrator with `after(...)`.
 - Does not move `fulfillment_blocked` or `fulfillment_failed` rows backward.
 
 ### 3. Confirmation Status Route Resume
@@ -79,7 +89,7 @@ src/app/api/paypal/tx-ledger/payments/[orderToken]/status/route.ts
 Current behavior:
 
 - Returns the current ledger status to the confirmation page.
-- If the row is captured or partially processed, has no active lock, has no error, and is not completed, it schedules `runPostProcessing(orderToken)` with `after(...)`.
+- If the row is captured or partially processed, has no active lock, has no error, and is not completed, it schedules the real paid order fulfillment orchestrator with `after(...)`.
 
 This is a useful local-development safety net, but it is a hidden side effect in a status endpoint. It means a customer-facing polling route can indirectly resume receipt generation, Django payment save, and fulfillment push.
 
@@ -93,7 +103,7 @@ src/app/admin/shop/paid-order-recovery/actions.ts
 
 Current behavior:
 
-- Admin retry calls `runPostProcessing(orderToken)`.
+- Admin retry calls the real paid order fulfillment orchestrator.
 - It blocks if the row is already completed or currently locked.
 - It currently acts as a broad retry path, not a fully separated "sync provider details only" action.
 
@@ -103,7 +113,8 @@ The current flow has important protections:
 
 - PayPal capture uses a stable `paypalRequestId` based on `orderToken`.
 - If a ledger row already has `capturePayload`, the capture route returns the stored capture payload instead of capturing again.
-- `runPostProcessing(...)` uses a DB-backed lease through `postProcessingLockId` and `postProcessingLockExpiresAt`.
+- `runPaidOrderFulfillmentProcessing(...)` uses a DB-backed lease through `postProcessingLockId` and `postProcessingLockExpiresAt`.
+- If the old `runPostProcessing(...)` entrypoint remains, it must be the real parent orchestrator, not an alias-only delegate.
 - Webhook events are deduped by PayPal `eventId`.
 - `fulfillment_blocked` and `fulfillment_failed` rows are not automatically moved backward by webhook capture events.
 - Existing Django/Merchize fulfillment responses are persisted for admin inspection.
@@ -321,16 +332,17 @@ Recommended target:
 ```mermaid
 flowchart TD
   A["PayPal capture route"] --> B["Persist capture payload"]
-  B --> C["Enqueue or run post-processing"]
+  B --> C["Enqueue or run paid order fulfillment processing"]
   D["PayPal webhook"] --> E["Verify signature"]
   E --> F["Persist webhook event"]
   F --> C
-  C --> G["runPostProcessing with DB lease"]
+  C --> G["runPaidOrderFulfillmentProcessing with DB lease"]
   G --> H["Receipt upload"]
   H --> I["Django payment save"]
-  I --> J["Django fulfillment push"]
-  J --> K["Ledger completed or recovery state"]
-  L["Scheduled recovery scan"] --> C
+  I --> J["Catalog-backed fulfillment process"]
+  J --> K["Push-to-fulfillment"]
+  K --> L["Ledger completed or recovery state"]
+  R["Scheduled recovery scan"] --> C
   M["Admin retry"] --> C
   N["Confirmation page"] --> O["Read-only status display"]
 ```
@@ -338,7 +350,7 @@ flowchart TD
 The long-term rule:
 
 - Capture route, webhook route, scheduled worker, and admin action may all request post-processing.
-- `runPostProcessing(...)` and the ledger lease decide whether work should actually run.
+- `runPaidOrderFulfillmentProcessing(...)` and the ledger lease decide whether work should actually run.
 - Customer status polling should not be the main production recovery mechanism.
 
 ## Recommended Next Implementation Steps
@@ -472,9 +484,10 @@ Rules:
 - Process sequentially.
 - Do not auto-run generic `error` rows. Show those for admin review first.
 - Do not auto-run rows in `fulfillment_blocked`.
-- Do not auto-run rows in `fulfillment_failed` when the saved fulfillment response is an accepted 201 that needs provider detail sync instead.
+- Do not auto-run rows in `fulfillment_failed` unless the saved stage state proves the failure is in a safe, idempotent remaining stage.
+- Accepted push-to-fulfillment rows should move to provider lookup/status/reconciliation, not full payment-side replay.
 - Respect active `postProcessingLockExpiresAt`.
-- Use the same `runPostProcessing(orderToken)` entrypoint only when the row is genuinely incomplete.
+- Use the same `runPaidOrderFulfillmentProcessing(orderToken)` entrypoint only when the row is genuinely incomplete.
 
 ### Step 6 - Add Webhook Operations Visibility
 
