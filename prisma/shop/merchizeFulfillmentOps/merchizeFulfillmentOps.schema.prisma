@@ -51,6 +51,7 @@ model MerchizeFulfillmentOrder {
   lastAddressCheckAt     DateTime?
   lastCostCheckAt        DateTime?
   lastProgressSyncAt     DateTime?
+  lastTrackingSyncAt     DateTime?
   lastHistorySyncAt      DateTime?
 
   // Access-controlled raw provider snapshots.
@@ -61,6 +62,7 @@ model MerchizeFulfillmentOrder {
   merchizeFulfillmentCostPayload    Json?
   merchizeTransactionFeePayload     Json?
   merchizeProgressPayload           Json?
+  merchizeTrackingPayload           Json?
   merchizeHistoryPayload            Json?
 
   // Operational state.

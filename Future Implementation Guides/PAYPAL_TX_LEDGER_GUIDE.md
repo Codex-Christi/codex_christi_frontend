@@ -11,7 +11,7 @@ Implemented in the current code checkpoint:
 
 - The Django fulfillment process endpoint is no longer treated as successful from HTTP 2xx alone.
 - A response body with `success: false` or a non-idempotent `processing_status: "failed"` is normalized to a fulfillment business failure.
-- A Django process response with `status: 200 | 201`, `success: true`, `processing_status: "completed"`, and the informational message `Order created but details not available` is treated as an accepted fulfillment-processing response. It is final completion only when the Django contract proves push-to-fulfillment was accepted.
+- A Django process response with `status: 200 | 201`, `success: true`, `processing_status: "completed"`, and the informational message `Order created but details not available` is treated as an accepted fulfillment-processing response. In the current runtime it resumes provider-side Merchize Ops registration, lookup, and explicit `POST /order/external/orders/push`; it does not trigger payment capture, receipt upload, Django payment save, or Django process replay.
 - A provider duplicate response such as `Order is duplicated` is treated as an idempotent accepted state that should be reconciled through Merchize lookup rather than treated as a new failure.
 - False-success fulfillment failures end as `status = "fulfillment_failed"` with `lastErrorCode = "FULFILLMENT_PROVIDER_REJECTED"`.
 - Local fulfillment payload validation failures end as `status = "fulfillment_blocked"` with `lastErrorCode = "FULFILLMENT_PAYLOAD_INVALID"`.
@@ -22,7 +22,7 @@ Implemented in the current code checkpoint:
 
 Not part of this checkpoint:
 
-- Dedicated fulfillment state tables, provider lookup, attention checks, address checks, tracking sync, and issue reconciliation belong to the paid order fulfillment / Merchize Ops phase.
+- Dedicated fulfillment state tables, provider lookup, push-to-fulfillment attempts, progress/tracking/invoice snapshots, attention checks, address checks, and issue reconciliation belong to the paid order fulfillment / Merchize Ops phase.
 - The Merchize-specific post-push plan now lives in `MERCHIZE_FULFILLMENT_OPS_GUIDE.md`.
 - PayPal webhook registration, domain strategy, and trigger-policy cleanup now live in `PAYPAL_WEBHOOK_REGISTRATION_AND_RECOVERY_GUIDE.md`.
 

@@ -13,11 +13,13 @@ import {
   type PayPalRecoveryScannerRunResult,
 } from '@/lib/paypal/txLedger/recoveryScanner';
 import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
-import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
+import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
-import { registerAcceptedMerchizeFulfillmentPush } from '@/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentPush';
+import { registerAcceptedMerchizeFulfillmentProcess } from '@/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentProcess';
 import { syncMerchizeFulfillmentOrder } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOrder';
+import { syncMerchizeFulfillmentOperationalSnapshots } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOperationalSnapshots';
 import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/lib/merchizeFulfillmentOps/merchizeMapper';
+import { CODEX_CHRISTI_FULFILLMENT_IDENTIFIER } from '@/lib/merchizeFulfillmentOps/fulfillmentIdentifier';
 
 type AdminNotificationActionResult = { ok: true; message: string } | { ok: false; error: string };
 
@@ -238,14 +240,6 @@ export async function retryAdminPaidOrderRecoveryAction({
       };
     }
 
-    if (isAcceptedDjangoFulfillmentProcessResponse(existing.merchizeFulfillmentResponsePayload)) {
-      return {
-        ok: false,
-        error:
-          'Fulfillment was already accepted. Sync Merchize provider details instead of retrying full post-processing.',
-      };
-    }
-
     await runPaidFulfillmentProcessing(orderToken);
 
     revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
@@ -351,12 +345,13 @@ export async function syncAdminMerchizeProviderDetailsAction({
       };
     }
 
-    const registration = await registerAcceptedMerchizeFulfillmentPush({
+    const registration = await registerAcceptedMerchizeFulfillmentProcess({
       orderToken: existing.orderToken,
       paypalOrderId: existing.paypalOrderId,
       djangoOrderIntentUuid: existing.djangoOrderIntentUuid,
       djangoOrderIntentOrderId: existing.djangoOrderIntentOrderId,
       djangoPaymentSaveCustomId: existing.djangoPaymentSaveCustomId,
+      fulfillmentIdentifier: CODEX_CHRISTI_FULFILLMENT_IDENTIFIER,
       merchizeExternalOrderNumber,
       merchizeOrderId: null,
       merchizeOrderCode: existing.merchizeProviderOrderCode ?? merchizeExternalOrderNumber,
@@ -375,6 +370,9 @@ export async function syncAdminMerchizeProviderDetailsAction({
     }
 
     const sync = await syncMerchizeFulfillmentOrder(existing.orderToken);
+    const snapshots = sync.ok
+      ? await syncMerchizeFulfillmentOperationalSnapshots(existing.orderToken)
+      : null;
 
     revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
     revalidatePath('/admin/shop/paid-order-recovery');
@@ -388,7 +386,10 @@ export async function syncAdminMerchizeProviderDetailsAction({
 
     return {
       ok: true,
-      message: `Merchize provider details synced for ${sync.merchizeOrderId}.`,
+      message:
+        snapshots && !snapshots.ok
+          ? `Merchize provider details synced for ${sync.merchizeOrderId}; review snapshot attempts for progress, tracking, or invoice gaps.`
+          : `Merchize provider details synced for ${sync.merchizeOrderId}.`,
     };
   } catch (error) {
     return {

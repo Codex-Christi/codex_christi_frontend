@@ -32,7 +32,7 @@ Do not keep `runPostProcessing(orderToken)` as an alias-only fallback. Callers s
 Implemented before the dashboard revamp continues:
 
 - `success: false`, non-idempotent `processing_status: failed`, or unknown provider errors from Django/Merchize become `fulfillment_failed`, not `completed`.
-- Django `status: 200 | 201`, `success: true`, `processing_status: completed`, and the known informational message `Order created but details not available` is an accepted fulfillment-processing response. It can satisfy completion only when the Django contract proves push-to-fulfillment was accepted.
+- Django `status: 200 | 201`, `success: true`, `processing_status: completed`, and the known informational message `Order created but details not available` is an accepted fulfillment-processing response. Current admin recovery should resume provider-side Merchize Ops registration, lookup, and explicit `POST /order/external/orders/push`; it must not replay payment capture, receipt upload, Django payment save, or the accepted Django process call.
 - Provider duplicate responses such as `Order is duplicated` are idempotent recovery signals and should be reconciled through Merchize lookup rather than treated as a fresh failure.
 - Local fulfillment payload validation failure becomes `fulfillment_blocked`.
 - Request and response payloads are persisted on the ledger row for admin inspection.
@@ -49,11 +49,11 @@ Dashboard/admin work should continue from these states:
 
 Next Merchize-specific admin phase:
 
-- Confirm catalog import and push-to-fulfillment status.
+- Confirm catalog/process acceptance and explicit Merchize push-to-fulfillment status.
 - Lookup provider order by external number.
 - Fetch in-depth provider order details by the Merchize platform order `_id` returned from the external-number lookup response.
 - Persist provider order and item snapshots in dedicated `MerchizeFulfillmentOrder` / `MerchizeFulfillmentItem` tables.
-- Add admin actions for running the remaining fulfillment pipeline, push-to-fulfillment, provider detail refresh, attention checks, address review, duplicate-order reconciliation, fulfillment status refresh, tracking sync, item-level inspection, and future provider actions such as change product and change processing.
+- Add admin actions for running the remaining fulfillment pipeline, push-to-fulfillment, provider detail refresh, progress/tracking/invoice refresh, attention checks, address review, duplicate-order reconciliation, item-level inspection, and future provider actions such as change product and change processing.
 
 ### Internal Alerts Naming
 
@@ -341,7 +341,7 @@ Unresolved paid statuses for recovery:
   'fulfillment_blocked',
   'fulfillment_failed',
   'error',
-]
+];
 ```
 
 A customer-facing recovery warning should only be considered for rows that:

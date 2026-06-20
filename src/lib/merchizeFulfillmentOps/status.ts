@@ -8,6 +8,9 @@ export const MERCHIZE_FULFILLMENT_SYNC_STATUS = {
   DETAIL_PENDING: 'detail_pending',
   DETAIL_FAILED: 'detail_failed',
   DETAIL_SYNCED: 'detail_synced',
+  PUSH_PENDING: 'push_to_fulfillment_pending',
+  PUSH_ACCEPTED: 'push_to_fulfillment_accepted',
+  PUSH_FAILED: 'push_to_fulfillment_failed',
   MANUAL_REVIEW_REQUIRED: 'manual_review_required',
 } as const;
 
@@ -19,4 +22,11 @@ export const MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS = {
   SUCCEEDED: 'succeeded',
   FAILED: 'failed',
   SKIPPED: 'skipped',
+} as const;
+
+export const MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS = {
+  PUSH_PENDING: 'push_pending',
+  PUSH_ACCEPTED: 'push_accepted',
+  PUSH_FAILED: 'push_failed',
+  HELD: 'held',
 } as const;

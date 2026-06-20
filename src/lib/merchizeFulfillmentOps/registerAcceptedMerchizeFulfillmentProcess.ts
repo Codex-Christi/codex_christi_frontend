@@ -31,7 +31,7 @@ type RegistrationResult =
       reason: string;
     };
 
-export async function registerAcceptedMerchizeFulfillmentPush(
+export async function registerAcceptedMerchizeFulfillmentProcess(
   input: MerchizeFulfillmentRegistrationInput,
   options: { syncImmediately?: boolean } = {},
 ): Promise<RegistrationResult> {
@@ -71,6 +71,7 @@ export async function registerAcceptedMerchizeFulfillmentPush(
       merchizeExternalOrderNumber: input.merchizeExternalOrderNumber,
       merchizeOrderId: input.merchizeOrderId,
       merchizeOrderCode: input.merchizeOrderCode,
+      merchizeIdentifier: input.fulfillmentIdentifier,
       merchizeStatus: input.merchizeStatus,
       customerEmailRedacted: summary.customerEmailRedacted,
       shippingCity: summary.shippingCity,
@@ -90,6 +91,7 @@ export async function registerAcceptedMerchizeFulfillmentPush(
       djangoPaymentSaveCustomId: input.djangoPaymentSaveCustomId,
       merchizeOrderId: input.merchizeOrderId ?? undefined,
       merchizeOrderCode: input.merchizeOrderCode,
+      merchizeIdentifier: input.fulfillmentIdentifier ?? undefined,
       merchizeStatus: input.merchizeStatus,
       customerEmailRedacted: summary.customerEmailRedacted,
       shippingCity: summary.shippingCity,

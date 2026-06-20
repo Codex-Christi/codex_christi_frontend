@@ -14,6 +14,34 @@ type MerchizeRequestOptions = {
   timeoutMs?: number;
 };
 
+export type MerchizeExternalOrderReference =
+  | {
+      code: string;
+      externalNumber?: string | null;
+      identifier?: string | null;
+    }
+  | {
+      code?: string | null;
+      externalNumber: string;
+      identifier?: string | null;
+    };
+
+export type MerchizeExternalOrderStatusAction = 'hold' | 'resume';
+
+export type MerchizeExternalOrderMutationResponse = {
+  success?: boolean;
+  status?: unknown;
+  message?: string;
+  data?: unknown;
+  error?: unknown;
+};
+
+export type MerchizeExternalOrderSnapshotResponse = {
+  success?: boolean;
+  message?: string;
+  data?: unknown;
+};
+
 export class MerchizeApiError extends Error {
   status: number | null;
   code: string;
@@ -38,7 +66,7 @@ export class MerchizeApiError extends Error {
 function getMerchizeConfig() {
   const baseUrl = process.env.MERCHIZE_BO_API_BASE_URL ?? process.env.MERCHIZE_BASE_URL;
   const apiKey = process.env.MERCHIZE_API_KEY;
-  const accessToken = process.env.MERCHIZE_ACCESS_TOKEN;
+  const accessToken = process.env.MERCHIZE_ACCESS_TOKEN ?? process.env.MERCHIZE_TOKEN;
   const storeId = process.env.MERCHIZE_STORE_ID;
 
   if (!baseUrl) {
@@ -72,6 +100,68 @@ function buildHeaders(config: ReturnType<typeof getMerchizeConfig>) {
   if (config.storeId) headers['x-store-id'] = config.storeId;
 
   return headers;
+}
+
+function buildExternalOrderBody(
+  reference: MerchizeExternalOrderReference,
+  action?: MerchizeExternalOrderStatusAction,
+) {
+  const code = 'code' in reference && reference.code ? reference.code.trim() : '';
+  const externalNumber =
+    'externalNumber' in reference && reference.externalNumber
+      ? reference.externalNumber.trim()
+      : '';
+  const identifier = reference.identifier?.trim() ?? '';
+
+  if (!code && !externalNumber) {
+    throw new MerchizeApiError('Merchize external order action requires code or external_number.', {
+      code: 'MERCHIZE_ORDER_REFERENCE_MISSING',
+    });
+  }
+
+  return {
+    order: {
+      code,
+      external_number: externalNumber,
+      identifier,
+      ...(action ? { action } : {}),
+    },
+  };
+}
+
+function buildExternalOrderQuery(reference: MerchizeExternalOrderReference) {
+  const params = new URLSearchParams();
+  const code = 'code' in reference && reference.code ? reference.code.trim() : '';
+  const externalNumber =
+    'externalNumber' in reference && reference.externalNumber
+      ? reference.externalNumber.trim()
+      : '';
+  const identifier = reference.identifier?.trim() ?? '';
+
+  if (code) {
+    params.set('code', code);
+  } else if (externalNumber) {
+    params.set('external_number', externalNumber);
+    if (identifier) params.set('identifier', identifier);
+  } else {
+    throw new MerchizeApiError('Merchize external order query requires code or external_number.', {
+      code: 'MERCHIZE_ORDER_REFERENCE_MISSING',
+    });
+  }
+
+  return params.toString();
+}
+
+function buildExternalOrderListBody(references: MerchizeExternalOrderReference[]) {
+  if (!references.length) {
+    throw new MerchizeApiError('Merchize external order list query requires at least one order.', {
+      code: 'MERCHIZE_ORDER_REFERENCE_MISSING',
+    });
+  }
+
+  return {
+    orders: references.map((reference) => buildExternalOrderBody(reference).order),
+  };
 }
 
 function summarizeFailedBody(body: string) {
@@ -131,10 +221,97 @@ async function merchizeRequest<T>(path: string, options: MerchizeRequestOptions 
   }
 }
 
-export async function getMerchizeOrderByExternalNumber(externalNumber: string) {
-  const encodedExternalNumber = encodeURIComponent(externalNumber);
+export async function getMerchizeOrderByExternalNumber(
+  externalNumber: string,
+  identifier?: string | null,
+) {
+  const params = new URLSearchParams({ external_number: externalNumber });
+  if (identifier?.trim()) params.set('identifier', identifier.trim());
   return merchizeRequest<MerchizeOrderLookupResponse>(
-    `/order/external/orders/order-detail?external_number=${encodedExternalNumber}`,
+    `/order/external/orders/order-detail?${params.toString()}`,
+  );
+}
+
+export async function pushMerchizeExternalOrderToFulfillment(
+  reference: MerchizeExternalOrderReference,
+) {
+  return merchizeRequest<MerchizeExternalOrderMutationResponse>('/order/external/orders/push', {
+    method: 'POST',
+    body: buildExternalOrderBody(reference),
+  });
+}
+
+export async function updateMerchizeExternalOrderStatus(
+  reference: MerchizeExternalOrderReference,
+  action: MerchizeExternalOrderStatusAction,
+) {
+  return merchizeRequest<MerchizeExternalOrderMutationResponse>(
+    '/order/external/orders/update-order-status',
+    {
+      method: 'POST',
+      body: buildExternalOrderBody(reference, action),
+    },
+  );
+}
+
+export async function cancelMerchizeExternalOrder(reference: MerchizeExternalOrderReference) {
+  return merchizeRequest<MerchizeExternalOrderMutationResponse>('/order/external/orders/cancel', {
+    method: 'POST',
+    body: buildExternalOrderBody(reference),
+  });
+}
+
+export async function getMerchizeExternalOrderProgress(reference: MerchizeExternalOrderReference) {
+  return merchizeRequest<MerchizeExternalOrderSnapshotResponse>(
+    `/order/external/orders/order-progress?${buildExternalOrderQuery(reference)}`,
+  );
+}
+
+export async function getMerchizeExternalOrderTracking(reference: MerchizeExternalOrderReference) {
+  return merchizeRequest<MerchizeExternalOrderSnapshotResponse>(
+    `/order/external/orders/tracking?${buildExternalOrderQuery(reference)}`,
+  );
+}
+
+export async function getMerchizeExternalOrderInvoice(reference: MerchizeExternalOrderReference) {
+  return merchizeRequest<MerchizeExternalOrderSnapshotResponse>(
+    `/order/external/orders/order-invoice?${buildExternalOrderQuery(reference)}`,
+  );
+}
+
+export async function listMerchizeExternalOrdersDetail(
+  references: MerchizeExternalOrderReference[],
+) {
+  return merchizeRequest<MerchizeExternalOrderSnapshotResponse>(
+    '/order/external/orders/list-orders-detail',
+    {
+      method: 'POST',
+      body: buildExternalOrderListBody(references),
+    },
+  );
+}
+
+export async function listMerchizeExternalOrdersTracking(
+  references: MerchizeExternalOrderReference[],
+) {
+  return merchizeRequest<MerchizeExternalOrderSnapshotResponse>(
+    '/order/external/orders/list-orders-tracking',
+    {
+      method: 'POST',
+      body: buildExternalOrderListBody(references),
+    },
+  );
+}
+
+export async function listMerchizeExternalOrdersInvoice(
+  references: MerchizeExternalOrderReference[],
+) {
+  return merchizeRequest<MerchizeExternalOrderSnapshotResponse>(
+    '/order/external/orders/list-orders-invoice',
+    {
+      method: 'POST',
+      body: buildExternalOrderListBody(references),
+    },
   );
 }
 

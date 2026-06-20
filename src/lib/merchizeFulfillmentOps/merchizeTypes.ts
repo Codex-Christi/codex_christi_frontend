@@ -18,6 +18,7 @@ export type MerchizeFulfillmentRegistrationInput = {
   djangoOrderIntentUuid: string | null;
   djangoOrderIntentOrderId: string | null;
   djangoPaymentSaveCustomId: string;
+  fulfillmentIdentifier?: string | null;
   merchizeExternalOrderNumber: string;
   merchizeOrderId: string | null;
   merchizeOrderCode: string | null;

@@ -134,11 +134,15 @@ export async function syncMerchizeFulfillmentOrder(
       action: 'external_lookup',
       requestSummary: {
         merchizeExternalOrderNumber: order.merchizeExternalOrderNumber,
+        fulfillmentIdentifier: order.merchizeIdentifier,
       },
     });
     activeAttemptId = lookupAttempt.id;
 
-    const lookup = await getMerchizeOrderByExternalNumber(order.merchizeExternalOrderNumber);
+    const lookup = await getMerchizeOrderByExternalNumber(
+      order.merchizeExternalOrderNumber,
+      order.merchizeIdentifier,
+    );
     merchizeOrderId = extractMerchizeOrderIdFromExternalLookup(lookup);
 
     if (!merchizeOrderId) {

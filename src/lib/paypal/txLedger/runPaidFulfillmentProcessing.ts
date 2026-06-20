@@ -15,12 +15,20 @@ import {
   FulfillmentProviderRejectedError,
   sendMerchizeFulfillmentOrder,
 } from '@/lib/paypal/txLedger/sendMerchizeFulfillmentOrder';
-import { registerAcceptedMerchizeFulfillmentPush } from '@/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentPush';
-import { safeLogErrorMessage } from '@/lib/merchizeFulfillmentOps/redaction';
+import { registerAcceptedMerchizeFulfillmentProcess } from '@/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentProcess';
+import {
+  MerchizeFulfillmentPushError,
+  pushMerchizeFulfillmentOrderToProduction,
+} from '@/lib/merchizeFulfillmentOps/pushMerchizeFulfillmentOrderToProduction';
+import { CODEX_CHRISTI_FULFILLMENT_IDENTIFIER } from '@/lib/merchizeFulfillmentOps/fulfillmentIdentifier';
+import { syncMerchizeFulfillmentOrder } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOrder';
+import { syncMerchizeFulfillmentOperationalSnapshots } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOperationalSnapshots';
+import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/lib/merchizeFulfillmentOps/merchizeMapper';
 import {
   enqueueAdminRecoveryNotification,
   sendPendingAdminRecoveryNotificationsForOrder,
 } from '@/lib/paypal/txLedger/adminNotificationOutbox';
+import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
@@ -60,6 +68,71 @@ async function updateLockedRow(
     where: { orderToken, postProcessingLockId: lockId },
     data,
   });
+}
+
+async function markFulfillmentFailedAndNotify(args: {
+  orderToken: string;
+  lockId: string;
+  row: {
+    paypalOrderId: string | null;
+    customerName: string;
+    customerEmail: string;
+    receiptLink: string | null;
+  };
+  errorCode: string;
+  errorMessage: string;
+  issueSummary?: string[];
+  requestPayload?: unknown;
+  responsePayload?: unknown;
+  merchizeFulfillmentProcessingId?: string | null;
+  merchizeProviderOrderId?: string | null;
+  merchizeProviderOrderCode?: string | null;
+}) {
+  await paypalTxLedger.$transaction(async (tx) => {
+    await tx.paypalIntent.updateMany({
+      where: { orderToken: args.orderToken, postProcessingLockId: args.lockId },
+      data: {
+        status: PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
+        lastErrorCode: args.errorCode,
+        lastErrorMessage: args.errorMessage,
+        merchizeFulfillmentRequestPayload:
+          args.requestPayload === undefined ? undefined : toLedgerJson(args.requestPayload),
+        merchizeFulfillmentResponsePayload:
+          args.responsePayload === undefined ? undefined : toLedgerJson(args.responsePayload),
+        merchizeFulfillmentProcessingId: args.merchizeFulfillmentProcessingId ?? undefined,
+        merchizeProviderOrderId: args.merchizeProviderOrderId ?? undefined,
+        merchizeProviderOrderCode: args.merchizeProviderOrderCode ?? undefined,
+        postProcessingLockId: null,
+        postProcessingLockedAt: null,
+        postProcessingLockExpiresAt: null,
+      } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
+    });
+
+    await enqueueAdminRecoveryNotification({
+      db: tx,
+      orderToken: args.orderToken,
+      paypalOrderId: args.row.paypalOrderId,
+      customerName: args.row.customerName,
+      customerEmail: args.row.customerEmail,
+      ledgerStatus: PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
+      errorCode: args.errorCode,
+      errorMessage: args.errorMessage,
+      issueSummary: args.issueSummary ?? [args.errorMessage],
+      receiptLink: args.row.receiptLink,
+    });
+  });
+
+  await sendPendingAdminRecoveryNotificationsForOrder(args.orderToken).catch(
+    (notificationError) => {
+      console.error('[AdminNotificationOutbox] failed to send fulfillment failed alert', {
+        orderToken: args.orderToken,
+        error:
+          notificationError instanceof Error
+            ? notificationError.message
+            : String(notificationError),
+      });
+    },
+  );
 }
 
 export async function runPaidFulfillmentProcessing(orderToken: string) {
@@ -182,69 +255,156 @@ export async function runPaidFulfillmentProcessing(orderToken: string) {
     const fulfillmentAddress =
       (row.fulfillmentAddressOverride as PaymentSavingActionProps['delivery_address'] | null) ??
       (row.shippingSnapshot as PaymentSavingActionProps['delivery_address']);
-    const fulfillmentSend = await sendMerchizeFulfillmentOrder({
-      cartSnapshot: row.cartSnapshot as CartVariant[],
-      djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
-      identifier: 'codexchristi-shop',
-      currency: row.initialCurrency ?? 'USD',
-      customerName: row.customerName,
-      countryIso2: row.countryIso2,
-      fulfillmentAddress,
-    });
-    const fulfillmentResponsePayload = {
-      ok: fulfillmentSend.ok,
-      status: fulfillmentSend.status,
-      success: fulfillmentSend.success,
-      message: fulfillmentSend.message,
-      data: fulfillmentSend.data,
-    };
+    let fulfillmentRequestPayload: unknown = row.merchizeFulfillmentRequestPayload;
+    let fulfillmentResponsePayload: unknown = row.merchizeFulfillmentResponsePayload;
+    let merchizeFulfillmentProcessingId = row.merchizeFulfillmentProcessingId;
+    let merchizeProviderOrderId = row.merchizeProviderOrderId;
+    let merchizeProviderOrderCode = row.merchizeProviderOrderCode;
+    let merchizeProviderStatus: string | null = null;
+    let merchizeExternalOrderNumber = isAcceptedDjangoFulfillmentProcessResponse(
+      row.merchizeFulfillmentResponsePayload,
+    )
+      ? extractMerchizeExternalOrderNumberFromDjangoProcessResponse(
+          row.merchizeFulfillmentResponsePayload,
+          row.djangoOrderIntentOrderId,
+        )
+      : null;
 
-    await updateLockedRow(orderToken, lockId, {
-      status: PAYPAL_LEDGER_STATUS.COMPLETED,
-      merchizeFulfillmentRequestPayload: JSON.parse(JSON.stringify(fulfillmentSend.requestPayload)),
-      merchizeFulfillmentResponsePayload: JSON.parse(JSON.stringify(fulfillmentResponsePayload)),
-      merchizeFulfillmentProcessingId: fulfillmentSend.data?.id ?? null,
-      merchizeProviderOrderId: fulfillmentSend.merchizeOrderIdentifiers.merchizeProviderOrderId,
-      merchizeProviderOrderCode: fulfillmentSend.merchizeOrderIdentifiers.merchizeProviderOrderCode,
-      processingCompletedAt: new Date(),
-      postProcessingLockId: null,
-      postProcessingLockedAt: null,
-      postProcessingLockExpiresAt: null,
-      lastErrorCode: null,
-      lastErrorMessage: null,
-    } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
+    if (!merchizeExternalOrderNumber) {
+      const fulfillmentSend = await sendMerchizeFulfillmentOrder({
+        cartSnapshot: row.cartSnapshot as CartVariant[],
+        djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
+        identifier: CODEX_CHRISTI_FULFILLMENT_IDENTIFIER,
+        currency: row.initialCurrency ?? 'USD',
+        customerName: row.customerName,
+        countryIso2: row.countryIso2,
+        fulfillmentAddress,
+      });
 
-    const merchizeExternalOrderNumber =
-      fulfillmentSend.merchizeOrderIdentifiers.merchizeExternalOrderNumber;
+      fulfillmentRequestPayload = fulfillmentSend.requestPayload;
+      fulfillmentResponsePayload = {
+        ok: fulfillmentSend.ok,
+        status: fulfillmentSend.status,
+        success: fulfillmentSend.success,
+        message: fulfillmentSend.message,
+        data: fulfillmentSend.data,
+      };
+      merchizeFulfillmentProcessingId = fulfillmentSend.data?.id ?? null;
+      merchizeProviderOrderId = fulfillmentSend.merchizeOrderIdentifiers.merchizeProviderOrderId;
+      merchizeProviderOrderCode =
+        fulfillmentSend.merchizeOrderIdentifiers.merchizeProviderOrderCode;
+      merchizeProviderStatus = fulfillmentSend.merchizeOrderIdentifiers.merchizeProviderStatus;
+      merchizeExternalOrderNumber =
+        fulfillmentSend.merchizeOrderIdentifiers.merchizeExternalOrderNumber;
+
+      await updateLockedRow(orderToken, lockId, {
+        merchizeFulfillmentRequestPayload: toLedgerJson(fulfillmentRequestPayload),
+        merchizeFulfillmentResponsePayload: toLedgerJson(fulfillmentResponsePayload),
+        merchizeFulfillmentProcessingId,
+        merchizeProviderOrderId,
+        merchizeProviderOrderCode,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+      } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
+    }
+
     if (merchizeExternalOrderNumber) {
-      await registerAcceptedMerchizeFulfillmentPush(
-        {
+      await registerAcceptedMerchizeFulfillmentProcess({
+        orderToken,
+        paypalOrderId: row.paypalOrderId,
+        djangoOrderIntentUuid: row.djangoOrderIntentUuid,
+        djangoOrderIntentOrderId: row.djangoOrderIntentOrderId,
+        djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
+        fulfillmentIdentifier: CODEX_CHRISTI_FULFILLMENT_IDENTIFIER,
+        merchizeExternalOrderNumber,
+        merchizeOrderId: null,
+        merchizeOrderCode: merchizeProviderOrderCode ?? merchizeExternalOrderNumber,
+        merchizeStatus: merchizeProviderStatus,
+        djangoProcessResponsePayload: fulfillmentResponsePayload,
+        customerEmail: row.customerEmail,
+        shippingSnapshot: fulfillmentAddress,
+        cartSnapshot: row.cartSnapshot,
+      });
+
+      const sync = await syncMerchizeFulfillmentOrder(orderToken);
+      if (!sync.ok) {
+        await markFulfillmentFailedAndNotify({
           orderToken,
-          paypalOrderId: row.paypalOrderId,
-          djangoOrderIntentUuid: row.djangoOrderIntentUuid,
-          djangoOrderIntentOrderId: row.djangoOrderIntentOrderId,
-          djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
-          merchizeExternalOrderNumber,
-          merchizeOrderId: null,
-          merchizeOrderCode: fulfillmentSend.merchizeOrderIdentifiers.merchizeProviderOrderCode,
-          merchizeStatus: fulfillmentSend.merchizeOrderIdentifiers.merchizeProviderStatus,
-          djangoProcessResponsePayload: fulfillmentResponsePayload,
-          customerEmail: row.customerEmail,
-          shippingSnapshot: fulfillmentAddress,
-          cartSnapshot: row.cartSnapshot,
-        },
-        { syncImmediately: true },
-      ).catch((opsError) => {
-        console.error('[merchize.fulfillment_ops.registration_failed]', {
+          lockId,
+          row,
+          errorCode: sync.errorCode,
+          errorMessage: sync.errorMessage,
+          requestPayload: fulfillmentRequestPayload,
+          responsePayload: fulfillmentResponsePayload,
+          merchizeFulfillmentProcessingId,
+          merchizeProviderOrderId,
+          merchizeProviderOrderCode,
+        });
+        return;
+      }
+
+      try {
+        await pushMerchizeFulfillmentOrderToProduction({
           orderToken,
           merchizeExternalOrderNumber,
-          error: safeLogErrorMessage(opsError),
+          merchizeOrderCode: merchizeProviderOrderCode,
+          identifier: CODEX_CHRISTI_FULFILLMENT_IDENTIFIER,
+        });
+      } catch (pushError) {
+        const message =
+          pushError instanceof Error ? pushError.message : 'Merchize push-to-fulfillment failed.';
+        await markFulfillmentFailedAndNotify({
+          orderToken,
+          lockId,
+          row,
+          errorCode:
+            pushError instanceof MerchizeFulfillmentPushError
+              ? pushError.code
+              : 'MERCHIZE_PUSH_FAILED',
+          errorMessage: message,
+          requestPayload: fulfillmentRequestPayload,
+          responsePayload: fulfillmentResponsePayload,
+          merchizeFulfillmentProcessingId,
+          merchizeProviderOrderId,
+          merchizeProviderOrderCode,
+        });
+        return;
+      }
+
+      await updateLockedRow(orderToken, lockId, {
+        status: PAYPAL_LEDGER_STATUS.COMPLETED,
+        merchizeFulfillmentRequestPayload: toLedgerJson(fulfillmentRequestPayload),
+        merchizeFulfillmentResponsePayload: toLedgerJson(fulfillmentResponsePayload),
+        merchizeFulfillmentProcessingId,
+        merchizeProviderOrderId,
+        merchizeProviderOrderCode,
+        processingCompletedAt: new Date(),
+        postProcessingLockId: null,
+        postProcessingLockedAt: null,
+        postProcessingLockExpiresAt: null,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+      } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
+
+      await syncMerchizeFulfillmentOperationalSnapshots(orderToken).catch((snapshotError) => {
+        console.error('[merchize.fulfillment_ops.operational_snapshot_failed]', {
+          orderToken,
+          merchizeExternalOrderNumber,
+          error: snapshotError instanceof Error ? snapshotError.message : String(snapshotError),
         });
       });
     } else {
-      console.error('[merchize.fulfillment_ops.registration_skipped]', {
+      await markFulfillmentFailedAndNotify({
         orderToken,
-        reason: 'missing_merchize_external_order_number',
+        lockId,
+        row,
+        errorCode: 'MERCHIZE_EXTERNAL_ORDER_NUMBER_MISSING',
+        errorMessage: 'Merchize external order number was missing after Django process acceptance.',
+        requestPayload: fulfillmentRequestPayload,
+        responsePayload: fulfillmentResponsePayload,
+        merchizeFulfillmentProcessingId,
+        merchizeProviderOrderId,
+        merchizeProviderOrderCode,
       });
     }
   } catch (error) {

@@ -145,7 +145,7 @@ Implementation rule:
 
 - Extract the provider-facing `order_id` as `merchizeExternalOrderNumber` when present.
 - Do not treat the wrapped process `response_data.data._id` as the in-depth detail path ID.
-- The authoritative `merchizeOrderId` for `GET /bo-api/order/orders/{id}` must come from `resp.data._id` returned by `GET /bo-api/order/external/orders/order-detail?external_number=...`.
+- The authoritative `merchizeOrderId` for `GET /order/orders/{id}` must come from `resp.data._id` returned by `GET /order/external/orders/order-detail?external_number=...`.
 - That same `merchizeOrderId` is the default Merchize platform identifier for later POD actions such as view, edit, pause, change product, change processing, and tracking/status operations.
 - Persist raw Merchize snapshots only in access-controlled DB fields.
 - Show redacted summaries in admin UI, logs, and notification emails.
@@ -226,10 +226,10 @@ Non-essential for the first implementation:
 These endpoints define the core catalog-backed fulfillment chain:
 
 ```txt
-POST /bo-api/order/external/orders/catalog
-POST /bo-api/order/external/orders/push
-GET  /bo-api/order/external/orders/order-detail?external_number={externalNumber}
-GET  /bo-api/order/orders/{merchizeOrderId}
+POST /order/external/orders/catalog
+POST /order/external/orders/push
+GET  /order/external/orders/order-detail?external_number={externalNumber}&identifier={fulfillmentIdentifier}
+GET  /order/orders/{merchizeOrderId}
 ```
 
 Operational meaning:
@@ -237,8 +237,8 @@ Operational meaning:
 - `POST /order/external/orders/catalog` is Merchize's direct external-order import endpoint.
 - `POST /order/external/orders/push` is Merchize's push-to-fulfillment endpoint.
 - Catalog import is not final fulfillment success by itself. Push-to-fulfillment acceptance is the final provider write boundary before operational monitoring.
-- In the current Codex Christi runtime, Django may own the catalog import and push stages through `/orders/process/{custom_id}`. If it does, the response contract must make that clear enough for Next.js to mark the paid order fulfillment runner complete.
-- If Django only imports or queues the catalog order, Next.js must use a server-only Merchize adapter to call `/order/external/orders/push` before setting the paid order fulfillment runner complete.
+- In the current Codex Christi runtime, Django `/orders/process/{custom_id}` is treated as catalog-backed process acceptance/import. Next.js performs the explicit server-only Merchize push stage before setting the paid order fulfillment runner complete.
+- A future Django contract may satisfy push-to-fulfillment only if it proves push acceptance directly. Until then, accepted Django 201 rows are not final success by themselves.
 - Merchize Ops should not replay direct Merchize creation during normal sync unless the target stage is explicitly incomplete and idempotency checks pass.
 - Direct creation or manual linking belongs to admin repair flows and must require admin confirmation and an audit reason.
 - `external_number` is the provider-facing order string, currently the `ORD-...` value from Django's wrapped process response.
@@ -267,22 +267,43 @@ Implementation rules:
 
 ## Production control endpoints
 
-These endpoints control whether the provider order is held or open:
+These external-order endpoints control provider order release and admin repair actions:
 
 ```txt
-PATCH /bo-api/order/update-order-status/{merchizeOrderId}
+POST /order/external/orders/update-order-status
+POST /order/external/orders/cancel
 ```
 
 Known status payload meanings:
 
-- `status = hold`: pause order for edit/review.
-- `status = open`: resume/release order after review.
+- `action = hold`: pause order progress for edit/review.
+- `action = resume`: resume order progress after review.
+- `cancel` is a destructive provider mutation and must stay behind an admin reason, audit log, and step-up confirmation before UI exposure.
 
 Implementation rule:
 
 - Opening/releasing production is a dangerous admin action unless the automatic production gate has passed.
 - Hold/open actions must record an admin reason and must create an admin action history row.
 - Future production auth should require WebAuthn/passkey step-up for open/resume, hold, cancel, and manual resolution.
+
+## External operational snapshots
+
+These server-auth endpoints feed admin reconciliation after push acceptance:
+
+```txt
+GET  /order/external/orders/order-progress
+GET  /order/external/orders/tracking
+GET  /order/external/orders/order-invoice
+POST /order/external/orders/list-orders-detail
+POST /order/external/orders/list-orders-tracking
+POST /order/external/orders/list-orders-invoice
+```
+
+Implementation rules:
+
+- Use `external_number + identifier` for single-order queries when the Codex Christi external number is known.
+- Persist progress into `merchizeProgressPayload`, tracking into `merchizeTrackingPayload`, and invoice/cost state into `merchizeFulfillmentCostPayload`.
+- Snapshot sync failures should create failed sync attempts and admin-visible reconciliation state, but they should not undo a successful push-to-fulfillment completion.
 
 ## Address and buyer detail endpoints
 
@@ -438,7 +459,7 @@ The PayPal TX ledger remains the source of truth for paid checkout state. Merchi
 `PaypalIntent.merchizeFulfillmentResponsePayload.data.response_data.data.data.order_id` -> `MerchizeFulfillmentOrder.merchizeExternalOrderNumber`
 
 - Purpose: external number used for Merchize external-number lookup.
-- Endpoint: `GET /bo-api/order/external/orders/order-detail?external_number=...`
+- Endpoint: `GET /order/external/orders/order-detail?external_number=...`
 - Required: yes.
 
 Merchize external lookup `resp.data._id` -> `MerchizeFulfillmentOrder.merchizeOrderId`
@@ -1212,7 +1233,7 @@ src/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOrder.ts
 
 ```ts
 export async function getMerchizeOrderByExternalNumber(externalNumber: string) {
-  // GET /bo-api/order/external/orders/order-detail?external_number=...
+  // GET /order/external/orders/order-detail?external_number=...
 }
 
 export async function getMerchizeInDepthOrderDetail(merchizeOrderId: string) {
@@ -1339,21 +1360,23 @@ Completion rule:
 
 - `completed` means payment captured, receipt uploaded, Django payment saved, and push-to-fulfillment accepted.
 - It does not require in-depth detail snapshots, tracking availability, shipment, delivery, or every operational check to be fresh.
-- If Django `/orders/process/{custom_id}` owns both catalog import and push-to-fulfillment, its accepted response can satisfy stages 5 and 6.
-- If Django does not own push-to-fulfillment, Next.js must call the server-only Merchize push adapter before marking stage 6 accepted.
+- Accepted Django `/orders/process/{custom_id}` responses satisfy stage 5. The current Next.js runtime then calls the server-only Merchize push adapter before marking stage 6 accepted.
+- Do not replay PayPal capture, receipt upload, Django payment save, or the Django process path for accepted 201 rows; resume at Merchize Ops registration, lookup, and push.
 
 Recommended function boundary:
 
 ```txt
 src/lib/paypal/txLedger/runPaidFulfillmentProcessing.ts
-src/lib/paidOrderFulfillment/stages/pushMerchizeOrderToFulfillment.ts
-src/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentPush.ts
+src/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentProcess.ts
+src/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOrder.ts
+src/lib/merchizeFulfillmentOps/pushMerchizeFulfillmentOrderToProduction.ts
+src/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOperationalSnapshots.ts
 ```
 
 Suggested signature:
 
 ```ts
-type RegisterAcceptedMerchizeFulfillmentPushInput = {
+type MerchizeFulfillmentRegistrationInput = {
   orderToken: string;
   paypalOrderId: string | null;
   djangoOrderIntentUuid: string | null;
@@ -1366,16 +1389,14 @@ type RegisterAcceptedMerchizeFulfillmentPushInput = {
   merchizeOrderCode: string | null;
   merchizeStatus: string | null;
   djangoProcessResponsePayload: unknown;
-  merchizePushToFulfillmentPayload?: unknown;
-  merchizePushToFulfillmentResponsePayload?: unknown;
 };
 ```
 
 Important rule:
 
-- Failure to register/sync Merchize Fulfillment Ops should not replay PayPal capture, receipt upload, or Django payment save.
-- Failure to sync provider details should not undo a push-to-fulfillment-accepted checkout.
-- If registration fails, store an admin-visible error or internal alert, then let admin retry Merchize Fulfillment Ops registration/sync.
+- Failure to register/sync Merchize Fulfillment Ops should not replay PayPal capture, receipt upload, Django payment save, or an accepted Django process response.
+- Failure to sync post-push operational snapshots should not undo a push-to-fulfillment-accepted checkout.
+- If registration or external lookup fails before push, keep the row unresolved and alert the fulfillment group.
 - If push-to-fulfillment fails, keep the order unresolved and alert the fulfillment group. Do not mark the paid order fulfillment runner complete.
 
 ---
@@ -1948,7 +1969,7 @@ Before starting Merchize Fulfillment Ops DB implementation:
 
 ## Phase 3 - Registration after accepted process
 
-1. Add `registerAcceptedMerchizeFulfillmentPush(...)`.
+1. Add `registerAcceptedMerchizeFulfillmentProcess(...)`.
 2. Call it after Django process response is accepted.
 3. Upsert Merchize Fulfillment Ops order by external number.
 4. Save Django process response payload.
@@ -2084,17 +2105,19 @@ These decisions supersede the older open-question framing.
 
 2. Push-to-fulfillment acceptance is the final provider write boundary for paid order fulfillment completion.
 
-3. Django `/orders/process/{custom_id}` can satisfy the catalog import and push stages only if its response contract proves both were accepted.
+3. Django `/orders/process/{custom_id}` satisfies catalog-backed process acceptance unless a future response contract proves push acceptance directly.
 
-4. Provider detail sync, tracking sync, and issue checks can run after completion as idempotent stages, but they remain part of the fulfillment ops domain.
+4. Current runtime should treat Django process acceptance as catalog-backed process acceptance, then call `POST /order/external/orders/push` explicitly before completion.
 
-5. Admin must be able to run the remaining pipeline and individual stage actions.
+5. Provider detail sync, progress sync, tracking sync, invoice/cost sync, and issue checks can run after completion as idempotent stages, but they remain part of the fulfillment ops domain.
 
-6. Internal alerts should use the Admin Ops ledger as the home for reusable alert routing, recipient groups, and outbox state.
+6. Admin must be able to run the remaining pipeline and individual stage actions.
 
-7. Alert emails should use redacted payloads by default and link to protected admin detail pages for full data.
+7. Internal alerts should use the Admin Ops ledger as the home for reusable alert routing, recipient groups, and outbox state.
 
-8. Raw Merchize payload retention, dashboard-session-only endpoints, and dangerous provider mutations still need provider-auth and retention decisions before production automation.
+8. Alert emails should use redacted payloads by default and link to protected admin detail pages for full data.
+
+9. Raw Merchize payload retention, dashboard-session-only endpoints, and dangerous provider mutations still need provider-auth and retention decisions before production automation.
 
 ---
 
@@ -2128,7 +2151,13 @@ Unless explicitly changed:
    - `GET /order/external/orders/order-detail`
    - `GET /order/external/orders/order-progress`
    - `GET /order/external/orders/tracking`
-5. Persist `fulfillmentIdentifier`, `merchizeExternalOrderNumber`, push request/response summaries, lookup snapshots, normalized order snapshots, and item snapshots.
+   - `GET /order/external/orders/order-invoice`
+   - `POST /order/external/orders/list-orders-detail`
+   - `POST /order/external/orders/list-orders-tracking`
+   - `POST /order/external/orders/list-orders-invoice`
+   - `POST /order/external/orders/update-order-status`
+   - `POST /order/external/orders/cancel`
+5. Persist `fulfillmentIdentifier`, `merchizeExternalOrderNumber`, push attempt summaries, lookup snapshots, normalized order snapshots, item snapshots, progress snapshots, tracking snapshots, and invoice/cost snapshots.
 6. Add explicit states for `push_to_fulfillment_pending`, `push_to_fulfillment_accepted`, `attention_required`, `address_review_required`, `product_unavailable`, `tracking_synced`, `blocked`, `reconciled`, and `completed`.
 7. Add Admin Ops ledger internal alert routing before wiring new alert events.
 8. Replace fulfillment-specific notification calls with reusable internal alert enqueue/send helpers.

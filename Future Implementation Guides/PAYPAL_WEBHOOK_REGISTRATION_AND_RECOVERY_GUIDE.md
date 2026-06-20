@@ -485,7 +485,7 @@ Rules:
 - Do not auto-run generic `error` rows. Show those for admin review first.
 - Do not auto-run rows in `fulfillment_blocked`.
 - Do not auto-run rows in `fulfillment_failed` unless the saved stage state proves the failure is in a safe, idempotent remaining stage.
-- Accepted push-to-fulfillment rows should move to provider lookup/status/reconciliation, not full payment-side replay.
+- Accepted Django fulfillment-process rows should move to provider registration, external-number lookup, explicit push-to-fulfillment, status/reconciliation, not full payment-side replay.
 - Respect active `postProcessingLockExpiresAt`.
 - Use the same `runPaidFulfillmentProcessing(orderToken)` entrypoint only when the row is genuinely incomplete.
 

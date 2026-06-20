@@ -101,14 +101,24 @@ export default function AdminPaidOrderRecoveryActionsPanel({
   return (
     <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2'>
       {needsProviderDetailSync ? (
-        <ActionButton
-          icon={SearchCheck}
-          tone='cyan'
-          disabled={isPending}
-          onClick={handleProviderDetailSync}
-        >
-          {isPending ? 'Syncing...' : 'Sync Provider Details'}
-        </ActionButton>
+        <>
+          <ActionButton
+            icon={SearchCheck}
+            tone='cyan'
+            disabled={isPending}
+            onClick={handleProviderDetailSync}
+          >
+            {isPending ? 'Syncing...' : 'Sync Provider Details'}
+          </ActionButton>
+          <ActionButton
+            icon={RefreshCw}
+            tone='cyan'
+            disabled={isPending || isCompleted}
+            onClick={handleRetry}
+          >
+            {isCompleted ? 'Already Completed' : isPending ? 'Pushing...' : 'Push To Fulfillment'}
+          </ActionButton>
+        </>
       ) : (
         <ActionButton
           icon={RefreshCw}
@@ -134,8 +144,8 @@ export default function AdminPaidOrderRecoveryActionsPanel({
 
       {needsProviderDetailSync ? (
         <p className='sm:col-span-2 xl:col-span-1 2xl:col-span-2 rounded-lg border border-cyan-300/14 bg-cyan-300/[0.05] px-3 py-2 text-xs leading-5 text-cyan-50/80'>
-          Fulfillment was already accepted. Do not retry the full pipeline; reconcile the provider
-          order through Merchize detail sync.
+          Django accepted the fulfillment process. Provider sync and push continue from that
+          accepted state without replaying payment capture, receipt upload, or Django payment save.
         </p>
       ) : null}
     </div>

@@ -96,12 +96,19 @@ export type PaidOrderRecoveryActivityItem = {
 
 export type MerchizeFulfillmentOpsAdminSummary = {
   syncStatus: string;
+  productionGateStatus: string | null;
   merchizeExternalOrderNumber: string;
   merchizeOrderId: string | null;
   merchizeStatus: string | null;
+  progressStatus: string | null;
+  deliveryStatus: string | null;
+  costReviewStatus: string | null;
   itemCount: number;
+  releasedToProductionAt: string | null;
   lastLookupAt: string | null;
   lastDetailSyncAt: string | null;
+  lastProgressSyncAt: string | null;
+  lastTrackingSyncAt: string | null;
   lastSyncErrorMessage: string | null;
 };
 

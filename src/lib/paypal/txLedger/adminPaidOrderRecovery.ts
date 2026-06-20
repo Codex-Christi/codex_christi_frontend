@@ -9,8 +9,12 @@ import {
   getMerchizeFulfillmentOpsPrisma,
   isMerchizeFulfillmentOpsDatabaseConfigured,
 } from '@/lib/prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOpsPrisma';
-import { MERCHIZE_FULFILLMENT_SYNC_STATUS } from '@/lib/merchizeFulfillmentOps/status';
+import {
+  MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS,
+  MERCHIZE_FULFILLMENT_SYNC_STATUS,
+} from '@/lib/merchizeFulfillmentOps/status';
 import { safeLogErrorMessage } from '@/lib/merchizeFulfillmentOps/redaction';
+import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import type {
   MerchizeFulfillmentOpsAdminSummary,
   PaidOrderRecoveryActivityItem,
@@ -33,7 +37,6 @@ const ADMIN_RECOVERY_STATUSES = [
 ] as const;
 
 type JsonRecord = Record<string, unknown>;
-const ACCEPTED_DJANGO_FULFILLMENT_INFO_MESSAGE = 'order created but details not available';
 const SCANNER_RECOVERABLE_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.CAPTURED,
   PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED,
@@ -62,28 +65,17 @@ function getPath(root: unknown, path: Array<string | number>) {
   }, root);
 }
 
-function normalizeFulfillmentMessage(value: unknown) {
-  return asString(value)?.trim().toLowerCase() ?? '';
-}
-
-export function isAcceptedDjangoFulfillmentProcessResponse(payload: unknown) {
-  const response = asRecord(payload);
-  const data = asRecord(response?.data);
-  const status = asNumber(response?.status);
-  const errorMessage = normalizeFulfillmentMessage(data?.error_message);
-
-  return (
-    (status === 200 || status === 201) &&
-    response?.success === true &&
-    normalizeFulfillmentMessage(data?.processing_status) === 'completed' &&
-    (!errorMessage || errorMessage === ACCEPTED_DJANGO_FULFILLMENT_INFO_MESSAGE)
-  );
-}
-
 function needsProviderDetailSync(payload: unknown, merchizeOpsSyncStatus?: string | null) {
+  const detailOrPushSyncedStatuses = new Set<string>([
+    MERCHIZE_FULFILLMENT_SYNC_STATUS.DETAIL_SYNCED,
+    MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_PENDING,
+    MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_ACCEPTED,
+    MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_FAILED,
+  ]);
+
   return (
     isAcceptedDjangoFulfillmentProcessResponse(payload) &&
-    merchizeOpsSyncStatus !== MERCHIZE_FULFILLMENT_SYNC_STATUS.DETAIL_SYNCED
+    !detailOrPushSyncedStatuses.has(merchizeOpsSyncStatus ?? '')
   );
 }
 
@@ -209,6 +201,8 @@ function buildTimeline(row: {
   merchizeFulfillmentResponsePayload: unknown;
   merchizeFulfillmentOpsSyncStatus?: string | null;
   merchizeFulfillmentOpsLastDetailSyncAt?: string | null;
+  merchizeFulfillmentOpsProductionGateStatus?: string | null;
+  merchizeFulfillmentOpsReleasedToProductionAt?: string | null;
 }) {
   const created = formatTimelineDate(row.createdAt);
   const updated = formatTimelineDate(row.updatedAt);
@@ -240,6 +234,24 @@ function buildTimeline(row: {
       label: 'Fulfillment Accepted; Provider Details Pending',
       time: updated,
       state: 'pending',
+    });
+  } else if (
+    row.merchizeFulfillmentOpsProductionGateStatus ===
+    MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_ACCEPTED
+  ) {
+    items.push({
+      label: 'Merchize Push Accepted',
+      time: row.merchizeFulfillmentOpsReleasedToProductionAt ?? completed,
+      state: 'done',
+    });
+  } else if (
+    row.merchizeFulfillmentOpsProductionGateStatus ===
+    MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_FAILED
+  ) {
+    items.push({
+      label: 'Merchize Push Failed',
+      time: updated,
+      state: 'failed',
     });
   } else if (
     row.merchizeFulfillmentOpsSyncStatus === MERCHIZE_FULFILLMENT_SYNC_STATUS.DETAIL_SYNCED
@@ -296,22 +308,38 @@ function formatLongDate(date: Date | null | undefined) {
 
 function mapMerchizeFulfillmentOpsSummary(row: {
   syncStatus: string;
+  productionGateStatus: string | null;
   merchizeExternalOrderNumber: string;
   merchizeOrderId: string | null;
   merchizeStatus: string | null;
+  progressStatus: string | null;
+  deliveryStatus: string | null;
+  costReviewStatus: string | null;
   itemCount: number;
+  releasedToProductionAt: Date | null;
   lastLookupAt: Date | null;
   lastDetailSyncAt: Date | null;
+  lastProgressSyncAt: Date | null;
+  lastTrackingSyncAt: Date | null;
   lastSyncErrorMessage: string | null;
 }): MerchizeFulfillmentOpsAdminSummary {
   return {
     syncStatus: row.syncStatus,
+    productionGateStatus: row.productionGateStatus,
     merchizeExternalOrderNumber: row.merchizeExternalOrderNumber,
     merchizeOrderId: row.merchizeOrderId,
     merchizeStatus: row.merchizeStatus,
+    progressStatus: row.progressStatus,
+    deliveryStatus: row.deliveryStatus,
+    costReviewStatus: row.costReviewStatus,
     itemCount: row.itemCount,
+    releasedToProductionAt: row.releasedToProductionAt
+      ? formatLongDate(row.releasedToProductionAt)
+      : null,
     lastLookupAt: row.lastLookupAt ? formatLongDate(row.lastLookupAt) : null,
     lastDetailSyncAt: row.lastDetailSyncAt ? formatLongDate(row.lastDetailSyncAt) : null,
+    lastProgressSyncAt: row.lastProgressSyncAt ? formatLongDate(row.lastProgressSyncAt) : null,
+    lastTrackingSyncAt: row.lastTrackingSyncAt ? formatLongDate(row.lastTrackingSyncAt) : null,
     lastSyncErrorMessage: row.lastSyncErrorMessage,
   };
 }
@@ -330,12 +358,19 @@ async function getMerchizeFulfillmentOpsSummaries(orderTokens: string[]) {
       select: {
         orderToken: true,
         syncStatus: true,
+        productionGateStatus: true,
         merchizeExternalOrderNumber: true,
         merchizeOrderId: true,
         merchizeStatus: true,
+        progressStatus: true,
+        deliveryStatus: true,
+        costReviewStatus: true,
         itemCount: true,
+        releasedToProductionAt: true,
         lastLookupAt: true,
         lastDetailSyncAt: true,
+        lastProgressSyncAt: true,
+        lastTrackingSyncAt: true,
         lastSyncErrorMessage: true,
       },
     });
@@ -623,6 +658,22 @@ function buildDetail(row: {
         label: 'Merchize Ops sync status',
         value: row.merchizeFulfillmentOps?.syncStatus ?? null,
       },
+      {
+        label: 'Merchize push gate status',
+        value: row.merchizeFulfillmentOps?.productionGateStatus ?? null,
+      },
+      {
+        label: 'Merchize progress status',
+        value: row.merchizeFulfillmentOps?.progressStatus ?? null,
+      },
+      {
+        label: 'Merchize delivery status',
+        value: row.merchizeFulfillmentOps?.deliveryStatus ?? null,
+      },
+      {
+        label: 'Merchize cost status',
+        value: row.merchizeFulfillmentOps?.costReviewStatus ?? null,
+      },
       { label: 'Latest PayPal webhook event', value: row.webhookEvents[0]?.eventType ?? null },
       {
         label: 'Latest webhook delivery status',
@@ -734,6 +785,8 @@ export async function getAdminPaidOrderRecoveryDetail(orderToken: string) {
       ...row,
       merchizeFulfillmentOpsSyncStatus: merchizeOpsSummary?.syncStatus,
       merchizeFulfillmentOpsLastDetailSyncAt: merchizeOpsSummary?.lastDetailSyncAt,
+      merchizeFulfillmentOpsProductionGateStatus: merchizeOpsSummary?.productionGateStatus,
+      merchizeFulfillmentOpsReleasedToProductionAt: merchizeOpsSummary?.releasedToProductionAt,
     }),
     notifications,
   };
