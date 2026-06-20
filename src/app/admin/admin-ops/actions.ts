@@ -57,7 +57,7 @@ export async function provisionAdminUserAction(
   }
 
   if (isMasterAdminRole(role)) {
-    return { error: 'The master admin is managed by the master-admin creation script.', success: null };
+    return { error: 'Master admins are managed through the master transfer flow.', success: null };
   }
 
   if (!scopes.length) {
@@ -65,7 +65,7 @@ export async function provisionAdminUserAction(
   }
 
   if (codexUserId === actor.userID) {
-    return { error: 'Use the master-admin creation script to update your own master access.', success: null };
+    return { error: 'Use the master transfer flow to move your own master access.', success: null };
   }
 
   try {
@@ -82,6 +82,7 @@ export async function provisionAdminUserAction(
       },
     });
 
+    revalidatePath('/admin/admin-ops');
     revalidatePath('/admin');
 
     return {

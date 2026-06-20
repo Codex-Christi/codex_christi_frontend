@@ -5,7 +5,7 @@ import { Loader2, ShieldPlus } from 'lucide-react';
 import {
   provisionAdminUserAction,
   type AdminUserProvisionActionState,
-} from '@/app/admin/actions';
+} from '@/app/admin/admin-ops/actions';
 
 const initialState: AdminUserProvisionActionState = {
   error: null,

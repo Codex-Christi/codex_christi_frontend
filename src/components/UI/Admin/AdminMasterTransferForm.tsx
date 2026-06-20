@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useActionState } from 'react';
 import { KeyRound, Loader2, ShieldCheck, UserRoundCog } from 'lucide-react';
 import {
@@ -7,7 +8,7 @@ import {
   startMasterAdminTransferAction,
   type MasterAdminTransferCompleteActionState,
   type MasterAdminTransferStartActionState,
-} from '@/app/admin/actions';
+} from '@/app/admin/admin-ops/actions';
 
 const initialStartState: MasterAdminTransferStartActionState = {
   error: null,
@@ -147,7 +148,7 @@ function Message({
   children,
 }: {
   tone: 'rose';
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const toneClass = {
     rose: 'border-rose-300/20 bg-rose-400/10 text-rose-100',

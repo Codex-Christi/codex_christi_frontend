@@ -9,11 +9,9 @@ import {
   ShoppingBag,
   Sparkles,
   Store,
+  UserRoundCog,
 } from 'lucide-react';
-import { listAdminUsersForDashboard } from '@/lib/admin/admin-auth-ledger';
 import { isAdminScopeAllowed, isMasterAdminRole } from '@/lib/admin/admin-config';
-import AdminMasterTransferForm from '@/components/UI/Admin/AdminMasterTransferForm';
-import AdminUserProvisioningForm from '@/components/UI/Admin/AdminUserProvisioningForm';
 import CometsContainer from '@/components/UI/general/CometsContainer';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
 import { requireAdminPage } from '@/lib/admin/require-admin';
@@ -45,10 +43,9 @@ export default async function AdminPage() {
   const canManageAdmins = isMasterAdminRole(admin.role);
   const canAccessShop = isAdminScopeAllowed(admin.scopes, 'shop', admin.role);
 
-  const [profile, recoveryRows, adminUsers] = await Promise.all([
+  const [profile, recoveryRows] = await Promise.all([
     getUser().catch(() => undefined),
     canAccessShop ? listAdminPaidOrderRecoveryRows().catch(() => []) : Promise.resolve([]),
-    canManageAdmins ? listAdminUsersForDashboard().catch(() => []) : Promise.resolve([]),
   ]);
   const displayName =
     profile?.first_name?.trim() || profile?.username?.trim() || `Admin ${admin.userID.slice(0, 8)}`;
@@ -111,6 +108,16 @@ export default async function AdminPage() {
                   status={canAccessShop ? 'Active' : 'Restricted'}
                   attention={canAccessShop ? `${attentionRows.length} attention` : 'No access'}
                 />
+                {canManageAdmins ? (
+                  <ProductCard
+                    title='Admin Ops'
+                    description='Operational admin creation, scope control, access review, and master-admin transfer.'
+                    href='/admin/admin-ops'
+                    icon={UserRoundCog}
+                    status='Master only'
+                    attention='Access management'
+                  />
+                ) : null}
                 <ProductCard
                   title='Primary Site'
                   description='Future content, user, and publishing operations for the main Codex Christi experience.'
@@ -160,51 +167,6 @@ export default async function AdminPage() {
                       </span>
                     ))}
                   </div>
-
-                  {canManageAdmins ? (
-                    <div className='mt-4 border-t border-white/10 pt-4'>
-                      <h3 className='mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400'>
-                        Create Operational Admin
-                      </h3>
-                      <AdminUserProvisioningForm />
-                    </div>
-                  ) : null}
-
-                  {canManageAdmins ? (
-                    <div className='mt-4 border-t border-white/10 pt-4'>
-                      <h3 className='mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400'>
-                        Transfer Master Admin
-                      </h3>
-                      <AdminMasterTransferForm />
-                    </div>
-                  ) : null}
-
-                  {canManageAdmins ? (
-                    <div className='mt-4 space-y-2'>
-                      {adminUsers.slice(0, 4).map((adminUser) => (
-                        <div
-                          key={adminUser.id}
-                          className='rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2'
-                        >
-                          <div className='flex items-center justify-between gap-3'>
-                            <p className='truncate text-sm text-slate-200'>
-                              {adminUser.email ?? adminUser.codexUserId}
-                            </p>
-                            <span className='text-xs text-slate-500'>{adminUser.status}</span>
-                          </div>
-                          <p className='mt-1 text-xs text-slate-500'>
-                            {adminUser.role ?? 'unknown'} ·{' '}
-                            {adminUser.scopes.join(', ') || 'no scopes'}
-                          </p>
-                        </div>
-                      ))}
-                      {!adminUsers.length ? (
-                        <p className='rounded-lg border border-amber-300/15 bg-amber-300/10 px-3 py-2 text-xs text-amber-100'>
-                          Admin ops ledger users could not be loaded.
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </section>
               </aside>
             </section>

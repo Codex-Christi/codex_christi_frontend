@@ -33,7 +33,7 @@ export function getDefaultAdminRole(): AdminRole {
 }
 
 export function getDefaultAdminScopes(): AdminScope[] {
-  return ['audit.view', 'settings.manage', 'shop'];
+  return [...ADMIN_SCOPE_VALUES];
 }
 
 export function getDefaultOperationalAdminScopes(): AdminScope[] {
