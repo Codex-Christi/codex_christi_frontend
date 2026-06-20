@@ -10,6 +10,9 @@ import {
   Sparkles,
   Store,
 } from 'lucide-react';
+import { listAdminUsersForDashboard } from '@/lib/admin/admin-auth-ledger';
+import { isAdminScopeAllowed, isMasterAdminRole } from '@/lib/admin/admin-config';
+import AdminUserProvisioningForm from '@/components/UI/Admin/AdminUserProvisioningForm';
 import CometsContainer from '@/components/UI/general/CometsContainer';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
 import { requireAdminPage } from '@/lib/admin/require-admin';
@@ -38,9 +41,13 @@ export default async function AdminPage() {
   const admin = await requireAdminPage({
     returnPath: '/admin',
   });
-  const [profile, recoveryRows] = await Promise.all([
+  const canManageAdmins = isMasterAdminRole(admin.role);
+  const canAccessShop = isAdminScopeAllowed(admin.scopes, 'shop', admin.role);
+
+  const [profile, recoveryRows, adminUsers] = await Promise.all([
     getUser().catch(() => undefined),
-    listAdminPaidOrderRecoveryRows().catch(() => []),
+    canAccessShop ? listAdminPaidOrderRecoveryRows().catch(() => []) : Promise.resolve([]),
+    canManageAdmins ? listAdminUsersForDashboard().catch(() => []) : Promise.resolve([]),
   ]);
   const displayName =
     profile?.first_name?.trim() || profile?.username?.trim() || `Admin ${admin.userID.slice(0, 8)}`;
@@ -98,10 +105,10 @@ export default async function AdminPage() {
                 <ProductCard
                   title='Codex Christi Shop'
                   description='Payments, checkout recovery, fulfillment support, catalog snapshots, and shop operations.'
-                  href='/admin/shop'
+                  href={canAccessShop ? '/admin/shop' : undefined}
                   icon={ShoppingBag}
-                  status='Active'
-                  attention={`${attentionRows.length} attention`}
+                  status={canAccessShop ? 'Active' : 'Restricted'}
+                  attention={canAccessShop ? `${attentionRows.length} attention` : 'No access'}
                 />
                 <ProductCard
                   title='Primary Site'
@@ -132,6 +139,62 @@ export default async function AdminPage() {
                   <p className='mt-3 text-sm leading-6 text-slate-300'>
                     {dailyJokes[dailyIndex % dailyJokes.length]}
                   </p>
+                </section>
+
+                <section className='rounded-lg border border-white/10 bg-slate-950/70 p-4 supports-[backdrop-filter]:backdrop-blur-xl'>
+                  <div className='flex items-center justify-between gap-3'>
+                    <h2 className='text-sm font-semibold text-white'>Admin Access</h2>
+                    <span className='rounded-md border border-emerald-300/20 bg-emerald-300/10 px-2 py-1 text-xs text-emerald-100'>
+                      {admin.role}
+                    </span>
+                  </div>
+                  <p className='mt-2 truncate text-xs text-slate-400'>{admin.email ?? admin.userID}</p>
+                  <div className='mt-3 flex flex-wrap gap-2'>
+                    {admin.scopes.map((scope) => (
+                      <span
+                        key={scope}
+                        className='rounded-md border border-cyan-300/15 bg-cyan-300/10 px-2 py-1 text-[11px] text-cyan-100'
+                      >
+                        {scope}
+                      </span>
+                    ))}
+                  </div>
+
+                  {canManageAdmins ? (
+                    <div className='mt-4 border-t border-white/10 pt-4'>
+                      <h3 className='mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400'>
+                        Create Operational Admin
+                      </h3>
+                      <AdminUserProvisioningForm />
+                    </div>
+                  ) : null}
+
+                  {canManageAdmins ? (
+                    <div className='mt-4 space-y-2'>
+                      {adminUsers.slice(0, 4).map((adminUser) => (
+                        <div
+                          key={adminUser.id}
+                          className='rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2'
+                        >
+                          <div className='flex items-center justify-between gap-3'>
+                            <p className='truncate text-sm text-slate-200'>
+                              {adminUser.email ?? adminUser.codexUserId}
+                            </p>
+                            <span className='text-xs text-slate-500'>{adminUser.status}</span>
+                          </div>
+                          <p className='mt-1 text-xs text-slate-500'>
+                            {adminUser.role ?? 'unknown'} ·{' '}
+                            {adminUser.scopes.join(', ') || 'no scopes'}
+                          </p>
+                        </div>
+                      ))}
+                      {!adminUsers.length ? (
+                        <p className='rounded-lg border border-amber-300/15 bg-amber-300/10 px-3 py-2 text-xs text-amber-100'>
+                          Admin ops ledger users could not be loaded.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </section>
               </aside>
             </section>

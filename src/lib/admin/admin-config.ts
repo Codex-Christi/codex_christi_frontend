@@ -1,63 +1,88 @@
-export type AdminRole = 'super_admin';
-export type AdminScope = 'shop';
+export type AdminRole = 'master_admin' | 'admin' | 'support' | 'viewer';
+export type AdminScope =
+  | 'audit.view'
+  | 'settings.manage'
+  | 'shop'
+  | 'shop.view'
+  | 'shop.recovery.run'
+  | 'shop.catalog.refresh';
+export type AdminStatus = 'active' | 'disabled';
 
 export const ADMIN_SESSION_COOKIE_NAME = 'admin_session';
 export const ADMIN_SESSION_COOKIE_PATH = '/admin';
 export const ADMIN_SESSION_TTL_SECONDS = 30 * 60;
 
-export function getAllowedAdminUserIds() {
-  const rawValue = process.env.ADMIN_ALLOWED_USER_IDS ?? '';
-  const trimmedValue = rawValue.trim();
+export const MASTER_ADMIN_ROLE: AdminRole = 'master_admin';
 
-  if (!trimmedValue) {
-    return [];
-  }
-
-  if (trimmedValue.startsWith('[')) {
-    try {
-      const parsed = JSON.parse(trimmedValue) as unknown;
-
-      if (Array.isArray(parsed)) {
-        return parsed
-          .filter((value): value is string => typeof value === 'string')
-          .map((value) => value.trim())
-          .filter(Boolean);
-      }
-    } catch {
-      return [];
-    }
-  }
-
-  return trimmedValue
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
-export function isAllowedAdminUser(userID: string | null | undefined) {
-  if (!userID) return false;
-
-  const allowedUserIds = getAllowedAdminUserIds();
-
-  return allowedUserIds.includes(userID);
-}
-
-export function getAdminPasswordHash() {
-  return process.env.ADMIN_PASSWORD_HASH?.trim() || null;
-}
+const ADMIN_ROLE_VALUES = [MASTER_ADMIN_ROLE, 'admin', 'support', 'viewer'] as const;
+const ADMIN_SCOPE_VALUES = [
+  'audit.view',
+  'settings.manage',
+  'shop',
+  'shop.view',
+  'shop.recovery.run',
+  'shop.catalog.refresh',
+] as const;
 
 export function getAdminSessionSecret() {
   return process.env.ADMIN_SESSION_SECRET?.trim() || null;
 }
 
 export function getDefaultAdminRole(): AdminRole {
-  return 'super_admin';
+  return MASTER_ADMIN_ROLE;
 }
 
 export function getDefaultAdminScopes(): AdminScope[] {
-  return ['shop'];
+  return ['audit.view', 'settings.manage', 'shop'];
 }
 
-export function isAdminScopeAllowed(scopes: AdminScope[], scope?: AdminScope) {
-  return !scope || scopes.includes(scope);
+export function getDefaultOperationalAdminScopes(): AdminScope[] {
+  return ['shop', 'shop.view'];
+}
+
+export function isMasterAdminRole(role: AdminRole | null | undefined) {
+  return role === MASTER_ADMIN_ROLE;
+}
+
+export function isAdminScopeAllowed(scopes: AdminScope[], scope?: AdminScope, role?: AdminRole) {
+  if (!scope) return true;
+  if (isMasterAdminRole(role)) return true;
+  if (scopes.includes(scope)) return true;
+
+  if (scope.startsWith('shop.')) {
+    return scopes.includes('shop');
+  }
+
+  return false;
+}
+
+export function normalizeAdminRole(value: string | null | undefined): AdminRole | null {
+  return ADMIN_ROLE_VALUES.includes(value as AdminRole) ? (value as AdminRole) : null;
+}
+
+export function normalizeAdminScopes(values: string[] | null | undefined): AdminScope[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return values.filter((value): value is AdminScope =>
+    ADMIN_SCOPE_VALUES.includes(value as AdminScope),
+  );
+}
+
+export function parseAdminScopes(value: string | null | undefined): AdminScope[] {
+  if (!value?.trim()) {
+    return getDefaultAdminScopes();
+  }
+
+  return normalizeAdminScopes(
+    value
+      .split(',')
+      .map((scope) => scope.trim())
+      .filter(Boolean),
+  );
+}
+
+export function isActiveAdminStatus(value: string | null | undefined) {
+  return value === 'active';
 }

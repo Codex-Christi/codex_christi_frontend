@@ -2,13 +2,13 @@
 
 import argon2 from 'argon2';
 import { redirect } from 'next/navigation';
-import { getAdminPasswordHash } from '@/lib/admin/admin-config';
-import { sanitizeAdminReturnPath } from '@/lib/admin/admin-paths';
 import {
-  clearAdminUnlockAttempts,
   getAdminUnlockRateLimit,
-  recordFailedAdminUnlock,
-} from '@/lib/admin/admin-unlock-rate-limit';
+  recordAdminUnlockAttempt,
+  touchAdminUserUnlockedAt,
+  writeAdminAuditLog,
+} from '@/lib/admin/admin-auth-ledger';
+import { sanitizeAdminReturnPath } from '@/lib/admin/admin-paths';
 import { createAdminSession } from '@/lib/admin/admin-session-server';
 import { requirePrimaryAdminCandidate } from '@/lib/admin/require-admin';
 
@@ -22,12 +22,21 @@ export async function unlockAdminAction(
 ): Promise<AdminUnlockActionState> {
   const nextPath = sanitizeAdminReturnPath(String(formData.get('next') ?? ''), '/admin');
   const password = String(formData.get('password') ?? '');
-  const { userID } = await requirePrimaryAdminCandidate({
+  const adminUser = await requirePrimaryAdminCandidate({
     returnPath: `/admin/unlock?next=${encodeURIComponent(nextPath)}`,
   });
-  const rateLimit = getAdminUnlockRateLimit(userID);
+  const rateLimit = await getAdminUnlockRateLimit(adminUser.codexUserId);
 
   if (rateLimit.locked) {
+    await writeAdminAuditLog({
+      actor: adminUser,
+      action: 'admin.unlock.blocked',
+      targetType: 'adminUser',
+      targetId: adminUser.id,
+      outcome: 'blocked',
+      metadata: { reason: 'rate_limited' },
+    });
+
     return {
       error: `Too many failed attempts. Try again in ${rateLimit.retryAfterSeconds ?? 900} seconds.`,
     };
@@ -39,18 +48,26 @@ export async function unlockAdminAction(
     };
   }
 
-  const adminPasswordHash = getAdminPasswordHash();
-
-  if (!adminPasswordHash) {
-    return {
-      error: 'Admin unlock is not configured.',
-    };
-  }
-
-  const passwordMatches = await argon2.verify(adminPasswordHash, password);
+  const passwordMatches = await argon2
+    .verify(adminUser.passwordHash, password)
+    .catch(() => false);
 
   if (!passwordMatches) {
-    const updatedRateLimit = recordFailedAdminUnlock(userID);
+    await recordAdminUnlockAttempt({
+      adminUser,
+      success: false,
+      failureReason: 'invalid_password',
+    });
+    await writeAdminAuditLog({
+      actor: adminUser,
+      action: 'admin.unlock.failed',
+      targetType: 'adminUser',
+      targetId: adminUser.id,
+      outcome: 'failure',
+      metadata: { reason: 'invalid_password' },
+    });
+
+    const updatedRateLimit = await getAdminUnlockRateLimit(adminUser.codexUserId);
     const remainingAttempts = updatedRateLimit.remainingAttempts ?? 0;
 
     return {
@@ -61,9 +78,20 @@ export async function unlockAdminAction(
     };
   }
 
-  clearAdminUnlockAttempts(userID);
-  await createAdminSession(userID);
+  await touchAdminUserUnlockedAt(adminUser.id);
+  await writeAdminAuditLog({
+    actor: adminUser,
+    action: 'admin.unlock.success',
+    targetType: 'adminUser',
+    targetId: adminUser.id,
+    outcome: 'success',
+  });
+  await createAdminSession({
+    userID: adminUser.codexUserId,
+    role: adminUser.role,
+    scopes: adminUser.scopes,
+    sessionVersion: adminUser.sessionVersion,
+  });
 
   redirect(nextPath);
 }
-

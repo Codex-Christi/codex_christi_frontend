@@ -2,22 +2,28 @@ import 'server-only';
 
 import { notFound, redirect } from 'next/navigation';
 import { getServerSessionState } from '@/lib/session/server-session';
+import { getActiveAdminUserByCodexUserId } from './admin-auth-ledger';
 import {
+  buildAdminLogoutPath,
   buildAdminUnlockPath,
   sanitizeAdminReturnPath,
 } from './admin-paths';
 import {
   isAdminScopeAllowed,
-  isAllowedAdminUser,
+  isMasterAdminRole,
   type AdminRole,
   type AdminScope,
 } from './admin-config';
 import { getServerAdminSessionState } from './admin-session-server';
 
 export type AdminAuthContext = {
+  adminUserId: string;
   userID: string;
+  email: string | null;
+  displayName: string | null;
   role: AdminRole;
   scopes: AdminScope[];
+  sessionVersion: number;
 };
 
 export async function requirePrimaryAdminCandidate({
@@ -32,13 +38,13 @@ export async function requirePrimaryAdminCandidate({
     redirect(`/auth/sign-in?next=${encodeURIComponent(safeReturnPath)}`);
   }
 
-  if (!isAllowedAdminUser(primarySession.userID)) {
+  const adminUser = await getActiveAdminUserByCodexUserId(primarySession.userID);
+
+  if (!adminUser) {
     notFound();
   }
 
-  return {
-    userID: primarySession.userID,
-  };
+  return adminUser;
 }
 
 export async function getAdminAuthContext(): Promise<AdminAuthContext | null> {
@@ -48,24 +54,26 @@ export async function getAdminAuthContext(): Promise<AdminAuthContext | null> {
     return null;
   }
 
-  if (!isAllowedAdminUser(primarySession.userID)) {
-    return null;
-  }
-
   const adminSession = await getServerAdminSessionState();
 
   if (!adminSession.isAuthenticated || adminSession.userID !== primarySession.userID) {
     return null;
   }
 
-  if (!adminSession.role) {
+  const adminUser = await getActiveAdminUserByCodexUserId(primarySession.userID);
+
+  if (!adminUser || adminSession.sessionVersion !== adminUser.sessionVersion) {
     return null;
   }
 
   return {
+    adminUserId: adminUser.id,
     userID: primarySession.userID,
-    role: adminSession.role,
-    scopes: adminSession.scopes,
+    email: adminUser.email,
+    displayName: adminUser.displayName,
+    role: adminUser.role,
+    scopes: adminUser.scopes,
+    sessionVersion: adminUser.sessionVersion,
   };
 }
 
@@ -83,34 +91,63 @@ export async function requireAdminPage({
     redirect(`/auth/sign-in?next=${encodeURIComponent(safeReturnPath)}`);
   }
 
-  if (!isAllowedAdminUser(primarySession.userID)) {
+  const adminUser = await getActiveAdminUserByCodexUserId(primarySession.userID);
+
+  if (!adminUser) {
     notFound();
   }
 
   const adminSession = await getServerAdminSessionState();
 
-  if (!adminSession.isAuthenticated || adminSession.userID !== primarySession.userID) {
-    redirect(buildAdminUnlockPath(safeReturnPath));
+  if (
+    !adminSession.isAuthenticated ||
+    adminSession.userID !== primarySession.userID ||
+    adminSession.sessionVersion !== adminUser.sessionVersion
+  ) {
+    const shouldClearAdminCookie =
+      adminSession.shouldClearCookie ||
+      (adminSession.isAuthenticated &&
+        (adminSession.userID !== primarySession.userID ||
+          adminSession.sessionVersion !== adminUser.sessionVersion));
+
+    redirect(
+      shouldClearAdminCookie
+        ? buildAdminLogoutPath(safeReturnPath)
+        : buildAdminUnlockPath(safeReturnPath),
+    );
   }
 
-  if (!adminSession.role || !isAdminScopeAllowed(adminSession.scopes, scope)) {
+  if (!isAdminScopeAllowed(adminUser.scopes, scope, adminUser.role)) {
     notFound();
   }
 
   return {
+    adminUserId: adminUser.id,
     userID: primarySession.userID,
-    role: adminSession.role,
-    scopes: adminSession.scopes,
+    email: adminUser.email,
+    displayName: adminUser.displayName,
+    role: adminUser.role,
+    scopes: adminUser.scopes,
+    sessionVersion: adminUser.sessionVersion,
   };
 }
 
 export async function requireAdminAction(scope?: AdminScope) {
   const context = await getAdminAuthContext();
 
-  if (!context || !isAdminScopeAllowed(context.scopes, scope)) {
+  if (!context || !isAdminScopeAllowed(context.scopes, scope, context.role)) {
     throw new Error('Admin authorization required.');
   }
 
   return context;
 }
 
+export async function requireMasterAdminAction() {
+  const context = await getAdminAuthContext();
+
+  if (!context || !isMasterAdminRole(context.role)) {
+    throw new Error('Master admin authorization required.');
+  }
+
+  return context;
+}

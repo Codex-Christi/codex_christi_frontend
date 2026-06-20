@@ -2,6 +2,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { writeAdminAuditLog } from '@/lib/admin/admin-auth-ledger';
 import { requireAdminAction } from '@/lib/admin/require-admin';
 import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
 import { refreshMerchizeCatalog } from '@/lib/merchizeCatalog/sync';
@@ -58,7 +59,12 @@ export async function getStorefrontSnapshotStats() {
 
 export async function refreshPriceShippingCatalogAction() {
   try {
-    await requireAdminAction('shop');
+    const admin = await requireAdminAction('shop');
+    await writeAdminAuditLog({
+      actor: admin,
+      action: 'shop.catalog.refresh_price_shipping',
+      outcome: 'started',
+    });
 
     const result = await refreshMerchizeCatalog();
 
@@ -83,7 +89,13 @@ export async function refreshPriceShippingCatalogAction() {
 }
 
 export async function refreshStorefrontSnapshotsAction() {
-  await requireAdminAction('shop');
+  const admin = await requireAdminAction('shop');
+  await writeAdminAuditLog({
+    actor: admin,
+    action: 'shop.catalog.refresh_storefront_snapshots',
+    outcome: 'started',
+    metadata: { categories: STOREFRONT_SNAPSHOT_CATEGORY_SLUGS.length },
+  });
 
   const pageSize = 50;
   const failures: Array<{ category: string; message: string }> = [];
@@ -222,7 +234,7 @@ function revalidateStorefrontSnapshotPaths({
 }
 
 export async function searchPriceShippingCatalogBySku(query: string) {
-  await requireAdminAction('shop');
+  const admin = await requireAdminAction('shop');
 
   const q = query.trim();
   if (!q) {
@@ -230,6 +242,14 @@ export async function searchPriceShippingCatalogBySku(query: string) {
   }
 
   try {
+    await writeAdminAuditLog({
+      actor: admin,
+      action: 'shop.catalog.search_price_shipping_by_sku',
+      targetType: 'skuQuery',
+      targetId: q.slice(0, 128),
+      outcome: 'started',
+    });
+
     const variants = await merchizeCatalogPrisma.variant.findMany({
       where: { sku: { contains: q } }, // Prisma SQLite StringFilter: no `mode`
       include: { product: true, shippingBands: true },

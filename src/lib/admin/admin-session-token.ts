@@ -1,6 +1,8 @@
 import { jwtVerify, SignJWT, type JWTPayload } from 'jose';
 import {
   getAdminSessionSecret,
+  normalizeAdminRole,
+  normalizeAdminScopes,
   type AdminRole,
   type AdminScope,
 } from './admin-config';
@@ -10,6 +12,7 @@ export type AdminSessionState = {
   userID: string | null;
   role: AdminRole | null;
   scopes: AdminScope[];
+  sessionVersion: number | null;
   expiresAt: Date | null;
   shouldClearCookie: boolean;
 };
@@ -18,6 +21,7 @@ type AdminSessionPayload = JWTPayload & {
   userID?: string;
   role?: AdminRole;
   scopes?: AdminScope[];
+  sessionVersion?: number;
 };
 
 const emptyAdminSessionState: AdminSessionState = {
@@ -25,6 +29,7 @@ const emptyAdminSessionState: AdminSessionState = {
   userID: null,
   role: null,
   scopes: [],
+  sessionVersion: null,
   expiresAt: null,
   shouldClearCookie: false,
 };
@@ -43,14 +48,16 @@ export async function signAdminSessionToken({
   userID,
   role,
   scopes,
+  sessionVersion,
   expiresAt,
 }: {
   userID: string;
   role: AdminRole;
   scopes: AdminScope[];
+  sessionVersion: number;
   expiresAt: Date;
 }) {
-  return new SignJWT({ userID, role, scopes })
+  return new SignJWT({ userID, role, scopes, sessionVersion })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(expiresAt)
@@ -70,15 +77,22 @@ export async function verifyAdminSessionToken(
     });
     const adminPayload = payload as AdminSessionPayload;
     const userID = typeof adminPayload.userID === 'string' ? adminPayload.userID : null;
-    const role = adminPayload.role === 'super_admin' ? adminPayload.role : null;
-    const scopes = Array.isArray(adminPayload.scopes)
-      ? adminPayload.scopes.filter((scope): scope is AdminScope => scope === 'shop')
-      : [];
+    const role = normalizeAdminRole(adminPayload.role);
+    const scopes = normalizeAdminScopes(adminPayload.scopes);
+    const sessionVersion =
+      typeof adminPayload.sessionVersion === 'number' ? adminPayload.sessionVersion : null;
     const expiresAt = typeof adminPayload.exp === 'number'
       ? new Date(adminPayload.exp * 1000)
       : null;
 
-    if (!userID || !role || !scopes.length || !expiresAt || expiresAt <= new Date()) {
+    if (
+      !userID ||
+      !role ||
+      !scopes.length ||
+      !sessionVersion ||
+      !expiresAt ||
+      expiresAt <= new Date()
+    ) {
       return {
         ...emptyAdminSessionState,
         shouldClearCookie: true,
@@ -90,6 +104,7 @@ export async function verifyAdminSessionToken(
       userID,
       role,
       scopes,
+      sessionVersion,
       expiresAt,
       shouldClearCookie: false,
     };
@@ -100,4 +115,3 @@ export async function verifyAdminSessionToken(
     };
   }
 }
-

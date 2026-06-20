@@ -40,3 +40,7 @@ export function buildAdminUnlockPath(returnPath: string | null | undefined) {
   return `${ADMIN_UNLOCK_PATH}?next=${encodeURIComponent(safeReturnPath)}`;
 }
 
+export function buildAdminLogoutPath(returnPath: string | null | undefined) {
+  const safeReturnPath = sanitizeAdminReturnPath(returnPath);
+  return `${ADMIN_LOGOUT_PATH}?next=${encodeURIComponent(safeReturnPath)}`;
+}

@@ -1,0 +1,64 @@
+datasource db {
+  provider = "postgresql"
+  // URL is set in prisma.config.ts (Prisma 7 style)
+}
+
+generator adminOpsLedger {
+  provider = "prisma-client"
+  output   = "../../src/lib/prisma/adminOpsLedger/generated/adminOpsLedger"
+}
+
+model AdminUser {
+  id                   String    @id @default(cuid())
+  codexUserId          String    @unique
+  email                String?   @unique
+  displayName          String?
+  passwordHash         String
+  role                 String    @default("master_admin")
+  scopes               String[]  @default(["shop"])
+  status               String    @default("active")
+  sessionVersion       Int       @default(1)
+  lastUnlockedAt       DateTime?
+  disabledAt           DateTime?
+  disabledReason       String?
+  createdByCodexUserId String?
+  updatedByCodexUserId String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  unlockAttempts       AdminUnlockAttempt[]
+  auditLogs            AdminAuditLog[] @relation("ActorAdminAuditLogs")
+}
+
+model AdminUnlockAttempt {
+  id             String    @id @default(cuid())
+  adminUserId    String?
+  adminUser      AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  codexUserId    String
+  email          String?
+  success        Boolean
+  failureReason  String?
+  ipHash         String?
+  userAgentHash  String?
+  createdAt      DateTime  @default(now())
+
+  @@index([codexUserId, success, createdAt])
+  @@index([createdAt])
+}
+
+model AdminAuditLog {
+  id                String    @id @default(cuid())
+  actorAdminUserId  String?
+  actorAdminUser    AdminUser? @relation("ActorAdminAuditLogs", fields: [actorAdminUserId], references: [id], onDelete: SetNull)
+  actorCodexUserId  String?
+  action            String
+  targetType        String?
+  targetId          String?
+  outcome           String
+  metadata          Json?
+  ipHash            String?
+  userAgentHash     String?
+  createdAt         DateTime  @default(now())
+
+  @@index([createdAt])
+}

@@ -5,7 +5,6 @@ import {
   buildAdminUnlockPath,
   sanitizeAdminReturnPath,
 } from '@/lib/admin/admin-paths';
-import { isAllowedAdminUser } from '@/lib/admin/admin-config';
 import {
   clearAdminSessionCookie,
   getRequestAdminSessionState,
@@ -54,10 +53,6 @@ export const protectAdminRouteMiddleware = async (req: NextRequest) => {
     }
 
     return response;
-  }
-
-  if (!isAllowedAdminUser(sessionState.userID)) {
-    return NextResponse.rewrite(new URL('/not-found', req.url));
   }
 
   if (req.nextUrl.pathname === ADMIN_UNLOCK_PATH || req.nextUrl.pathname === ADMIN_LOGOUT_PATH) {

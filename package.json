@@ -17,11 +17,18 @@
     "prisma:paypalTxLedger:generate:prod": "PAYPAL_TX_LEDGER_NEON_BRANCH=prod prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
     "prisma:paypalTxLedger:migrate:dev": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev prisma migrate dev --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
     "prisma:paypalTxLedger:migrate:deploy:prod": "PAYPAL_TX_LEDGER_NEON_BRANCH=prod prisma migrate deploy --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
+    "prisma:adminOpsLedger:generate": "prisma generate --schema prisma/adminOpsLedger/adminOpsLedger.schema.prisma",
+    "prisma:adminOpsLedger:migrate:dev": "prisma migrate dev --schema prisma/adminOpsLedger/adminOpsLedger.schema.prisma",
+    "prisma:adminOpsLedger:migrate:deploy": "prisma migrate deploy --schema prisma/adminOpsLedger/adminOpsLedger.schema.prisma",
     "paypal-ledger:recovery-demo:create": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts create",
     "paypal-ledger:recovery-demo:list": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts list",
     "paypal-ledger:recovery-demo:cleanup": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts cleanup",
     "paypal-ledger:recovery-demo:cleanup-all": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts cleanup-all",
-    "admin:hash-password": "tsx scripts/hash_admin_password.ts"
+    "admin:auth:create-unlock-password-hash": "node --import tsx scripts/create_admin_unlock_password_hash.ts",
+    "admin:user:create-master": "node --import tsx scripts/create_master_admin_user.ts",
+    "admin:auth:prune-ledger": "node --import tsx scripts/prune_admin_ops_ledger.ts",
+    "admin:auth:prune-ledger:standard": "ADMIN_UNLOCK_ATTEMPT_RETENTION_HOURS=24 ADMIN_AUDIT_LOG_RETENTION_DAYS=30 node --import tsx scripts/prune_admin_ops_ledger.ts",
+    "admin:auth:prune-ledger:minimum-storage": "ADMIN_UNLOCK_ATTEMPT_RETENTION_HOURS=24 ADMIN_AUDIT_LOG_RETENTION_DAYS=7 node --import tsx scripts/prune_admin_ops_ledger.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1026.0",

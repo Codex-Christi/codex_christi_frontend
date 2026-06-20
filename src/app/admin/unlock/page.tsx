@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import AdminUnlockForm from '@/components/UI/Admin/AdminUnlockForm';
 import CometsContainer from '@/components/UI/general/CometsContainer';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
-import { sanitizeAdminReturnPath } from '@/lib/admin/admin-paths';
+import { buildAdminLogoutPath, sanitizeAdminReturnPath } from '@/lib/admin/admin-paths';
 import { getServerAdminSessionState } from '@/lib/admin/admin-session-server';
 import { requirePrimaryAdminCandidate } from '@/lib/admin/require-admin';
 
@@ -20,12 +20,20 @@ type AdminUnlockPageProps = {
 export default async function AdminUnlockPage({ searchParams }: AdminUnlockPageProps) {
   const params = await searchParams;
   const nextPath = sanitizeAdminReturnPath(params.next, '/admin');
-  const { userID } = await requirePrimaryAdminCandidate({
+  const adminUser = await requirePrimaryAdminCandidate({
     returnPath: `/admin/unlock?next=${encodeURIComponent(nextPath)}`,
   });
   const adminSession = await getServerAdminSessionState();
 
-  if (adminSession.isAuthenticated && adminSession.userID === userID) {
+  if (adminSession.shouldClearCookie) {
+    redirect(buildAdminLogoutPath(nextPath));
+  }
+
+  if (
+    adminSession.isAuthenticated &&
+    adminSession.userID === adminUser.codexUserId &&
+    adminSession.sessionVersion === adminUser.sessionVersion
+  ) {
     redirect(nextPath);
   }
 

@@ -5,8 +5,8 @@ import {
   ADMIN_SESSION_COOKIE_NAME,
   ADMIN_SESSION_COOKIE_PATH,
   ADMIN_SESSION_TTL_SECONDS,
-  getDefaultAdminRole,
-  getDefaultAdminScopes,
+  type AdminRole,
+  type AdminScope,
 } from './admin-config';
 import { signAdminSessionToken, verifyAdminSessionToken } from './admin-session-token';
 
@@ -17,12 +17,23 @@ export async function getServerAdminSessionState() {
   return verifyAdminSessionToken(token);
 }
 
-export async function createAdminSession(userID: string) {
+export async function createAdminSession({
+  userID,
+  role,
+  scopes,
+  sessionVersion,
+}: {
+  userID: string;
+  role: AdminRole;
+  scopes: AdminScope[];
+  sessionVersion: number;
+}) {
   const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL_SECONDS * 1000);
   const token = await signAdminSessionToken({
     userID,
-    role: getDefaultAdminRole(),
-    scopes: getDefaultAdminScopes(),
+    role,
+    scopes,
+    sessionVersion,
     expiresAt,
   });
   const cookieStore = await cookies();
@@ -49,4 +60,3 @@ export async function deleteAdminSession() {
     expires: new Date(0),
   });
 }
-

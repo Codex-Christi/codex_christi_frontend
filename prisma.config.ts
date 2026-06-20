@@ -11,6 +11,7 @@ const root = __dirname;
 
 // ── Schema paths ──────────────────────────────────────────────
 const schemas = {
+  adminOpsLedger: path.join(root, 'prisma', 'adminOpsLedger', 'adminOpsLedger.schema.prisma'),
   merchize: path.join(root, 'prisma', 'shop', 'merchize', 'priceCatalog.prisma'),
   paypal: path.join(root, 'prisma', 'shop', 'paypal', 'paypalTXLedger.schema.prisma'),
 } as const;
@@ -48,6 +49,16 @@ function resolveCatalogDbUrl(): string {
 }
 
 function resolve(): { schema: string; url: string } {
+  if (schemaPath === schemas.adminOpsLedger) {
+    return {
+      schema: './prisma/adminOpsLedger/adminOpsLedger.schema.prisma',
+      url:
+        process.env.NEON_ADMIN_OPS_LEDGER_URL ??
+        process.env.NEON_ADMIN_OPS_LEDGER_POOLED_URL ??
+        'postgresql://user:password@localhost:5432/admin_ops_ledger?schema=public',
+    };
+  }
+
   if (schemaPath === schemas.merchize) {
     const url = resolveCatalogDbUrl();
     if (url !== 'file::memory:') {
