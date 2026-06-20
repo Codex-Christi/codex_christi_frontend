@@ -122,6 +122,18 @@ A real user can pay successfully, but post-payment processing can fail after Pay
 
 The admin tooling must make these cases visible and recoverable without relying on the shopper's browser session.
 
+### Current Notification Gaps After Merchize Push Wiring
+
+The current fulfillment runner sends internal recovery notifications for failure/blocking states, but it does not send customer or admin success emails when Merchize push-to-fulfillment succeeds.
+
+Missing follow-up work:
+
+- Add a tracked customer notification/outbox row after push acceptance, then send a customer-safe "we're working on your order" email.
+- Add an admin-visible success event for `push_accepted`; do not default to admin success emails unless operations explicitly wants that volume.
+- Keep using the fulfillment issue recipient group for failures and future `attention_required` states.
+- Escalate repeated progress/tracking/invoice snapshot failures into admin-visible reconciliation states.
+- Add admin pause/resume/cancel controls only with reason capture, audit logging, confirmation, and step-up auth.
+
 ## Naming Rules
 
 Use names that say which system owns the value.

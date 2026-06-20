@@ -4,12 +4,11 @@ import { runPayPalRecoveryScanner } from '@/lib/paypal/txLedger/recoveryScanner'
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const CRON_SECRET = process.env.PAYPAL_TX_LEDGER_RECOVERY_SCANNER_SECRET;
-
 export async function POST(req: NextRequest) {
+  const cronSecret = process.env.PAYPAL_TX_LEDGER_RECOVERY_SCANNER_SECRET;
   const headerSecret = req.headers.get('x-cron-secret');
 
-  if (!CRON_SECRET || headerSecret !== CRON_SECRET) {
+  if (!cronSecret || headerSecret !== cronSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

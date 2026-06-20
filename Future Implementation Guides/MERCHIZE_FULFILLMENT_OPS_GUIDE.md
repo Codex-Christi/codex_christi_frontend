@@ -305,6 +305,36 @@ Implementation rules:
 - Persist progress into `merchizeProgressPayload`, tracking into `merchizeTrackingPayload`, and invoice/cost state into `merchizeFulfillmentCostPayload`.
 - Snapshot sync failures should create failed sync attempts and admin-visible reconciliation state, but they should not undo a successful push-to-fulfillment completion.
 
+## Current post-push notification and reconciliation gaps
+
+The current implemented runtime records successful push-to-fulfillment in Merchize Fulfillment Ops and completes the PayPal TX ledger row, but it does not yet send customer or admin success emails.
+
+Missing customer-facing work:
+
+- Add an idempotent customer order-status notification after `pushMerchizeFulfillmentOrderToProduction(...)` succeeds.
+- Use a durable outbox or equivalent tracked notification row; do not send the email as an untracked side effect inside the runner.
+- Suggested event name: `paid_order_fulfillment_push_accepted`.
+- Suggested customer copy: payment received, order is now being prepared, support reference is `orderToken`, receipt link when available.
+- Do not include raw provider payloads, full internal IDs, or address data beyond what is already safe for the customer confirmation context.
+
+Missing admin-facing work:
+
+- Do not email admins for every successful push by default unless operations explicitly wants a low-severity success stream.
+- Persist a protected admin-visible operational event for successful push acceptance, with `orderToken`, `merchizeExternalOrderNumber`, `merchizeOrderId` when known, `productionGateStatus = push_accepted`, and `releasedToProductionAt`.
+- Continue sending admin recovery emails for failure/blocking states such as payload invalid, provider rejected, lookup failed, push failed, missing external number, and future `attention_required` states.
+- Add optional recipient-group routing for success events separately from `paid_order_fulfillment_issues` if success emails are requested later.
+
+Missing post-push escalation work:
+
+- Convert progress/tracking/invoice snapshot failures into admin-visible reconciliation states when they persist after retry.
+- Add explicit classification rules for `attention_required`, `blocked`, `address_review_required`, `product_unavailable`, `tracking_synced`, and `reconciled`.
+- Add customer tracking/update emails only after tracking data is present and customer-safe.
+
+Missing dangerous admin action work:
+
+- Adapter methods exist for pause/resume/cancel, but admin UI actions still need reason capture, audit logging, confirmation, and eventual step-up auth before production use.
+- Cancel remains out of automatic workflow scope.
+
 ## Address and buyer detail endpoints
 
 These endpoints support address review and correction:

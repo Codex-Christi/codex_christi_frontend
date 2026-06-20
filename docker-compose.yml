@@ -22,6 +22,8 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runtime
+      secrets:
+        - production_env
     image: codexchristi-next:runtime
     container_name: codex-con-app-start
     env_file:
@@ -44,6 +46,10 @@ services:
 
 volumes:
   merchize_price_catalog_data: {}
+
+secrets:
+  production_env:
+    file: ${DOCKER_BUILD_ENV_FILE:-.env.production}
 
 networks:
   webserver-network:

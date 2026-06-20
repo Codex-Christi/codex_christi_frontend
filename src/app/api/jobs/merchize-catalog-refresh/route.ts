@@ -3,12 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { refreshMerchizeCatalog } from '@/lib/merchizeCatalog/sync';
 
-const CRON_SECRET = process.env.MERCHIZE_OFFLINE_CATALOG_CRON_SECRET;
-
 export async function POST(req: NextRequest) {
+  const cronSecret = process.env.MERCHIZE_OFFLINE_CATALOG_CRON_SECRET;
   const headerSecret = req.headers.get('x-cron-secret');
 
-  if (!CRON_SECRET || headerSecret !== CRON_SECRET) {
+  if (!cronSecret || headerSecret !== cronSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

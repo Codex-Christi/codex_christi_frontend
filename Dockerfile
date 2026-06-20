@@ -47,13 +47,37 @@ COPY . .
 ENV NODE_OPTIONS="--max-old-space-size=1792"
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Generate Prisma client for Merchize catalog schema so imports like
-# ./src/lib/prisma/shop/merchize/generated/merchizeCatalog/client
-# exist when `yarn build` runs.
-RUN yarn prisma generate --schema prisma/shop/merchize/priceCatalog.prisma
+RUN --mount=type=secret,id=production_env,target=/run/secrets/production_env \
+  public_env=/tmp/next-public-build.env \
+  && grep -E '^NEXT_PUBLIC_[A-Za-z0-9_]+=' /run/secrets/production_env > "$public_env" \
+  && set -a \
+  && source "$public_env" \
+  && set +a \
+  && case "${NEXT_PUBLIC_PAYPAL_PAYMENT_MODE:-}" in \
+    sandbox) test -n "${NEXT_PUBLIC_PAYPAL_SANDBOX_CLIENT_ID:-}" ;; \
+    live) test -n "${NEXT_PUBLIC_PAYPAL_LIVE_CLIENT_ID:-}" ;; \
+    *) echo "NEXT_PUBLIC_PAYPAL_PAYMENT_MODE must be sandbox or live" >&2; exit 1 ;; \
+  esac
+
+# Generate every Prisma client needed by the standalone app. Prisma 7 config
+# asks for datasource URLs even for generate, so non-secret placeholder URLs are
+# used for generated Postgres clients instead of leaking real DB credentials into
+# build layers.
+RUN yarn prisma generate --schema prisma/shop/merchize/priceCatalog.prisma \
+  && NEON_ADMIN_OPS_LEDGER_URL=postgresql://user:password@localhost:5432/admin_ops_ledger \
+    yarn prisma generate --schema prisma/adminOpsLedger/adminOpsLedger.schema.prisma \
+  && PAYPAL_TX_LEDGER_NEON_BRANCH=prod \
+    PAYPAL_TX_LEDGER_NEON_DB_STRING=postgresql://user:password@localhost:5432/paypal_tx_ledger \
+    yarn prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma \
+  && MERCHIZE_FULFILLMENT_OPS_NEON_BRANCH=prod \
+    MERCHIZE_FULFILLMENT_OPS_NEON_DB_STRING=postgresql://user:password@localhost:5432/merchize_fulfillment_ops \
+    yarn prisma generate --schema prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOps.schema.prisma
 
 RUN --mount=type=cache,target=/root/.cache/yarn \
-  yarn build
+  set -a \
+  && source /tmp/next-public-build.env \
+  && set +a \
+  && yarn build
 
 ########################
 # 4) Runtime (small)

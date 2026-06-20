@@ -19,6 +19,11 @@ export COMPOSE_DOCKER_CLI_BUILD=1
 echo "== deploy start $(date -u +%FT%TZ) =="
 cd "$APP_DIR"
 
+if [ ! -f "$APP_DIR/.env.production" ]; then
+  echo "Missing required env file: $APP_DIR/.env.production" >&2
+  exit 1
+fi
+
 # --- Helper: does a builder exist? ---
 have_builder() {
   docker buildx inspect "$1" >/dev/null 2>&1
