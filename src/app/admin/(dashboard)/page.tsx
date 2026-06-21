@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock3,
-  Home,
   Lock,
   ScrollText,
   ShoppingBag,
@@ -323,14 +322,6 @@ export default async function AdminPage() {
               }
             />
           ) : null}
-          <ProductCard
-            title='Public Site Root'
-            description='Return to the live Codex Christi site outside the admin shell.'
-            href='/'
-            icon={Home}
-            status='Public'
-            attention='Open site root'
-          />
         </div>
 
         <aside className='space-y-4'>
