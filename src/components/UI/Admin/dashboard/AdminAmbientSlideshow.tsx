@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import CometsContainer from '@/components/UI/general/CometsContainer';
 import styles from './AdminAmbientSlideshow.module.css';
 
 type AmbientSlide = {
@@ -44,11 +45,7 @@ export default function AdminAmbientSlideshow() {
   const durationSeconds = ambientSlides.length * secondsPerSlide;
 
   return (
-    <div
-      className={styles.slideshow}
-      data-admin-ambient-slideshow
-      aria-hidden='true'
-    >
+    <div className={styles.slideshow} data-admin-ambient-slideshow aria-hidden='true'>
       {ambientSlides.map((slide, index) => (
         <span
           key={slide.id}
@@ -57,14 +54,8 @@ export default function AdminAmbientSlideshow() {
           style={getAmbientSlideStyle(slide, index, durationSeconds)}
         >
           <picture className={styles.picture}>
-            <source
-              media='(max-width: 640px)'
-              srcSet={getAmbientImageSrc(slide.id, 'mobile')}
-            />
-            <source
-              media='(max-width: 1180px)'
-              srcSet={getAmbientImageSrc(slide.id, 'tablet')}
-            />
+            <source media='(max-width: 640px)' srcSet={getAmbientImageSrc(slide.id, 'mobile')} />
+            <source media='(max-width: 1180px)' srcSet={getAmbientImageSrc(slide.id, 'tablet')} />
             <img
               className={styles.image}
               src={getAmbientImageSrc(slide.id, 'desktop')}
@@ -77,6 +68,11 @@ export default function AdminAmbientSlideshow() {
           </picture>
         </span>
       ))}
+      <CometsContainer
+        variant='overlay'
+        className={styles.comets}
+        cometClassName={styles.cometField}
+      />
       <div className={styles.scrim} data-admin-ambient-scrim />
     </div>
   );
@@ -99,9 +95,6 @@ function getAmbientImageStyle(slide: AmbientSlide): AmbientImageStyle {
   };
 }
 
-function getAmbientImageSrc(
-  id: AmbientSlide['id'],
-  variant: 'desktop' | 'mobile' | 'tablet',
-) {
+function getAmbientImageSrc(id: AmbientSlide['id'], variant: 'desktop' | 'mobile' | 'tablet') {
   return `/media/img/admin/ambient/${id}-${variant}.avif`;
 }
