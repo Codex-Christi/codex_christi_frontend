@@ -16,7 +16,7 @@ export default async function ShopAdminPage() {
     returnPath: '/admin/shop',
   });
   const [recoveryRows, reconciliationSummary] = await Promise.all([
-    listAdminPaidOrderRecoveryRows(),
+    listAdminPaidOrderRecoveryRows().then((result) => result.rows),
     getPayPalPaymentReconciliationDashboardSummary(),
   ]);
 

@@ -61,7 +61,9 @@ export default async function AdminPage() {
   const [profile, recoveryRows, reconciliationSummary, adminOpsSummary] = await Promise.all([
     getUser().catch(() => undefined),
     shouldLoadShopSummaries
-      ? listAdminPaidOrderRecoveryRows().catch(() => [])
+      ? listAdminPaidOrderRecoveryRows()
+          .then((result) => result.rows)
+          .catch(() => [])
       : Promise.resolve([]),
     shouldLoadShopSummaries
       ? getPayPalPaymentReconciliationDashboardSummary().catch(() => null)

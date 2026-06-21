@@ -17,13 +17,18 @@ import {
 } from '@/lib/merchizeFulfillmentOps/status';
 import { safeLogErrorMessage } from '@/lib/merchizeFulfillmentOps/redaction';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
+import type { Prisma } from '@/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger/client';
 import type {
   MerchizeFulfillmentOpsAdminSummary,
   PaidOrderRecoveryActivityItem,
   PaidOrderRecoveryAddress,
   PaidOrderRecoveryDetail,
+  PaidOrderRecoveryFilters,
   PaidOrderRecoveryLineItem,
+  PaidOrderRecoveryListResult,
+  PaidOrderRecoveryPagination,
   PaidOrderRecoveryRow,
+  PaidOrderRecoveryStatusFilter,
   PaidOrderRecoveryWebhookEvent,
   TimelineItem,
 } from '@/components/UI/Admin/dashboard/adminShopDashboardTypes';
@@ -45,6 +50,24 @@ const SCANNER_RECOVERABLE_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED,
   PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
 ]);
+const DEFAULT_ADMIN_RECOVERY_PAGE_SIZE = 25;
+const ADMIN_RECOVERY_PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+const MAX_ADMIN_RECOVERY_SCAN_ROWS = 1000;
+const ADMIN_RECOVERY_STATUS_FILTERS = new Set<PaidOrderRecoveryStatusFilter>([
+  'all',
+  'failed',
+  'recovery',
+  'pending',
+  'completed',
+  'sync',
+  'attention',
+]);
+
+export type ListAdminPaidOrderRecoveryRowsArgs = {
+  filters?: Partial<PaidOrderRecoveryFilters>;
+  page?: number;
+  pageSize?: number;
+};
 
 function asRecord(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : null;
@@ -137,6 +160,115 @@ function mapLedgerStatusToAdminStatus(status: string): PaidOrderRecoveryRow['sta
     return 'recovery';
   }
   return 'pending';
+}
+
+function normalizeRecoveryStatusFilter(
+  status: string | null | undefined,
+): PaidOrderRecoveryStatusFilter {
+  const normalized = status?.trim() as PaidOrderRecoveryStatusFilter | undefined;
+
+  return normalized && ADMIN_RECOVERY_STATUS_FILTERS.has(normalized) ? normalized : 'all';
+}
+
+function normalizeRecoverySearch(search: string | null | undefined) {
+  return search?.trim().slice(0, 160) ?? '';
+}
+
+export function normalizePaidOrderRecoveryFilters(filters: {
+  search?: string | null;
+  status?: string | null;
+} = {}): PaidOrderRecoveryFilters {
+  return {
+    search: normalizeRecoverySearch(filters.search),
+    status: normalizeRecoveryStatusFilter(filters.status),
+  };
+}
+
+export function getPaidOrderRecoveryPageSize(value: unknown) {
+  const pageSize = Number(value);
+
+  return ADMIN_RECOVERY_PAGE_SIZE_OPTIONS.includes(
+    pageSize as (typeof ADMIN_RECOVERY_PAGE_SIZE_OPTIONS)[number],
+  )
+    ? pageSize
+    : DEFAULT_ADMIN_RECOVERY_PAGE_SIZE;
+}
+
+export function getPaidOrderRecoveryPage(value: unknown) {
+  const page = Number(value);
+
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function getRawStatusFilter(status: PaidOrderRecoveryStatusFilter) {
+  switch (status) {
+    case 'failed':
+      return [
+        PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED,
+        PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
+        PAYPAL_LEDGER_STATUS.ERROR,
+      ];
+    case 'recovery':
+      return [PAYPAL_LEDGER_STATUS.CAPTURED, PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED];
+    case 'attention':
+      return [PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED];
+    case 'completed':
+    case 'sync':
+      return [PAYPAL_LEDGER_STATUS.COMPLETED];
+    case 'pending':
+      return [PAYPAL_LEDGER_STATUS.PAYMENT_SAVED];
+    case 'all':
+    default:
+      return [...ADMIN_RECOVERY_STATUSES];
+  }
+}
+
+function buildPaidOrderRecoveryWhere(filters: PaidOrderRecoveryFilters) {
+  const where: Prisma.PaypalIntentWhereInput = {
+    status: {
+      in: getRawStatusFilter(filters.status),
+    },
+  };
+
+  if (filters.search) {
+    const search = filters.search;
+    where.OR = [
+      { orderToken: { contains: search } },
+      { customerEmail: { contains: search } },
+      { customerName: { contains: search } },
+      { paypalOrderId: { contains: search } },
+      { djangoOrderIntentOrderId: { contains: search } },
+      { djangoPaymentSaveCustomId: { contains: search } },
+      { merchizeProviderOrderId: { contains: search } },
+      { merchizeProviderOrderCode: { contains: search } },
+      { lastErrorCode: { contains: search } },
+      { lastErrorMessage: { contains: search } },
+    ];
+  }
+
+  return where;
+}
+
+function buildPaidOrderRecoveryPagination({
+  currentPage,
+  pageSize,
+  totalRows,
+}: {
+  currentPage: number;
+  pageSize: number;
+  totalRows: number;
+}): PaidOrderRecoveryPagination {
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const boundedPage = Math.min(currentPage, totalPages);
+
+  return {
+    currentPage: boundedPage,
+    pageSize,
+    totalRows,
+    totalPages,
+    pageStart: totalRows ? (boundedPage - 1) * pageSize + 1 : 0,
+    pageEnd: Math.min(boundedPage * pageSize, totalRows),
+  };
 }
 
 function getStepLabel(status: string) {
@@ -752,17 +884,21 @@ function buildDetail(row: {
   };
 }
 
-export async function listAdminPaidOrderRecoveryRows() {
+export async function listAdminPaidOrderRecoveryRows({
+  filters: rawFilters,
+  page,
+  pageSize,
+}: ListAdminPaidOrderRecoveryRowsArgs = {}): Promise<PaidOrderRecoveryListResult> {
+  const filters = normalizePaidOrderRecoveryFilters(rawFilters);
+  const normalizedPageSize = getPaidOrderRecoveryPageSize(pageSize);
+  const requestedPage = getPaidOrderRecoveryPage(page);
+  const where = buildPaidOrderRecoveryWhere(filters);
   const rows = await paypalTxLedger.paypalIntent.findMany({
-    where: {
-      status: {
-        in: [...ADMIN_RECOVERY_STATUSES],
-      },
-    },
+    where,
     orderBy: {
       updatedAt: 'desc',
     },
-    take: 25,
+    take: MAX_ADMIN_RECOVERY_SCAN_ROWS,
     select: {
       orderToken: true,
       customerEmail: true,
@@ -780,13 +916,32 @@ export async function listAdminPaidOrderRecoveryRows() {
   const merchizeOpsSummaries = await getMerchizeFulfillmentOpsSummaries(
     rows.map((row) => row.orderToken),
   );
+  const mappedRows = rows
+    .map((row) =>
+      mapLedgerRowToPaidOrderRecoveryRow({
+        ...row,
+        merchizeFulfillmentOpsSyncStatus: merchizeOpsSummaries.get(row.orderToken)?.syncStatus,
+      }),
+    )
+    .filter((row) => filters.status === 'all' || row.status === filters.status);
+  const initialPagination = buildPaidOrderRecoveryPagination({
+    currentPage: requestedPage,
+    pageSize: normalizedPageSize,
+    totalRows: mappedRows.length,
+  });
+  const start = (initialPagination.currentPage - 1) * normalizedPageSize;
+  const pageRows = mappedRows.slice(start, start + normalizedPageSize);
+  const pagination = buildPaidOrderRecoveryPagination({
+    currentPage: initialPagination.currentPage,
+    pageSize: normalizedPageSize,
+    totalRows: mappedRows.length,
+  });
 
-  return rows.map((row) =>
-    mapLedgerRowToPaidOrderRecoveryRow({
-      ...row,
-      merchizeFulfillmentOpsSyncStatus: merchizeOpsSummaries.get(row.orderToken)?.syncStatus,
-    }),
-  );
+  return {
+    rows: pageRows,
+    filters,
+    pagination,
+  };
 }
 
 export async function getAdminPaidOrderRecoveryDetail(orderToken: string) {

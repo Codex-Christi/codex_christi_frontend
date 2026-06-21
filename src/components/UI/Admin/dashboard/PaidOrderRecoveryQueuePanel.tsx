@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -10,20 +11,59 @@ import {
 import { cn } from '@/lib/utils';
 import AdminGlassPanel from './AdminGlassPanel';
 import { AdminPaidOrderRecoveryStatusBadge } from './AdminStatusBadge';
-import type { PaidOrderRecoveryRow } from './adminShopDashboardTypes';
+import type {
+  PaidOrderRecoveryFilters,
+  PaidOrderRecoveryPagination,
+  PaidOrderRecoveryRow,
+  PaidOrderRecoveryStatusFilter,
+} from './adminShopDashboardTypes';
 
 type PaidOrderRecoveryQueuePanelProps = {
   mobileMode?: 'summary-link' | 'full-list';
   rows?: PaidOrderRecoveryRow[];
+  filters?: PaidOrderRecoveryFilters;
+  pagination?: PaidOrderRecoveryPagination;
 };
+
+const statusFilterOptions: Array<{ value: PaidOrderRecoveryStatusFilter; label: string }> = [
+  { value: 'all', label: 'All statuses' },
+  { value: 'failed', label: 'Failed' },
+  { value: 'attention', label: 'Attention' },
+  { value: 'recovery', label: 'Recovery' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'sync', label: 'Provider sync' },
+  { value: 'completed', label: 'Completed' },
+];
+
+const pageSizeOptions = [10, 25, 50] as const;
 
 export default function PaidOrderRecoveryQueuePanel({
   mobileMode = 'full-list',
   rows = [],
+  filters = { search: '', status: 'all' },
+  pagination = {
+    currentPage: 1,
+    pageSize: rows.length || 25,
+    totalRows: rows.length,
+    totalPages: 1,
+    pageStart: rows.length ? 1 : 0,
+    pageEnd: rows.length,
+  },
 }: PaidOrderRecoveryQueuePanelProps) {
   const failedCount = rows.filter((row) => row.status === 'failed').length;
   const recoveryCount = rows.filter((row) => row.status === 'recovery').length;
   const latestRow = rows[0];
+  const showFullControls = mobileMode === 'full-list';
+  const previousHref = buildPaidOrderRecoveryHref({
+    filters,
+    page: Math.max(1, pagination.currentPage - 1),
+    pageSize: pagination.pageSize,
+  });
+  const nextHref = buildPaidOrderRecoveryHref({
+    filters,
+    page: Math.min(pagination.totalPages, pagination.currentPage + 1),
+    pageSize: pagination.pageSize,
+  });
 
   return (
     <AdminGlassPanel className='overflow-hidden'>
@@ -33,19 +73,81 @@ export default function PaidOrderRecoveryQueuePanel({
           <p className='mt-1 text-xs text-slate-500'>Live ledger-backed paid order recovery queue.</p>
         </div>
         <div className={cn('items-center gap-2', mobileMode === 'summary-link' ? 'hidden md:flex' : 'flex')}>
-          <button className='inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-200'>
+          <a
+            href={showFullControls ? '#paid-order-recovery-filters' : '/admin/shop/paid-order-recovery'}
+            className='inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-200 transition hover:border-cyan-300/30 hover:text-cyan-100'
+          >
             <Filter size={15} />
             Filters
-          </button>
-          <button
-            type='button'
-            aria-label='More paid order recovery actions'
-            className='grid h-9 w-9 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200'
+          </a>
+          <Link
+            href='/admin/shop/paid-order-recovery'
+            aria-label='Reset paid order recovery filters'
+            className='grid h-9 w-9 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200 transition hover:border-cyan-300/30 hover:text-cyan-100'
           >
             <MoreHorizontal size={16} />
-          </button>
+          </Link>
         </div>
       </div>
+
+      {showFullControls ? (
+        <form
+          id='paid-order-recovery-filters'
+          action='/admin/shop/paid-order-recovery'
+          className='grid gap-3 border-b border-white/10 bg-slate-950/16 px-4 py-4 md:grid-cols-[minmax(0,1fr)_180px_120px_auto_auto] md:items-end'
+        >
+          <label className='grid gap-1.5 text-xs text-slate-400'>
+            Search
+            <input
+              name='search'
+              defaultValue={filters.search}
+              placeholder='Email, token, PayPal ID, Django ID, error...'
+              className='h-10 rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-300/35 focus:ring-2 focus:ring-cyan-300/10'
+            />
+          </label>
+          <label className='grid gap-1.5 text-xs text-slate-400'>
+            Status
+            <select
+              name='status'
+              defaultValue={filters.status}
+              className='h-10 rounded-lg border border-white/10 bg-black/30 px-3 text-sm text-white outline-none focus:border-cyan-300/35 focus:ring-2 focus:ring-cyan-300/10'
+            >
+              {statusFilterOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className='grid gap-1.5 text-xs text-slate-400'>
+            Page size
+            <select
+              name='pageSize'
+              defaultValue={String(pagination.pageSize)}
+              className='h-10 rounded-lg border border-white/10 bg-black/30 px-3 text-sm text-white outline-none focus:border-cyan-300/35 focus:ring-2 focus:ring-cyan-300/10'
+            >
+              {pageSizeOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type='submit'
+            className='inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-4 text-sm font-medium text-cyan-100 transition hover:border-cyan-200/50 hover:bg-cyan-300/15'
+          >
+            <Filter size={15} />
+            Apply
+          </button>
+          <Link
+            href='/admin/shop/paid-order-recovery'
+            className='inline-flex h-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-4 text-sm font-medium text-slate-200 transition hover:border-cyan-300/30 hover:text-cyan-100'
+          >
+            Reset
+          </Link>
+        </form>
+      ) : null}
 
       {mobileMode === 'summary-link' ? (
         <div className='p-4 md:hidden'>
@@ -92,7 +194,7 @@ export default function PaidOrderRecoveryQueuePanel({
         </div>
       ) : (
         <div className='divide-y divide-white/10 md:hidden'>
-          {rows.map((row) => (
+          {rows.length ? rows.map((row) => (
             <Link
               href={getPaidOrderRecoveryDetailHref(row)}
               key={row.supportRef}
@@ -130,7 +232,11 @@ export default function PaidOrderRecoveryQueuePanel({
                 <Eye size={14} />
               </span>
             </Link>
-          ))}
+          )) : (
+            <div className='px-4 py-8 text-center text-sm text-slate-500'>
+              No paid order recovery rows match these filters.
+            </div>
+          )}
         </div>
       )}
 
@@ -149,7 +255,7 @@ export default function PaidOrderRecoveryQueuePanel({
             </tr>
           </thead>
           <tbody className='divide-y divide-white/10'>
-            {rows.map((row) => (
+            {rows.length ? rows.map((row) => (
               <tr key={row.supportRef} className='bg-slate-950/18 text-slate-300 transition hover:bg-cyan-300/[0.035]'>
                 <td className='px-4 py-3'>
                 <AdminPaidOrderRecoveryStatusBadge status={row.status} />
@@ -171,7 +277,13 @@ export default function PaidOrderRecoveryQueuePanel({
                   </Link>
                 </td>
               </tr>
-            ))}
+            )) : (
+              <tr>
+                <td colSpan={8} className='px-4 py-10 text-center text-sm text-slate-500'>
+                  No paid order recovery rows match these filters.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -182,13 +294,29 @@ export default function PaidOrderRecoveryQueuePanel({
           mobileMode === 'summary-link' ? 'hidden md:flex' : 'flex',
         )}
       >
-        <span>Showing {rows.length ? `1 to ${rows.length}` : '0'} of {rows.length} rows</span>
+        <span>
+          Showing {pagination.pageStart ? `${pagination.pageStart} to ${pagination.pageEnd}` : '0'} of{' '}
+          {pagination.totalRows} rows
+        </span>
         <div className='flex items-center gap-2'>
-          <ArrowLeft size={15} />
-          <span className='rounded-md border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-cyan-100'>1</span>
-          <span>2</span>
-          <span>3</span>
-          <ArrowRight size={15} />
+          <PaginationLink
+            href={previousHref}
+            disabled={pagination.currentPage <= 1}
+            ariaLabel='Previous paid order recovery page'
+          >
+            <ArrowLeft size={15} />
+          </PaginationLink>
+          <span className='rounded-md border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-cyan-100'>
+            {pagination.currentPage}
+          </span>
+          <span>of {pagination.totalPages}</span>
+          <PaginationLink
+            href={nextHref}
+            disabled={pagination.currentPage >= pagination.totalPages}
+            ariaLabel='Next paid order recovery page'
+          >
+            <ArrowRight size={15} />
+          </PaginationLink>
         </div>
       </div>
     </AdminGlassPanel>
@@ -197,4 +325,59 @@ export default function PaidOrderRecoveryQueuePanel({
 
 function getPaidOrderRecoveryDetailHref(row: PaidOrderRecoveryRow) {
   return `/admin/shop/paid-order-recovery/${encodeURIComponent(row.orderToken)}`;
+}
+
+function PaginationLink({
+  href,
+  disabled,
+  ariaLabel,
+  children,
+}: {
+  href: string;
+  disabled: boolean;
+  ariaLabel: string;
+  children: ReactNode;
+}) {
+  if (disabled) {
+    return (
+      <span
+        aria-disabled='true'
+        aria-label={ariaLabel}
+        className='grid h-8 w-8 place-items-center rounded-md border border-white/10 bg-white/[0.02] text-slate-600'
+      >
+        {children}
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      aria-label={ariaLabel}
+      className='grid h-8 w-8 place-items-center rounded-md border border-white/10 bg-white/[0.04] text-slate-200 transition hover:border-cyan-300/35 hover:text-cyan-100'
+    >
+      {children}
+    </Link>
+  );
+}
+
+function buildPaidOrderRecoveryHref({
+  filters,
+  page,
+  pageSize,
+}: {
+  filters: PaidOrderRecoveryFilters;
+  page: number;
+  pageSize: number;
+}) {
+  const params = new URLSearchParams();
+
+  if (filters.search) params.set('search', filters.search);
+  if (filters.status !== 'all') params.set('status', filters.status);
+  if (page > 1) params.set('page', String(page));
+  if (pageSize !== 25) params.set('pageSize', String(pageSize));
+
+  const query = params.toString();
+
+  return query ? `/admin/shop/paid-order-recovery?${query}` : '/admin/shop/paid-order-recovery';
 }

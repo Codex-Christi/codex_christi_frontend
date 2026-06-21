@@ -39,6 +39,28 @@ export type PaidOrderRecoveryRow = {
   needsProviderDetailSync?: boolean;
 };
 
+export type PaidOrderRecoveryStatusFilter = PaidOrderRecoveryRow['status'] | 'all';
+
+export type PaidOrderRecoveryFilters = {
+  search: string;
+  status: PaidOrderRecoveryStatusFilter;
+};
+
+export type PaidOrderRecoveryPagination = {
+  currentPage: number;
+  pageSize: number;
+  totalRows: number;
+  totalPages: number;
+  pageStart: number;
+  pageEnd: number;
+};
+
+export type PaidOrderRecoveryListResult = {
+  rows: PaidOrderRecoveryRow[];
+  filters: PaidOrderRecoveryFilters;
+  pagination: PaidOrderRecoveryPagination;
+};
+
 export type TimelineItem = {
   label: string;
   time: string;

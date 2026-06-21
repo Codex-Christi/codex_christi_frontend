@@ -20,8 +20,14 @@ type ScannerCandidate = Extract<
   { ok: true }
 >['scan']['candidates'][number];
 
-export default function AdminPaidOrderRecoveryScannerPanel() {
-  const [scan, setScan] = useState<AdminRecoveryScannerActionResult['scan'] | null>(null);
+type AdminPaidOrderRecoveryScannerPanelProps = {
+  initialScan?: AdminRecoveryScannerActionResult['scan'] | null;
+};
+
+export default function AdminPaidOrderRecoveryScannerPanel({
+  initialScan = null,
+}: AdminPaidOrderRecoveryScannerPanelProps) {
+  const [scan, setScan] = useState<AdminRecoveryScannerActionResult['scan'] | null>(initialScan);
   const [selectedTokens, setSelectedTokens] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
   const candidates = scan?.candidates ?? [];

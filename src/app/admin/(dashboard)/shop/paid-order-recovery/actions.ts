@@ -23,6 +23,7 @@ import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureComplet
 import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+import { getAdminOpsLedgerPrisma } from '@/lib/prisma/adminOpsLedger/adminOpsLedgerPrisma';
 import { registerAcceptedMerchizeFulfillmentProcess } from '@/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentProcess';
 import { syncMerchizeFulfillmentOrder } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOrder';
 import { syncMerchizeFulfillmentOperationalSnapshots } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOperationalSnapshots';
@@ -34,6 +35,111 @@ import {
 } from '@/lib/prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOpsPrisma';
 
 type AdminNotificationActionResult = { ok: true; message: string } | { ok: false; error: string };
+
+const SCANNER_AUDIT_ACTIONS = [
+  'shop.paid_order_recovery.scan_candidates',
+  'shop.paid_order_recovery.run_selected',
+] as const;
+
+function toScannerAuditMetadata(scan: PayPalRecoveryScannerRunResult) {
+  return {
+    candidateCount: scan.candidates.length,
+    resultCount: scan.results.length,
+    skippedCount: scan.skipped.length,
+    scan,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function parseStoredScannerRun(value: unknown): PayPalRecoveryScannerRunResult | null {
+  const metadata = isRecord(value) ? value : null;
+  const scan = isRecord(metadata?.scan) ? metadata.scan : null;
+
+  if (!scan) return null;
+
+  const candidates = Array.isArray(scan.candidates) ? scan.candidates : null;
+  const results = Array.isArray(scan.results) ? scan.results : null;
+  const skipped = Array.isArray(scan.skipped) ? scan.skipped : null;
+
+  if (
+    typeof scan.ok !== 'boolean' ||
+    typeof scan.enabled !== 'boolean' ||
+    typeof scan.dryRun !== 'boolean' ||
+    typeof scan.minAgeMinutes !== 'number' ||
+    typeof scan.batchSize !== 'number' ||
+    typeof scan.scannedAt !== 'string' ||
+    !candidates ||
+    !results ||
+    !skipped
+  ) {
+    return null;
+  }
+
+  return {
+    ok: scan.ok,
+    enabled: scan.enabled,
+    dryRun: scan.dryRun,
+    minAgeMinutes: scan.minAgeMinutes,
+    batchSize: scan.batchSize,
+    scannedAt: scan.scannedAt,
+    candidates: candidates
+      .map((candidate) => {
+        if (!isRecord(candidate)) return null;
+
+        return {
+          orderToken: typeof candidate.orderToken === 'string' ? candidate.orderToken : '',
+          status: typeof candidate.status === 'string' ? candidate.status : '',
+          customerEmail:
+            typeof candidate.customerEmail === 'string' ? candidate.customerEmail : '',
+          createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : '',
+          updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : '',
+          reason: typeof candidate.reason === 'string' ? candidate.reason : '',
+          lastErrorCode:
+            typeof candidate.lastErrorCode === 'string' ? candidate.lastErrorCode : null,
+          lastErrorMessage:
+            typeof candidate.lastErrorMessage === 'string' ? candidate.lastErrorMessage : null,
+        };
+      })
+      .filter((candidate): candidate is PayPalRecoveryScannerRunResult['candidates'][number] =>
+        Boolean(candidate?.orderToken),
+      ),
+    results: results
+      .map((result) => {
+        if (!isRecord(result)) return null;
+
+        return {
+          orderToken: typeof result.orderToken === 'string' ? result.orderToken : '',
+          previousStatus:
+            typeof result.previousStatus === 'string' ? result.previousStatus : '',
+          status: typeof result.status === 'string' ? result.status : null,
+          processingCompletedAt:
+            typeof result.processingCompletedAt === 'string'
+              ? result.processingCompletedAt
+              : null,
+          ok: typeof result.ok === 'boolean' ? result.ok : false,
+          error: typeof result.error === 'string' ? result.error : null,
+        };
+      })
+      .filter((result): result is PayPalRecoveryScannerRunResult['results'][number] =>
+        Boolean(result?.orderToken),
+      ),
+    skipped: skipped
+      .map((item) => {
+        if (!isRecord(item)) return null;
+
+        return {
+          orderToken: typeof item.orderToken === 'string' ? item.orderToken : '',
+          reason: typeof item.reason === 'string' ? item.reason : '',
+        };
+      })
+      .filter((item): item is PayPalRecoveryScannerRunResult['skipped'][number] =>
+        Boolean(item?.orderToken),
+      ),
+  };
+}
 
 async function verifyMasterAdminPasswordStepUp({
   password,
@@ -137,6 +243,35 @@ export type AdminRecoveryScannerActionResult =
       scan?: PayPalRecoveryScannerRunResult;
     };
 
+export async function getLatestAdminPaidOrderRecoveryScannerRun(): Promise<PayPalRecoveryScannerRunResult | null> {
+  await requireAdminAction('shop.view');
+
+  const rows = await getAdminOpsLedgerPrisma().adminAuditLog.findMany({
+    where: {
+      action: {
+        in: [...SCANNER_AUDIT_ACTIONS],
+      },
+      outcome: {
+        in: ['success', 'failure'],
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: 10,
+    select: {
+      metadata: true,
+    },
+  });
+
+  for (const row of rows) {
+    const scan = parseStoredScannerRun(row.metadata);
+    if (scan) return scan;
+  }
+
+  return null;
+}
+
 export async function scanAdminPaidOrderRecoveryCandidatesAction(): Promise<AdminRecoveryScannerActionResult> {
   try {
     const admin = await requireAdminAction('shop.recovery.run');
@@ -148,6 +283,13 @@ export async function scanAdminPaidOrderRecoveryCandidatesAction(): Promise<Admi
 
     const scan = await runPayPalRecoveryScanner({ dryRun: true });
     const candidateCount = scan.candidates.length;
+
+    await writeAdminAuditLog({
+      actor: admin,
+      action: 'shop.paid_order_recovery.scan_candidates',
+      outcome: 'success',
+      metadata: toScannerAuditMetadata(scan),
+    });
 
     return {
       ok: true,
@@ -194,6 +336,18 @@ export async function runSelectedAdminPaidOrderRecoveryAction({
     }
 
     const completedCount = scan.results.filter((result) => result.ok).length;
+
+    await writeAdminAuditLog({
+      actor: admin,
+      action: 'shop.paid_order_recovery.run_selected',
+      targetType: 'orderTokenBatch',
+      outcome: scan.ok ? 'success' : 'failure',
+      metadata: {
+        requestedCount: orderTokens.length,
+        completedCount,
+        ...toScannerAuditMetadata(scan),
+      },
+    });
 
     if (!scan.ok) {
       return {

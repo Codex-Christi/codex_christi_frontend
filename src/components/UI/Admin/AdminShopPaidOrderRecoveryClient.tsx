@@ -4,14 +4,17 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import AdminPaidOrderRecoveryScannerPanel from './dashboard/AdminPaidOrderRecoveryScannerPanel';
 import PaidOrderRecoveryQueuePanel from './dashboard/PaidOrderRecoveryQueuePanel';
-import type { PaidOrderRecoveryRow } from './dashboard/adminShopDashboardTypes';
+import type { PaidOrderRecoveryListResult } from './dashboard/adminShopDashboardTypes';
+import type { AdminRecoveryScannerActionResult } from '@/app/admin/(dashboard)/shop/paid-order-recovery/actions';
 
 type AdminShopPaidOrderRecoveryClientProps = {
-  rows: PaidOrderRecoveryRow[];
+  recoveryList: PaidOrderRecoveryListResult;
+  latestScannerRun: AdminRecoveryScannerActionResult['scan'] | null;
 };
 
 export default function AdminShopPaidOrderRecoveryClient({
-  rows,
+  recoveryList,
+  latestScannerRun,
 }: AdminShopPaidOrderRecoveryClientProps) {
   return (
     <div className='px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
@@ -24,9 +27,14 @@ export default function AdminShopPaidOrderRecoveryClient({
           Shop dashboard
         </Link>
 
-        <AdminPaidOrderRecoveryScannerPanel />
+        <AdminPaidOrderRecoveryScannerPanel initialScan={latestScannerRun} />
 
-        <PaidOrderRecoveryQueuePanel mobileMode='full-list' rows={rows} />
+        <PaidOrderRecoveryQueuePanel
+          mobileMode='full-list'
+          rows={recoveryList.rows}
+          filters={recoveryList.filters}
+          pagination={recoveryList.pagination}
+        />
       </section>
     </div>
   );
