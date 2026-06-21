@@ -13,6 +13,15 @@ export const ADMIN_NOTIFICATION_RECIPIENT_GROUP_KEY = {
   GENERAL_ADMIN_OPS: 'general_admin_ops',
 } as const;
 
+export const ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY = 'all_notification_groups' as const;
+
+export const ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_DEFINITION = {
+  key: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY,
+  label: 'All Notification Groups',
+  description:
+    'Default recipients inherited by every notification group and used when new groups are created.',
+} as const;
+
 export const ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS = [
   {
     key: ADMIN_NOTIFICATION_RECIPIENT_GROUP_KEY.PAYMENT_ISSUES,
@@ -39,7 +48,8 @@ export const ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS = [
 ] as const;
 
 export type AdminNotificationRecipientGroupKey =
-  (typeof ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS)[number]['key'];
+  | typeof ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY
+  | (typeof ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS)[number]['key'];
 
 export type AdminNotificationRecipientGroupSummary = {
   key: AdminNotificationRecipientGroupKey;
@@ -92,24 +102,37 @@ export async function resolveAdminNotificationRecipients({
 
   try {
     const prisma = getAdminOpsLedgerPrisma();
-    const group = await prisma.adminNotificationRecipientGroup.findUnique({
-      where: { key: groupKey },
-      select: {
-        enabled: true,
-        recipientEmails: true,
-        includeMasterAdmins: true,
-      },
-    });
+    const [globalDefaults, group] = await Promise.all([
+      prisma.adminNotificationRecipientGroup.findUnique({
+        where: { key: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY },
+        select: {
+          recipientEmails: true,
+        },
+      }),
+      prisma.adminNotificationRecipientGroup.findUnique({
+        where: { key: groupKey },
+        select: {
+          enabled: true,
+          recipientEmails: true,
+          includeMasterAdmins: true,
+        },
+      }),
+    ]);
 
     if (group && !group.enabled) {
       return [];
     }
 
     if (!group) {
-      return fallbackRecipients;
+      const recipientsWithoutGroup = normalizeAdminNotificationEmails([
+        ...(globalDefaults?.recipientEmails ?? []),
+        ...fallbackRecipients,
+      ]);
+
+      return recipientsWithoutGroup.length ? recipientsWithoutGroup : fallbackRecipients;
     }
 
-    const recipientEmails = [...group.recipientEmails];
+    const recipientEmails = [...(globalDefaults?.recipientEmails ?? []), ...group.recipientEmails];
 
     if (group.includeMasterAdmins) {
       const masterAdmins = await prisma.adminUser.findMany({
@@ -149,8 +172,9 @@ export async function resolveAdminNotificationRecipients({
 export function isSupportedAdminNotificationRecipientGroupKey(
   key: string,
 ): key is AdminNotificationRecipientGroupKey {
-  return ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.some(
-    (definition) => definition.key === key,
+  return (
+    key === ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY ||
+    ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.some((definition) => definition.key === key)
   );
 }
 
@@ -158,17 +182,43 @@ export async function listAdminNotificationRecipientGroupsForDashboard(): Promis
   AdminNotificationRecipientGroupSummary[]
 > {
   if (!isAdminOpsLedgerDatabaseConfigured()) {
-    return ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.map((definition) => ({
-      ...definition,
-      recipientEmails: [],
-      includeMasterAdmins: true,
-      enabled: false,
-      configured: false,
-      updatedAt: null,
-    }));
+    return [
+      {
+        ...ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_DEFINITION,
+        recipientEmails: [],
+        includeMasterAdmins: false,
+        enabled: true,
+        configured: false,
+        updatedAt: null,
+      },
+      ...ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.map((definition) => ({
+        ...definition,
+        recipientEmails: [],
+        includeMasterAdmins: true,
+        enabled: false,
+        configured: false,
+        updatedAt: null,
+      })),
+    ];
   }
 
   const prisma = getAdminOpsLedgerPrisma();
+  await prisma.adminNotificationRecipientGroup.upsert({
+    where: { key: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY },
+    create: {
+      key: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY,
+      label: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_DEFINITION.label,
+      description: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_DEFINITION.description,
+      includeMasterAdmins: false,
+      enabled: true,
+    },
+    update: {
+      label: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_DEFINITION.label,
+      description: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_DEFINITION.description,
+      includeMasterAdmins: false,
+      enabled: true,
+    },
+  });
 
   await Promise.all(
     ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.map((definition) =>
@@ -190,7 +240,10 @@ export async function listAdminNotificationRecipientGroupsForDashboard(): Promis
   const rows = await prisma.adminNotificationRecipientGroup.findMany({
     where: {
       key: {
-        in: ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.map((definition) => definition.key),
+        in: [
+          ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY,
+          ...ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.map((definition) => definition.key),
+        ],
       },
     },
     select: {
@@ -204,21 +257,35 @@ export async function listAdminNotificationRecipientGroupsForDashboard(): Promis
     },
   });
   const rowByKey = new Map(rows.map((row) => [row.key, row]));
+  const globalRow = rowByKey.get(ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY);
 
-  return ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.map((definition) => {
-    const row = rowByKey.get(definition.key);
+  return [
+    {
+      key: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY,
+      label: globalRow?.label ?? ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_DEFINITION.label,
+      description:
+        globalRow?.description ?? ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_DEFINITION.description,
+      recipientEmails: normalizeAdminNotificationEmails(globalRow?.recipientEmails ?? []),
+      includeMasterAdmins: false,
+      enabled: true,
+      configured: Boolean(globalRow),
+      updatedAt: globalRow?.updatedAt ?? null,
+    },
+    ...ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.map((definition) => {
+      const row = rowByKey.get(definition.key);
 
-    return {
-      key: definition.key,
-      label: row?.label ?? definition.label,
-      description: row?.description ?? definition.description,
-      recipientEmails: normalizeAdminNotificationEmails(row?.recipientEmails ?? []),
-      includeMasterAdmins: row?.includeMasterAdmins ?? true,
-      enabled: row?.enabled ?? true,
-      configured: Boolean(row),
-      updatedAt: row?.updatedAt ?? null,
-    };
-  });
+      return {
+        key: definition.key,
+        label: row?.label ?? definition.label,
+        description: row?.description ?? definition.description,
+        recipientEmails: normalizeAdminNotificationEmails(row?.recipientEmails ?? []),
+        includeMasterAdmins: row?.includeMasterAdmins ?? true,
+        enabled: row?.enabled ?? true,
+        configured: Boolean(row),
+        updatedAt: row?.updatedAt ?? null,
+      };
+    }),
+  ];
 }
 
 export async function saveAdminNotificationRecipientGroup({
@@ -236,9 +303,10 @@ export async function saveAdminNotificationRecipientGroup({
     throw new Error('Admin Ops Ledger database is not configured.');
   }
 
-  const definition = ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.find(
-    (candidate) => candidate.key === key,
-  );
+  const definition =
+    key === ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY
+      ? ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_DEFINITION
+      : ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.find((candidate) => candidate.key === key);
 
   if (!definition) {
     throw new Error('Unsupported notification recipient group.');

@@ -62,6 +62,11 @@ export type AdminAuditLogFilters = {
   targetId?: string;
 };
 
+export type AdminAuditLogDeleteRange = {
+  from: Date;
+  to: Date;
+};
+
 export type AdminOpsDashboardSummary = {
   activeAdmins: number;
   disabledAdmins: number;
@@ -311,6 +316,22 @@ export async function listAdminAuditLogsForDashboard({
   return rows;
 }
 
+export async function deleteAdminAuditLogsByCreatedAtRange({ from, to }: AdminAuditLogDeleteRange) {
+  const result = await getAdminOpsLedgerPrisma().adminAuditLog.deleteMany({
+    where: {
+      createdAt: {
+        gte: from,
+        lte: to,
+      },
+      action: {
+        not: 'admin.audit_logs.cleared',
+      },
+    },
+  });
+
+  return result.count;
+}
+
 export async function upsertAdminUserFromDashboard({
   actor,
   input,
@@ -451,7 +472,5 @@ function toJsonObject(value: Record<string, unknown>): Prisma.InputJsonValue {
 function normalizeAuditOutcome(value: string | null | undefined) {
   const outcome = value?.trim();
 
-  return ['success', 'failure', 'blocked', 'started'].includes(outcome ?? '')
-    ? outcome
-    : undefined;
+  return ['success', 'failure', 'blocked', 'started'].includes(outcome ?? '') ? outcome : undefined;
 }

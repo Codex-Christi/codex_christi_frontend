@@ -6,14 +6,12 @@ import {
   KeyRound,
   ScrollText,
   ShieldCheck,
-  ShieldPlus,
   UserRoundCog,
 } from 'lucide-react';
 import { listAdminUsersForDashboard, type AdminUserSummary } from '@/lib/admin/admin-auth-ledger';
 import { isMasterAdminRole } from '@/lib/admin/admin-config';
-import AdminMasterTransferForm from '@/components/UI/Admin/AdminMasterTransferForm';
 import AdminNotificationRecipientSettings from '@/components/UI/Admin/AdminNotificationRecipientSettings';
-import AdminUserProvisioningForm from '@/components/UI/Admin/AdminUserProvisioningForm';
+import AdminOpsManagementModals from '@/components/UI/Admin/AdminOpsManagementModals';
 import AdminAmbientSlideshow from '@/components/UI/Admin/dashboard/AdminAmbientSlideshow';
 import AdminGlassPanel, {
   adminPageMainClass,
@@ -44,6 +42,7 @@ export default async function AdminOpsPage() {
       id: adminUser.id,
       label: adminUser.displayName ?? adminUser.email ?? adminUser.codexUserId,
       email: adminUser.email ?? '',
+      role: adminUser.role,
       status: adminUser.status,
     }));
 
@@ -96,38 +95,7 @@ export default async function AdminOpsPage() {
               </div>
             </AdminGlassPanel>
 
-            <section className='grid items-start gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]'>
-              <AdminGlassPanel className='p-4 sm:p-5'>
-                <div className='mb-4 flex items-center justify-between gap-3'>
-                  <div>
-                    <h2 className='text-base font-semibold text-white'>Operational Admins</h2>
-                    <p className='mt-1 text-sm leading-6 text-slate-400'>
-                      Create admins and adjust their role, status, and product scopes.
-                    </p>
-                  </div>
-                  <span className='grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-cyan-300/20 bg-cyan-300/10 text-cyan-100'>
-                    <ShieldPlus size={20} />
-                  </span>
-                </div>
-                <AdminUserProvisioningForm />
-              </AdminGlassPanel>
-
-              <AdminGlassPanel className='p-4 sm:p-5'>
-                <div className='mb-4 flex items-center justify-between gap-3'>
-                  <div>
-                    <h2 className='text-base font-semibold text-white'>Master Transfer</h2>
-                    <p className='mt-1 text-sm leading-6 text-slate-400'>
-                      Move master privileges to another Codex Christi user after password and OTP
-                      confirmation.
-                    </p>
-                  </div>
-                  <span className='grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-rose-300/20 bg-rose-300/10 text-rose-100'>
-                    <KeyRound size={20} />
-                  </span>
-                </div>
-                <AdminMasterTransferForm />
-              </AdminGlassPanel>
-            </section>
+            <AdminOpsManagementModals />
 
             <Link
               href='/admin/admin-ops/audit-logs'

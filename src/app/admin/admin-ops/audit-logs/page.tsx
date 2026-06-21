@@ -1,18 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import {
-  ArrowLeft,
-  Filter,
-  RotateCcw,
-  ScrollText,
-  ShieldCheck,
-} from 'lucide-react';
+import { ArrowLeft, Filter, RotateCcw, ScrollText, ShieldCheck } from 'lucide-react';
 import {
   listAdminAuditLogsForDashboard,
   type AdminAuditLogFilters,
   type AdminAuditLogSummary,
 } from '@/lib/admin/admin-auth-ledger';
 import { isMasterAdminRole } from '@/lib/admin/admin-config';
+import AdminAuditLogClearRangeDialog from '@/components/UI/Admin/AdminAuditLogClearRangeDialog';
 import AdminAmbientSlideshow from '@/components/UI/Admin/dashboard/AdminAmbientSlideshow';
 import AdminGlassPanel, {
   adminFieldClass,
@@ -34,9 +29,7 @@ export const metadata: Metadata = {
 
 const outcomeOptions = ['success', 'failure', 'blocked', 'started'] as const;
 
-export default async function AdminAuditLogsPage({
-  searchParams,
-}: AdminAuditLogsPageProps) {
+export default async function AdminAuditLogsPage({ searchParams }: AdminAuditLogsPageProps) {
   const params = (await searchParams) ?? {};
   const filters = getAuditLogFilters(params);
   const admin = await requireAdminPage({
@@ -71,13 +64,19 @@ export default async function AdminAuditLogsPage({
                       Admin Audit Logs
                     </h1>
                     <p className='max-w-3xl text-sm leading-6 text-slate-300 sm:text-base'>
-                      Review admin actions, outcomes, targets, and request fingerprints from the Admin Ops Ledger.
+                      Review admin actions, outcomes, targets, and request fingerprints from the
+                      Admin Ops Ledger.
                     </p>
                   </div>
                 </div>
 
                 <div className='grid gap-3 sm:grid-cols-2 lg:min-w-[420px]'>
-                  <MetricPill label='Visible' value={`${auditLogs.length}`} icon={ScrollText} tone='cyan' />
+                  <MetricPill
+                    label='Visible'
+                    value={`${auditLogs.length}`}
+                    icon={ScrollText}
+                    tone='cyan'
+                  />
                   <MetricPill
                     label='Access'
                     value={isMasterAdminRole(admin.role) ? 'Master' : 'Audit'}
@@ -87,6 +86,21 @@ export default async function AdminAuditLogsPage({
                 </div>
               </div>
             </AdminGlassPanel>
+
+            {isMasterAdminRole(admin.role) ? (
+              <AdminGlassPanel className='p-4 sm:p-5'>
+                <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+                  <div className='min-w-0'>
+                    <h2 className='text-base font-semibold text-white'>Audit Log Maintenance</h2>
+                    <p className='mt-1 max-w-3xl text-sm leading-6 text-slate-400'>
+                      Clear audit events by created-at range. Clear-operation audit events are
+                      preserved for accountability.
+                    </p>
+                  </div>
+                  <AdminAuditLogClearRangeDialog />
+                </div>
+              </AdminGlassPanel>
+            ) : null}
 
             <AdminGlassPanel className='p-4 sm:p-5'>
               <div className='mb-4 flex items-center justify-between gap-3'>
@@ -108,7 +122,11 @@ export default async function AdminAuditLogsPage({
                   name='actorCodexUserId'
                   defaultValue={filters.actorCodexUserId}
                 />
-                <TextField label='Target ID contains' name='targetId' defaultValue={filters.targetId} />
+                <TextField
+                  label='Target ID contains'
+                  name='targetId'
+                  defaultValue={filters.targetId}
+                />
 
                 <label className='grid gap-1 text-xs font-medium text-slate-300'>
                   Outcome
@@ -147,7 +165,9 @@ export default async function AdminAuditLogsPage({
               <div className='mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
                 <div>
                   <h2 className='text-base font-semibold text-white'>Recent Activity</h2>
-                  <p className='mt-1 text-sm text-slate-400'>Newest matching events, capped at 100 rows.</p>
+                  <p className='mt-1 text-sm text-slate-400'>
+                    Newest matching events, capped at 100 rows.
+                  </p>
                 </div>
                 <span className='rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-300'>
                   {auditLogs.length} shown
@@ -230,7 +250,9 @@ function AuditLogCard({ auditLog }: { auditLog: AdminAuditLogSummary }) {
       <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
         <div className='min-w-0 space-y-2'>
           <div className='flex flex-wrap items-center gap-2'>
-            <span className={`rounded-md border px-2 py-1 text-xs ${getOutcomeClass(auditLog.outcome)}`}>
+            <span
+              className={`rounded-md border px-2 py-1 text-xs ${getOutcomeClass(auditLog.outcome)}`}
+            >
               {auditLog.outcome}
             </span>
             <time className='text-xs text-slate-500' dateTime={auditLog.createdAt.toISOString()}>
@@ -239,8 +261,8 @@ function AuditLogCard({ auditLog }: { auditLog: AdminAuditLogSummary }) {
           </div>
           <h3 className='break-words text-sm font-semibold text-white'>{auditLog.action}</h3>
           <p className='break-words text-xs leading-5 text-slate-400'>
-            Actor: {auditLog.actorCodexUserId ?? 'system'} · Target:{' '}
-            {auditLog.targetType ?? 'none'} {auditLog.targetId ? `/ ${auditLog.targetId}` : ''}
+            Actor: {auditLog.actorCodexUserId ?? 'system'} · Target: {auditLog.targetType ?? 'none'}{' '}
+            {auditLog.targetId ? `/ ${auditLog.targetId}` : ''}
           </p>
         </div>
 
@@ -251,7 +273,9 @@ function AuditLogCard({ auditLog }: { auditLog: AdminAuditLogSummary }) {
       </div>
 
       {metadata ? (
-        <pre className={`${adminInsetSurfaceClass} mt-3 max-h-44 overflow-auto p-3 text-xs leading-5 text-slate-300`}>
+        <pre
+          className={`${adminInsetSurfaceClass} mt-3 max-h-44 overflow-auto p-3 text-xs leading-5 text-slate-300`}
+        >
           {metadata}
         </pre>
       ) : null}
@@ -259,7 +283,9 @@ function AuditLogCard({ auditLog }: { auditLog: AdminAuditLogSummary }) {
   );
 }
 
-function getAuditLogFilters(params: Record<string, string | string[] | undefined>): AdminAuditLogFilters {
+function getAuditLogFilters(
+  params: Record<string, string | string[] | undefined>,
+): AdminAuditLogFilters {
   return {
     action: getSingleParam(params.action),
     actorCodexUserId: getSingleParam(params.actorCodexUserId),

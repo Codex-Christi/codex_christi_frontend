@@ -38,11 +38,18 @@ export type AdminNotificationRecipientGroupActionState = {
   success: string | null;
 };
 
+type MasterAdminActionContext =
+  | { ok: true; actor: Awaited<ReturnType<typeof requireMasterAdminAction>> }
+  | { ok: false; error: string };
+
 export async function provisionAdminUserAction(
   _prevState: AdminUserProvisionActionState,
   formData: FormData,
 ): Promise<AdminUserProvisionActionState> {
-  const actor = await requireMasterAdminAction();
+  const auth = await getMasterAdminActionContext();
+  if (!auth.ok) return { error: auth.error, success: null };
+
+  const actor = auth.actor;
   const codexUserId = String(formData.get('codexUserId') ?? '').trim();
   const email = normalizeOptionalString(formData.get('email'))?.toLowerCase() ?? null;
   const displayName = normalizeOptionalString(formData.get('displayName')) ?? null;
@@ -123,7 +130,10 @@ export async function startMasterAdminTransferAction(
   _prevState: MasterAdminTransferStartActionState,
   formData: FormData,
 ): Promise<MasterAdminTransferStartActionState> {
-  const actor = await requireMasterAdminAction();
+  const auth = await getMasterAdminActionContext();
+  if (!auth.ok) return { error: auth.error, challenge: null };
+
+  const actor = auth.actor;
   const currentAdminPassword = String(formData.get('currentAdminPassword') ?? '');
   const targetCodexUserId = String(formData.get('targetCodexUserId') ?? '');
   const targetEmail = String(formData.get('targetEmail') ?? '');
@@ -154,7 +164,10 @@ export async function completeMasterAdminTransferAction(
   _prevState: MasterAdminTransferCompleteActionState,
   formData: FormData,
 ): Promise<MasterAdminTransferCompleteActionState> {
-  const actor = await requireMasterAdminAction();
+  const auth = await getMasterAdminActionContext();
+  if (!auth.ok) return { error: auth.error };
+
+  const actor = auth.actor;
   const challengeId = String(formData.get('challengeId') ?? '');
   const otp = String(formData.get('otp') ?? '').trim();
 
@@ -179,7 +192,10 @@ export async function saveAdminNotificationRecipientGroupAction(
   _prevState: AdminNotificationRecipientGroupActionState,
   formData: FormData,
 ): Promise<AdminNotificationRecipientGroupActionState> {
-  const actor = await requireMasterAdminAction();
+  const auth = await getMasterAdminActionContext();
+  if (!auth.ok) return { error: auth.error, success: null };
+
+  const actor = auth.actor;
   const key = String(formData.get('key') ?? '').trim();
   const recipientEmails = formData
     .getAll('recipientEmails')
@@ -252,6 +268,17 @@ function normalizeOptionalString(value: FormDataEntryValue | null) {
   const text = typeof value === 'string' ? value.trim() : '';
 
   return text || null;
+}
+
+async function getMasterAdminActionContext(): Promise<MasterAdminActionContext> {
+  try {
+    return { ok: true, actor: await requireMasterAdminAction() };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Master admin authorization required.',
+    };
+  }
 }
 
 function normalizeAdminStatus(value: string): AdminStatus {
