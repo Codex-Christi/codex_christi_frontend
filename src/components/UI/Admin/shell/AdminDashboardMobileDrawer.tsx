@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronDown, X } from 'lucide-react';
+import { ArrowUpLeft, ChevronDown, X } from 'lucide-react';
 import {
   Drawer,
   DrawerClose,
@@ -51,11 +51,11 @@ export default function AdminDashboardMobileDrawer({
           Navigation drawer for Codex Christi admin tools.
         </DrawerDescription>
 
-        <div className='flex h-full flex-col'>
-          <div className='flex min-h-20 items-center justify-between border-b border-white/10 px-4'>
+        <div className='flex h-full min-w-0 flex-col overflow-x-hidden'>
+          <div className='flex min-h-20 min-w-0 items-center justify-between gap-3 border-b border-white/10 px-4'>
             <Link
               href='/admin'
-              className='flex items-center gap-3'
+              className='flex min-w-0 items-center gap-2'
               onClick={() => onOpenChange(false)}
             >
               <Image
@@ -64,22 +64,34 @@ export default function AdminDashboardMobileDrawer({
                 width={146}
                 height={63}
                 priority
-                className='h-11 w-auto'
+                className='h-11 min-w-0 max-w-[180px] shrink'
               />
-              <span className='rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-cyan-100'>
+              <span className='shrink-0 rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-cyan-100'>
                 Admin
               </span>
             </Link>
 
-            <DrawerClose
-              aria-label='Close admin navigation'
-              className='grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200'
-            >
-              <X size={18} />
-            </DrawerClose>
+            <div className='flex shrink-0 items-center gap-2'>
+              <Link
+                href='/'
+                aria-label='Open site root'
+                title='Site root'
+                className='grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200 transition hover:border-cyan-300/25 hover:bg-white/[0.06] hover:text-cyan-100'
+                onClick={() => onOpenChange(false)}
+              >
+                <ArrowUpLeft size={17} />
+              </Link>
+
+              <DrawerClose
+                aria-label='Close admin navigation'
+                className='grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200'
+              >
+                <X size={18} />
+              </DrawerClose>
+            </div>
           </div>
 
-          <div className='min-h-0 flex-1 overflow-y-auto py-3 [scrollbar-width:thin]'>
+          <div className='min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden py-3 [scrollbar-width:thin]'>
             <AdminDashboardNavigationList
               activeSection={activeSection}
               groups={navigationGroups}
@@ -88,7 +100,7 @@ export default function AdminDashboardMobileDrawer({
             />
           </div>
 
-          <div className='border-t border-white/10 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]'>
+          <div className='min-w-0 overflow-x-hidden border-t border-white/10 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]'>
             <AdminGlassPanel className='p-3'>
               <p className='text-[11px] text-slate-400'>Admin session</p>
               <div className='mt-2 flex items-center gap-2 text-sm text-slate-100'>
@@ -100,7 +112,7 @@ export default function AdminDashboardMobileDrawer({
               </p>
             </AdminGlassPanel>
 
-            <div className='mt-4 flex items-center gap-3 px-2'>
+            <div className='mt-4 flex min-w-0 items-center gap-3 px-2'>
               <div className='grid h-10 w-10 place-items-center rounded-full bg-white/10 text-sm font-semibold text-white'>
                 AD
               </div>

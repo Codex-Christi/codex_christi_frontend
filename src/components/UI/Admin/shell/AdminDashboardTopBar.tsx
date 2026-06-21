@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronDown, Lock, Menu, RefreshCw, Search } from 'lucide-react';
+import { ArrowUpLeft, ChevronDown, Lock, Menu, RefreshCw, Search } from 'lucide-react';
 
 type AdminDashboardTopBarProps = {
   onOpenMobileNavigation: () => void;
@@ -39,7 +39,7 @@ export default function AdminDashboardTopBar({
         </kbd>
       </div>
 
-      <div className='ml-auto flex items-center gap-3'>
+      <div className='ml-auto flex items-center gap-2 sm:gap-3'>
         <span className='hidden items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-sm text-slate-100 xl:inline-flex'>
           <span className='h-2 w-2 rounded-full bg-emerald-300' />
           Production
@@ -54,8 +54,18 @@ export default function AdminDashboardTopBar({
         <RefreshCw className='hidden text-emerald-300 xl:block' size={22} />
 
         <Link
+          href='/'
+          aria-label='Open site root'
+          title='Site root'
+          className='grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-slate-200 transition hover:border-cyan-300/25 hover:bg-white/[0.06] hover:text-cyan-100'
+        >
+          <ArrowUpLeft size={17} />
+        </Link>
+
+        <Link
           href='/admin/logout'
           aria-label='Lock admin session'
+          title='Lock admin session'
           className='grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-slate-200 transition hover:border-cyan-300/25 hover:bg-white/[0.06] hover:text-cyan-100'
         >
           <Lock size={17} />

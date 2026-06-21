@@ -3,14 +3,19 @@ import Link from 'next/link';
 import {
   AlertTriangle,
   ArrowRight,
+  BarChart3,
+  BellRing,
   CheckCircle2,
+  ClipboardList,
   Clock3,
+  Home,
   Lock,
   ScrollText,
   ShoppingBag,
   Sparkles,
   Store,
   UserRoundCog,
+  type LucideIcon,
 } from 'lucide-react';
 import { isAdminScopeAllowed, isMasterAdminRole } from '@/lib/admin/admin-config';
 import AdminSystemTimeGreeting from '@/components/UI/Admin/AdminSystemTimeGreeting';
@@ -22,6 +27,7 @@ import { getAdminOpsDashboardSummary } from '@/lib/admin/admin-auth-ledger';
 import { requireAdminPage } from '@/lib/admin/require-admin';
 import { getUser } from '@/lib/funcs/userProfileFetchers/getUser';
 import { listAdminPaidOrderRecoveryRows } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
+import { getPayPalPaymentReconciliationDashboardSummary } from '@/lib/paypal/txLedger/paymentReconciliation';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
@@ -47,13 +53,20 @@ export default async function AdminPage() {
     returnPath: '/admin',
   });
   const canManageAdmins = isMasterAdminRole(admin.role);
-  const canAccessShop = isAdminScopeAllowed(admin.scopes, 'shop', admin.role);
+  const canAccessShopOverview = isAdminScopeAllowed(admin.scopes, 'shop', admin.role);
+  const canAccessShopTools = isAdminScopeAllowed(admin.scopes, 'shop.view', admin.role);
   const canViewAuditLogs = isAdminScopeAllowed(admin.scopes, 'audit.view', admin.role);
 
   const shouldLoadAdminOpsSummary = canManageAdmins || canViewAuditLogs;
-  const [profile, recoveryRows, adminOpsSummary] = await Promise.all([
+  const shouldLoadShopSummaries = canAccessShopTools;
+  const [profile, recoveryRows, reconciliationSummary, adminOpsSummary] = await Promise.all([
     getUser().catch(() => undefined),
-    canAccessShop ? listAdminPaidOrderRecoveryRows().catch(() => []) : Promise.resolve([]),
+    shouldLoadShopSummaries
+      ? listAdminPaidOrderRecoveryRows().catch(() => [])
+      : Promise.resolve([]),
+    shouldLoadShopSummaries
+      ? getPayPalPaymentReconciliationDashboardSummary().catch(() => null)
+      : Promise.resolve(null),
     shouldLoadAdminOpsSummary
       ? getAdminOpsDashboardSummary().catch(() => null)
       : Promise.resolve(null),
@@ -62,10 +75,14 @@ export default async function AdminPage() {
     profile?.first_name?.trim() || profile?.username?.trim() || `Admin ${admin.userID.slice(0, 8)}`;
   const dailyIndex = getDailyIndex(new Date(), admin.userID);
   const attentionRows = recoveryRows.filter((row) =>
-    ['failed', 'recovery', 'pending', 'sync'].includes(row.status),
+    ['failed', 'recovery', 'pending', 'sync', 'attention'].includes(row.status),
   );
   const failedRows = recoveryRows.filter((row) => row.status === 'failed');
   const syncRows = recoveryRows.filter((row) => row.status === 'sync');
+  const paymentReconciliationAttentionCount = reconciliationSummary?.total ?? 0;
+  const paymentReconciliationCriticalCount = reconciliationSummary?.critical ?? 0;
+  const paymentReconciliationWarningCount = reconciliationSummary?.warning ?? 0;
+  const totalShopAttentionCount = attentionRows.length + paymentReconciliationAttentionCount;
 
   return (
     <div className='mx-auto flex w-full max-w-[1500px] flex-col gap-6 px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
@@ -87,14 +104,20 @@ export default async function AdminPage() {
           <div className='grid gap-3 sm:grid-cols-3 lg:min-w-[520px]'>
             <StatusPill
               label='System'
-              value={failedRows.length ? 'Needs review' : 'Stable'}
-              tone={failedRows.length ? 'amber' : 'emerald'}
-              icon={failedRows.length ? AlertTriangle : CheckCircle2}
+              value={
+                failedRows.length || paymentReconciliationCriticalCount ? 'Needs review' : 'Stable'
+              }
+              tone={failedRows.length || paymentReconciliationCriticalCount ? 'amber' : 'emerald'}
+              icon={
+                failedRows.length || paymentReconciliationCriticalCount
+                  ? AlertTriangle
+                  : CheckCircle2
+              }
             />
             <StatusPill
               label='Attention'
-              value={`${attentionRows.length}`}
-              tone={attentionRows.length ? 'cyan' : 'emerald'}
+              value={`${totalShopAttentionCount}`}
+              tone={totalShopAttentionCount ? 'cyan' : 'emerald'}
               icon={Clock3}
             />
             <StatusPill label='Admin Mode' value='Unlocked' tone='cyan' icon={Lock} />
@@ -103,20 +126,118 @@ export default async function AdminPage() {
       </AdminGlassPanel>
 
       <section className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]'>
-        <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
+        <div className='grid gap-4 md:grid-cols-2 2xl:grid-cols-3'>
           <ProductCard
-            title='Codex Christi Shop'
-            description='Payments, checkout recovery, fulfillment support, catalog snapshots, and shop operations.'
-            href={canAccessShop ? '/admin/shop' : undefined}
+            title='Shop Operations'
+            description='Hub for paid order recovery, PayPal reconciliation, catalog snapshots, and storefront support tools.'
+            href={canAccessShopOverview ? '/admin/shop' : undefined}
             icon={ShoppingBag}
-            status={canAccessShop ? 'Active' : 'Restricted'}
-            attention={canAccessShop ? `${attentionRows.length} attention` : 'No access'}
+            status={
+              canAccessShopOverview ? 'Overview' : canAccessShopTools ? 'Tools only' : 'Restricted'
+            }
+            attention={
+              canAccessShopTools
+                ? `${totalShopAttentionCount} needs review`
+                : canAccessShopOverview
+                  ? 'Overview available'
+                  : 'No access'
+            }
             metrics={
-              canAccessShop
+              canAccessShopTools
                 ? [
-                    { label: 'Attention', value: `${attentionRows.length}`, tone: 'cyan' },
-                    { label: 'Failed', value: `${failedRows.length}`, tone: 'rose' },
-                    { label: 'Sync', value: `${syncRows.length}`, tone: 'amber' },
+                    {
+                      label: 'Recovery',
+                      value: `${attentionRows.length}`,
+                      tone: attentionRows.length ? 'cyan' : 'emerald',
+                    },
+                    {
+                      label: 'PayPal',
+                      value: `${paymentReconciliationAttentionCount}`,
+                      tone: paymentReconciliationAttentionCount ? 'amber' : 'emerald',
+                    },
+                    {
+                      label: 'Failed',
+                      value: `${failedRows.length}`,
+                      tone: failedRows.length ? 'rose' : 'emerald',
+                    },
+                  ]
+                : undefined
+            }
+          />
+          <ProductCard
+            title='Paid Order Recovery'
+            description='Review paid checkout rows that need recovery, provider sync, or failure handling.'
+            href={canAccessShopTools ? '/admin/shop/paid-order-recovery' : undefined}
+            icon={ClipboardList}
+            status={canAccessShopTools ? 'Live queue' : 'Restricted'}
+            attention={canAccessShopTools ? `${attentionRows.length} active rows` : 'No access'}
+            metrics={
+              canAccessShopTools
+                ? [
+                    {
+                      label: 'Active',
+                      value: `${attentionRows.length}`,
+                      tone: attentionRows.length ? 'cyan' : 'emerald',
+                    },
+                    {
+                      label: 'Failed',
+                      value: `${failedRows.length}`,
+                      tone: failedRows.length ? 'rose' : 'emerald',
+                    },
+                    {
+                      label: 'Sync',
+                      value: `${syncRows.length}`,
+                      tone: syncRows.length ? 'amber' : 'emerald',
+                    },
+                  ]
+                : undefined
+            }
+          />
+          <ProductCard
+            title='PayPal Reconciliation'
+            description='Check PayPal authorization and capture truth before recovery or fulfillment decisions.'
+            href={canAccessShopTools ? '/admin/shop/paypal-reconciliation' : undefined}
+            icon={BarChart3}
+            status={canAccessShopTools ? 'Payment checks' : 'Restricted'}
+            attention={
+              canAccessShopTools
+                ? `${paymentReconciliationAttentionCount} payment rows`
+                : 'No access'
+            }
+            metrics={
+              canAccessShopTools
+                ? [
+                    {
+                      label: 'Critical',
+                      value: `${paymentReconciliationCriticalCount}`,
+                      tone: paymentReconciliationCriticalCount ? 'rose' : 'emerald',
+                    },
+                    {
+                      label: 'Warning',
+                      value: `${paymentReconciliationWarningCount}`,
+                      tone: paymentReconciliationWarningCount ? 'amber' : 'emerald',
+                    },
+                    {
+                      label: 'Total',
+                      value: `${paymentReconciliationAttentionCount}`,
+                      tone: paymentReconciliationAttentionCount ? 'cyan' : 'emerald',
+                    },
+                  ]
+                : undefined
+            }
+          />
+          <ProductCard
+            title='Catalog & Snapshots'
+            description='Inspect Merchize catalog sync state, sample variants, shipping bands, and storefront fallback snapshots.'
+            href={canAccessShopTools ? '/admin/shop/merchize-catalog-snapshots' : undefined}
+            icon={Store}
+            status={canAccessShopTools ? 'Catalog tool' : 'Restricted'}
+            attention={canAccessShopTools ? 'Open implemented tool' : 'No access'}
+            metrics={
+              canAccessShopTools
+                ? [
+                    { label: 'Route', value: 'Available', tone: 'cyan' },
+                    { label: 'Scope', value: 'shop.view', tone: 'emerald' },
                   ]
                 : undefined
             }
@@ -151,7 +272,33 @@ export default async function AdminPage() {
               }
             />
           ) : null}
-          {canViewAuditLogs && !canManageAdmins ? (
+          {canManageAdmins ? (
+            <ProductCard
+              title='Notification Recipients'
+              description='Manage default operational recipients and per-group admin notification routing.'
+              href='/admin/admin-ops/notification-recipients'
+              icon={BellRing}
+              status='Routing'
+              attention='Operational email routing'
+              metrics={
+                adminOpsSummary
+                  ? [
+                      {
+                        label: 'Admin Sources',
+                        value: `${adminOpsSummary.activeAdmins}`,
+                        tone: 'emerald',
+                      },
+                      {
+                        label: 'Disabled',
+                        value: `${adminOpsSummary.disabledAdmins}`,
+                        tone: adminOpsSummary.disabledAdmins ? 'amber' : 'emerald',
+                      },
+                    ]
+                  : undefined
+              }
+            />
+          ) : null}
+          {canViewAuditLogs ? (
             <ProductCard
               title='Admin Security Records'
               description='Review admin activity, outcomes, targets, and request fingerprints.'
@@ -177,16 +324,12 @@ export default async function AdminPage() {
             />
           ) : null}
           <ProductCard
-            title='Primary Site'
-            description='Future content, user, and publishing operations for the main Codex Christi experience.'
-            icon={Store}
-            status='Coming later'
-          />
-          <ProductCard
-            title='Reports'
-            description='Future cross-product sales, fulfillment, incident, and support reporting.'
-            icon={CheckCircle2}
-            status='Coming later'
+            title='Public Site Root'
+            description='Return to the live Codex Christi site outside the admin shell.'
+            href='/'
+            icon={Home}
+            status='Public'
+            attention='Open site root'
           />
         </div>
 
@@ -197,6 +340,11 @@ export default async function AdminPage() {
               <AttentionRow label='Paid order recovery' value={attentionRows.length} />
               <AttentionRow label='Failed rows' value={failedRows.length} tone='rose' />
               <AttentionRow label='Provider sync' value={syncRows.length} tone='amber' />
+              <AttentionRow
+                label='PayPal reconciliation'
+                value={paymentReconciliationAttentionCount}
+                tone={paymentReconciliationCriticalCount ? 'rose' : 'amber'}
+              />
             </div>
           </AdminGlassPanel>
 
@@ -241,7 +389,7 @@ function StatusPill({
   label: string;
   value: string;
   tone: 'cyan' | 'emerald' | 'amber';
-  icon: typeof CheckCircle2;
+  icon: LucideIcon;
 }) {
   const toneClass = {
     cyan: 'text-cyan-100 bg-cyan-300/[0.06]',
@@ -273,7 +421,7 @@ function ProductCard({
 }: {
   title: string;
   description: string;
-  icon: typeof ShoppingBag;
+  icon: LucideIcon;
   status: string;
   attention?: string;
   metrics?: ProductMetric[];
@@ -282,38 +430,40 @@ function ProductCard({
   const body = (
     <article
       className={getAdminGlassPanelClassName(
-        'group flex min-h-[250px] flex-col justify-between p-5',
+        'group flex min-h-0 flex-col justify-between p-3.5 sm:min-h-[220px] sm:p-4 xl:min-h-[230px]',
         { interactive: Boolean(href) },
       )}
     >
-      <div className='space-y-5'>
+      <div className='space-y-2 sm:space-y-4'>
         <div className='flex items-start justify-between gap-3'>
           <span
             className={cn(
               adminInsetSurfaceClass,
-              'grid h-11 w-11 place-items-center text-cyan-200',
+              'grid h-9 w-9 shrink-0 place-items-center text-cyan-200 sm:h-10 sm:w-10',
             )}
           >
-            <Icon size={22} />
+            <Icon size={19} />
           </span>
-          <span className='rounded-md bg-white/[0.035] px-2 py-1 text-xs text-slate-300'>
+          <span className='max-w-[9rem] shrink-0 truncate rounded-md bg-white/[0.035] px-2 py-1 text-[11px] text-slate-300 sm:text-xs'>
             {status}
           </span>
         </div>
-        <div className='space-y-2'>
-          <h2 className='text-lg font-semibold text-white'>{title}</h2>
-          <p className='text-sm leading-6 text-slate-300'>{description}</p>
+        <div className='space-y-1.5'>
+          <h2 className='text-base font-semibold text-white'>{title}</h2>
+          <p className='sr-only text-sm leading-5 text-slate-300 sm:not-sr-only sm:line-clamp-2'>
+            {description}
+          </p>
         </div>
         {metrics?.length ? (
-          <div className='grid gap-3 border-t border-white/[0.045] pt-3 sm:grid-cols-3'>
+          <div className='grid grid-cols-3 gap-2 border-t border-white/[0.045] pt-2'>
             {metrics.map((metric) => (
               <span key={`${title}-${metric.label}`} className='min-w-0 text-xs'>
-                <span className='block truncate text-[10px] uppercase tracking-[0.12em] text-slate-500'>
+                <span className='block truncate text-[9px] uppercase leading-3 tracking-[0.12em] text-slate-500 sm:text-[10px]'>
                   {metric.label}
                 </span>
                 <span
                   className={cn(
-                    'mt-1 block text-sm font-semibold',
+                    'mt-0.5 block text-sm font-semibold leading-4',
                     getMetricToneClass(metric.tone),
                   )}
                 >
@@ -325,9 +475,9 @@ function ProductCard({
         ) : null}
       </div>
 
-      <div className='mt-6 flex items-center justify-between gap-3 border-t border-white/[0.045] pt-4 text-sm'>
-        <span className='text-slate-400'>{attention ?? 'No active tool'}</span>
-        <span className='inline-flex items-center gap-2 text-cyan-100'>
+      <div className='hidden items-center justify-between gap-2 border-t border-white/[0.045] text-xs sm:mt-4 sm:flex sm:gap-3 sm:pt-3 sm:text-sm'>
+        <span className='min-w-0 truncate text-slate-400'>{attention ?? 'No active tool'}</span>
+        <span className='inline-flex shrink-0 items-center gap-2 text-cyan-100'>
           {href ? 'Open' : 'Unavailable'}
           {href ? <ArrowRight size={15} /> : null}
         </span>

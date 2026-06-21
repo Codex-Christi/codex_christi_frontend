@@ -21,18 +21,21 @@ export default function AdminDashboardSidebar({
   navigationGroups,
 }: AdminDashboardSidebarProps) {
   return (
-    <aside className='hidden border-r border-white/[0.055] bg-[rgba(20,25,35,0.80)] shadow-[12px_0_38px_rgba(0,0,0,0.14)] supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 xl:fixed xl:left-0 xl:top-0 xl:z-50 xl:block xl:h-dvh xl:w-[250px]'>
-      <div className='flex h-full min-h-0 flex-col'>
-        <Link href='/admin' className='flex h-20 items-center gap-3 border-b border-white/10 px-5'>
+    <aside className='hidden overflow-x-hidden border-r border-white/[0.055] bg-[rgba(20,25,35,0.80)] shadow-[12px_0_38px_rgba(0,0,0,0.14)] supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 xl:fixed xl:left-0 xl:top-0 xl:z-50 xl:block xl:h-dvh xl:w-[250px]'>
+      <div className='flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden'>
+        <Link
+          href='/admin'
+          className='flex h-20 min-w-0 items-center gap-2 border-b border-white/10 px-4'
+        >
           <Image
             src='/media/img/general/logo.svg'
             alt='Codex Christi'
             width={146}
             height={63}
             priority
-            className='h-11 w-auto'
+            className='h-11 min-w-0 max-w-[136px] shrink'
           />
-          <span className='rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-[11px] uppercase tracking-[0.18em] text-cyan-100'>
+          <span className='shrink-0 rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-cyan-100'>
             Admin
           </span>
         </Link>
@@ -43,7 +46,7 @@ export default function AdminDashboardSidebar({
           mode='desktop'
         />
 
-        <div className='hidden shrink-0 border-t border-white/10 p-3 xl:block'>
+        <div className='hidden min-w-0 shrink-0 overflow-x-hidden border-t border-white/10 p-3 xl:block'>
           <AdminGlassPanel className='p-3'>
             <p className='text-[11px] text-slate-400'>Admin session</p>
             <div className='mt-2 flex items-center gap-2 text-sm text-slate-100'>
@@ -55,7 +58,7 @@ export default function AdminDashboardSidebar({
             </p>
           </AdminGlassPanel>
 
-          <div className='mt-4 flex items-center gap-3 px-2'>
+          <div className='mt-4 flex min-w-0 items-center gap-3 px-2'>
             <div className='grid h-10 w-10 place-items-center rounded-full bg-white/10 text-sm font-semibold'>
               AD
             </div>

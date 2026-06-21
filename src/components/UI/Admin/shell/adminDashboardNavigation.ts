@@ -1,5 +1,4 @@
 import {
-  ArrowUpLeft,
   ClipboardList,
   DatabaseZap,
   Home,
@@ -95,19 +94,6 @@ export const adminDashboardNavigationGroups: AdminDashboardNavigationGroup[] = [
         icon: ScrollText,
         requiredAccess: 'canAccessAuditLogs',
         section: 'admin-security-records',
-      },
-    ],
-  },
-  {
-    id: 'external',
-    label: 'External',
-    items: [
-      {
-        title: 'Site Root',
-        description: 'Return to public site',
-        href: '/',
-        icon: ArrowUpLeft,
-        section: 'external',
       },
     ],
   },

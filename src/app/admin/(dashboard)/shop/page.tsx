@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import AdminShopDashboardClient from '@/components/UI/Admin/AdminShopDashboardClient';
 import { requireAdminPage } from '@/lib/admin/require-admin';
+import { listAdminPaidOrderRecoveryRows } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
 import { getPayPalPaymentReconciliationDashboardSummary } from '@/lib/paypal/txLedger/paymentReconciliation';
 
 export const metadata: Metadata = {
@@ -14,12 +15,17 @@ export default async function ShopAdminPage() {
     scope: 'shop',
     returnPath: '/admin/shop',
   });
-  const reconciliationSummary = await getPayPalPaymentReconciliationDashboardSummary();
+  const [recoveryRows, reconciliationSummary] = await Promise.all([
+    listAdminPaidOrderRecoveryRows(),
+    getPayPalPaymentReconciliationDashboardSummary(),
+  ]);
 
   return (
     <AdminShopDashboardClient
+      recoveryRows={recoveryRows}
       paymentReconciliationAttentionCount={reconciliationSummary.total}
       paymentReconciliationCriticalCount={reconciliationSummary.critical}
+      paymentReconciliationWarningCount={reconciliationSummary.warning}
     />
   );
 }
