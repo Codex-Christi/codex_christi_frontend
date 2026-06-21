@@ -134,6 +134,32 @@ Missing follow-up work:
 - Escalate repeated progress/tracking/invoice snapshot failures into admin-visible reconciliation states.
 - Add admin pause/resume/cancel controls only with reason capture, audit logging, confirmation, and step-up auth.
 
+### Push-Disabled Semi-Real Test Contract
+
+Current runtime status:
+
+- There is no implemented `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false` guard yet.
+- A fresh checkout with live Merchize credentials will still attempt the real `POST /order/external/orders/push` call after the accepted Django process/import and provider sync stages.
+- The current admin notification path sends durable outbox rows and email attempts only for failure/blocking states, not successful push acceptance.
+- There is no customer success email after automatic or manual push acceptance yet.
+- The existing admin `Push To Fulfillment`/retry action is resumable, but it is not a master-admin-only password override flow.
+
+Target admin behavior before using this as a semi-real provider test:
+
+- When `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false`, stop before provider push and persist an explicit push-disabled production gate state.
+- Enqueue and send an internal paid-order recovery notification for that stopped state, using the configured recipient group/fallback email list.
+- Show a clear admin action on the paid-order recovery detail page: provider push is disabled by configuration, and the order is waiting for manual release.
+- Manual release must require master admin authorization, fresh password step-up, explicit confirmation, and an admin reason.
+- Manual release must resume only the remaining provider push stage. It must not replay PayPal capture, receipt upload, Django payment save, or an already accepted Django process/import.
+- On manual release success, record `push_accepted`, set `releasedToProductionAt`, complete the paid fulfillment runner, and enqueue the customer-safe post-push notification once that customer outbox exists.
+- On manual release failure, keep the order recoverable, persist `push_failed`, and send the internal recovery notification/email.
+
+Target customer behavior during a push-disabled test:
+
+- The confirmation page should not tell the customer fulfillment fully succeeded when provider push was intentionally paused.
+- It should show payment received, receipt/payment preparation progress when available, a support reference, and a neutral message that the order is being reviewed/prepared for fulfillment.
+- It should not show raw provider IDs, raw provider payloads, admin-only error text, or customer address payloads.
+
 ## Naming Rules
 
 Use names that say which system owns the value.
