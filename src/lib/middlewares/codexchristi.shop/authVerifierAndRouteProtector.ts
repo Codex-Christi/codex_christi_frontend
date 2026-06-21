@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestSessionState } from '@/lib/session/request-session';
+import { getHostnameFromHostHeader, isShopSiteHostname } from '@/lib/siteBaseUrls';
 
 export const authVerifierAndRouteProtector = async (req: NextRequest) => {
-  // Auth verifier for shop login page on codexchristi.shop
-  const hostname = req.headers.get('host'); // Get the incoming hostname
+  // Auth verifier for shop login page on the configured shop domain.
+  const hostname = getHostnameFromHostHeader(req.headers.get('host'));
 
-  if (hostname === 'localhost:3000' || hostname === 'codexchristi.shop') {
-    const isLocalHost = hostname === 'localhost:3000';
-    const isProdShopDomian = hostname === 'codexchristi.shop';
+  if (hostname === 'localhost' || isShopSiteHostname(hostname)) {
+    const isLocalHost = hostname === 'localhost';
+    const isProdShopDomian = !isLocalHost && isShopSiteHostname(hostname);
 
     const checkObj = { isLocalHost, isProdShopDomian, req };
 

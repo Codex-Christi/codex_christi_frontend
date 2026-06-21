@@ -1,3 +1,5 @@
+import { getMainSiteUrl } from '@/lib/siteBaseUrls';
+
 type RecoveryOtpEmailTemplateProps = {
   otp: string;
   recipientName?: string;
@@ -21,6 +23,7 @@ export function buildRecoveryOtpEmailHtml({
   const safeOtp = escapeHtml(otp);
   const safeName = recipientName?.trim() ? escapeHtml(recipientName.trim()) : 'there';
   const currentYear = new Date().getFullYear();
+  const logoUrl = getMainSiteUrl('/media/img/general/logo-glow-tiny.jpg');
 
   return `<!doctype html>
 <html>
@@ -33,7 +36,7 @@ export function buildRecoveryOtpEmailHtml({
                 padding-top:10px">
                     <tr>
                         <td align="center" style="padding-bottom:18px;">
-                            <img src="https://codexchristi.org/media/img/general/logo-glow-tiny.jpg" width="64" height="64" alt="Codex Christi" style="border-radius:18px;border:1px solid rgba(255,255,255,0.14);" />
+                            <img src="${escapeHtml(logoUrl)}" width="64" height="64" alt="Codex Christi" style="border-radius:18px;border:1px solid rgba(255,255,255,0.14);" />
                             <div style="font-size:13px;letter-spacing:0.22em;text-transform:uppercase;color:#94a3b8;margin-top:12px;">Codex Christi</div>
                         </td>
                     </tr>

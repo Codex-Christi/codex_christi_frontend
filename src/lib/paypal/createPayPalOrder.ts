@@ -14,6 +14,7 @@ import { removeOrKeepDecimalPrecision } from '@/actions/merchize/getMerchizeTota
 import { format } from 'date-fns';
 import type { CartVariant } from '@/stores/shop_stores/cartStore';
 import type { ShopCheckoutStoreInterface } from '@/stores/shop_stores/checkoutStore';
+import { getShopSiteUrl } from '@/lib/siteBaseUrls';
 
 export interface BillingAddressInterface {
   addressLine1: string;
@@ -135,7 +136,7 @@ export async function createPayPalOrder(body: CreateOrderActionInterface): Promi
         quantity: String(quantity),
         description: title,
         sku: itemDetail.sku_seller,
-        url: `https://codexchristi.shop/product/${itemDetail.product}`,
+        url: getShopSiteUrl(`/product/${itemDetail.product}`),
         category: ItemCategory.PhysicalGoods,
       }) as Item,
   );

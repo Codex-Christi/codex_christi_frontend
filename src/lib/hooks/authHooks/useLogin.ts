@@ -14,6 +14,7 @@ import successToast from '@/lib/success-toast';
 import { createLoginSession } from '@/actions/login';
 import useAuthStore from '@/stores/authStore';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
+import { isShopSiteHostname } from '@/lib/siteBaseUrls';
 
 const tokenClient = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL}`,
@@ -55,7 +56,7 @@ export const useLogin = () => {
   );
 
   const isCodexChristiShop = isClient
-    ? window.location.hostname.includes('codexchristi.shop')
+    ? isShopSiteHostname(window.location.hostname)
     : false;
 
   // Effect to set client-side state and referer

@@ -8,6 +8,7 @@ import {
   ProductDescriptionSection,
   ProductFeedbackSection,
 } from '@/components/UI/Shop/ProductDetails/ProductStaticSections';
+import { getShopSiteUrl } from '@/lib/siteBaseUrls';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -45,7 +46,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         title: title,
         description: description,
         ...(firstImageUrl ? { images: [{ url: firstImageUrl }] } : {}),
-        url: `https://codexchristi.shop/product/${id}`,
+        url: getShopSiteUrl(`/product/${id}`),
         locale: 'en_US',
         siteName: 'Codex Christi Shop',
       },

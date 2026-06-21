@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+import { getMainSiteUrl } from '@/lib/siteBaseUrls';
 
 const DEFAULT_PENDING_SEND_LIMIT = 25;
 
@@ -65,6 +66,7 @@ function buildDedupeKey(orderToken: string, recipient: string) {
 function buildCustomerFulfillmentPushAcceptedEmailHtml(
   payload: CustomerFulfillmentPushAcceptedPayload,
 ) {
+  const logoUrl = getMainSiteUrl('/media/img/general/logo-glow-tiny.jpg');
   const receiptLink = payload.receiptLink
     ? `<a href="${escapeHtml(payload.receiptLink)}" style="display:inline-block;margin-top:14px;border-radius:12px;background:#dbeafe;color:#0f172a;text-decoration:none;font-size:13px;font-weight:700;padding:12px 18px;">View Receipt</a>`
     : '';
@@ -78,7 +80,7 @@ function buildCustomerFulfillmentPushAcceptedEmailHtml(
           <table width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;">
             <tr>
               <td style="padding:0 0 18px;">
-                <img src="https://codexchristi.org/media/img/general/logo-glow-tiny.jpg" width="44" height="44" alt="Codex Christi" style="border-radius:12px;vertical-align:middle;" />
+                <img src="${escapeHtml(logoUrl)}" width="44" height="44" alt="Codex Christi" style="border-radius:12px;vertical-align:middle;" />
                 <span style="display:inline-block;margin-left:12px;font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#475569;vertical-align:middle;">Codex Christi</span>
               </td>
             </tr>

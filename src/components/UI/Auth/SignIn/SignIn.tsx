@@ -12,16 +12,17 @@ import GoogleIcon from '@/components/UI/general/IconComponents/GoogleIcon';
 import AppleIcon from '@/components/UI/general/IconComponents/AppleIcon';
 import GitHubIcon from '@/components/UI/general/IconComponents/GitHubIcon';
 import { useHasMounted } from '@/lib/hooks/useHasMounted';
+import { getMainSiteUrl, isShopSiteHostname } from '@/lib/siteBaseUrls';
 
 // Main Component
 const SignIn = () => {
   const { login } = useLogin();
   const hasMounted = useHasMounted();
   const isCodexChristiShop =
-    hasMounted && window.location.hostname.includes('codexchristi.shop');
+    hasMounted && isShopSiteHostname(window.location.hostname);
   const signUpHref =
     isCodexChristiShop && hasMounted
-      ? `https://codexchristi.org/auth/signup?redirect=${window.location.href}`
+      ? `${getMainSiteUrl('/auth/signup')}?redirect=${encodeURIComponent(window.location.href)}`
       : '/auth/signup';
 
   const signInForm = useForm<signInSchemaType>({

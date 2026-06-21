@@ -5,6 +5,7 @@ import {
   resolveAdminNotificationRecipients,
 } from '@/lib/admin/admin-notification-recipients';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+import { getMainSiteUrl } from '@/lib/siteBaseUrls';
 
 const DEFAULT_PENDING_SEND_LIMIT = 25;
 
@@ -111,8 +112,7 @@ function getConfiguredAdminRecipients() {
 }
 
 function buildAdminOrderRecoveryUrl(orderToken: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://codexchristi.org';
-  return `${baseUrl.replace(/\/+$/, '')}/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`;
+  return getMainSiteUrl(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
 }
 
 function buildNotificationDedupeKey({
@@ -149,6 +149,7 @@ function escapeHtml(value: string) {
 }
 
 function buildAdminRecoveryAlertEmailHtml(payload: AdminRecoveryNotificationPayload) {
+  const logoUrl = getMainSiteUrl('/media/img/general/logo-glow-tiny.jpg');
   const issueRows = payload.issueSummary
     .map(
       (issue) => `
@@ -172,7 +173,7 @@ function buildAdminRecoveryAlertEmailHtml(payload: AdminRecoveryNotificationPayl
                 <table width="100%" cellpadding="0" cellspacing="0">
                   <tr>
                     <td>
-                      <img src="https://codexchristi.org/media/img/general/logo-glow-tiny.jpg" width="48" height="48" alt="Codex Christi" style="border-radius:14px;border:1px solid rgba(255,255,255,0.14);vertical-align:middle;" />
+                      <img src="${escapeHtml(logoUrl)}" width="48" height="48" alt="Codex Christi" style="border-radius:14px;border:1px solid rgba(255,255,255,0.14);vertical-align:middle;" />
                       <span style="display:inline-block;margin-left:12px;font-size:12px;letter-spacing:0.22em;text-transform:uppercase;color:#94a3b8;vertical-align:middle;">Codex Christi Ops</span>
                     </td>
                     <td align="right" style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#fbbf24;">

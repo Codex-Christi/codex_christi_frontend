@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import { notFound } from 'next/navigation';
 import { fetchCategoryProducts, getCategoryMetadataFromMerchize } from './categoryDetailsSSR';
+import { getShopSiteUrl } from '@/lib/siteBaseUrls';
 
 const ProductList = dynamic(
   () =>
@@ -34,7 +35,7 @@ export async function generateCategoryPageMetadata(
         description,
         ...(cover ? { images: [{ url: cover.url }] } : {}),
         type: 'website',
-        url: `https://codexchristi.shop/category/${categoryName}${urlSuffix}`,
+        url: getShopSiteUrl(`/category/${categoryName}${urlSuffix}`),
         locale: 'en_US',
         siteName: 'Codex Christi Shop',
       },

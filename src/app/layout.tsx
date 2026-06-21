@@ -3,6 +3,7 @@ import localFont from 'next/font/local';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import dynamic from 'next/dynamic';
+import { getMainSiteBaseUrl } from '@/lib/siteBaseUrls';
 
 // Dynamic Components
 
@@ -37,7 +38,7 @@ const TradeWinds = localFont({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://codexchristi.org'),
+  metadataBase: new URL(getMainSiteBaseUrl()),
   title: 'Codex Christi',
   description: 'A Hub for Christian Creatives to connect, share, and glorify God.',
 };
