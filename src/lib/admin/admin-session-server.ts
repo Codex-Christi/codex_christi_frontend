@@ -10,6 +10,8 @@ import {
 } from './admin-config';
 import { signAdminSessionToken, verifyAdminSessionToken } from './admin-session-token';
 
+const LEGACY_ADMIN_SESSION_COOKIE_PATHS = ['/'];
+
 export async function getServerAdminSessionState() {
   const cookieStore = await cookies();
   const token = cookieStore.get(ADMIN_SESSION_COOKIE_NAME)?.value;
@@ -38,12 +40,23 @@ export async function createAdminSession({
   });
   const cookieStore = await cookies();
 
+  for (const path of LEGACY_ADMIN_SESSION_COOKIE_PATHS) {
+    cookieStore.set(ADMIN_SESSION_COOKIE_NAME, '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path,
+      expires: new Date(0),
+    });
+  }
+
   cookieStore.set(ADMIN_SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: ADMIN_SESSION_COOKIE_PATH,
     expires: expiresAt,
+    maxAge: ADMIN_SESSION_TTL_SECONDS,
   });
 
   return { expiresAt };
@@ -59,4 +72,14 @@ export async function deleteAdminSession() {
     path: ADMIN_SESSION_COOKIE_PATH,
     expires: new Date(0),
   });
+
+  for (const path of LEGACY_ADMIN_SESSION_COOKIE_PATHS) {
+    cookieStore.set(ADMIN_SESSION_COOKIE_NAME, '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path,
+      expires: new Date(0),
+    });
+  }
 }

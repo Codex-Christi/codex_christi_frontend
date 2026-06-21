@@ -18,10 +18,11 @@ export async function runPayPalPaymentReconciliationAction(
   _prevState: PayPalPaymentReconciliationActionState,
   formData: FormData,
 ): Promise<PayPalPaymentReconciliationActionState> {
-  const actor = await requireAdminAction('shop.recovery.run');
   const dryRun = formData.get('dryRun') === 'true';
+  let actor: Awaited<ReturnType<typeof requireAdminAction>> | null = null;
 
   try {
+    actor = await requireAdminAction('shop.recovery.run');
     const result = await runPayPalPaymentReconciliationScanner({ dryRun });
     const completedCount = result.results.filter((row) => row.ok).length;
     const failedCount = result.results.length - completedCount;
@@ -60,16 +61,18 @@ export async function runPayPalPaymentReconciliationAction(
       result,
     };
   } catch (error) {
-    await writeAdminAuditLog({
-      actor,
-      action: 'shop.paypal_payment_reconciliation.scan',
-      targetType: 'paypalTxLedger',
-      outcome: 'failure',
-      metadata: {
-        dryRun,
-        reason: error instanceof Error ? error.message : 'unknown_error',
-      },
-    });
+    if (actor) {
+      await writeAdminAuditLog({
+        actor,
+        action: 'shop.paypal_payment_reconciliation.scan',
+        targetType: 'paypalTxLedger',
+        outcome: 'failure',
+        metadata: {
+          dryRun,
+          reason: error instanceof Error ? error.message : 'unknown_error',
+        },
+      });
+    }
 
     return {
       error: error instanceof Error ? error.message : 'Unable to run payment reconciliation.',
