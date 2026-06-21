@@ -19,6 +19,7 @@ import {
   runSelectedPayPalRecoveryScanner,
   type PayPalRecoveryScannerRunResult,
 } from '@/lib/paypal/txLedger/recoveryScanner';
+import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
@@ -373,6 +374,7 @@ export async function retryAdminPaidOrderRecoveryAction({
       where: { orderToken },
       select: {
         status: true,
+        capturePayload: true,
         processingCompletedAt: true,
         postProcessingLockExpiresAt: true,
         merchizeFulfillmentResponsePayload: true,
@@ -397,6 +399,14 @@ export async function retryAdminPaidOrderRecoveryAction({
       return {
         ok: false,
         error: 'This order is already being processed.',
+      };
+    }
+
+    const captureCompletion = getPayPalCaptureCompletion(existing.capturePayload);
+    if (!captureCompletion.ok) {
+      return {
+        ok: false,
+        error: captureCompletion.reason,
       };
     }
 
@@ -512,6 +522,7 @@ export async function overrideMerchizePushDisabledAndReleaseAction({
       where: { orderToken },
       select: {
         status: true,
+        capturePayload: true,
         lastErrorCode: true,
         processingCompletedAt: true,
         postProcessingLockExpiresAt: true,
@@ -535,6 +546,11 @@ export async function overrideMerchizePushDisabledAndReleaseAction({
 
     if (existing.postProcessingLockExpiresAt && existing.postProcessingLockExpiresAt > new Date()) {
       return rejectAfterStepUp('This order is already being processed.');
+    }
+
+    const captureCompletion = getPayPalCaptureCompletion(existing.capturePayload);
+    if (!captureCompletion.ok) {
+      return rejectAfterStepUp(captureCompletion.reason);
     }
 
     await runPaidFulfillmentProcessing(orderToken, {

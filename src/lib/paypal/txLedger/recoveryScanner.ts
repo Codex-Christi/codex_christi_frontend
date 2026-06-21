@@ -6,6 +6,7 @@ import {
   isRecoveryScannerEnabled,
 } from '@/lib/paypal/txLedger/processingPolicy';
 import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
+import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 
@@ -60,18 +61,21 @@ function toCandidate(row: {
   orderToken: string;
   status: string;
   customerEmail: string;
+  capturePayload: unknown;
   createdAt: Date;
   updatedAt: Date;
   lastErrorCode: string | null;
   lastErrorMessage: string | null;
 }) {
+  const captureCompletion = getPayPalCaptureCompletion(row.capturePayload);
+
   return {
     orderToken: row.orderToken,
     status: row.status,
     customerEmail: row.customerEmail,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    reason: `Post-capture ledger row is still ${row.status}.`,
+    reason: `${captureCompletion.reason} Post-capture ledger row is still ${row.status}.`,
     lastErrorCode: row.lastErrorCode,
     lastErrorMessage: row.lastErrorMessage,
   };
@@ -112,7 +116,7 @@ export async function findPayPalRecoveryCandidates(args?: {
   });
 
   return rows
-    .filter((row) => row.capturePayload)
+    .filter((row) => getPayPalCaptureCompletion(row.capturePayload).ok)
     .slice(0, batchSize)
     .map((row) => toCandidate(row));
 }

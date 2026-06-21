@@ -38,6 +38,7 @@ import {
 } from '@/lib/paypal/txLedger/customerNotificationOutbox';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
+import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
 import type { CartVariant } from '@/stores/shop_stores/cartStore';
@@ -235,9 +236,7 @@ async function notifyFulfillmentPushAccepted(args: {
     console.error('[CustomerNotificationOutbox] failed to enqueue fulfillment success alert', {
       orderToken: args.orderToken,
       error:
-        notificationError instanceof Error
-          ? notificationError.message
-          : String(notificationError),
+        notificationError instanceof Error ? notificationError.message : String(notificationError),
     });
   });
 
@@ -254,9 +253,7 @@ async function notifyFulfillmentPushAccepted(args: {
     console.error('[AdminNotificationOutbox] failed to enqueue fulfillment success alert', {
       orderToken: args.orderToken,
       error:
-        notificationError instanceof Error
-          ? notificationError.message
-          : String(notificationError),
+        notificationError instanceof Error ? notificationError.message : String(notificationError),
     });
   });
 
@@ -326,6 +323,22 @@ export async function runPaidFulfillmentProcessing(
 
     if (!authData || !finalCapturedOrder) {
       throw new Error('Missing authorize/capture payload in ledger');
+    }
+
+    const captureCompletion = getPayPalCaptureCompletion(finalCapturedOrder);
+    if (!captureCompletion.ok) {
+      await updateLockedRow(orderToken, lockId, {
+        status:
+          captureCompletion.status === 'PENDING'
+            ? PAYPAL_LEDGER_STATUS.PENDING
+            : PAYPAL_LEDGER_STATUS.ERROR,
+        lastErrorCode: 'CAPTURE_NOT_COMPLETED',
+        lastErrorMessage: captureCompletion.reason,
+        postProcessingLockId: null,
+        postProcessingLockedAt: null,
+        postProcessingLockExpiresAt: null,
+      });
+      throw new Error(captureCompletion.reason);
     }
 
     const customer = {
@@ -493,10 +506,7 @@ export async function runPaidFulfillmentProcessing(
         return;
       }
 
-      if (
-        !options.overrideMerchizeFulfillmentPushDisabled &&
-        !isMerchizeFulfillmentPushEnabled()
-      ) {
+      if (!options.overrideMerchizeFulfillmentPushDisabled && !isMerchizeFulfillmentPushEnabled()) {
         const message =
           'Merchize push-to-fulfillment is disabled by MERCHIZE_FULFILLMENT_PUSH_ENABLED=false.';
         await recordMerchizeFulfillmentPushDisabledByConfig({

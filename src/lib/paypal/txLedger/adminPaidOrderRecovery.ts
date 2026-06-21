@@ -3,6 +3,7 @@ import 'server-only';
 import { formatDistanceToNowStrict } from 'date-fns';
 
 import { getRecoveryScannerMinAgeMinutes } from '@/lib/paypal/txLedger/processingPolicy';
+import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { listCustomerNotificationsForOrder } from '@/lib/paypal/txLedger/customerNotificationOutbox';
@@ -500,9 +501,14 @@ function buildActivity(row: {
 
   const latestWebhook = row.webhookEvents[0];
   if (latestWebhook) {
+    const webhookFailed = latestWebhook.processingStatus === 'failed';
+    const laterCompleted = webhookFailed && Boolean(row.processingCompletedAt);
+
     activity.push({
-      label: 'Webhook observed',
-      description: `${latestWebhook.eventType} is ${latestWebhook.processingStatus}.`,
+      label: webhookFailed ? 'Webhook processing failed' : 'Webhook observed',
+      description: `${latestWebhook.eventType} webhook delivery is ${latestWebhook.processingStatus}.${
+        laterCompleted ? ' Ledger processing later completed successfully.' : ''
+      }`,
       time: latestWebhook.processedAt ?? latestWebhook.lastAttemptAt ?? latestWebhook.createdAt,
       tone: latestWebhook.processingStatus === 'processed' ? 'emerald' : 'amber',
     });
@@ -591,6 +597,11 @@ function getScannerState(row: {
     return { eligible: false, reason: 'Capture payload is missing.' };
   }
 
+  const captureCompletion = getPayPalCaptureCompletion(row.capturePayload);
+  if (!captureCompletion.ok) {
+    return { eligible: false, reason: captureCompletion.reason };
+  }
+
   if (row.postProcessingLockExpiresAt && row.postProcessingLockExpiresAt > new Date()) {
     return { eligible: false, reason: 'A post-processing lock is active.' };
   }
@@ -653,6 +664,7 @@ function buildDetail(row: {
     (row.lastErrorCode === 'MERCHIZE_PUSH_DISABLED_BY_CONFIG' ||
       row.merchizeFulfillmentOps?.productionGateStatus ===
         MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_DISABLED);
+  const captureCompletion = getPayPalCaptureCompletion(row.capturePayload);
 
   return {
     customerName: row.customerName,
@@ -673,6 +685,7 @@ function buildDetail(row: {
       { label: 'Ledger order token', value: row.orderToken },
       { label: 'Authenticated user ID', value: row.userId },
       { label: 'PayPal order ID', value: row.paypalOrderId },
+      { label: 'PayPal capture proof', value: captureCompletion.reason },
       { label: 'Django order intent UUID', value: row.djangoOrderIntentUuid },
       { label: 'Django order intent order ID', value: row.djangoOrderIntentOrderId },
       { label: 'Django payment save custom ID', value: row.djangoPaymentSaveCustomId },
@@ -732,6 +745,7 @@ function buildDetail(row: {
       merchizeFulfillmentOps: row.merchizeFulfillmentOps,
       needsProviderDetailSync: providerDetailSyncNeeded,
       requiresPushOverride,
+      captureCompletion,
       scannerState: getScannerState(row),
       webhookEvents: row.webhookEvents,
     },

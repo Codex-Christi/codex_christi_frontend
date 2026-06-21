@@ -2,6 +2,7 @@ import 'server-only';
 
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
+import { isCompletedPayPalCapture } from '@/lib/paypal/txLedger/captureCompletion';
 import { normalizeRecoveryEmail } from './recoveryOtpUtils';
 import { Prisma } from '@/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger/client';
 
@@ -18,7 +19,7 @@ const UNRESOLVED_PAID_STATUSES = [
 export async function findUnresolvedPaidCheckoutsByEmail(email: string) {
   const normalizedEmail = normalizeRecoveryEmail(email);
 
-  return paypalTxLedger.paypalIntent.findMany({
+  const rows = await paypalTxLedger.paypalIntent.findMany({
     where: {
       customerEmail: normalizedEmail,
       processingCompletedAt: null,
@@ -38,6 +39,8 @@ export async function findUnresolvedPaidCheckoutsByEmail(email: string) {
     orderBy: {
       createdAt: 'desc',
     },
-    take: 3,
+    take: 10,
   });
+
+  return rows.filter((row) => isCompletedPayPalCapture(row.capturePayload)).slice(0, 3);
 }

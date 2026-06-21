@@ -7,6 +7,10 @@ import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { createPayPalRouteResponders } from '@/lib/paypal/txLedger/routeResponses';
 import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 import { isCaptureRouteRunnerEnabled } from '@/lib/paypal/txLedger/processingPolicy';
+import {
+  getPayPalCaptureCompletion,
+  type PayPalCaptureCompletion,
+} from '@/lib/paypal/txLedger/captureCompletion';
 
 const POST_CAPTURE_RESUMABLE_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.CAPTURED,
@@ -14,6 +18,15 @@ const POST_CAPTURE_RESUMABLE_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
   PAYPAL_LEDGER_STATUS.ERROR,
 ]);
+
+function getLedgerStatusForIncompleteCapture(completion: PayPalCaptureCompletion) {
+  if (completion.status === 'PENDING') return PAYPAL_LEDGER_STATUS.PENDING;
+  if (completion.status === 'REFUNDED' || completion.status === 'PARTIALLY_REFUNDED') {
+    return PAYPAL_LEDGER_STATUS.REFUNDED;
+  }
+
+  return PAYPAL_LEDGER_STATUS.ERROR;
+}
 
 export async function POST(req: Request) {
   const requestId = randomUUID();
@@ -76,7 +89,29 @@ export async function POST(req: Request) {
     });
   };
 
+  const persistIncompleteCaptureResult = async (
+    payload: CapturedPayment | unknown,
+    completion: PayPalCaptureCompletion,
+  ) => {
+    await paypalTxLedger.paypalIntent.update({
+      where: { orderToken },
+      data: {
+        status: getLedgerStatusForIncompleteCapture(completion),
+        capturePayload: JSON.parse(JSON.stringify(payload)),
+        lastErrorCode: 'CAPTURE_NOT_COMPLETED',
+        lastErrorMessage: completion.reason,
+      },
+    });
+  };
+
   const persistCapturedResult = async (payload: CapturedPayment) => {
+    const completion = getPayPalCaptureCompletion(payload);
+
+    if (!completion.ok) {
+      await persistIncompleteCaptureResult(payload, completion);
+      return completion;
+    }
+
     await paypalTxLedger.paypalIntent.update({
       where: { orderToken },
       data: {
@@ -86,6 +121,8 @@ export async function POST(req: Request) {
         lastErrorMessage: null,
       },
     });
+
+    return completion;
   };
 
   const schedulePostProcessing = (token: string, reason: string) => {
@@ -140,6 +177,20 @@ export async function POST(req: Request) {
     // If capture already succeeded earlier, resume server-side follow-up work instead of
     // attempting another PayPal capture. Webhooks may arrive late or not reach local dev tunnels.
     if (intent.capturePayload && intent.status !== PAYPAL_LEDGER_STATUS.REFUNDED) {
+      const completion = getPayPalCaptureCompletion(intent.capturePayload);
+
+      if (!completion.ok) {
+        await persistIncompleteCaptureResult(intent.capturePayload, completion).catch(
+          () => undefined,
+        );
+        return routeError({
+          status: 409,
+          code: 'CAPTURE_NOT_COMPLETED',
+          stage: 'validate_stored_capture',
+          message: completion.reason,
+        });
+      }
+
       if (!intent.processingCompletedAt && POST_CAPTURE_RESUMABLE_STATUSES.has(intent.status)) {
         schedulePostProcessing(orderToken, 'stored_capture_payload');
       }
@@ -183,7 +234,17 @@ export async function POST(req: Request) {
     });
 
     try {
-      await persistCapturedResult(result);
+      const completion = await persistCapturedResult(result);
+
+      if (!completion.ok) {
+        return routeError({
+          status: 409,
+          code: 'CAPTURE_NOT_COMPLETED',
+          stage: 'capture_payment',
+          message: completion.reason,
+        });
+      }
+
       schedulePostProcessing(orderToken, 'capture_persisted');
     } catch (persistErr) {
       // Keep this separate so retries know PayPal may already be ahead of the ledger.

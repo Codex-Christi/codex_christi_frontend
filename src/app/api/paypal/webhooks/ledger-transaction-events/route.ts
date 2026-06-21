@@ -1,6 +1,7 @@
 import { after } from 'next/server';
 
 import { getServerPayPalConfig } from '@/lib/paypal/serverPayPalConfig';
+import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import {
@@ -24,6 +25,7 @@ const POST_CAPTURE_LEDGER_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
   PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED,
   PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
+  PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED,
   PAYPAL_LEDGER_STATUS.COMPLETED,
 ]);
 
@@ -47,8 +49,10 @@ async function updateLedgerFromWebhook(args: {
   orderToken: string;
   eventType: string;
   currentStatus: string;
+  currentCapturePayload: unknown;
+  webhookResource: unknown;
 }) {
-  const { orderToken, eventType, currentStatus } = args;
+  const { orderToken, eventType, currentStatus, currentCapturePayload, webhookResource } = args;
 
   switch (eventType) {
     case 'PAYMENT.AUTHORIZATION.CREATED':
@@ -72,13 +76,14 @@ async function updateLedgerFromWebhook(args: {
       return;
 
     case 'PAYMENT.CAPTURE.DENIED':
+    case 'PAYMENT.CAPTURE.DECLINED':
       await paypalTxLedger.paypalIntent.update({
         where: { orderToken },
         data: {
           status: PAYPAL_LEDGER_STATUS.ERROR,
           lastEventType: eventType,
-          lastErrorCode: 'CAPTURE_DENIED',
-          lastErrorMessage: 'PayPal capture denied',
+          lastErrorCode: 'CAPTURE_DECLINED',
+          lastErrorMessage: 'PayPal capture declined',
         },
       });
       return;
@@ -93,18 +98,56 @@ async function updateLedgerFromWebhook(args: {
       });
       return;
 
-    case 'PAYMENT.CAPTURE.COMPLETED':
+    case 'PAYMENT.CAPTURE.COMPLETED': {
+      const currentCaptureCompletion = getPayPalCaptureCompletion(currentCapturePayload);
+      const webhookCaptureCompletion = getPayPalCaptureCompletion(webhookResource);
+      const completedCapturePayload = currentCaptureCompletion.ok
+        ? undefined
+        : webhookCaptureCompletion.ok
+          ? JSON.parse(JSON.stringify(webhookResource))
+          : undefined;
+
+      if (!currentCaptureCompletion.ok && !webhookCaptureCompletion.ok) {
+        await paypalTxLedger.paypalIntent.update({
+          where: { orderToken },
+          data: {
+            status: PAYPAL_LEDGER_STATUS.ERROR,
+            lastEventType: eventType,
+            lastErrorCode: 'CAPTURE_NOT_COMPLETED',
+            lastErrorMessage: webhookCaptureCompletion.reason,
+          },
+        });
+        return;
+      }
+
       // Do not move the row backward if post-processing already advanced it.
       if (!POST_CAPTURE_LEDGER_STATUSES.has(currentStatus)) {
         await paypalTxLedger.paypalIntent.update({
           where: { orderToken },
           data: {
             status: PAYPAL_LEDGER_STATUS.CAPTURED,
+            capturePayload: completedCapturePayload,
+            lastEventType: eventType,
+          },
+        });
+      } else if (completedCapturePayload) {
+        await paypalTxLedger.paypalIntent.update({
+          where: { orderToken },
+          data: {
+            capturePayload: completedCapturePayload,
+            lastEventType: eventType,
+          },
+        });
+      } else {
+        await paypalTxLedger.paypalIntent.update({
+          where: { orderToken },
+          data: {
             lastEventType: eventType,
           },
         });
       }
       return;
+    }
 
     default:
       return;
@@ -192,6 +235,8 @@ export async function POST(req: Request) {
       orderToken: row.orderToken,
       eventType: event.event_type,
       currentStatus: row.status,
+      currentCapturePayload: row.capturePayload,
+      webhookResource: event.resource,
     });
 
     if (event.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
