@@ -9,10 +9,6 @@ function requiredBooleanEnv(name: string) {
   throw new Error(`Invalid ${name}. Expected "true" or "false".`);
 }
 
-export function isStatusRouteResumeEnabled() {
-  return requiredBooleanEnv('PAYPAL_TX_LEDGER_ENABLE_STATUS_ROUTE_RESUME');
-}
-
 export function isCaptureRouteRunnerEnabled() {
   return requiredBooleanEnv('PAYPAL_TX_LEDGER_ENABLE_CAPTURE_ROUTE_RUNNER');
 }

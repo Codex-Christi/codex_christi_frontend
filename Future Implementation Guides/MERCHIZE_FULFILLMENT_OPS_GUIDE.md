@@ -394,10 +394,11 @@ NEXT_PUBLIC_PAYPAL_PAYMENT_MODE=sandbox
 PAYPAL_TX_LEDGER_NEON_BRANCH=dev
 MERCHIZE_FULFILLMENT_OPS_NEON_BRANCH=dev
 PAYPAL_TX_LEDGER_ENABLE_CAPTURE_ROUTE_RUNNER=true
-PAYPAL_TX_LEDGER_ENABLE_STATUS_ROUTE_RESUME=true
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 MERCHIZE_FULFILLMENT_PUSH_ENABLED=false # semi-real no-push test
 ```
+
+The confirmation status route is read-only. With webhooks/ngrok off, post-capture work is triggered by the capture route runner or by the scheduled recovery scanner/cron.
 
 Provider safety setup:
 

@@ -121,27 +121,15 @@ The current flow has important protections:
 
 ## Current Risk Areas
 
-### Status Route Is Not Read-Only
+### Status Route Is Read-Only
 
-The status route currently reads and can schedule write-heavy post-processing. That makes the confirmation page part of the recovery system.
+The confirmation status route now only returns ledger state. It does not schedule `runPaidFulfillmentProcessing(...)` and does not read a status-route resume env flag.
 
-Risk:
+Operational rule:
 
-- Harder to reason about production behavior.
-- A normal customer page visit can trigger backend side effects.
-- Webhook downtime can be hidden because the status route completes work.
-
-Recommended direction:
-
-- Make status-route resume explicitly configurable.
-- Default it off in production.
-- Keep it available for local dev or beta only if intentionally enabled.
-
-Recommended future env var:
-
-```txt
-PAYPAL_TX_LEDGER_ENABLE_STATUS_ROUTE_RESUME=false
-```
+- Capture route, webhook route, scheduled recovery scanner/cron, and admin actions may request post-processing.
+- Confirmation-page polling must stay read-only.
+- Webhook downtime should be visible through ledger/admin state instead of hidden by a browser polling side effect.
 
 ### Capture Route Is A First-Party Runner
 
@@ -361,7 +349,6 @@ Add clear env flags:
 
 ```txt
 PAYPAL_TX_LEDGER_ENABLE_CAPTURE_ROUTE_RUNNER=false
-PAYPAL_TX_LEDGER_ENABLE_STATUS_ROUTE_RESUME=false
 PAYPAL_TX_LEDGER_RECOVERY_SCANNER_ENABLED=true
 PAYPAL_TX_LEDGER_RECOVERY_SCANNER_MIN_AGE_MINUTES=15
 PAYPAL_TX_LEDGER_RECOVERY_SCANNER_BATCH_SIZE=5
@@ -373,11 +360,11 @@ Recommended behavior:
 - Capture route runner disabled by default.
 - Webhook runner enabled.
 - Recovery scanner enabled.
-- Status route resume disabled.
+- Confirmation status route remains read-only.
 
-### Step 2 - Gate Status Route Resume
+### Step 2 - Keep Status Route Read-Only
 
-Update:
+Runtime:
 
 ```txt
 src/app/api/paypal/tx-ledger/payments/[orderToken]/status/route.ts
@@ -386,8 +373,8 @@ src/app/api/paypal/tx-ledger/payments/[orderToken]/status/route.ts
 Behavior:
 
 - Always return status.
-- Only schedule `runPaidFulfillmentProcessing(...)` when `PAYPAL_TX_LEDGER_ENABLE_STATUS_ROUTE_RESUME=true`.
-- Include a response field such as `recoveryResumeScheduled` only if useful for debugging.
+- Never schedule `runPaidFulfillmentProcessing(...)`.
+- Do not reintroduce a browser-polling write path unless there is a deliberate production incident fallback plan.
 
 ### Step 3 - Register Sandbox Webhook
 
@@ -513,7 +500,7 @@ Admin UI should eventually expose:
 - Webhook events are stored once per PayPal event ID.
 - Duplicate webhook deliveries do not duplicate post-processing.
 - Capture route does not capture money again when `capturePayload` already exists.
-- Status route resume is explicitly gated before production.
+- Confirmation status route is read-only.
 - Confirmation page success is based on ledger `completed`, not receipt availability alone.
 - Accepted Django 201 fulfillment rows are not shown as "rerun full post-processing" cases.
 - Stuck captured/payment-saved rows have an admin or scheduled recovery path.
@@ -521,7 +508,6 @@ Admin UI should eventually expose:
 ## Open Questions
 
 1. Should capture-route post-processing remain enabled in production as the immediate first-party runner, or should it only persist capture and let webhook/scheduled recovery do the rest?
-2. Should status-route resume be completely removed, or kept as a local-dev-only fallback?
-3. Which production domain is the canonical PayPal live payment webhook endpoint?
-4. Should staging use a stable sandbox webhook URL instead of local ngrok for repeatable QA?
-5. What scheduled job mechanism will run recovery scans: Vercel cron, VPS cron, a private admin endpoint, or a dedicated worker?
+2. Which production domain is the canonical PayPal live payment webhook endpoint?
+3. Should staging use a stable sandbox webhook URL instead of local ngrok for repeatable QA?
+4. What scheduled job mechanism will run recovery scans: Vercel cron, VPS cron, a private admin endpoint, or a dedicated worker?
