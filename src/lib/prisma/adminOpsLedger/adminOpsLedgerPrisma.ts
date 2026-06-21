@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { PrismaPg } from '@prisma/adapter-pg';
+import { normalizePostgresSslMode } from '@/lib/prisma/postgresSslMode';
 import { PrismaClient } from './generated/adminOpsLedger/client';
 
 function resolveAdminOpsLedgerConnectionString(): string | null {
@@ -32,7 +33,7 @@ export function getAdminOpsLedgerPrisma() {
     return global.__adminOpsLedgerPrisma__;
   }
 
-  const adapter = new PrismaPg({ connectionString });
+  const adapter = new PrismaPg({ connectionString: normalizePostgresSslMode(connectionString) });
   const prisma = new PrismaClient({ adapter });
 
   if (process.env.NODE_ENV !== 'production') {
@@ -41,4 +42,3 @@ export function getAdminOpsLedgerPrisma() {
 
   return prisma;
 }
-

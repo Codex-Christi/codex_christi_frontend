@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { normalizePostgresSslMode } from '../src/lib/prisma/postgresSslMode';
 import { PrismaClient } from '../src/lib/prisma/adminOpsLedger/generated/adminOpsLedger/client';
 
 dotenv.config({ path: '.env.local' });
@@ -49,7 +50,9 @@ async function main() {
     'ADMIN_MASTER_TRANSFER_CHALLENGE_RETENTION_HOURS',
     DEFAULT_MASTER_TRANSFER_CHALLENGE_RETENTION_HOURS,
   );
-  const adapter = new PrismaPg({ connectionString: getConnectionString() });
+  const adapter = new PrismaPg({
+    connectionString: normalizePostgresSslMode(getConnectionString()),
+  });
   const prisma = new PrismaClient({ adapter });
   const now = Date.now();
   const unlockAttemptCutoff = new Date(

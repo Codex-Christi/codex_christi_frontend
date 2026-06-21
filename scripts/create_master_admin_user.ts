@@ -2,6 +2,7 @@ import argon2 from 'argon2';
 import dotenv from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/lib/prisma/adminOpsLedger/generated/adminOpsLedger/client';
+import { normalizePostgresSslMode } from '../src/lib/prisma/postgresSslMode';
 import {
   getDefaultAdminRole,
   getDefaultAdminScopes,
@@ -73,7 +74,9 @@ async function main() {
     throw new Error('At least one valid admin scope is required.');
   }
 
-  const adapter = new PrismaPg({ connectionString: getConnectionString() });
+  const adapter = new PrismaPg({
+    connectionString: normalizePostgresSslMode(getConnectionString()),
+  });
   const prisma = new PrismaClient({ adapter });
   const passwordHash = await argon2.hash(password, {
     type: argon2.argon2id,

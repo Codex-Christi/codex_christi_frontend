@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { PrismaPg } from '@prisma/adapter-pg';
+import { normalizePostgresSslMode } from '@/lib/prisma/postgresSslMode';
 import { PrismaClient } from './txLedger/generated/paypalTxLedger/client';
 
 function resolvePaypalLedgerConnectionString(): string | null {
@@ -49,7 +50,7 @@ export function getPaypalTxLedger() {
   }
 
   const prisma = new PrismaClient({
-    adapter: new PrismaPg({ connectionString }),
+    adapter: new PrismaPg({ connectionString: normalizePostgresSslMode(connectionString) }),
   });
 
   paypalTxLedgerSingleton = prisma;
