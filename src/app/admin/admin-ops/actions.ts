@@ -14,7 +14,10 @@ import {
   normalizeAdminScopes,
   type AdminStatus,
 } from '@/lib/admin/admin-config';
-import { saveAdminNotificationRecipientGroup } from '@/lib/admin/admin-notification-recipients';
+import {
+  saveAdminNotificationRecipientEmailPermissions,
+  saveAdminNotificationRecipientGroup,
+} from '@/lib/admin/admin-notification-recipients';
 import { deleteAdminSession } from '@/lib/admin/admin-session-server';
 import { requireMasterAdminAction } from '@/lib/admin/require-admin';
 import { deleteSession } from '@/lib/session/main-session';
@@ -34,6 +37,11 @@ export type MasterAdminTransferCompleteActionState = {
 };
 
 export type AdminNotificationRecipientGroupActionState = {
+  error: string | null;
+  success: string | null;
+};
+
+export type AdminNotificationRecipientEmailPermissionsActionState = {
   error: string | null;
   success: string | null;
 };
@@ -236,6 +244,7 @@ export async function saveAdminNotificationRecipientGroupAction(
     });
 
     revalidatePath('/admin/admin-ops');
+    revalidatePath('/admin/admin-ops/notification-recipients');
     revalidatePath('/admin/shop');
 
     return {
@@ -259,6 +268,77 @@ export async function saveAdminNotificationRecipientGroupAction(
 
     return {
       error: error instanceof Error ? error.message : 'Unable to save notification recipients.',
+      success: null,
+    };
+  }
+}
+
+export async function saveAdminNotificationRecipientEmailPermissionsAction(
+  _prevState: AdminNotificationRecipientEmailPermissionsActionState,
+  formData: FormData,
+): Promise<AdminNotificationRecipientEmailPermissionsActionState> {
+  const auth = await getMasterAdminActionContext();
+  if (!auth.ok) return { error: auth.error, success: null };
+
+  const actor = auth.actor;
+  const email = String(formData.get('email') ?? '')
+    .trim()
+    .toLowerCase();
+  const includeGlobalDefault = formData.get('includeGlobalDefault') === 'true';
+  const groupKeys = formData.getAll('groupKeys').map(String).filter(Boolean);
+
+  if (!isValidEmail(email)) {
+    return {
+      error: 'Enter a valid notification recipient email.',
+      success: null,
+    };
+  }
+
+  try {
+    const result = await saveAdminNotificationRecipientEmailPermissions({
+      email,
+      includeGlobalDefault,
+      groupKeys,
+      actorCodexUserId: actor.userID,
+    });
+
+    await writeAdminAuditLog({
+      actor,
+      action: 'admin.notification_recipient_email_permissions.save',
+      targetType: 'adminNotificationRecipientEmail',
+      targetId: email,
+      outcome: 'success',
+      metadata: {
+        includeGlobalDefault,
+        groupCount: result.groupCount,
+      },
+    });
+
+    revalidatePath('/admin/admin-ops');
+    revalidatePath('/admin/admin-ops/notification-recipients');
+    revalidatePath('/admin/shop');
+
+    return {
+      error: null,
+      success: `${result.email} notification permissions saved.`,
+    };
+  } catch (error) {
+    await writeAdminAuditLog({
+      actor,
+      action: 'admin.notification_recipient_email_permissions.save',
+      targetType: 'adminNotificationRecipientEmail',
+      targetId: email || undefined,
+      outcome: 'failure',
+      metadata: {
+        includeGlobalDefault,
+        groupCount: groupKeys.length,
+        reason: error instanceof Error ? error.message : 'unknown_error',
+      },
+    });
+
+    return {
+      error:
+        error instanceof Error ? error.message : 'Unable to save notification email permissions.',
       success: null,
     };
   }

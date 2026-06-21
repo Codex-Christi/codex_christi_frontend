@@ -70,6 +70,13 @@ export type AdminNotificationRecipientGroupInput = {
   actorCodexUserId?: string | null;
 };
 
+export type AdminNotificationRecipientEmailPermissionsInput = {
+  email: string;
+  includeGlobalDefault: boolean;
+  groupKeys: string[];
+  actorCodexUserId?: string | null;
+};
+
 type ResolveAdminNotificationRecipientsProps = {
   groupKey: string;
   fallbackEmails?: string[];
@@ -313,8 +320,31 @@ export async function saveAdminNotificationRecipientGroup({
   }
 
   const normalizedEmails = normalizeAdminNotificationEmails(recipientEmails);
+  const prisma = getAdminOpsLedgerPrisma();
+  const protectedAdmins = await prisma.adminUser.findMany({
+    where: {
+      email: {
+        in: normalizedEmails,
+      },
+    },
+    select: {
+      email: true,
+      role: true,
+      status: true,
+    },
+  });
+  const protectedMasterAdmin = protectedAdmins.find(
+    (admin) =>
+      admin.email &&
+      isMasterAdminRole(normalizeAdminRole(admin.role)) &&
+      isActiveAdminStatus(admin.status),
+  );
 
-  return getAdminOpsLedgerPrisma().adminNotificationRecipientGroup.upsert({
+  if (protectedMasterAdmin) {
+    throw new Error('Master admin notification routing is inherited and cannot be edited here.');
+  }
+
+  return prisma.adminNotificationRecipientGroup.upsert({
     where: { key },
     create: {
       key,
@@ -335,6 +365,141 @@ export async function saveAdminNotificationRecipientGroup({
       updatedByCodexUserId: actorCodexUserId ?? null,
     },
   });
+}
+
+export async function saveAdminNotificationRecipientEmailPermissions({
+  email,
+  includeGlobalDefault,
+  groupKeys,
+  actorCodexUserId,
+}: AdminNotificationRecipientEmailPermissionsInput) {
+  const normalizedEmail = normalizeAdminNotificationEmails([email])[0];
+
+  if (!normalizedEmail) {
+    throw new Error('Enter a valid notification recipient email.');
+  }
+
+  if (!isAdminOpsLedgerDatabaseConfigured()) {
+    throw new Error('Admin Ops Ledger database is not configured.');
+  }
+
+  const supportedGroupKeySet = new Set<string>(
+    ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.map((definition) => definition.key),
+  );
+  const normalizedGroupKeys = Array.from(
+    new Set(groupKeys.map((key) => key.trim()).filter(Boolean)),
+  );
+  const unsupportedGroupKey = normalizedGroupKeys.find((key) => !supportedGroupKeySet.has(key));
+
+  if (unsupportedGroupKey) {
+    throw new Error('Unsupported notification recipient group.');
+  }
+
+  const prisma = getAdminOpsLedgerPrisma();
+  const existingAdmin = await prisma.adminUser.findUnique({
+    where: { email: normalizedEmail },
+    select: {
+      role: true,
+      status: true,
+    },
+  });
+
+  if (
+    existingAdmin &&
+    isMasterAdminRole(normalizeAdminRole(existingAdmin.role)) &&
+    isActiveAdminStatus(existingAdmin.status)
+  ) {
+    throw new Error('Master admin notification routing is inherited and cannot be edited here.');
+  }
+
+  const managedKeys = [
+    ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY,
+    ...ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.map((definition) => definition.key),
+  ];
+  const existingRows = await prisma.adminNotificationRecipientGroup.findMany({
+    where: {
+      key: {
+        in: managedKeys,
+      },
+    },
+    select: {
+      key: true,
+      recipientEmails: true,
+    },
+  });
+  const rowByKey = new Map(existingRows.map((row) => [row.key, row]));
+  const selectedGroupKeySet = new Set(normalizedGroupKeys);
+
+  const getNextRecipientEmails = (currentEmails: string[], shouldIncludeEmail: boolean) => {
+    const remainingEmails = normalizeAdminNotificationEmails(currentEmails).filter(
+      (candidate) => candidate !== normalizedEmail,
+    );
+
+    return shouldIncludeEmail
+      ? normalizeAdminNotificationEmails([...remainingEmails, normalizedEmail])
+      : remainingEmails;
+  };
+
+  const updates = [
+    prisma.adminNotificationRecipientGroup.upsert({
+      where: { key: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY },
+      create: {
+        key: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY,
+        label: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_DEFINITION.label,
+        description: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_DEFINITION.description,
+        recipientEmails: getNextRecipientEmails([], includeGlobalDefault),
+        includeMasterAdmins: false,
+        enabled: true,
+        createdByCodexUserId: actorCodexUserId ?? null,
+        updatedByCodexUserId: actorCodexUserId ?? null,
+      },
+      update: {
+        label: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_DEFINITION.label,
+        description: ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_DEFINITION.description,
+        recipientEmails: getNextRecipientEmails(
+          rowByKey.get(ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY)?.recipientEmails ?? [],
+          includeGlobalDefault,
+        ),
+        includeMasterAdmins: false,
+        enabled: true,
+        updatedByCodexUserId: actorCodexUserId ?? null,
+      },
+    }),
+    ...ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.map((definition) => {
+      const shouldIncludeEmail = !includeGlobalDefault && selectedGroupKeySet.has(definition.key);
+
+      return prisma.adminNotificationRecipientGroup.upsert({
+        where: { key: definition.key },
+        create: {
+          key: definition.key,
+          label: definition.label,
+          description: definition.description,
+          recipientEmails: getNextRecipientEmails([], shouldIncludeEmail),
+          updatedByCodexUserId: actorCodexUserId ?? null,
+          createdByCodexUserId: actorCodexUserId ?? null,
+        },
+        update: {
+          label: definition.label,
+          description: definition.description,
+          recipientEmails: getNextRecipientEmails(
+            rowByKey.get(definition.key)?.recipientEmails ?? [],
+            shouldIncludeEmail,
+          ),
+          updatedByCodexUserId: actorCodexUserId ?? null,
+        },
+      });
+    }),
+  ];
+
+  await prisma.$transaction(updates);
+
+  return {
+    email: normalizedEmail,
+    includeGlobalDefault,
+    groupCount: includeGlobalDefault
+      ? ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS.length
+      : normalizedGroupKeys.length,
+  };
 }
 
 function isValidEmail(email: string) {
