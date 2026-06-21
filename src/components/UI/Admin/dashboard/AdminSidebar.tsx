@@ -7,7 +7,7 @@ import type { AdminShopScope } from './adminShopDashboardTypes';
 
 export default function AdminSidebar({ scope }: { scope: AdminShopScope }) {
   return (
-    <aside className='hidden border-r border-white/[0.055] bg-[rgba(20,25,35,0.80)] shadow-[12px_0_38px_rgba(0,0,0,0.14)] supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 lg:fixed lg:left-0 lg:top-0 lg:z-50 lg:block lg:h-dvh lg:w-[250px]'>
+    <aside className='hidden border-r border-white/[0.055] bg-[rgba(20,25,35,0.80)] shadow-[12px_0_38px_rgba(0,0,0,0.14)] supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 xl:fixed xl:left-0 xl:top-0 xl:z-50 xl:block xl:h-dvh xl:w-[250px]'>
       <div className='flex h-full min-h-0 flex-col'>
         <Link
           href='/admin'
@@ -28,7 +28,7 @@ export default function AdminSidebar({ scope }: { scope: AdminShopScope }) {
 
         <AdminNavigationList scope={scope} mode='desktop' />
 
-        <div className='hidden shrink-0 border-t border-white/10 p-3 lg:block'>
+        <div className='hidden shrink-0 border-t border-white/10 p-3 xl:block'>
           <AdminGlassPanel className='p-3'>
             <p className='text-[11px] text-slate-400'>Environment</p>
             <div className='mt-2 flex items-center gap-2 text-sm text-slate-100'>

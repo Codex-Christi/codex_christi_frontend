@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from 'react';
 
 export type AdminShopScope =
+  | 'admin'
   | 'shop'
   | 'shop-paid-order-recovery'
   | 'shop-payment-reconciliation'

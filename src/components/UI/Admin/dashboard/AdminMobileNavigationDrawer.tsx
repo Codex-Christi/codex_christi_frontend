@@ -12,6 +12,7 @@ import {
   DrawerTitle,
 } from '@/components/UI/primitives/drawer';
 import { useRouteChangeAware } from '@/lib/hooks/useRouteChangeAware';
+import { cn } from '@/lib/utils';
 import AdminGlassPanel from './AdminGlassPanel';
 import AdminNavigationList from './AdminNavigationList';
 import type { AdminShopScope } from './adminShopDashboardTypes';
@@ -20,9 +21,11 @@ type AdminMobileNavigationDrawerProps = {
   scope: AdminShopScope;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  desktopHidden?: boolean;
 };
 
 export default function AdminMobileNavigationDrawer({
+  desktopHidden = true,
   scope,
   open,
   onOpenChange,
@@ -33,10 +36,15 @@ export default function AdminMobileNavigationDrawer({
 
   return (
     <Drawer direction='left' open={open} onOpenChange={onOpenChange}>
-      <DrawerOverlay className='bg-[#141923]/42 !backdrop-blur-[3px] lg:hidden' />
+      <DrawerOverlay
+        className={cn('bg-[#141923]/42 !backdrop-blur-[3px]', desktopHidden && 'xl:hidden')}
+      />
       <DrawerContent
         data-testid='admin-mobile-navigation-drawer'
-        className='!fixed !bottom-0 !left-0 !z-[500] h-[100dvh] min-h-[100dvh] w-full max-w-[360px] overflow-hidden !rounded-none border-r border-white/[0.055] bg-[rgba(20,25,35,0.82)] shadow-[24px_0_70px_rgba(0,0,0,0.30)] after:!hidden supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 lg:hidden'
+        className={cn(
+          '!fixed !bottom-0 !left-0 !z-[500] h-[100dvh] min-h-[100dvh] w-full max-w-[360px] overflow-hidden !rounded-none border-r border-white/[0.055] bg-[rgba(20,25,35,0.82)] shadow-[24px_0_70px_rgba(0,0,0,0.30)] after:!hidden supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150',
+          desktopHidden && 'xl:hidden',
+        )}
       >
         <DrawerTitle className='sr-only'>Admin navigation</DrawerTitle>
         <DrawerDescription className='sr-only'>

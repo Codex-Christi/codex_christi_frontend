@@ -24,6 +24,7 @@ import type {
 
 export const adminShopNavItems: NavItem[] = [
   { label: 'Site Root', href: '/', icon: ArrowUpLeft },
+  { label: 'Admin Dashboard', href: '/admin', icon: Home },
   { label: 'Shop Overview', href: '/admin/shop', icon: Home },
   { label: 'Paid Order Recovery', href: '/admin/shop/paid-order-recovery', icon: ClipboardList },
   { label: 'Checkout Recovery OTPs', icon: LifeBuoy },

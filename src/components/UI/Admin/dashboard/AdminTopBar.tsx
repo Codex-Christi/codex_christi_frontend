@@ -10,12 +10,12 @@ type AdminTopBarProps = {
 
 export default function AdminTopBar({ title, subtitle, onOpenMobileNav }: AdminTopBarProps) {
   return (
-    <header className='sticky top-0 z-40 flex min-h-20 flex-wrap items-center gap-3 border-b border-white/[0.055] bg-[rgba(20,25,35,0.80)] px-3 py-3 shadow-[0_12px_32px_rgba(0,0,0,0.13)] supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 sm:gap-4 sm:px-5 lg:fixed lg:left-[250px] lg:right-0 lg:top-0 lg:h-20 lg:flex-nowrap'>
+    <header className='sticky top-0 z-40 flex min-h-20 flex-wrap items-center gap-3 border-b border-white/[0.055] bg-[rgba(20,25,35,0.80)] px-3 py-3 shadow-[0_12px_32px_rgba(0,0,0,0.13)] supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 sm:gap-4 sm:px-5 xl:fixed xl:left-[250px] xl:right-0 xl:top-0 xl:h-20 xl:flex-nowrap'>
       <button
         type='button'
         aria-label='Open admin navigation'
         onClick={onOpenMobileNav}
-        className='grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-slate-200 lg:hidden'
+        className='grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-slate-200 xl:hidden'
       >
         <Menu size={18} />
       </button>

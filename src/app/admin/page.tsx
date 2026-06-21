@@ -13,6 +13,7 @@ import {
   UserRoundCog,
 } from 'lucide-react';
 import { isAdminScopeAllowed, isMasterAdminRole } from '@/lib/admin/admin-config';
+import AdminDashboardNavigationTrigger from '@/components/UI/Admin/AdminDashboardNavigationTrigger';
 import AdminSystemTimeGreeting from '@/components/UI/Admin/AdminSystemTimeGreeting';
 import AdminAmbientSlideshow from '@/components/UI/Admin/dashboard/AdminAmbientSlideshow';
 import AdminGlassPanel, {
@@ -77,6 +78,8 @@ export default async function AdminPage() {
         <main className={adminPageMainClass}>
           <AdminAmbientSlideshow />
           <div className='relative z-10 mx-auto flex w-full max-w-[1500px] flex-col gap-6'>
+            <AdminDashboardNavigationTrigger />
+
             <AdminGlassPanel className='p-5 sm:p-6'>
               <div className='flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between'>
                 <div className='min-w-0 space-y-4'>

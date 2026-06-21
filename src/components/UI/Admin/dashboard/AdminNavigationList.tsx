@@ -80,6 +80,10 @@ function AdminNavigationItem({
 }
 
 function isAdminNavItemActive(item: NavItem, scope: AdminShopScope) {
+  if (item.label === 'Admin Dashboard') {
+    return scope === 'admin';
+  }
+
   if (item.label === 'Shop Overview') {
     return scope === 'shop';
   }
