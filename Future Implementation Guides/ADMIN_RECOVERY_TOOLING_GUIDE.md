@@ -160,6 +160,25 @@ Target customer behavior during a push-disabled test:
 - It should show payment received, receipt/payment preparation progress when available, a support reference, and a neutral message that the order is being reviewed/prepared for fulfillment.
 - It should not show raw provider IDs, raw provider payloads, admin-only error text, or customer address payloads.
 
+### UI-Led Recovery Verification
+
+Use the full current runbook in `MERCHIZE_FULFILLMENT_OPS_GUIDE.md` for checkout-to-server verification. Admin recovery verification should add these checks:
+
+1. Open `/admin/shop/paid-order-recovery`.
+2. Search by the copied `orderToken`, PayPal order ID, or customer email only in the secured admin UI.
+3. Open `/admin/shop/paid-order-recovery/[orderToken]`.
+4. Confirm the detail page shows the PayPal ledger stage, receipt state, Django payment-save custom ID, Merchize external order number when known, Merchize Ops sync status, production gate status, and notification history.
+5. For successful push acceptance, confirm the detail page shows `push_accepted`/`push_to_fulfillment_accepted`; do not expect a customer success email or admin success email yet.
+6. For failure or blocked states, confirm a notification outbox row exists and that resend/suppress actions work without changing the PayPal ledger stage.
+7. If using the current retry button, confirm it resumes through `runPaidFulfillmentProcessing(orderToken)` without replaying PayPal capture, receipt upload, Django payment save, or an already accepted Django process response.
+
+Current expected notification behavior:
+
+- Failure/blocking states should create durable `AdminNotificationOutbox` rows and attempt email delivery.
+- Successful automatic push acceptance does not create a success email.
+- Successful manual retry/push does not create a customer success email yet.
+- A future push-disabled gate should create an admin recovery notification, but that gate is not implemented yet.
+
 ## Naming Rules
 
 Use names that say which system owns the value.

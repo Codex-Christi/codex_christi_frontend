@@ -368,6 +368,173 @@ Target customer/admin notification behavior:
 - Admin emails should be sent for push-disabled, push-failed, lookup-failed, provider-rejected, payload-invalid, and future attention-required states.
 - Admin success emails for every pushed order should stay optional; if enabled, route them through a separate low-severity recipient group instead of `paid_order_fulfillment_issues`.
 
+## Current UI-led end-to-end verification runbook
+
+Use this runbook to test the committed flow from the storefront UI, then verify the server state. This is for dev/staging only.
+
+Safety rule:
+
+- Do not run this against a live Merchize store unless the test order is intentionally allowed to be pushed to fulfillment.
+- The current implementation does not honor `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false`.
+- The Django `/orders/process/{custom_id}` stage can create/import the external order before the Next.js Merchize Ops push stage runs. Use a staging Django backend or a provider mock if the test must not touch production fulfillment.
+
+Preflight commands:
+
+```bash
+yarn prisma:paypalTxLedger:generate:dev
+yarn prisma:merchizeFulfillmentOps:generate:dev
+yarn prisma:adminOpsLedger:generate
+
+PAYPAL_TX_LEDGER_NEON_BRANCH=dev yarn prisma migrate status --schema prisma/shop/paypal/paypalTXLedger.schema.prisma
+MERCHIZE_FULFILLMENT_OPS_NEON_BRANCH=dev yarn prisma migrate status --schema prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOps.schema.prisma
+yarn prisma migrate status --schema prisma/adminOpsLedger/adminOpsLedger.schema.prisma
+
+./node_modules/.bin/tsc --noEmit --pretty false
+yarn lint
+```
+
+Local env switches for a UI-led run:
+
+```bash
+PAYPAL_PAYMENT_MODE=sandbox
+NEXT_PUBLIC_PAYPAL_PAYMENT_MODE=sandbox
+PAYPAL_TX_LEDGER_NEON_BRANCH=dev
+MERCHIZE_FULFILLMENT_OPS_NEON_BRANCH=dev
+PAYPAL_TX_LEDGER_ENABLE_CAPTURE_ROUTE_RUNNER=true
+PAYPAL_TX_LEDGER_ENABLE_STATUS_ROUTE_RESUME=true
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+```
+
+Provider safety setup:
+
+- Safe full UI test: PayPal sandbox + Django staging/test backend + Merchize staging/test store.
+- Safe mocked provider test: PayPal sandbox + Django staging/mock that returns the accepted process contract + Next.js Merchize API base URL pointed to a local mock that implements the external-order lookup, detail, push, progress, tracking, and invoice endpoints.
+- Unsafe test: PayPal sandbox + production Django + live Merchize base URL. This can still create/import and push a real order.
+
+For a Next.js-side Merchize mock, set server-only values like these in a local-only env file:
+
+```bash
+MERCHIZE_BO_API_BASE_URL=http://127.0.0.1:8787
+MERCHIZE_API_KEY=dev-mock
+MERCHIZE_ACCESS_TOKEN=dev-mock
+```
+
+The mock must return successful JSON for these current calls:
+
+```txt
+GET  /order/external/orders/order-detail?external_number=...&identifier=...
+GET  /order/orders/{merchizeOrderId}
+POST /order/external/orders/push
+GET  /order/external/orders/order-progress?external_number=...&identifier=...
+GET  /order/external/orders/tracking?external_number=...&identifier=...
+GET  /order/external/orders/order-invoice?external_number=...&identifier=...
+```
+
+Storefront UI steps:
+
+1. Start the app with `yarn dev`.
+2. Open `http://localhost:3000/shop`.
+3. Add a low-risk test item to cart.
+4. Check out with a PayPal sandbox buyer account.
+5. Wait for the redirect to `/shop/checkout/confirmation/{orderToken}`.
+6. Keep the confirmation page open until it reaches either `Payment confirmed` or the manual-review state.
+7. Copy the support reference. That value is the `orderToken`.
+
+Expected current successful path:
+
+- Confirmation page reaches `Payment confirmed`.
+- Receipt download is available when receipt upload completed.
+- PayPal ledger row has `status = completed` and `processingCompletedAt` set.
+- Merchize Fulfillment Ops row has `syncStatus = push_to_fulfillment_accepted`, `productionGateStatus = push_accepted`, and `releasedToProductionAt` set.
+- Sync attempts include `registration`, `external_lookup`, `detail_lookup`, `push_to_fulfillment`, and best-effort operational snapshot attempts for progress, tracking, and invoice.
+- No customer success email is sent yet.
+- No admin success email is sent yet.
+
+Expected current failure path:
+
+- Provider rejection, lookup failure, missing external number, push failure, or local payload validation stops the runner before `completed`.
+- Confirmation page shows the manual-review customer-safe state.
+- PayPal ledger row is `fulfillment_failed` or `fulfillment_blocked`.
+- Admin notification outbox receives a row and the runner attempts to send the configured admin email.
+- Admin recovery can retry the remaining paid fulfillment runner without replaying PayPal capture.
+
+Server verification without dumping raw payloads:
+
+```bash
+curl -s "http://localhost:3000/next-api/paypal/tx-ledger/payments/<orderToken>/status"
+```
+
+PayPal ledger check:
+
+```sql
+select
+  "orderToken",
+  "status",
+  "djangoPaymentSaveCustomId",
+  "merchizeFulfillmentProcessingId",
+  "merchizeProviderOrderCode",
+  "processingCompletedAt",
+  "lastErrorCode",
+  "lastErrorMessage"
+from "PaypalIntent"
+where "orderToken" = '<orderToken>';
+```
+
+Merchize Fulfillment Ops check:
+
+```sql
+select
+  "orderToken",
+  "merchizeExternalOrderNumber",
+  "merchizeOrderId",
+  "merchizeOrderCode",
+  "syncStatus",
+  "productionGateStatus",
+  "progressStatus",
+  "deliveryStatus",
+  "costReviewStatus",
+  "releasedToProductionAt",
+  "lastSyncErrorCode",
+  "lastSyncErrorMessage"
+from "MerchizeFulfillmentOrder"
+where "orderToken" = '<orderToken>'
+order by "updatedAt" desc;
+```
+
+Sync attempt check:
+
+```sql
+select
+  "action",
+  "status",
+  "errorCode",
+  "errorMessage",
+  "startedAt",
+  "finishedAt"
+from "MerchizeFulfillmentSyncAttempt"
+where "orderToken" = '<orderToken>'
+order by "createdAt" asc;
+```
+
+Admin notification check:
+
+```sql
+select
+  "type",
+  "stage",
+  "errorCode",
+  "severity",
+  "status",
+  "recipient",
+  "sentAt",
+  "lastErrorMessage"
+from "AdminNotificationOutbox"
+where "orderToken" = '<orderToken>'
+order by "createdAt" asc;
+```
+
+Do not select raw payload columns during normal verification. Use the admin detail UI or a redacted debug path when payload inspection is required.
+
 ## Address and buyer detail endpoints
 
 These endpoints support address review and correction:
