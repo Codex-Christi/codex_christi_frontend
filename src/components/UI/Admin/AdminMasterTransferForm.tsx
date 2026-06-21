@@ -1,14 +1,17 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useActionState } from 'react';
-import { KeyRound, Loader2, ShieldCheck, UserRoundCog } from 'lucide-react';
+import { useActionState, useState } from 'react';
+import { KeyRound, Loader2, Search, ShieldCheck, UserRoundCog } from 'lucide-react';
 import {
   completeMasterAdminTransferAction,
+  previewCodexChristiUserProfileAction,
   startMasterAdminTransferAction,
+  type CodexUserProfilePreviewActionState,
   type MasterAdminTransferCompleteActionState,
   type MasterAdminTransferStartActionState,
 } from '@/app/admin/(dashboard)/admin-ops/actions';
+import AdminCodexUserProfilePreview from '@/components/UI/Admin/AdminCodexUserProfilePreview';
 import {
   adminFieldClass,
   adminInsetSurfaceClass,
@@ -24,7 +27,13 @@ const initialCompleteState: MasterAdminTransferCompleteActionState = {
   error: null,
 };
 
+const initialPreviewState: CodexUserProfilePreviewActionState = {
+  error: null,
+  profile: null,
+};
+
 export default function AdminMasterTransferForm() {
+  const [targetCodexUserId, setTargetCodexUserId] = useState('');
   const [startState, startAction, startPending] = useActionState(
     startMasterAdminTransferAction,
     initialStartState,
@@ -33,6 +42,12 @@ export default function AdminMasterTransferForm() {
     completeMasterAdminTransferAction,
     initialCompleteState,
   );
+  const [previewState, previewAction, previewPending] = useActionState(
+    previewCodexChristiUserProfileAction,
+    initialPreviewState,
+  );
+  const verifiedProfile =
+    previewState.profile?.id === targetCodexUserId.trim() ? previewState.profile : null;
 
   return (
     <div className='space-y-3'>
@@ -44,7 +59,25 @@ export default function AdminMasterTransferForm() {
           autoComplete='current-password'
           required
         />
-        <TextField label='Target Codex Christi user ID' name='targetCodexUserId' required />
+        <TextField
+          label='Target Codex Christi user ID'
+          name='targetCodexUserId'
+          value={targetCodexUserId}
+          onChange={setTargetCodexUserId}
+          required
+        />
+        <button
+          type='submit'
+          formAction={previewAction}
+          formNoValidate
+          disabled={previewPending || !targetCodexUserId.trim()}
+          className='inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-3 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-60'
+        >
+          {previewPending ? <Loader2 size={15} className='animate-spin' /> : <Search size={15} />}
+          {previewPending ? 'Checking...' : 'Preview Target User'}
+        </button>
+        {previewState.error ? <Message tone='rose'>{previewState.error}</Message> : null}
+        {verifiedProfile ? <AdminCodexUserProfilePreview profile={verifiedProfile} /> : null}
         <TextField
           label='Target email'
           name='targetEmail'
@@ -122,6 +155,8 @@ function TextField({
   type = 'text',
   autoComplete,
   inputMode,
+  value,
+  onChange,
   minLength,
   maxLength,
   required,
@@ -131,6 +166,8 @@ function TextField({
   type?: string;
   autoComplete?: string;
   inputMode?: 'numeric';
+  value?: string;
+  onChange?: (value: string) => void;
   minLength?: number;
   maxLength?: number;
   required?: boolean;
@@ -143,6 +180,8 @@ function TextField({
         type={type}
         autoComplete={autoComplete}
         inputMode={inputMode}
+        value={value}
+        onChange={onChange ? (event) => onChange(event.target.value) : undefined}
         minLength={minLength}
         maxLength={maxLength}
         required={required}

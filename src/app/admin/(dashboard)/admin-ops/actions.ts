@@ -15,16 +15,26 @@ import {
   type AdminStatus,
 } from '@/lib/admin/admin-config';
 import {
+  requireCodexChristiUserProfilePreview,
+  type CodexChristiUserProfilePreview,
+} from '@/lib/admin/codex-christi-user-profile';
+import {
   saveAdminNotificationRecipientEmailPermissions,
   saveAdminNotificationRecipientGroup,
 } from '@/lib/admin/admin-notification-recipients';
 import { deleteAdminSession } from '@/lib/admin/admin-session-server';
 import { requireMasterAdminAction } from '@/lib/admin/require-admin';
 import { deleteSession } from '@/lib/session/main-session';
+import { getServerAccessToken } from '@/lib/session/server-session';
 
 export type AdminUserProvisionActionState = {
   error: string | null;
   success: string | null;
+};
+
+export type CodexUserProfilePreviewActionState = {
+  error: string | null;
+  profile: CodexChristiUserProfilePreview | null;
 };
 
 export type MasterAdminTransferStartActionState = {
@@ -87,6 +97,10 @@ export async function provisionAdminUserAction(
   }
 
   try {
+    const profile = await requireCodexChristiUserProfilePreview({
+      accessToken: await getServerAccessToken(),
+      userId: codexUserId,
+    });
     const result = await upsertAdminUserFromDashboard({
       actor,
       input: {
@@ -105,7 +119,7 @@ export async function provisionAdminUserAction(
 
     return {
       error: null,
-      success: `${result.adminUser.email ?? result.adminUser.codexUserId} ${result.action}.`,
+      success: `${profile.displayName} (${result.adminUser.codexUserId}) ${result.action}.`,
     };
   } catch (error) {
     await writeAdminAuditLog({
@@ -130,6 +144,57 @@ export async function provisionAdminUserAction(
           ? error.message
           : 'Unable to save admin user. Check that the Codex Christi user ID and email are not already assigned.',
       success: null,
+    };
+  }
+}
+
+export async function previewCodexChristiUserProfileAction(
+  _prevState: CodexUserProfilePreviewActionState,
+  formData: FormData,
+): Promise<CodexUserProfilePreviewActionState> {
+  const auth = await getMasterAdminActionContext();
+  if (!auth.ok) return { error: auth.error, profile: null };
+
+  const actor = auth.actor;
+  const codexUserId = getTargetCodexUserId(formData);
+
+  if (!codexUserId) {
+    return { error: 'Enter the Codex Christi user ID to preview.', profile: null };
+  }
+
+  try {
+    const profile = await requireCodexChristiUserProfilePreview({
+      accessToken: await getServerAccessToken(),
+      userId: codexUserId,
+    });
+
+    await writeAdminAuditLog({
+      actor,
+      action: 'admin.codex_user.profile_previewed',
+      targetType: 'codexUser',
+      targetId: profile.id,
+      outcome: 'success',
+      metadata: {
+        username: profile.username,
+      },
+    });
+
+    return { error: null, profile };
+  } catch (error) {
+    await writeAdminAuditLog({
+      actor,
+      action: 'admin.codex_user.profile_previewed',
+      targetType: 'codexUser',
+      targetId: codexUserId,
+      outcome: 'failure',
+      metadata: {
+        reason: error instanceof Error ? error.message : 'profile_preview_failed',
+      },
+    });
+
+    return {
+      error: error instanceof Error ? error.message : 'Unable to preview Codex Christi user.',
+      profile: null,
     };
   }
 }
@@ -348,6 +413,13 @@ function normalizeOptionalString(value: FormDataEntryValue | null) {
   const text = typeof value === 'string' ? value.trim() : '';
 
   return text || null;
+}
+
+function getTargetCodexUserId(formData: FormData) {
+  return (
+    String(formData.get('codexUserId') ?? '').trim() ||
+    String(formData.get('targetCodexUserId') ?? '').trim()
+  );
 }
 
 async function getMasterAdminActionContext(): Promise<MasterAdminActionContext> {

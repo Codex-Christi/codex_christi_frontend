@@ -16,6 +16,7 @@ import {
   type AdminAuditActor,
 } from './admin-auth-ledger';
 import { buildAdminMasterTransferOtpEmailHtml } from './admin-master-transfer-email';
+import { requireCodexChristiUserProfilePreview } from './codex-christi-user-profile';
 
 const MASTER_TRANSFER_OTP_EXPIRY_MINUTES = 10;
 const MAX_MASTER_TRANSFER_OTP_ATTEMPTS = 5;
@@ -89,6 +90,10 @@ export async function startMasterAdminTransfer({
 
     throw new Error('Current admin unlock password is incorrect.');
   }
+
+  const targetProfile = await requireCodexChristiUserProfilePreview({
+    userId: normalizedTargetCodexUserId,
+  });
 
   const prisma = getAdminOpsLedgerPrisma();
   const otp = createAdminTransferOtp();
@@ -171,6 +176,8 @@ export async function startMasterAdminTransfer({
     outcome: 'success',
     metadata: {
       targetEmail: normalizedTargetEmail,
+      targetDisplayName: targetProfile.displayName,
+      targetUsername: targetProfile.username,
       challengeId: challenge.id,
       expiresAt: challenge.expiresAt.toISOString(),
     },

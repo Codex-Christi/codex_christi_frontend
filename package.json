@@ -29,7 +29,6 @@
     "paypal-ledger:recovery-demo:list": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts list",
     "paypal-ledger:recovery-demo:cleanup": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts cleanup",
     "paypal-ledger:recovery-demo:cleanup-all": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev tsx prisma/shop/paypal/seedCheckoutRecoveryDemoPaypalIntent.ts cleanup-all",
-    "admin:auth:create-unlock-password-hash": "node --import tsx scripts/create_admin_unlock_password_hash.ts",
     "admin:user:create-master": "node --import tsx scripts/create_master_admin_user.ts",
     "admin:auth:prune-ledger": "node --import tsx scripts/prune_admin_ops_ledger.ts",
     "admin:auth:prune-ledger:standard": "ADMIN_UNLOCK_ATTEMPT_RETENTION_HOURS=24 ADMIN_AUDIT_LOG_RETENTION_DAYS=30 ADMIN_MASTER_TRANSFER_CHALLENGE_RETENTION_HOURS=24 node --import tsx scripts/prune_admin_ops_ledger.ts",

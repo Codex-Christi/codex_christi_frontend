@@ -1,11 +1,14 @@
 'use client';
 
-import { useActionState } from 'react';
-import { Loader2, ShieldPlus } from 'lucide-react';
+import { useActionState, useState } from 'react';
+import { Loader2, Search, ShieldPlus } from 'lucide-react';
 import {
+  previewCodexChristiUserProfileAction,
   provisionAdminUserAction,
+  type CodexUserProfilePreviewActionState,
   type AdminUserProvisionActionState,
 } from '@/app/admin/(dashboard)/admin-ops/actions';
+import AdminCodexUserProfilePreview from '@/components/UI/Admin/AdminCodexUserProfilePreview';
 import {
   adminFieldClass,
   adminInsetSurfaceClass,
@@ -15,6 +18,11 @@ import { cn } from '@/lib/utils';
 const initialState: AdminUserProvisionActionState = {
   error: null,
   success: null,
+};
+
+const initialPreviewState: CodexUserProfilePreviewActionState = {
+  error: null,
+  profile: null,
 };
 
 const roleOptions = [
@@ -33,12 +41,38 @@ const scopeOptions = [
 ] as const;
 
 export default function AdminUserProvisioningForm() {
+  const [codexUserId, setCodexUserId] = useState('');
   const [state, formAction, pending] = useActionState(provisionAdminUserAction, initialState);
+  const [previewState, previewAction, previewPending] = useActionState(
+    previewCodexChristiUserProfileAction,
+    initialPreviewState,
+  );
+  const verifiedProfile =
+    previewState.profile?.id === codexUserId.trim() ? previewState.profile : null;
 
   return (
     <form action={formAction} className='space-y-3'>
       <div className='grid gap-3'>
-        <TextField label='Codex Christi user ID' name='codexUserId' autoComplete='off' required />
+        <TextField
+          label='Codex Christi user ID'
+          name='codexUserId'
+          autoComplete='off'
+          value={codexUserId}
+          onChange={setCodexUserId}
+          required
+        />
+        <button
+          type='submit'
+          formAction={previewAction}
+          formNoValidate
+          disabled={previewPending || !codexUserId.trim()}
+          className='inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-3 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-60'
+        >
+          {previewPending ? <Loader2 size={15} className='animate-spin' /> : <Search size={15} />}
+          {previewPending ? 'Checking...' : 'Preview Codex Christi User'}
+        </button>
+        {previewState.error ? <Message tone='rose'>{previewState.error}</Message> : null}
+        {verifiedProfile ? <AdminCodexUserProfilePreview profile={verifiedProfile} /> : null}
         <TextField label='Email' name='email' type='email' autoComplete='email' />
         <TextField label='Display name' name='displayName' autoComplete='name' />
         <TextField
@@ -92,15 +126,9 @@ export default function AdminUserProvisioningForm() {
         </label>
       </div>
 
-      {state.error ? (
-        <p className='rounded-lg border border-rose-300/20 bg-rose-400/10 px-3 py-2 text-xs leading-5 text-rose-100'>
-          {state.error}
-        </p>
-      ) : null}
+      {state.error ? <Message tone='rose'>{state.error}</Message> : null}
       {state.success ? (
-        <p className='rounded-lg border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-xs leading-5 text-emerald-100'>
-          {state.success}
-        </p>
+        <Message tone='emerald'>{state.success}</Message>
       ) : null}
 
       <button
@@ -120,12 +148,16 @@ function TextField({
   name,
   type = 'text',
   autoComplete,
+  value,
+  onChange,
   required,
 }: {
   label: string;
   name: string;
   type?: string;
   autoComplete?: string;
+  value?: string;
+  onChange?: (value: string) => void;
   required?: boolean;
 }) {
   return (
@@ -135,9 +167,26 @@ function TextField({
         name={name}
         type={type}
         autoComplete={autoComplete}
+        value={value}
+        onChange={onChange ? (event) => onChange(event.target.value) : undefined}
         required={required}
         className={adminFieldClass}
       />
     </label>
   );
+}
+
+function Message({
+  children,
+  tone,
+}: {
+  children: string;
+  tone: 'emerald' | 'rose';
+}) {
+  const toneClass = {
+    emerald: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100',
+    rose: 'border-rose-300/20 bg-rose-400/10 text-rose-100',
+  }[tone];
+
+  return <p className={`rounded-lg border px-3 py-2 text-xs leading-5 ${toneClass}`}>{children}</p>;
 }
