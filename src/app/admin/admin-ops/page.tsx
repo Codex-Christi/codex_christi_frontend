@@ -1,16 +1,19 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import {
   ArrowLeft,
   BadgeCheck,
+  BellRing,
   KeyRound,
+  type LucideIcon,
+  MailCheck,
   ScrollText,
   ShieldCheck,
   UserRoundCog,
 } from 'lucide-react';
 import { listAdminUsersForDashboard, type AdminUserSummary } from '@/lib/admin/admin-auth-ledger';
 import { isMasterAdminRole } from '@/lib/admin/admin-config';
-import AdminNotificationRecipientSettings from '@/components/UI/Admin/AdminNotificationRecipientSettings';
 import AdminOpsManagementModals from '@/components/UI/Admin/AdminOpsManagementModals';
 import AdminAmbientSlideshow from '@/components/UI/Admin/dashboard/AdminAmbientSlideshow';
 import AdminGlassPanel, {
@@ -19,7 +22,10 @@ import AdminGlassPanel, {
 } from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import CometsContainer from '@/components/UI/general/CometsContainer';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
-import { listAdminNotificationRecipientGroupsForDashboard } from '@/lib/admin/admin-notification-recipients';
+import {
+  ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY,
+  listAdminNotificationRecipientGroupsForDashboard,
+} from '@/lib/admin/admin-notification-recipients';
 import { requireAdminPage } from '@/lib/admin/require-admin';
 
 export default async function AdminOpsPage() {
@@ -36,15 +42,7 @@ export default async function AdminOpsPage() {
     await listAdminNotificationRecipientGroupsForDashboard().catch(() => []);
   const activeAdmins = adminUsers.filter((adminUser) => adminUser.status === 'active');
   const disabledAdmins = adminUsers.filter((adminUser) => adminUser.status === 'disabled');
-  const adminRecipientOptions = activeAdmins
-    .filter((adminUser) => adminUser.email)
-    .map((adminUser) => ({
-      id: adminUser.id,
-      label: adminUser.displayName ?? adminUser.email ?? adminUser.codexUserId,
-      email: adminUser.email ?? '',
-      role: adminUser.role,
-      status: adminUser.status,
-    }));
+  const notificationSummary = getNotificationRecipientSummary(notificationRecipientGroups);
 
   return (
     <DefaultPageWrapper hasMainNav>
@@ -97,34 +95,38 @@ export default async function AdminOpsPage() {
 
             <AdminOpsManagementModals />
 
-            <Link
-              href='/admin/admin-ops/audit-logs'
-              className={getAdminGlassPanelClassName('group p-4 sm:p-5', {
-                interactive: true,
-              })}
-            >
-              <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-                <div className='min-w-0'>
-                  <div className='mb-3 inline-flex items-center gap-2 rounded-lg border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100'>
-                    <ScrollText size={14} />
-                    Audit
-                  </div>
-                  <h2 className='text-base font-semibold text-white'>Audit Logs</h2>
-                  <p className='mt-1 max-w-3xl text-sm leading-6 text-slate-400'>
-                    Review admin actions, outcomes, targets, and request fingerprints from the Admin
-                    Ops Ledger.
-                  </p>
-                </div>
-                <span className='inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-cyan-100 transition group-hover:border-cyan-300/30'>
-                  Open Logs
-                </span>
-              </div>
-            </Link>
+            <section className='grid gap-4 xl:grid-cols-2'>
+              <AdminOpsLinkCard
+                href='/admin/admin-ops/notification-recipients'
+                eyebrow='Notifications'
+                icon={BellRing}
+                title='Notification Recipients'
+                description='Manage global default recipients and route-specific operational email groups.'
+                actionLabel='Manage Routing'
+              >
+                <MetricPill
+                  label='Groups'
+                  value={`${notificationSummary.enabledGroups}/${notificationSummary.groupCount}`}
+                  icon={MailCheck}
+                  tone='cyan'
+                />
+                <MetricPill
+                  label='Default'
+                  value={`${notificationSummary.defaultRecipientCount}`}
+                  icon={BellRing}
+                  tone='amber'
+                />
+              </AdminOpsLinkCard>
 
-            <AdminNotificationRecipientSettings
-              groups={notificationRecipientGroups}
-              adminOptions={adminRecipientOptions}
-            />
+              <AdminOpsLinkCard
+                href='/admin/admin-ops/audit-logs'
+                eyebrow='Audit'
+                icon={ScrollText}
+                title='Audit Logs'
+                description='Review admin actions, outcomes, targets, and request fingerprints from the Admin Ops Ledger.'
+                actionLabel='Open Logs'
+              />
+            </section>
 
             <AdminGlassPanel className='p-4 sm:p-5'>
               <div className='mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
@@ -158,6 +160,50 @@ export default async function AdminOpsPage() {
   );
 }
 
+function AdminOpsLinkCard({
+  href,
+  eyebrow,
+  icon: Icon,
+  title,
+  description,
+  actionLabel,
+  children,
+}: {
+  href: string;
+  eyebrow: string;
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  actionLabel: string;
+  children?: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={getAdminGlassPanelClassName('group p-4 sm:p-5', {
+        interactive: true,
+      })}
+    >
+      <div className='flex h-full flex-col gap-4'>
+        <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
+          <div className='min-w-0'>
+            <div className='mb-3 inline-flex items-center gap-2 rounded-lg border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100'>
+              <Icon size={14} />
+              {eyebrow}
+            </div>
+            <h2 className='text-base font-semibold text-white'>{title}</h2>
+            <p className='mt-1 max-w-3xl text-sm leading-6 text-slate-400'>{description}</p>
+          </div>
+          <span className='inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-cyan-100 transition group-hover:border-cyan-300/30'>
+            {actionLabel}
+          </span>
+        </div>
+        {children ? <div className='grid gap-3 sm:grid-cols-2'>{children}</div> : null}
+      </div>
+    </Link>
+  );
+}
+
 function MetricPill({
   label,
   value,
@@ -166,7 +212,7 @@ function MetricPill({
 }: {
   label: string;
   value: string;
-  icon: typeof ShieldCheck;
+  icon: LucideIcon;
   tone: 'cyan' | 'emerald' | 'amber';
 }) {
   const toneClass = {
@@ -228,4 +274,21 @@ function AdminUserCard({ adminUser }: { adminUser: AdminUserSummary }) {
       </div>
     </article>
   );
+}
+
+function getNotificationRecipientSummary(
+  groups: Awaited<ReturnType<typeof listAdminNotificationRecipientGroupsForDashboard>>,
+) {
+  const notificationGroups = groups.filter(
+    (group) => group.key !== ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY,
+  );
+  const globalDefaults = groups.find(
+    (group) => group.key === ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY,
+  );
+
+  return {
+    defaultRecipientCount: globalDefaults?.recipientEmails.length ?? 0,
+    enabledGroups: notificationGroups.filter((group) => group.enabled).length,
+    groupCount: notificationGroups.length,
+  };
 }
