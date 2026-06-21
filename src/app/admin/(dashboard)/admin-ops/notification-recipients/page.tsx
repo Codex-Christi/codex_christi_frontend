@@ -5,12 +5,7 @@ import { ArrowLeft, BellRing, type LucideIcon, MailCheck, ShieldCheck } from 'lu
 import { listAdminUsersForDashboard } from '@/lib/admin/admin-auth-ledger';
 import { isMasterAdminRole } from '@/lib/admin/admin-config';
 import AdminNotificationRecipientSettings from '@/components/UI/Admin/AdminNotificationRecipientSettings';
-import AdminAmbientSlideshow from '@/components/UI/Admin/dashboard/AdminAmbientSlideshow';
-import AdminGlassPanel, {
-  adminPageMainClass,
-} from '@/components/UI/Admin/dashboard/AdminGlassPanel';
-import CometsContainer from '@/components/UI/general/CometsContainer';
-import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
+import AdminGlassPanel from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import {
   ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY,
   listAdminNotificationRecipientGroupsForDashboard,
@@ -47,67 +42,60 @@ export default async function AdminNotificationRecipientsPage() {
   const notificationSummary = getNotificationRecipientSummary(notificationRecipientGroups);
 
   return (
-    <DefaultPageWrapper hasMainNav>
-      <CometsContainer>
-        <main className={adminPageMainClass}>
-          <AdminAmbientSlideshow />
-          <div className='relative z-10 mx-auto flex w-full max-w-[1400px] flex-col gap-6'>
-            <AdminGlassPanel className='p-5 sm:p-6'>
-              <div className='flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between'>
-                <div className='min-w-0 space-y-4'>
-                  <Link
-                    href='/admin/admin-ops'
-                    className='inline-flex items-center gap-2 text-sm font-medium text-cyan-100 transition hover:text-white'
-                  >
-                    <ArrowLeft size={16} />
-                    Admin Ops
-                  </Link>
-                  <div className='space-y-2'>
-                    <div className='inline-flex items-center gap-2 rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-amber-100'>
-                      <BellRing size={14} />
-                      Notification Routing
-                    </div>
-                    <h1 className='text-3xl font-semibold tracking-normal text-white sm:text-4xl'>
-                      Notification Recipients
-                    </h1>
-                    <p className='max-w-3xl text-sm leading-6 text-slate-300 sm:text-base'>
-                      Manage default operational recipients and per-group notification routing from
-                      one focused admin surface.
-                    </p>
-                  </div>
-                </div>
-
-                <div className='grid gap-3 sm:grid-cols-3 lg:min-w-[560px]'>
-                  <MetricPill
-                    label='Groups Enabled'
-                    value={`${notificationSummary.enabledGroups} of ${notificationSummary.groupCount}`}
-                    icon={MailCheck}
-                    tone='cyan'
-                  />
-                  <MetricPill
-                    label='Default Emails'
-                    value={`${notificationSummary.defaultRecipientCount}`}
-                    icon={BellRing}
-                    tone='amber'
-                  />
-                  <MetricPill
-                    label='Admin Sources'
-                    value={`${adminRecipientOptions.length}`}
-                    icon={ShieldCheck}
-                    tone='emerald'
-                  />
-                </div>
+    <div className='mx-auto flex w-full max-w-[1400px] flex-col gap-6 px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
+      <AdminGlassPanel className='p-5 sm:p-6'>
+        <div className='flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between'>
+          <div className='min-w-0 space-y-4'>
+            <Link
+              href='/admin/admin-ops'
+              className='inline-flex items-center gap-2 text-sm font-medium text-cyan-100 transition hover:text-white'
+            >
+              <ArrowLeft size={16} />
+              Admin Ops
+            </Link>
+            <div className='space-y-2'>
+              <div className='inline-flex items-center gap-2 rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-amber-100'>
+                <BellRing size={14} />
+                Notification Routing
               </div>
-            </AdminGlassPanel>
+              <h1 className='text-3xl font-semibold tracking-normal text-white sm:text-4xl'>
+                Notification Recipients
+              </h1>
+              <p className='max-w-3xl text-sm leading-6 text-slate-300 sm:text-base'>
+                Manage default operational recipients and per-group notification routing from one
+                focused admin surface.
+              </p>
+            </div>
+          </div>
 
-            <AdminNotificationRecipientSettings
-              groups={notificationRecipientGroups}
-              adminOptions={adminRecipientOptions}
+          <div className='grid gap-3 sm:grid-cols-3 lg:min-w-[560px]'>
+            <MetricPill
+              label='Groups Enabled'
+              value={`${notificationSummary.enabledGroups} of ${notificationSummary.groupCount}`}
+              icon={MailCheck}
+              tone='cyan'
+            />
+            <MetricPill
+              label='Default Emails'
+              value={`${notificationSummary.defaultRecipientCount}`}
+              icon={BellRing}
+              tone='amber'
+            />
+            <MetricPill
+              label='Admin Sources'
+              value={`${adminRecipientOptions.length}`}
+              icon={ShieldCheck}
+              tone='emerald'
             />
           </div>
-        </main>
-      </CometsContainer>
-    </DefaultPageWrapper>
+        </div>
+      </AdminGlassPanel>
+
+      <AdminNotificationRecipientSettings
+        groups={notificationRecipientGroups}
+        adminOptions={adminRecipientOptions}
+      />
+    </div>
   );
 }
 

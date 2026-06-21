@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import errorToast from '@/lib/error-toast';
 import loadingToast from '@/lib/loading-toast';
 import successToast from '@/lib/success-toast';
-import { savePaidOrderFulfillmentAddressOverrideAction } from '@/app/admin/shop/paid-order-recovery/actions';
+import { savePaidOrderFulfillmentAddressOverrideAction } from '@/app/admin/(dashboard)/shop/paid-order-recovery/actions';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/UI/primitives/popover';
 import { cn } from '@/lib/utils';
 import type { PaidOrderRecoveryAddress } from './adminShopDashboardTypes';

@@ -7,9 +7,6 @@ type AdminGlassPanelProps = {
   interactive?: boolean;
 };
 
-export const adminPageMainClass =
-  'relative isolate min-h-dvh overflow-hidden bg-[#141923] px-4 pb-6 pt-24 text-slate-50 [background:linear-gradient(180deg,rgba(30,35,47,0.82),rgba(16,21,31,0.94))] supports-[backdrop-filter]:backdrop-blur-[1px] sm:px-6 lg:px-8';
-
 export const adminGlassPanelClass =
   'rounded-lg border border-white/[0.055] bg-[linear-gradient(145deg,rgba(76,61,61,0.22),rgba(15,23,42,0.30)_56%,rgba(8,15,30,0.36))] shadow-[0_18px_48px_rgba(0,0,0,0.24),inset_0_1px_0_rgba(255,255,255,0.055)] supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150';
 
@@ -38,9 +35,5 @@ export default function AdminGlassPanel({
   className,
   interactive = false,
 }: AdminGlassPanelProps) {
-  return (
-    <div className={getAdminGlassPanelClassName(className, { interactive })}>
-      {children}
-    </div>
-  );
+  return <div className={getAdminGlassPanelClassName(className, { interactive })}>{children}</div>;
 }

@@ -15,7 +15,7 @@ import {
 import {
   saveAdminNotificationRecipientGroupAction,
   type AdminNotificationRecipientGroupActionState,
-} from '@/app/admin/admin-ops/actions';
+} from '@/app/admin/(dashboard)/admin-ops/actions';
 import {
   adminFieldClass,
   adminInsetSurfaceClass,

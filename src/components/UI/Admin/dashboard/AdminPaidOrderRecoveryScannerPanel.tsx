@@ -7,7 +7,7 @@ import {
   runSelectedAdminPaidOrderRecoveryAction,
   scanAdminPaidOrderRecoveryCandidatesAction,
   type AdminRecoveryScannerActionResult,
-} from '@/app/admin/shop/paid-order-recovery/actions';
+} from '@/app/admin/(dashboard)/shop/paid-order-recovery/actions';
 import errorToast from '@/lib/error-toast';
 import loadingToast from '@/lib/loading-toast';
 import successToast from '@/lib/success-toast';

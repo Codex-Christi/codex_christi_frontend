@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import AdminShopDashboardClient from '@/components/UI/Admin/AdminShopDashboardClient';
-import CometsContainer from '@/components/UI/general/CometsContainer';
 import { requireAdminPage } from '@/lib/admin/require-admin';
 import { getPayPalPaymentReconciliationDashboardSummary } from '@/lib/paypal/txLedger/paymentReconciliation';
 
@@ -18,12 +17,9 @@ export default async function ShopAdminPage() {
   const reconciliationSummary = await getPayPalPaymentReconciliationDashboardSummary();
 
   return (
-    <CometsContainer>
-      <AdminShopDashboardClient
-        scope='shop'
-        paymentReconciliationAttentionCount={reconciliationSummary.total}
-        paymentReconciliationCriticalCount={reconciliationSummary.critical}
-      />
-    </CometsContainer>
+    <AdminShopDashboardClient
+      paymentReconciliationAttentionCount={reconciliationSummary.total}
+      paymentReconciliationCriticalCount={reconciliationSummary.critical}
+    />
   );
 }

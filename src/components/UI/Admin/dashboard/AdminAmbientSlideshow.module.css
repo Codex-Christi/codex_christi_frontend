@@ -5,15 +5,25 @@
   overflow: hidden;
   pointer-events: none;
   background: linear-gradient(180deg, rgb(24, 29, 40), rgb(13, 17, 25));
-  contain: paint;
+  contain: layout paint style;
 }
 
 .slide {
   position: absolute;
   inset: 0;
   opacity: 0;
-  animation: ambient-slideshow var(--admin-ambient-duration, 50s) ease-in-out infinite;
-  animation-delay: var(--admin-ambient-delay, 0s);
+  transition: opacity 1800ms ease-in-out;
+  will-change: opacity;
+}
+
+.slideVisible {
+  z-index: 1;
+  opacity: 0.72;
+}
+
+.slideExiting {
+  z-index: 0;
+  opacity: 0;
 }
 
 .picture,
@@ -24,13 +34,13 @@
 }
 
 .image {
-  filter: brightness(0.62) contrast(1.06) saturate(0.88);
+  filter: brightness(0.52) contrast(1.08) saturate(0.86);
   object-fit: cover;
   object-position: var(--admin-ambient-position, center);
 }
 
 .comets {
-  opacity: 0.58;
+  opacity: 0.64;
   mix-blend-mode: screen;
 }
 
@@ -42,25 +52,18 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(
-      180deg,
-      rgba(8, 12, 20, 0.44),
-      rgba(8, 12, 20, 0.72) 58%,
-      rgba(8, 12, 20, 0.88)
-    ),
+    linear-gradient(180deg, rgba(8, 12, 20, 0.56), rgba(8, 12, 20, 0.78) 58%, rgba(8, 12, 20, 0.9)),
     linear-gradient(90deg, rgba(13, 18, 28, 0.24), transparent 38%, rgba(13, 18, 28, 0.3));
-  -webkit-backdrop-filter: blur(1.5px);
-  backdrop-filter: blur(1.5px);
 }
 
 @media (prefers-reduced-motion: reduce), (prefers-reduced-transparency: reduce) {
   .slide {
-    animation: none;
-    opacity: 0;
+    transition: none;
+    will-change: auto;
   }
 
-  .slide:first-child {
-    opacity: 0.7;
+  .slideVisible {
+    opacity: 0.68;
   }
 
   .scrim {
@@ -71,17 +74,5 @@
 
   .comets {
     opacity: 0.36;
-  }
-}
-
-@keyframes ambient-slideshow {
-  0%,
-  16% {
-    opacity: 0.68;
-  }
-
-  24%,
-  100% {
-    opacity: 0;
   }
 }

@@ -15,13 +15,9 @@ import {
 import { listAdminUsersForDashboard, type AdminUserSummary } from '@/lib/admin/admin-auth-ledger';
 import { isMasterAdminRole } from '@/lib/admin/admin-config';
 import AdminOpsManagementModals from '@/components/UI/Admin/AdminOpsManagementModals';
-import AdminAmbientSlideshow from '@/components/UI/Admin/dashboard/AdminAmbientSlideshow';
 import AdminGlassPanel, {
-  adminPageMainClass,
   getAdminGlassPanelClassName,
 } from '@/components/UI/Admin/dashboard/AdminGlassPanel';
-import CometsContainer from '@/components/UI/general/CometsContainer';
-import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
 import {
   ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_KEY,
   listAdminNotificationRecipientGroupsForDashboard,
@@ -45,118 +41,109 @@ export default async function AdminOpsPage() {
   const notificationSummary = getNotificationRecipientSummary(notificationRecipientGroups);
 
   return (
-    <DefaultPageWrapper hasMainNav>
-      <CometsContainer>
-        <main className={adminPageMainClass}>
-          <AdminAmbientSlideshow />
-          <div className='relative z-10 mx-auto flex w-full max-w-[1400px] flex-col gap-6'>
-            <AdminGlassPanel className='p-5 sm:p-6'>
-              <div className='flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between'>
-                <div className='min-w-0 space-y-4'>
-                  <Link
-                    href='/admin'
-                    className='inline-flex items-center gap-2 text-sm font-medium text-cyan-100 transition hover:text-white'
-                  >
-                    <ArrowLeft size={16} />
-                    Admin Dashboard
-                  </Link>
-                  <div className='space-y-2'>
-                    <div className='inline-flex items-center gap-2 rounded-lg border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100'>
-                      <UserRoundCog size={14} />
-                      Admin Ops
-                    </div>
-                    <h1 className='text-3xl font-semibold tracking-normal text-white sm:text-4xl'>
-                      Admin Operations
-                    </h1>
-                    <p className='max-w-3xl text-sm leading-6 text-slate-300 sm:text-base'>
-                      Manage operational admin access, scopes, and master-admin transfer from one
-                      restricted surface.
-                    </p>
-                  </div>
-                </div>
-
-                <div className='grid gap-3 sm:grid-cols-3 lg:min-w-[520px]'>
-                  <MetricPill label='Role' value='Master' icon={ShieldCheck} tone='cyan' />
-                  <MetricPill
-                    label='Active'
-                    value={`${activeAdmins.length}`}
-                    icon={BadgeCheck}
-                    tone='emerald'
-                  />
-                  <MetricPill
-                    label='Disabled'
-                    value={`${disabledAdmins.length}`}
-                    icon={KeyRound}
-                    tone='amber'
-                  />
-                </div>
+    <div className='mx-auto flex w-full max-w-[1400px] flex-col gap-6 px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
+      <AdminGlassPanel className='p-5 sm:p-6'>
+        <div className='flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between'>
+          <div className='min-w-0 space-y-4'>
+            <Link
+              href='/admin'
+              className='inline-flex items-center gap-2 text-sm font-medium text-cyan-100 transition hover:text-white'
+            >
+              <ArrowLeft size={16} />
+              Admin Dashboard
+            </Link>
+            <div className='space-y-2'>
+              <div className='inline-flex items-center gap-2 rounded-lg border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100'>
+                <UserRoundCog size={14} />
+                Admin Ops
               </div>
-            </AdminGlassPanel>
-
-            <AdminOpsManagementModals />
-
-            <section className='grid gap-4 xl:grid-cols-2'>
-              <AdminOpsLinkCard
-                href='/admin/admin-ops/notification-recipients'
-                eyebrow='Notifications'
-                icon={BellRing}
-                title='Notification Recipients'
-                description='Manage global default recipients and route-specific operational email groups.'
-                actionLabel='Manage Routing'
-              >
-                <MetricPill
-                  label='Groups'
-                  value={`${notificationSummary.enabledGroups}/${notificationSummary.groupCount}`}
-                  icon={MailCheck}
-                  tone='cyan'
-                />
-                <MetricPill
-                  label='Default'
-                  value={`${notificationSummary.defaultRecipientCount}`}
-                  icon={BellRing}
-                  tone='amber'
-                />
-              </AdminOpsLinkCard>
-
-              <AdminOpsLinkCard
-                href='/admin/admin-ops/audit-logs'
-                eyebrow='Audit'
-                icon={ScrollText}
-                title='Audit Logs'
-                description='Review admin actions, outcomes, targets, and request fingerprints from the Admin Ops Ledger.'
-                actionLabel='Open Logs'
-              />
-            </section>
-
-            <AdminGlassPanel className='p-4 sm:p-5'>
-              <div className='mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-                <div>
-                  <h2 className='text-base font-semibold text-white'>Admin Users</h2>
-                  <p className='mt-1 text-sm text-slate-400'>
-                    Latest rows from the Admin Ops Ledger.
-                  </p>
-                </div>
-                <span className='rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-300'>
-                  {adminUsers.length} shown
-                </span>
-              </div>
-
-              {adminUsers.length ? (
-                <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-3'>
-                  {adminUsers.map((adminUser) => (
-                    <AdminUserCard key={adminUser.id} adminUser={adminUser} />
-                  ))}
-                </div>
-              ) : (
-                <p className='rounded-lg border border-amber-300/15 bg-amber-300/10 px-3 py-2 text-sm text-amber-100'>
-                  Admin ops ledger users could not be loaded.
-                </p>
-              )}
-            </AdminGlassPanel>
+              <h1 className='text-3xl font-semibold tracking-normal text-white sm:text-4xl'>
+                Admin Operations
+              </h1>
+              <p className='max-w-3xl text-sm leading-6 text-slate-300 sm:text-base'>
+                Manage operational admin access, scopes, and master-admin transfer from one
+                restricted surface.
+              </p>
+            </div>
           </div>
-        </main>
-      </CometsContainer>
-    </DefaultPageWrapper>
+
+          <div className='grid gap-3 sm:grid-cols-3 lg:min-w-[520px]'>
+            <MetricPill label='Role' value='Master' icon={ShieldCheck} tone='cyan' />
+            <MetricPill
+              label='Active'
+              value={`${activeAdmins.length}`}
+              icon={BadgeCheck}
+              tone='emerald'
+            />
+            <MetricPill
+              label='Disabled'
+              value={`${disabledAdmins.length}`}
+              icon={KeyRound}
+              tone='amber'
+            />
+          </div>
+        </div>
+      </AdminGlassPanel>
+
+      <AdminOpsManagementModals />
+
+      <section className='grid gap-4 xl:grid-cols-2'>
+        <AdminOpsLinkCard
+          href='/admin/admin-ops/notification-recipients'
+          eyebrow='Notifications'
+          icon={BellRing}
+          title='Notification Recipients'
+          description='Manage global default recipients and route-specific operational email groups.'
+          actionLabel='Manage Routing'
+        >
+          <MetricPill
+            label='Groups'
+            value={`${notificationSummary.enabledGroups}/${notificationSummary.groupCount}`}
+            icon={MailCheck}
+            tone='cyan'
+          />
+          <MetricPill
+            label='Default'
+            value={`${notificationSummary.defaultRecipientCount}`}
+            icon={BellRing}
+            tone='amber'
+          />
+        </AdminOpsLinkCard>
+
+        <AdminOpsLinkCard
+          href='/admin/admin-ops/audit-logs'
+          eyebrow='Audit'
+          icon={ScrollText}
+          title='Audit Logs'
+          description='Review admin actions, outcomes, targets, and request fingerprints from the Admin Ops Ledger.'
+          actionLabel='Open Logs'
+        />
+      </section>
+
+      <AdminGlassPanel className='p-4 sm:p-5'>
+        <div className='mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+          <div>
+            <h2 className='text-base font-semibold text-white'>Admin Users</h2>
+            <p className='mt-1 text-sm text-slate-400'>Latest rows from the Admin Ops Ledger.</p>
+          </div>
+          <span className='rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-300'>
+            {adminUsers.length} shown
+          </span>
+        </div>
+
+        {adminUsers.length ? (
+          <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-3'>
+            {adminUsers.map((adminUser) => (
+              <AdminUserCard key={adminUser.id} adminUser={adminUser} />
+            ))}
+          </div>
+        ) : (
+          <p className='rounded-lg border border-amber-300/15 bg-amber-300/10 px-3 py-2 text-sm text-amber-100'>
+            Admin ops ledger users could not be loaded.
+          </p>
+        )}
+      </AdminGlassPanel>
+    </div>
   );
 }
 

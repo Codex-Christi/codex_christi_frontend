@@ -8,7 +8,7 @@ import errorToast from '@/lib/error-toast';
 import loadingToast from '@/lib/loading-toast';
 import successToast from '@/lib/success-toast';
 import { cn } from '@/lib/utils';
-import { resendCustomerNotificationAction } from '@/app/admin/shop/paid-order-recovery/actions';
+import { resendCustomerNotificationAction } from '@/app/admin/(dashboard)/shop/paid-order-recovery/actions';
 import type { CustomerNotificationHistoryItem } from './adminShopDashboardTypes';
 
 type CustomerNotificationHistoryPanelProps = {

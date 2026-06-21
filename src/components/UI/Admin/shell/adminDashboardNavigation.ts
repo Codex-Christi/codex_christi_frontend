@@ -1,0 +1,215 @@
+import {
+  ArrowUpLeft,
+  ClipboardList,
+  DatabaseZap,
+  Home,
+  RotateCcw,
+  ScrollText,
+  Settings,
+  ShoppingBag,
+  Store,
+} from 'lucide-react';
+import type {
+  AdminDashboardAccess,
+  AdminDashboardNavigationGroup,
+  AdminDashboardNavigationItem,
+  AdminDashboardPageConfig,
+} from './adminDashboardTypes';
+
+export const adminDashboardNavigationGroups: AdminDashboardNavigationGroup[] = [
+  {
+    id: 'core',
+    label: 'Core',
+    items: [
+      {
+        title: 'Admin Dashboard',
+        description: 'Main admin hub',
+        href: '/admin',
+        icon: Home,
+        section: 'admin',
+      },
+    ],
+  },
+  {
+    id: 'shop',
+    label: 'Shop Ops',
+    items: [
+      {
+        title: 'Shop Overview',
+        description: 'Payments, recovery, fulfillment, and catalog',
+        href: '/admin/shop',
+        icon: ShoppingBag,
+        requiredAccess: 'canAccessShopOverview',
+        section: 'shop',
+      },
+      {
+        title: 'Paid Order Recovery',
+        description: 'Recover paid checkout rows',
+        href: '/admin/shop/paid-order-recovery',
+        icon: ClipboardList,
+        requiredAccess: 'canAccessShopTools',
+        section: 'shop-paid-order-recovery',
+      },
+      {
+        title: 'Reconciliation',
+        description: 'PayPal truth checks',
+        href: '/admin/shop/paypal-reconciliation',
+        icon: RotateCcw,
+        requiredAccess: 'canAccessShopTools',
+        section: 'shop-payment-reconciliation',
+      },
+      {
+        title: 'Catalog & Snapshots',
+        description: 'Merchize data and storefront fallback',
+        href: '/admin/shop/merchize-catalog-snapshots',
+        icon: Store,
+        requiredAccess: 'canAccessShopTools',
+        section: 'shop-catalog-snapshots',
+      },
+    ],
+  },
+  {
+    id: 'admin-ops',
+    label: 'Admin Ops',
+    items: [
+      {
+        title: 'Admin Ops',
+        description: 'Admin users, scopes, and transfers',
+        href: '/admin/admin-ops',
+        icon: Settings,
+        requiredAccess: 'canAccessAdminOps',
+        section: 'admin-ops',
+      },
+      {
+        title: 'Notification Recipients',
+        description: 'Operational email routing',
+        href: '/admin/admin-ops/notification-recipients',
+        icon: DatabaseZap,
+        requiredAccess: 'canAccessAdminOps',
+        section: 'admin-notification-recipients',
+      },
+      {
+        title: 'Audit Logs',
+        description: 'Admin action audit trail',
+        href: '/admin/admin-ops/audit-logs',
+        icon: ScrollText,
+        requiredAccess: 'canAccessAuditLogs',
+        section: 'admin-audit-logs',
+      },
+    ],
+  },
+  {
+    id: 'external',
+    label: 'External',
+    items: [
+      {
+        title: 'Site Root',
+        description: 'Return to public site',
+        href: '/',
+        icon: ArrowUpLeft,
+        section: 'external',
+      },
+    ],
+  },
+];
+
+const defaultPageConfig: AdminDashboardPageConfig = {
+  section: 'admin',
+  title: 'Admin Dashboard',
+  subtitle: 'Operational overview across Codex Christi admin tools',
+  searchPlaceholder: 'Search admin tools, orders, audit logs, recipients...',
+};
+
+const pageConfigs: Array<[prefix: string, config: AdminDashboardPageConfig]> = [
+  [
+    '/admin/shop/paid-order-recovery/',
+    {
+      section: 'shop-paid-order-recovery',
+      title: 'Paid Order Recovery Detail',
+      subtitle: 'Inspect timeline, provider state, failure context, and recovery actions',
+      searchPlaceholder: 'Search order tokens, support refs, customers...',
+    },
+  ],
+  [
+    '/admin/shop/paid-order-recovery',
+    {
+      section: 'shop-paid-order-recovery',
+      title: 'Paid Order Recovery',
+      subtitle: 'Provider-neutral queue for paid, paused, failed, and recoverable orders',
+      searchPlaceholder: 'Search order tokens, customers, support refs...',
+    },
+  ],
+  [
+    '/admin/shop/paypal-reconciliation',
+    {
+      section: 'shop-payment-reconciliation',
+      title: 'PayPal Reconciliation',
+      subtitle: 'Payment truth checks before fulfillment recovery',
+      searchPlaceholder: 'Search PayPal order tokens, capture IDs, customers...',
+    },
+  ],
+  [
+    '/admin/shop/merchize-catalog-snapshots',
+    {
+      section: 'shop-catalog-snapshots',
+      title: 'Merchize Catalog & Snapshots',
+      subtitle: 'Price, shipping, variant, and storefront fallback data',
+      searchPlaceholder: 'Search SKUs, product titles, catalog records...',
+    },
+  ],
+  [
+    '/admin/shop',
+    {
+      section: 'shop',
+      title: 'Shop Operations',
+      subtitle: 'Payments, recovery, fulfillment, and shop support tooling',
+      searchPlaceholder: 'Search orders, support refs, customers...',
+    },
+  ],
+  [
+    '/admin/admin-ops/notification-recipients',
+    {
+      section: 'admin-notification-recipients',
+      title: 'Notification Recipients',
+      subtitle: 'Default recipients and per-group notification routing',
+      searchPlaceholder: 'Search recipient emails, groups, admin names...',
+    },
+  ],
+  [
+    '/admin/admin-ops/audit-logs',
+    {
+      section: 'admin-audit-logs',
+      title: 'Admin Audit Logs',
+      subtitle: 'Admin actions, outcomes, targets, and request fingerprints',
+      searchPlaceholder: 'Search audit actions, actor IDs, targets...',
+    },
+  ],
+  [
+    '/admin/admin-ops',
+    {
+      section: 'admin-ops',
+      title: 'Admin Operations',
+      subtitle: 'Operational admin access, scopes, recipients, and master-admin transfer',
+      searchPlaceholder: 'Search admin users, scopes, notification groups...',
+    },
+  ],
+];
+
+export function getAdminDashboardPageConfig(pathname: string | null): AdminDashboardPageConfig {
+  if (!pathname) return defaultPageConfig;
+
+  return pageConfigs.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? defaultPageConfig;
+}
+
+export function getPermittedAdminNavigationGroups(access: AdminDashboardAccess) {
+  return adminDashboardNavigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => canShowNavigationItem(item, access)),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+function canShowNavigationItem(item: AdminDashboardNavigationItem, access: AdminDashboardAccess) {
+  return item.requiredAccess ? access[item.requiredAccess] : true;
+}

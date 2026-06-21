@@ -2,19 +2,25 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronDown, Lock, Menu, RefreshCw, Search } from 'lucide-react';
 
-type AdminTopBarProps = {
-  title: string;
+type AdminDashboardTopBarProps = {
+  onOpenMobileNavigation: () => void;
+  searchPlaceholder: string;
   subtitle: string;
-  onOpenMobileNav: () => void;
+  title: string;
 };
 
-export default function AdminTopBar({ title, subtitle, onOpenMobileNav }: AdminTopBarProps) {
+export default function AdminDashboardTopBar({
+  onOpenMobileNavigation,
+  searchPlaceholder,
+  subtitle,
+  title,
+}: AdminDashboardTopBarProps) {
   return (
     <header className='sticky top-0 z-40 flex min-h-20 flex-wrap items-center gap-3 border-b border-white/[0.055] bg-[rgba(20,25,35,0.80)] px-3 py-3 shadow-[0_12px_32px_rgba(0,0,0,0.13)] supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 sm:gap-4 sm:px-5 xl:fixed xl:left-[250px] xl:right-0 xl:top-0 xl:h-20 xl:flex-nowrap'>
       <button
         type='button'
         aria-label='Open admin navigation'
-        onClick={onOpenMobileNav}
+        onClick={onOpenMobileNavigation}
         className='grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-slate-200 xl:hidden'
       >
         <Menu size={18} />
@@ -27,9 +33,9 @@ export default function AdminTopBar({ title, subtitle, onOpenMobileNav }: AdminT
 
       <div className='order-last flex min-w-full flex-1 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:order-none sm:min-w-[320px] lg:min-w-[280px] xl:min-w-[320px] xl:max-w-[470px]'>
         <Search size={16} />
-        <span className='truncate text-sm'>Search orders, support refs, emails...</span>
+        <span className='truncate text-sm'>{searchPlaceholder}</span>
         <kbd className='ml-auto rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[11px] text-slate-400'>
-          ⌘K
+          /
         </kbd>
       </div>
 
@@ -41,7 +47,7 @@ export default function AdminTopBar({ title, subtitle, onOpenMobileNav }: AdminT
         </span>
 
         <div className='hidden text-sm xl:block'>
-          <p className='text-slate-300'>Queue Health</p>
+          <p className='text-slate-300'>Admin Health</p>
           <p className='text-emerald-300'>Good</p>
         </div>
 

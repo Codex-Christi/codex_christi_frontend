@@ -1,10 +1,8 @@
-// src/app/admin/shop/merchize-catalog-snapshots/page.tsx
 import type { Metadata } from 'next';
-import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
 import MerchizeCatalogSnapshotsAdminClient from './MerchizeCatalogSnapshotsAdminClient';
-import CometsContainer from '@/components/UI/general/CometsContainer';
-import { requireAdminPage } from '@/lib/admin/require-admin';
 import { getStorefrontSnapshotStats } from './actions';
+import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
+import { requireAdminPage } from '@/lib/admin/require-admin';
 
 export const metadata: Metadata = {
   title: 'Merchize Catalog & Snapshots | Codex Christi Admin',
@@ -43,7 +41,7 @@ export default async function MerchizeCatalogSnapshotsAdminPage() {
   const pageData = await getCatalogPageData();
 
   return (
-    <CometsContainer>
+    <>
       {pageData ? (
         <MerchizeCatalogSnapshotsAdminClient
           initialSyncState={pageData.syncState}
@@ -51,12 +49,12 @@ export default async function MerchizeCatalogSnapshotsAdminPage() {
           initialStorefrontSnapshotStats={pageData.storefrontSnapshotStats}
         />
       ) : (
-        <div className='grid min-h-dvh place-items-center px-4 text-white'>
+        <div className='grid min-h-[60dvh] place-items-center px-4 text-white'>
           <div className='rounded-lg border border-rose-300/20 bg-rose-400/10 p-5 text-sm text-rose-100 supports-[backdrop-filter]:backdrop-blur-xl'>
             Error loading Merchize catalog and snapshot data.
           </div>
         </div>
       )}
-    </CometsContainer>
+    </>
   );
 }

@@ -5,7 +5,7 @@ import { Loader2, ShieldPlus } from 'lucide-react';
 import {
   provisionAdminUserAction,
   type AdminUserProvisionActionState,
-} from '@/app/admin/admin-ops/actions';
+} from '@/app/admin/(dashboard)/admin-ops/actions';
 import {
   adminFieldClass,
   adminInsetSurfaceClass,
@@ -33,20 +33,12 @@ const scopeOptions = [
 ] as const;
 
 export default function AdminUserProvisioningForm() {
-  const [state, formAction, pending] = useActionState(
-    provisionAdminUserAction,
-    initialState,
-  );
+  const [state, formAction, pending] = useActionState(provisionAdminUserAction, initialState);
 
   return (
     <form action={formAction} className='space-y-3'>
       <div className='grid gap-3'>
-        <TextField
-          label='Codex Christi user ID'
-          name='codexUserId'
-          autoComplete='off'
-          required
-        />
+        <TextField label='Codex Christi user ID' name='codexUserId' autoComplete='off' required />
         <TextField label='Email' name='email' type='email' autoComplete='email' />
         <TextField label='Display name' name='displayName' autoComplete='name' />
         <TextField
@@ -58,11 +50,7 @@ export default function AdminUserProvisioningForm() {
 
         <label className='grid gap-1 text-xs font-medium text-slate-300'>
           Role
-          <select
-            name='role'
-            defaultValue='admin'
-            className={adminFieldClass}
-          >
+          <select name='role' defaultValue='admin' className={adminFieldClass}>
             {roleOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -77,7 +65,10 @@ export default function AdminUserProvisioningForm() {
             {scopeOptions.map((option) => (
               <label
                 key={option.value}
-                className={cn(adminInsetSurfaceClass, 'flex min-h-9 items-center gap-2 px-2 text-xs text-slate-200')}
+                className={cn(
+                  adminInsetSurfaceClass,
+                  'flex min-h-9 items-center gap-2 px-2 text-xs text-slate-200',
+                )}
               >
                 <input
                   type='checkbox'
@@ -94,11 +85,7 @@ export default function AdminUserProvisioningForm() {
 
         <label className='grid gap-1 text-xs font-medium text-slate-300'>
           Status
-          <select
-            name='status'
-            defaultValue='active'
-            className={adminFieldClass}
-          >
+          <select name='status' defaultValue='active' className={adminFieldClass}>
             <option value='active'>Active</option>
             <option value='disabled'>Disabled</option>
           </select>

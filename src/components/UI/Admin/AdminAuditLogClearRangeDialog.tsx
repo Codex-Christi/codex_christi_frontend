@@ -5,7 +5,7 @@ import { Clock3, Loader2, Trash2 } from 'lucide-react';
 import {
   clearAdminAuditLogsByTimeRangeAction,
   type ClearAdminAuditLogsActionState,
-} from '@/app/admin/admin-ops/audit-logs/actions';
+} from '@/app/admin/(dashboard)/admin-ops/audit-logs/actions';
 import { adminFieldClass } from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import {
   AlertDialog,

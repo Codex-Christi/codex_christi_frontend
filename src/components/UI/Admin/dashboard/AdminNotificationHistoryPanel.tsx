@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import {
   resendAdminRecoveryNotificationAction,
   suppressAdminRecoveryNotificationAction,
-} from '@/app/admin/shop/paid-order-recovery/actions';
+} from '@/app/admin/(dashboard)/shop/paid-order-recovery/actions';
 import type { AdminNotificationHistoryItem } from './adminShopDashboardTypes';
 
 type AdminNotificationHistoryPanelProps = {
@@ -103,7 +103,9 @@ export default function AdminNotificationHistoryPanel({
   };
 
   if (!notifications.length) {
-    return <p className='text-sm text-slate-500'>No admin notifications recorded for this order.</p>;
+    return (
+      <p className='text-sm text-slate-500'>No admin notifications recorded for this order.</p>
+    );
   }
 
   return (
@@ -148,7 +150,9 @@ export default function AdminNotificationHistoryPanel({
             </div>
 
             {notification.lastErrorMessage ? (
-              <p className='mt-2 text-xs leading-5 text-rose-300'>{notification.lastErrorMessage}</p>
+              <p className='mt-2 text-xs leading-5 text-rose-300'>
+                {notification.lastErrorMessage}
+              </p>
             ) : null}
 
             <div className='mt-3 flex items-center gap-2'>

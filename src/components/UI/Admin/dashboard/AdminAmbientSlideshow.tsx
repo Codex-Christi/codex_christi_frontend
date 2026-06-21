@@ -1,5 +1,8 @@
-import type { CSSProperties } from 'react';
+'use client';
+
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import CometsContainer from '@/components/UI/general/CometsContainer';
+import { cn } from '@/lib/utils';
 import styles from './AdminAmbientSlideshow.module.css';
 
 type AmbientSlide = {
@@ -8,12 +11,12 @@ type AmbientSlide = {
 };
 
 type AmbientSlideStyle = CSSProperties & {
-  '--admin-ambient-duration': string;
-  '--admin-ambient-delay': string;
+  '--admin-ambient-position': string;
 };
 
-type AmbientImageStyle = CSSProperties & {
-  '--admin-ambient-position': string;
+type AmbientSlideState = {
+  activeIndex: number;
+  previousIndex: number | null;
 };
 
 const ambientSlides: AmbientSlide[] = [
@@ -40,34 +43,82 @@ const ambientSlides: AmbientSlide[] = [
 ];
 
 const secondsPerSlide = 10;
+const slideIntervalMs = secondsPerSlide * 1000;
+const crossFadeMs = 1800;
 
 export default function AdminAmbientSlideshow() {
-  const durationSeconds = ambientSlides.length * secondsPerSlide;
+  const reducedMotion = usePrefersReducedAmbientMotion();
+  const pageVisible = usePageVisible();
+  const [slideState, setSlideState] = useState<AmbientSlideState>({
+    activeIndex: 0,
+    previousIndex: null,
+  });
+  const visibleSlideIndexes = useMemo(() => {
+    if (
+      reducedMotion ||
+      slideState.previousIndex === null ||
+      slideState.previousIndex === slideState.activeIndex
+    ) {
+      return [slideState.activeIndex];
+    }
+
+    return [slideState.previousIndex, slideState.activeIndex];
+  }, [reducedMotion, slideState.activeIndex, slideState.previousIndex]);
+
+  useEffect(() => {
+    if (reducedMotion || !pageVisible || ambientSlides.length < 2) return;
+
+    const intervalID = window.setInterval(() => {
+      setSlideState(({ activeIndex }) => ({
+        activeIndex: (activeIndex + 1) % ambientSlides.length,
+        previousIndex: activeIndex,
+      }));
+    }, slideIntervalMs);
+
+    return () => window.clearInterval(intervalID);
+  }, [pageVisible, reducedMotion]);
+
+  useEffect(() => {
+    if (slideState.previousIndex === null) return;
+
+    const previousIndex = slideState.previousIndex;
+    const timeoutID = window.setTimeout(() => {
+      setSlideState((current) =>
+        current.previousIndex === previousIndex ? { ...current, previousIndex: null } : current,
+      );
+    }, crossFadeMs);
+
+    return () => window.clearTimeout(timeoutID);
+  }, [slideState.previousIndex]);
 
   return (
     <div className={styles.slideshow} data-admin-ambient-slideshow aria-hidden='true'>
-      {ambientSlides.map((slide, index) => (
-        <span
-          key={slide.id}
-          className={styles.slide}
-          data-admin-ambient-slide
-          style={getAmbientSlideStyle(slide, index, durationSeconds)}
-        >
-          <picture className={styles.picture}>
-            <source media='(max-width: 640px)' srcSet={getAmbientImageSrc(slide.id, 'mobile')} />
-            <source media='(max-width: 1180px)' srcSet={getAmbientImageSrc(slide.id, 'tablet')} />
-            <img
-              className={styles.image}
-              src={getAmbientImageSrc(slide.id, 'desktop')}
-              alt=''
-              decoding='async'
-              fetchPriority={index === 0 ? 'high' : 'low'}
-              loading={index === 0 ? 'eager' : 'lazy'}
-              style={getAmbientImageStyle(slide)}
-            />
-          </picture>
-        </span>
-      ))}
+      {visibleSlideIndexes.map((slideIndex) => {
+        const slide = ambientSlides[slideIndex];
+        const isActive = slideIndex === slideState.activeIndex;
+
+        return (
+          <span
+            key={slide.id}
+            className={cn(styles.slide, isActive ? styles.slideVisible : styles.slideExiting)}
+            data-admin-ambient-slide
+            style={getAmbientSlideStyle(slide)}
+          >
+            <picture className={styles.picture}>
+              <source media='(max-width: 640px)' srcSet={getAmbientImageSrc(slide.id, 'mobile')} />
+              <source media='(max-width: 1180px)' srcSet={getAmbientImageSrc(slide.id, 'tablet')} />
+              <img
+                className={styles.image}
+                src={getAmbientImageSrc(slide.id, 'desktop')}
+                alt=''
+                decoding='async'
+                fetchPriority={slideIndex === 0 ? 'high' : 'low'}
+                loading={slideIndex === 0 ? 'eager' : 'lazy'}
+              />
+            </picture>
+          </span>
+        );
+      })}
       <CometsContainer
         variant='overlay'
         className={styles.comets}
@@ -78,18 +129,7 @@ export default function AdminAmbientSlideshow() {
   );
 }
 
-function getAmbientSlideStyle(
-  slide: AmbientSlide,
-  index: number,
-  durationSeconds: number,
-): AmbientSlideStyle {
-  return {
-    '--admin-ambient-duration': `${durationSeconds}s`,
-    '--admin-ambient-delay': `${index * secondsPerSlide}s`,
-  };
-}
-
-function getAmbientImageStyle(slide: AmbientSlide): AmbientImageStyle {
+function getAmbientSlideStyle(slide: AmbientSlide): AmbientSlideStyle {
   return {
     '--admin-ambient-position': slide.position,
   };
@@ -97,4 +137,44 @@ function getAmbientImageStyle(slide: AmbientSlide): AmbientImageStyle {
 
 function getAmbientImageSrc(id: AmbientSlide['id'], variant: 'desktop' | 'mobile' | 'tablet') {
   return `/media/img/admin/ambient/${id}-${variant}.avif`;
+}
+
+function usePrefersReducedAmbientMotion() {
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const transparencyQuery = window.matchMedia('(prefers-reduced-transparency: reduce)');
+    const updateReducedMotion = () => {
+      setReducedMotion(motionQuery.matches || transparencyQuery.matches);
+    };
+
+    updateReducedMotion();
+    motionQuery.addEventListener('change', updateReducedMotion);
+    transparencyQuery.addEventListener('change', updateReducedMotion);
+
+    return () => {
+      motionQuery.removeEventListener('change', updateReducedMotion);
+      transparencyQuery.removeEventListener('change', updateReducedMotion);
+    };
+  }, []);
+
+  return reducedMotion;
+}
+
+function usePageVisible() {
+  const [pageVisible, setPageVisible] = useState(true);
+
+  useEffect(() => {
+    const updatePageVisible = () => {
+      setPageVisible(document.visibilityState !== 'hidden');
+    };
+
+    updatePageVisible();
+    document.addEventListener('visibilitychange', updatePageVisible);
+
+    return () => document.removeEventListener('visibilitychange', updatePageVisible);
+  }, []);
+
+  return pageVisible;
 }

@@ -19,7 +19,7 @@ import {
   overrideMerchizePushDisabledAndReleaseAction,
   retryAdminPaidOrderRecoveryAction,
   syncAdminMerchizeProviderDetailsAction,
-} from '@/app/admin/shop/paid-order-recovery/actions';
+} from '@/app/admin/(dashboard)/shop/paid-order-recovery/actions';
 import type { AdminIcon } from './adminShopDashboardTypes';
 
 type AdminRecoveryActionsPanelProps = {
@@ -284,7 +284,7 @@ function ActionButton({
           ? 'border-cyan-300/35 bg-cyan-300/10 text-cyan-100 hover:border-cyan-200/50 hover:bg-cyan-300/14'
           : tone === 'amber'
             ? 'border-amber-300/35 bg-amber-300/10 text-amber-100 hover:border-amber-200/50 hover:bg-amber-300/14'
-          : 'border-white/10 bg-white/[0.04] text-slate-200',
+            : 'border-white/10 bg-white/[0.04] text-slate-200',
       )}
     >
       <Icon size={16} />

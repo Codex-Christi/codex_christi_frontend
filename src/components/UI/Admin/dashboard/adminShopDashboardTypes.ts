@@ -1,11 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
 
-export type AdminShopScope =
-  | 'admin'
-  | 'shop'
-  | 'shop-paid-order-recovery'
-  | 'shop-payment-reconciliation'
-  | 'shop-catalog-snapshots';
 export type ToolTone = 'cyan' | 'emerald' | 'amber' | 'rose' | 'violet' | 'blue';
 export type ToolState =
   | 'healthy'
@@ -31,13 +25,6 @@ export type MetricCard = {
   icon: AdminIcon;
   state: ToolState;
   tone: ToolTone;
-};
-
-export type NavItem = {
-  label: string;
-  href?: string;
-  icon: AdminIcon;
-  count?: string;
 };
 
 export type PaidOrderRecoveryRow = {

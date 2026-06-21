@@ -1,18 +1,29 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
-import AdminGlassPanel from './AdminGlassPanel';
-import AdminNavigationList from './AdminNavigationList';
-import type { AdminShopScope } from './adminShopDashboardTypes';
+import AdminGlassPanel from '@/components/UI/Admin/dashboard/AdminGlassPanel';
+import AdminDashboardNavigationList from './AdminDashboardNavigationList';
+import type {
+  AdminDashboardIdentity,
+  AdminDashboardNavigationGroup,
+  AdminDashboardSection,
+} from './adminDashboardTypes';
 
-export default function AdminSidebar({ scope }: { scope: AdminShopScope }) {
+type AdminDashboardSidebarProps = {
+  activeSection: AdminDashboardSection;
+  identity: AdminDashboardIdentity | null;
+  navigationGroups: AdminDashboardNavigationGroup[];
+};
+
+export default function AdminDashboardSidebar({
+  activeSection,
+  identity,
+  navigationGroups,
+}: AdminDashboardSidebarProps) {
   return (
     <aside className='hidden border-r border-white/[0.055] bg-[rgba(20,25,35,0.80)] shadow-[12px_0_38px_rgba(0,0,0,0.14)] supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 xl:fixed xl:left-0 xl:top-0 xl:z-50 xl:block xl:h-dvh xl:w-[250px]'>
       <div className='flex h-full min-h-0 flex-col'>
-        <Link
-          href='/admin'
-          className='flex h-20 items-center gap-3 border-b border-white/10 px-5'
-        >
+        <Link href='/admin' className='flex h-20 items-center gap-3 border-b border-white/10 px-5'>
           <Image
             src='/media/img/general/logo.svg'
             alt='Codex Christi'
@@ -26,16 +37,22 @@ export default function AdminSidebar({ scope }: { scope: AdminShopScope }) {
           </span>
         </Link>
 
-        <AdminNavigationList scope={scope} mode='desktop' />
+        <AdminDashboardNavigationList
+          activeSection={activeSection}
+          groups={navigationGroups}
+          mode='desktop'
+        />
 
         <div className='hidden shrink-0 border-t border-white/10 p-3 xl:block'>
           <AdminGlassPanel className='p-3'>
-            <p className='text-[11px] text-slate-400'>Environment</p>
+            <p className='text-[11px] text-slate-400'>Admin session</p>
             <div className='mt-2 flex items-center gap-2 text-sm text-slate-100'>
               <span className='h-2 w-2 rounded-full bg-emerald-300' />
-              Production
+              {identity?.role ?? 'Locked'}
             </div>
-            <p className='mt-2 text-[11px] text-slate-500'>Version 1.3.0</p>
+            <p className='mt-2 truncate text-[11px] text-slate-500'>
+              {identity?.email ?? identity?.userID ?? 'Admin user'}
+            </p>
           </AdminGlassPanel>
 
           <div className='mt-4 flex items-center gap-3 px-2'>
@@ -44,7 +61,9 @@ export default function AdminSidebar({ scope }: { scope: AdminShopScope }) {
             </div>
             <div className='min-w-0 flex-1'>
               <p className='truncate text-sm font-medium text-white'>Admin User</p>
-              <p className='text-xs text-slate-400'>Super Admin</p>
+              <p className='truncate text-xs text-slate-400'>
+                {identity?.email ?? identity?.userID ?? 'Session pending'}
+              </p>
             </div>
             <ChevronDown size={15} className='text-slate-500' />
           </div>

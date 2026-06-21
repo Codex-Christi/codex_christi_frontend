@@ -15,7 +15,7 @@ import {
 import {
   saveAdminNotificationRecipientEmailPermissionsAction,
   type AdminNotificationRecipientEmailPermissionsActionState,
-} from '@/app/admin/admin-ops/actions';
+} from '@/app/admin/(dashboard)/admin-ops/actions';
 import {
   adminFieldClass,
   adminInsetSurfaceClass,

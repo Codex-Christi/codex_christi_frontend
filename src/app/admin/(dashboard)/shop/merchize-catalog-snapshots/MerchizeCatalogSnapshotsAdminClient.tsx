@@ -1,9 +1,7 @@
-// src/app/admin/shop/merchize-catalog-snapshots/MerchizeCatalogSnapshotsAdminClient.tsx
 'use client';
 
 import { useEffect, useState, useTransition, type ReactNode } from 'react';
 import { ArrowRight, Database, RefreshCw, Search, Store } from 'lucide-react';
-import AdminShopShell from '@/components/UI/Admin/AdminShopShell';
 import AdminGlassPanel from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import type {
   SyncState,
@@ -223,186 +221,183 @@ export default function MerchizeCatalogSnapshotsAdminClient({
   };
 
   return (
-    <AdminShopShell
-      scope='shop-catalog-snapshots'
-      title='Merchize Catalog & Snapshots'
-      subtitle='Price, shipping, variant, and storefront fallback data'
-    >
-      <div className='space-y-5 px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
-        <section className='grid gap-4 xl:grid-cols-[minmax(0,1fr)_430px]'>
-          <AdminGlassPanel className='p-4 sm:p-5'>
-            <p className='inline-flex rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-cyan-100'>
-              Merchize data plane
-            </p>
-            <h2 className='mt-4 text-xl font-semibold text-white'>Catalog and fallback health</h2>
-            <p className='mt-2 max-w-3xl text-sm leading-6 text-slate-400'>
-              Refresh the local price/shipping catalog used for SKU lookups, and refresh the
-              storefront snapshots used when Merchize product, category, or variant requests are
-              unavailable.
-            </p>
+    <div className='space-y-5 px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
+      <section className='grid gap-4 xl:grid-cols-[minmax(0,1fr)_430px]'>
+        <AdminGlassPanel className='p-4 sm:p-5'>
+          <p className='inline-flex rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-cyan-100'>
+            Merchize data plane
+          </p>
+          <h2 className='mt-4 text-xl font-semibold text-white'>Catalog and fallback health</h2>
+          <p className='mt-2 max-w-3xl text-sm leading-6 text-slate-400'>
+            Refresh the local price/shipping catalog used for SKU lookups, and refresh the
+            storefront snapshots used when Merchize product, category, or variant requests are
+            unavailable.
+          </p>
 
-            <div className='mt-5 grid gap-3 text-xs sm:grid-cols-3'>
-              <MiniStatus label='Catalog sync' value={lastSuccess === 'Never' ? 'Pending' : 'Ready'} />
-              <MiniStatus label='Storefront TTL' value={snapshotTtlLabel} />
-              <MiniStatus label='SQLite source' value='merchize_catalog' />
-            </div>
-          </AdminGlassPanel>
-
-          <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-1'>
-            <RefreshConfirmationDialog
-              disabled={working}
-              icon={<Database size={16} />}
-              buttonText='Refresh price & shipping'
-              helperText='SKU, variants, tiers, and shipping bands'
-              title='Refresh price and shipping catalog?'
-              description='This pulls all pages from the Merchize product-line catalog API and updates local price, SKU, variant, tier, and shipping data.'
-              confirmText='Refresh price and shipping'
-              onConfirm={handlePriceShippingRefreshConfirmed}
+          <div className='mt-5 grid gap-3 text-xs sm:grid-cols-3'>
+            <MiniStatus
+              label='Catalog sync'
+              value={lastSuccess === 'Never' ? 'Pending' : 'Ready'}
             />
-            <RefreshConfirmationDialog
-              disabled={working}
-              icon={<Store size={16} />}
-              buttonText='Refresh storefront snapshots'
-              helperText='Category/product fallback and ISR paths'
-              title='Refresh storefront snapshots?'
-              description='This refreshes the category and product data used by public storefront pages when Merchize is unavailable, then revalidates the affected shop, category, and product pages.'
-              confirmText='Refresh snapshots'
-              onConfirm={handleStorefrontSnapshotsRefreshConfirmed}
-            />
-          </div>
-        </section>
-
-        {status.type === 'loading' && (
-          <div
-            className='h-1 w-full overflow-hidden rounded-full bg-slate-800'
-            role='progressbar'
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={refreshProgress}
-            aria-label={status.message}
-          >
-            <div
-              className='h-full bg-cyan-300 transition-all duration-300 ease-out'
-              style={{ width: `${refreshProgress}%` }}
-            />
-          </div>
-        )}
-
-        {status.type !== 'idle' && (
-          <div
-            role='status'
-            aria-live='polite'
-            className={`rounded-lg border px-3 py-2 text-xs transition ${
-              status.type === 'success'
-                ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-200'
-                : status.type === 'error'
-                  ? 'border-rose-500/60 bg-rose-500/10 text-rose-200'
-                  : 'border-slate-700 bg-slate-800 text-slate-200'
-            }`}
-          >
-            {status.message}
-          </div>
-        )}
-
-        <section className='grid gap-3 sm:grid-cols-2 xl:grid-cols-3'>
-          <StatTile label='Last catalog run' value={lastRun} />
-          <StatTile label='Last successful sync' value={lastSuccess} />
-          <StatTile label='Catalog total products' value={syncState?.lastTotal ?? 'Unknown'} />
-          <StatTile label='Storefront products' value={storefrontSnapshotStats.productCount} />
-          <StatTile label='Snapshot categories' value={storefrontSnapshotStats.categoryCount} />
-          <StatTile label='Snapshot variants' value={storefrontSnapshotStats.variantSnapshotCount} />
-          <StatTile label='Product snapshot' value={lastProductSnapshot} />
-          <StatTile label='Category snapshot' value={lastCategorySnapshot} />
-          <StatTile label='Snapshot TTL' value={snapshotTtlLabel} />
-        </section>
-
-        <AdminGlassPanel className='overflow-hidden'>
-          <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
-            <div className='flex flex-wrap items-center justify-between gap-3'>
-              <div>
-                <h2 className='text-base font-semibold text-white'>SKU lookup</h2>
-                <p className='mt-1 text-xs text-slate-500'>
-                  Search the local price and shipping catalog without touching the public shop UI.
-                </p>
-              </div>
-              {searchResults ? (
-                <button
-                  type='button'
-                  onClick={handleClearSearch}
-                  className='rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-slate-200 transition hover:border-cyan-300/30 hover:text-cyan-100'
-                >
-                  Clear search
-                </button>
-              ) : null}
-            </div>
-
-            <div className='mt-4 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center'>
-              <label htmlFor='merchize-sku-search' className='sr-only'>
-                Search price and shipping catalog by SKU
-              </label>
-              <input
-                id='merchize-sku-search'
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder='Search by full or partial SKU...'
-                className='flex-1 rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2.5 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/40 focus:ring-2 focus:ring-cyan-300/20'
-              />
-              <button
-                type='button'
-                onClick={handleSearch}
-                disabled={working || !searchTerm.trim()}
-                aria-label='Search price and shipping catalog by SKU'
-                className='inline-flex items-center justify-center gap-2 rounded-lg border border-cyan-300/24 bg-cyan-300/10 px-4 py-2.5 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/16 disabled:cursor-not-allowed disabled:opacity-50'
-              >
-                <Search size={14} aria-hidden='true' />
-                Search
-              </button>
-            </div>
-          </div>
-
-          <div className='max-h-[28rem] overflow-auto p-3 sm:p-4'>
-            <div className='mb-3 flex items-center justify-between text-xs text-slate-400'>
-              <span>
-                {searchResults
-                  ? `Search results (${list.length})`
-                  : `Latest sample variants (${list.length})`}
-              </span>
-            </div>
-            <div className='space-y-2'>
-              {list.map((v) => (
-                <div
-                  key={v.id}
-                  className='rounded-lg border border-white/10 bg-slate-950/28 px-3 py-3 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'
-                >
-                  <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-                    <div className='min-w-0 space-y-1'>
-                      <div className='font-mono text-[11px] text-emerald-300'>{v.sku}</div>
-                      <div className='truncate text-sm font-medium text-slate-100'>
-                        {v.product?.title ?? 'No title'}
-                      </div>
-                      <div className='text-slate-500'>
-                        {v.product?.skuPrefix ?? v.product?.merchizeId}
-                      </div>
-                    </div>
-                    <div className='flex flex-wrap gap-1.5'>
-                      {v.shippingBands.slice(0, 4).map((b) => (
-                        <span
-                          key={b.id}
-                          className='inline-flex items-center rounded-full border border-cyan-300/15 bg-cyan-300/[0.06] px-2 py-0.5 text-[10px] text-cyan-100'
-                        >
-                          {b.toZone}: {b.firstItem ?? '-'} / {b.addlItem ?? '-'}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {list.length === 0 && <div className='text-xs text-slate-500'>No data yet.</div>}
-            </div>
+            <MiniStatus label='Storefront TTL' value={snapshotTtlLabel} />
+            <MiniStatus label='SQLite source' value='merchize_catalog' />
           </div>
         </AdminGlassPanel>
-      </div>
-    </AdminShopShell>
+
+        <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-1'>
+          <RefreshConfirmationDialog
+            disabled={working}
+            icon={<Database size={16} />}
+            buttonText='Refresh price & shipping'
+            helperText='SKU, variants, tiers, and shipping bands'
+            title='Refresh price and shipping catalog?'
+            description='This pulls all pages from the Merchize product-line catalog API and updates local price, SKU, variant, tier, and shipping data.'
+            confirmText='Refresh price and shipping'
+            onConfirm={handlePriceShippingRefreshConfirmed}
+          />
+          <RefreshConfirmationDialog
+            disabled={working}
+            icon={<Store size={16} />}
+            buttonText='Refresh storefront snapshots'
+            helperText='Category/product fallback and ISR paths'
+            title='Refresh storefront snapshots?'
+            description='This refreshes the category and product data used by public storefront pages when Merchize is unavailable, then revalidates the affected shop, category, and product pages.'
+            confirmText='Refresh snapshots'
+            onConfirm={handleStorefrontSnapshotsRefreshConfirmed}
+          />
+        </div>
+      </section>
+
+      {status.type === 'loading' && (
+        <div
+          className='h-1 w-full overflow-hidden rounded-full bg-slate-800'
+          role='progressbar'
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={refreshProgress}
+          aria-label={status.message}
+        >
+          <div
+            className='h-full bg-cyan-300 transition-all duration-300 ease-out'
+            style={{ width: `${refreshProgress}%` }}
+          />
+        </div>
+      )}
+
+      {status.type !== 'idle' && (
+        <div
+          role='status'
+          aria-live='polite'
+          className={`rounded-lg border px-3 py-2 text-xs transition ${
+            status.type === 'success'
+              ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-200'
+              : status.type === 'error'
+                ? 'border-rose-500/60 bg-rose-500/10 text-rose-200'
+                : 'border-slate-700 bg-slate-800 text-slate-200'
+          }`}
+        >
+          {status.message}
+        </div>
+      )}
+
+      <section className='grid gap-3 sm:grid-cols-2 xl:grid-cols-3'>
+        <StatTile label='Last catalog run' value={lastRun} />
+        <StatTile label='Last successful sync' value={lastSuccess} />
+        <StatTile label='Catalog total products' value={syncState?.lastTotal ?? 'Unknown'} />
+        <StatTile label='Storefront products' value={storefrontSnapshotStats.productCount} />
+        <StatTile label='Snapshot categories' value={storefrontSnapshotStats.categoryCount} />
+        <StatTile label='Snapshot variants' value={storefrontSnapshotStats.variantSnapshotCount} />
+        <StatTile label='Product snapshot' value={lastProductSnapshot} />
+        <StatTile label='Category snapshot' value={lastCategorySnapshot} />
+        <StatTile label='Snapshot TTL' value={snapshotTtlLabel} />
+      </section>
+
+      <AdminGlassPanel className='overflow-hidden'>
+        <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
+          <div className='flex flex-wrap items-center justify-between gap-3'>
+            <div>
+              <h2 className='text-base font-semibold text-white'>SKU lookup</h2>
+              <p className='mt-1 text-xs text-slate-500'>
+                Search the local price and shipping catalog without touching the public shop UI.
+              </p>
+            </div>
+            {searchResults ? (
+              <button
+                type='button'
+                onClick={handleClearSearch}
+                className='rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-slate-200 transition hover:border-cyan-300/30 hover:text-cyan-100'
+              >
+                Clear search
+              </button>
+            ) : null}
+          </div>
+
+          <div className='mt-4 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center'>
+            <label htmlFor='merchize-sku-search' className='sr-only'>
+              Search price and shipping catalog by SKU
+            </label>
+            <input
+              id='merchize-sku-search'
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder='Search by full or partial SKU...'
+              className='flex-1 rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2.5 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-300/40 focus:ring-2 focus:ring-cyan-300/20'
+            />
+            <button
+              type='button'
+              onClick={handleSearch}
+              disabled={working || !searchTerm.trim()}
+              aria-label='Search price and shipping catalog by SKU'
+              className='inline-flex items-center justify-center gap-2 rounded-lg border border-cyan-300/24 bg-cyan-300/10 px-4 py-2.5 text-sm font-medium text-cyan-100 transition hover:bg-cyan-300/16 disabled:cursor-not-allowed disabled:opacity-50'
+            >
+              <Search size={14} aria-hidden='true' />
+              Search
+            </button>
+          </div>
+        </div>
+
+        <div className='max-h-[28rem] overflow-auto p-3 sm:p-4'>
+          <div className='mb-3 flex items-center justify-between text-xs text-slate-400'>
+            <span>
+              {searchResults
+                ? `Search results (${list.length})`
+                : `Latest sample variants (${list.length})`}
+            </span>
+          </div>
+          <div className='space-y-2'>
+            {list.map((v) => (
+              <div
+                key={v.id}
+                className='rounded-lg border border-white/10 bg-slate-950/28 px-3 py-3 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'
+              >
+                <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+                  <div className='min-w-0 space-y-1'>
+                    <div className='font-mono text-[11px] text-emerald-300'>{v.sku}</div>
+                    <div className='truncate text-sm font-medium text-slate-100'>
+                      {v.product?.title ?? 'No title'}
+                    </div>
+                    <div className='text-slate-500'>
+                      {v.product?.skuPrefix ?? v.product?.merchizeId}
+                    </div>
+                  </div>
+                  <div className='flex flex-wrap gap-1.5'>
+                    {v.shippingBands.slice(0, 4).map((b) => (
+                      <span
+                        key={b.id}
+                        className='inline-flex items-center rounded-full border border-cyan-300/15 bg-cyan-300/[0.06] px-2 py-0.5 text-[10px] text-cyan-100'
+                      >
+                        {b.toZone}: {b.firstItem ?? '-'} / {b.addlItem ?? '-'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {list.length === 0 && <div className='text-xs text-slate-500'>No data yet.</div>}
+          </div>
+        </div>
+      </AdminGlassPanel>
+    </div>
   );
 }
 

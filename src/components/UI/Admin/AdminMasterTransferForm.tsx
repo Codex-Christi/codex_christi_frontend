@@ -8,7 +8,7 @@ import {
   startMasterAdminTransferAction,
   type MasterAdminTransferCompleteActionState,
   type MasterAdminTransferStartActionState,
-} from '@/app/admin/admin-ops/actions';
+} from '@/app/admin/(dashboard)/admin-ops/actions';
 import {
   adminFieldClass,
   adminInsetSurfaceClass,
@@ -61,16 +61,18 @@ export default function AdminMasterTransferForm() {
           required
         />
 
-        {startState.error ? (
-          <Message tone='rose'>{startState.error}</Message>
-        ) : null}
+        {startState.error ? <Message tone='rose'>{startState.error}</Message> : null}
 
         <button
           type='submit'
           disabled={startPending}
           className='inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-60'
         >
-          {startPending ? <Loader2 size={16} className='animate-spin' /> : <UserRoundCog size={16} />}
+          {startPending ? (
+            <Loader2 size={16} className='animate-spin' />
+          ) : (
+            <UserRoundCog size={16} />
+          )}
           {startPending ? 'Sending...' : 'Send Transfer Code'}
         </button>
       </form>
@@ -94,16 +96,18 @@ export default function AdminMasterTransferForm() {
             required
           />
 
-          {completeState.error ? (
-            <Message tone='rose'>{completeState.error}</Message>
-          ) : null}
+          {completeState.error ? <Message tone='rose'>{completeState.error}</Message> : null}
 
           <button
             type='submit'
             disabled={completePending}
             className='inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-rose-300 px-3 text-sm font-semibold text-slate-950 transition hover:bg-rose-200 disabled:cursor-not-allowed disabled:opacity-60'
           >
-            {completePending ? <Loader2 size={16} className='animate-spin' /> : <KeyRound size={16} />}
+            {completePending ? (
+              <Loader2 size={16} className='animate-spin' />
+            ) : (
+              <KeyRound size={16} />
+            )}
             {completePending ? 'Transferring...' : 'Transfer And Sign Out'}
           </button>
         </form>
@@ -148,13 +152,7 @@ function TextField({
   );
 }
 
-function Message({
-  tone,
-  children,
-}: {
-  tone: 'rose';
-  children: ReactNode;
-}) {
+function Message({ tone, children }: { tone: 'rose'; children: ReactNode }) {
   const toneClass = {
     rose: 'border-rose-300/20 bg-rose-400/10 text-rose-100',
   }[tone];

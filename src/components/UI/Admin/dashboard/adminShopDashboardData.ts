@@ -1,48 +1,17 @@
 import {
   AlertTriangle,
-  ArrowUpLeft,
   BarChart3,
   CheckCircle2,
   ClipboardList,
   DatabaseZap,
-  Home,
   LifeBuoy,
   PackageCheck,
   RefreshCw,
-  RotateCcw,
-  Settings,
   ShieldCheck,
   Store,
   TimerReset,
 } from 'lucide-react';
-import type {
-  MetricCard,
-  NavItem,
-  PaidOrderRecoveryRow,
-  TimelineItem,
-} from './adminShopDashboardTypes';
-
-export const adminShopNavItems: NavItem[] = [
-  { label: 'Site Root', href: '/', icon: ArrowUpLeft },
-  { label: 'Admin Dashboard', href: '/admin', icon: Home },
-  { label: 'Shop Overview', href: '/admin/shop', icon: Home },
-  { label: 'Paid Order Recovery', href: '/admin/shop/paid-order-recovery', icon: ClipboardList },
-  { label: 'Checkout Recovery OTPs', icon: LifeBuoy },
-  { label: 'Django OTP Intents', icon: ShieldCheck },
-  { label: 'Merchize Fulfillment', icon: PackageCheck },
-  { label: 'Failed Queue', icon: AlertTriangle, count: '12' },
-  { label: 'Reconciliation', href: '/admin/shop/paypal-reconciliation', icon: RotateCcw },
-  { label: 'Expired OTP Cleanup', icon: TimerReset },
-  { label: 'Support Cases', icon: ClipboardList, count: '5' },
-  {
-    label: 'Catalog & Snapshots',
-    href: '/admin/shop/merchize-catalog-snapshots',
-    icon: Store,
-  },
-  { label: 'Reports', icon: BarChart3 },
-  { label: 'Audit Logs', href: '/admin/admin-ops/audit-logs', icon: DatabaseZap },
-  { label: 'Settings', href: '/admin/admin-ops', icon: Settings },
-];
+import type { MetricCard, PaidOrderRecoveryRow, TimelineItem } from './adminShopDashboardTypes';
 
 export const adminShopMetricCards: MetricCard[] = [
   {

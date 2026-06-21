@@ -13,13 +13,12 @@ import {
 import {
   runPayPalPaymentReconciliationAction,
   type PayPalPaymentReconciliationActionState,
-} from '@/app/admin/shop/paypal-reconciliation/actions';
+} from '@/app/admin/(dashboard)/shop/paypal-reconciliation/actions';
 import type {
   PayPalPaymentReconciliationDashboard,
   PayPalPaymentReconciliationRow,
 } from '@/lib/paypal/txLedger/paymentReconciliation';
 import { cn } from '@/lib/utils';
-import AdminShopShell from './AdminShopShell';
 import AdminGlassPanel from './dashboard/AdminGlassPanel';
 
 type AdminShopPaymentReconciliationClientProps = {
@@ -41,136 +40,126 @@ export default function AdminShopPaymentReconciliationClient({
   );
 
   return (
-    <AdminShopShell
-      scope='shop-payment-reconciliation'
-      title='PayPal Reconciliation'
-      subtitle='Payment truth checks before fulfillment recovery'
-    >
-      <div className='px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
-        <section className='mx-auto max-w-[1600px] space-y-4'>
-          <Link
-            href='/admin/shop'
-            className='inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-200 transition hover:border-cyan-300/30 hover:text-cyan-100'
-          >
-            <ArrowLeft size={16} />
-            Shop dashboard
-          </Link>
+    <div className='px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
+      <section className='mx-auto max-w-[1600px] space-y-4'>
+        <Link
+          href='/admin/shop'
+          className='inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-200 transition hover:border-cyan-300/30 hover:text-cyan-100'
+        >
+          <ArrowLeft size={16} />
+          Shop dashboard
+        </Link>
 
-          <div className='grid gap-3 md:grid-cols-4'>
-            <MetricCard label='Attention Rows' value={`${dashboard.total}`} tone='cyan' />
-            <MetricCard label='Critical' value={`${dashboard.critical}`} tone='rose' />
-            <MetricCard label='Warning' value={`${dashboard.warning}`} tone='amber' />
-            <MetricCard
-              label='Scanner'
-              value={dashboard.enabled ? 'Enabled' : 'Disabled'}
-              tone={dashboard.enabled ? 'emerald' : 'amber'}
-            />
+        <div className='grid gap-3 md:grid-cols-4'>
+          <MetricCard label='Attention Rows' value={`${dashboard.total}`} tone='cyan' />
+          <MetricCard label='Critical' value={`${dashboard.critical}`} tone='rose' />
+          <MetricCard label='Warning' value={`${dashboard.warning}`} tone='amber' />
+          <MetricCard
+            label='Scanner'
+            value={dashboard.enabled ? 'Enabled' : 'Disabled'}
+            tone={dashboard.enabled ? 'emerald' : 'amber'}
+          />
+        </div>
+
+        <AdminGlassPanel className='p-4 sm:p-5'>
+          <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
+            <div className='min-w-0'>
+              <div className='inline-flex items-center gap-2 rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-amber-100'>
+                <ShieldAlert size={14} />
+                Payment Reconciliation
+              </div>
+              <h2 className='mt-3 text-base font-semibold text-white'>PayPal truth scanner</h2>
+              <p className='mt-1 max-w-3xl text-sm leading-6 text-slate-400'>
+                Checks stale authorization/capture rows against PayPal, hydrates completed captures,
+                resumes server-side fulfillment, and alerts payment recipients when manual review is
+                still required.
+              </p>
+            </div>
+
+            <form action={formAction} className='flex flex-col gap-2 sm:flex-row'>
+              <button
+                type='submit'
+                name='dryRun'
+                value='true'
+                disabled={pending}
+                className='inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-300/30 disabled:cursor-not-allowed disabled:opacity-60'
+              >
+                {pending ? <Loader2 size={16} className='animate-spin' /> : <RefreshCw size={16} />}
+                Dry Run
+              </button>
+              <button
+                type='submit'
+                disabled={pending}
+                className='inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-cyan-300 px-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60'
+              >
+                {pending ? (
+                  <Loader2 size={16} className='animate-spin' />
+                ) : (
+                  <CheckCircle2 size={16} />
+                )}
+                Run Batch
+              </button>
+            </form>
           </div>
 
-          <AdminGlassPanel className='p-4 sm:p-5'>
-            <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
-              <div className='min-w-0'>
-                <div className='inline-flex items-center gap-2 rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-amber-100'>
-                  <ShieldAlert size={14} />
-                  Payment Reconciliation
-                </div>
-                <h2 className='mt-3 text-base font-semibold text-white'>PayPal truth scanner</h2>
-                <p className='mt-1 max-w-3xl text-sm leading-6 text-slate-400'>
-                  Checks stale authorization/capture rows against PayPal, hydrates completed
-                  captures, resumes server-side fulfillment, and alerts payment recipients when
-                  manual review is still required.
-                </p>
-              </div>
+          <div className='mt-4 grid gap-2 text-xs text-slate-400 sm:grid-cols-3'>
+            <span className='rounded-md border border-white/10 bg-white/[0.03] px-3 py-2'>
+              Min age: {dashboard.minAgeMinutes} minutes
+            </span>
+            <span className='rounded-md border border-white/10 bg-white/[0.03] px-3 py-2'>
+              Batch size: {dashboard.batchSize}
+            </span>
+            <span className='rounded-md border border-white/10 bg-white/[0.03] px-3 py-2'>
+              Generated: {formatShortDate(dashboard.generatedAt)}
+            </span>
+          </div>
 
-              <form action={formAction} className='flex flex-col gap-2 sm:flex-row'>
-                <button
-                  type='submit'
-                  name='dryRun'
-                  value='true'
-                  disabled={pending}
-                  className='inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-300/30 disabled:cursor-not-allowed disabled:opacity-60'
-                >
-                  {pending ? (
-                    <Loader2 size={16} className='animate-spin' />
-                  ) : (
-                    <RefreshCw size={16} />
-                  )}
-                  Dry Run
-                </button>
-                <button
-                  type='submit'
-                  disabled={pending}
-                  className='inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-cyan-300 px-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60'
-                >
-                  {pending ? (
-                    <Loader2 size={16} className='animate-spin' />
-                  ) : (
-                    <CheckCircle2 size={16} />
-                  )}
-                  Run Batch
-                </button>
-              </form>
-            </div>
+          {state.error ? (
+            <p className='mt-4 rounded-lg border border-rose-300/20 bg-rose-400/10 px-3 py-2 text-sm leading-6 text-rose-100'>
+              {state.error}
+            </p>
+          ) : null}
+          {state.success ? (
+            <p className='mt-4 rounded-lg border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-sm leading-6 text-emerald-100'>
+              {state.success}
+            </p>
+          ) : null}
 
-            <div className='mt-4 grid gap-2 text-xs text-slate-400 sm:grid-cols-3'>
-              <span className='rounded-md border border-white/10 bg-white/[0.03] px-3 py-2'>
-                Min age: {dashboard.minAgeMinutes} minutes
-              </span>
-              <span className='rounded-md border border-white/10 bg-white/[0.03] px-3 py-2'>
-                Batch size: {dashboard.batchSize}
-              </span>
-              <span className='rounded-md border border-white/10 bg-white/[0.03] px-3 py-2'>
-                Generated: {formatShortDate(dashboard.generatedAt)}
-              </span>
-            </div>
-
-            {state.error ? (
-              <p className='mt-4 rounded-lg border border-rose-300/20 bg-rose-400/10 px-3 py-2 text-sm leading-6 text-rose-100'>
-                {state.error}
-              </p>
-            ) : null}
-            {state.success ? (
-              <p className='mt-4 rounded-lg border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-sm leading-6 text-emerald-100'>
-                {state.success}
-              </p>
-            ) : null}
-
-            {state.result?.results.length ? (
-              <div className='mt-4 rounded-lg border border-white/10 bg-slate-950/28 p-3'>
-                <h3 className='text-sm font-semibold text-white'>Latest Run</h3>
-                <div className='mt-3 grid gap-2 md:grid-cols-2'>
-                  {state.result.results.map((result) => (
-                    <div
-                      key={`${result.orderToken}-${result.action}`}
-                      className='rounded-md border border-white/10 bg-white/[0.03] p-3 text-xs'
-                    >
-                      <div className='flex items-center justify-between gap-3'>
-                        <span className='font-mono text-cyan-100'>
-                          {result.orderToken.slice(0, 8).toUpperCase()}
-                        </span>
-                        <span
-                          className={cn(
-                            'rounded-md border px-2 py-0.5',
-                            result.ok
-                              ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
-                              : 'border-rose-300/20 bg-rose-300/10 text-rose-100',
-                          )}
-                        >
-                          {result.ok ? 'ok' : 'attention'}
-                        </span>
-                      </div>
-                      <p className='mt-2 text-slate-300'>{result.message}</p>
+          {state.result?.results.length ? (
+            <div className='mt-4 rounded-lg border border-white/10 bg-slate-950/28 p-3'>
+              <h3 className='text-sm font-semibold text-white'>Latest Run</h3>
+              <div className='mt-3 grid gap-2 md:grid-cols-2'>
+                {state.result.results.map((result) => (
+                  <div
+                    key={`${result.orderToken}-${result.action}`}
+                    className='rounded-md border border-white/10 bg-white/[0.03] p-3 text-xs'
+                  >
+                    <div className='flex items-center justify-between gap-3'>
+                      <span className='font-mono text-cyan-100'>
+                        {result.orderToken.slice(0, 8).toUpperCase()}
+                      </span>
+                      <span
+                        className={cn(
+                          'rounded-md border px-2 py-0.5',
+                          result.ok
+                            ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
+                            : 'border-rose-300/20 bg-rose-300/10 text-rose-100',
+                        )}
+                      >
+                        {result.ok ? 'ok' : 'attention'}
+                      </span>
                     </div>
-                  ))}
-                </div>
+                    <p className='mt-2 text-slate-300'>{result.message}</p>
+                  </div>
+                ))}
               </div>
-            ) : null}
-          </AdminGlassPanel>
+            </div>
+          ) : null}
+        </AdminGlassPanel>
 
-          <PaymentReconciliationTable rows={dashboard.rows} />
-        </section>
-      </div>
-    </AdminShopShell>
+        <PaymentReconciliationTable rows={dashboard.rows} />
+      </section>
+    </div>
   );
 }
 
