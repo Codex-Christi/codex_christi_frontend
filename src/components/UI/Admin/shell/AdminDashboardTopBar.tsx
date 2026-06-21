@@ -57,9 +57,10 @@ export default function AdminDashboardTopBar({
           href='/'
           aria-label='Open site root'
           title='Site root'
-          className='grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-slate-200 transition hover:border-cyan-300/25 hover:bg-white/[0.06] hover:text-cyan-100'
+          className='inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-300/25 hover:bg-white/[0.06] hover:text-cyan-100'
         >
           <ArrowUpLeft size={17} />
+          Site root
         </Link>
 
         <Link
