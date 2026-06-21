@@ -1,6 +1,10 @@
 import type { ComponentType, ReactNode } from 'react';
 
-export type AdminShopScope = 'shop' | 'shop-paid-order-recovery' | 'shop-catalog-snapshots';
+export type AdminShopScope =
+  | 'shop'
+  | 'shop-paid-order-recovery'
+  | 'shop-payment-reconciliation'
+  | 'shop-catalog-snapshots';
 export type ToolTone = 'cyan' | 'emerald' | 'amber' | 'rose' | 'violet' | 'blue';
 export type ToolState =
   | 'healthy'

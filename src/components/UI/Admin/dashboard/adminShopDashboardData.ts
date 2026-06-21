@@ -15,7 +15,12 @@ import {
   Store,
   TimerReset,
 } from 'lucide-react';
-import type { MetricCard, NavItem, PaidOrderRecoveryRow, TimelineItem } from './adminShopDashboardTypes';
+import type {
+  MetricCard,
+  NavItem,
+  PaidOrderRecoveryRow,
+  TimelineItem,
+} from './adminShopDashboardTypes';
 
 export const adminShopNavItems: NavItem[] = [
   { label: 'Site Root', href: '/', icon: ArrowUpLeft },
@@ -25,7 +30,7 @@ export const adminShopNavItems: NavItem[] = [
   { label: 'Django OTP Intents', icon: ShieldCheck },
   { label: 'Merchize Fulfillment', icon: PackageCheck },
   { label: 'Failed Queue', icon: AlertTriangle, count: '12' },
-  { label: 'Reconciliation', icon: RotateCcw },
+  { label: 'Reconciliation', href: '/admin/shop/paypal-reconciliation', icon: RotateCcw },
   { label: 'Expired OTP Cleanup', icon: TimerReset },
   { label: 'Support Cases', icon: ClipboardList, count: '5' },
   {
@@ -34,8 +39,8 @@ export const adminShopNavItems: NavItem[] = [
     icon: Store,
   },
   { label: 'Reports', icon: BarChart3 },
-  { label: 'Audit Logs', icon: DatabaseZap },
-  { label: 'Settings', icon: Settings },
+  { label: 'Audit Logs', href: '/admin/admin-ops/audit-logs', icon: DatabaseZap },
+  { label: 'Settings', href: '/admin/admin-ops', icon: Settings },
 ];
 
 export const adminShopMetricCards: MetricCard[] = [
@@ -87,9 +92,10 @@ export const adminShopMetricCards: MetricCard[] = [
   },
   {
     title: 'Reconciliation',
-    metric: '3',
-    caption: 'Discrepancies',
-    action: 'Review Items',
+    metric: '0',
+    caption: 'Payment attention',
+    action: 'Open PayPal Reconciliation',
+    href: '/admin/shop/paypal-reconciliation',
     icon: BarChart3,
     state: 'review',
     tone: 'amber',

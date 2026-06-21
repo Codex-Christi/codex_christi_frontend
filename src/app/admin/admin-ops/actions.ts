@@ -2,10 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import {
-  upsertAdminUserFromDashboard,
-  writeAdminAuditLog,
-} from '@/lib/admin/admin-auth-ledger';
+import { upsertAdminUserFromDashboard, writeAdminAuditLog } from '@/lib/admin/admin-auth-ledger';
 import {
   completeMasterAdminTransfer,
   startMasterAdminTransfer,
@@ -17,6 +14,7 @@ import {
   normalizeAdminScopes,
   type AdminStatus,
 } from '@/lib/admin/admin-config';
+import { saveAdminNotificationRecipientGroup } from '@/lib/admin/admin-notification-recipients';
 import { deleteAdminSession } from '@/lib/admin/admin-session-server';
 import { requireMasterAdminAction } from '@/lib/admin/require-admin';
 import { deleteSession } from '@/lib/session/main-session';
@@ -33,6 +31,11 @@ export type MasterAdminTransferStartActionState = {
 
 export type MasterAdminTransferCompleteActionState = {
   error: string | null;
+};
+
+export type AdminNotificationRecipientGroupActionState = {
+  error: string | null;
+  success: string | null;
 };
 
 export async function provisionAdminUserAction(
@@ -172,6 +175,79 @@ export async function completeMasterAdminTransferAction(
   redirect('/auth/sign-in?from-master-transfer=true');
 }
 
+export async function saveAdminNotificationRecipientGroupAction(
+  _prevState: AdminNotificationRecipientGroupActionState,
+  formData: FormData,
+): Promise<AdminNotificationRecipientGroupActionState> {
+  const actor = await requireMasterAdminAction();
+  const key = String(formData.get('key') ?? '').trim();
+  const recipientEmails = formData
+    .getAll('recipientEmails')
+    .map(String)
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  const includeMasterAdmins = formData.get('includeMasterAdmins') === 'true';
+  const enabled = formData.get('enabled') === 'true';
+  const invalidEmails = recipientEmails.filter((email) => !isValidEmail(email));
+
+  if (invalidEmails.length) {
+    return {
+      error: `Invalid email ${invalidEmails[0]}.`,
+      success: null,
+    };
+  }
+
+  try {
+    const group = await saveAdminNotificationRecipientGroup({
+      key,
+      recipientEmails,
+      includeMasterAdmins,
+      enabled,
+      actorCodexUserId: actor.userID,
+    });
+
+    await writeAdminAuditLog({
+      actor,
+      action: 'admin.notification_recipient_group.save',
+      targetType: 'adminNotificationRecipientGroup',
+      targetId: key,
+      outcome: 'success',
+      metadata: {
+        recipientCount: recipientEmails.length,
+        includeMasterAdmins,
+        enabled,
+      },
+    });
+
+    revalidatePath('/admin/admin-ops');
+    revalidatePath('/admin/shop');
+
+    return {
+      error: null,
+      success: `${group.label} recipients saved.`,
+    };
+  } catch (error) {
+    await writeAdminAuditLog({
+      actor,
+      action: 'admin.notification_recipient_group.save',
+      targetType: 'adminNotificationRecipientGroup',
+      targetId: key || undefined,
+      outcome: 'failure',
+      metadata: {
+        recipientCount: recipientEmails.length,
+        includeMasterAdmins,
+        enabled,
+        reason: error instanceof Error ? error.message : 'unknown_error',
+      },
+    });
+
+    return {
+      error: error instanceof Error ? error.message : 'Unable to save notification recipients.',
+      success: null,
+    };
+  }
+}
+
 function normalizeOptionalString(value: FormDataEntryValue | null) {
   const text = typeof value === 'string' ? value.trim() : '';
 
@@ -180,4 +256,8 @@ function normalizeOptionalString(value: FormDataEntryValue | null) {
 
 function normalizeAdminStatus(value: string): AdminStatus {
   return value === 'disabled' ? 'disabled' : 'active';
+}
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }

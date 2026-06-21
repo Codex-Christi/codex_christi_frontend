@@ -12,9 +12,11 @@ import {
 import { listAdminUsersForDashboard, type AdminUserSummary } from '@/lib/admin/admin-auth-ledger';
 import { isMasterAdminRole } from '@/lib/admin/admin-config';
 import AdminMasterTransferForm from '@/components/UI/Admin/AdminMasterTransferForm';
+import AdminNotificationRecipientSettings from '@/components/UI/Admin/AdminNotificationRecipientSettings';
 import AdminUserProvisioningForm from '@/components/UI/Admin/AdminUserProvisioningForm';
 import CometsContainer from '@/components/UI/general/CometsContainer';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
+import { listAdminNotificationRecipientGroupsForDashboard } from '@/lib/admin/admin-notification-recipients';
 import { requireAdminPage } from '@/lib/admin/require-admin';
 
 export default async function AdminOpsPage() {
@@ -27,8 +29,18 @@ export default async function AdminOpsPage() {
   }
 
   const adminUsers = await listAdminUsersForDashboard().catch(() => []);
+  const notificationRecipientGroups =
+    await listAdminNotificationRecipientGroupsForDashboard().catch(() => []);
   const activeAdmins = adminUsers.filter((adminUser) => adminUser.status === 'active');
   const disabledAdmins = adminUsers.filter((adminUser) => adminUser.status === 'disabled');
+  const adminRecipientOptions = activeAdmins
+    .filter((adminUser) => adminUser.email)
+    .map((adminUser) => ({
+      id: adminUser.id,
+      label: adminUser.displayName ?? adminUser.email ?? adminUser.codexUserId,
+      email: adminUser.email ?? '',
+      status: adminUser.status,
+    }));
 
   return (
     <DefaultPageWrapper hasMainNav>
@@ -54,15 +66,26 @@ export default async function AdminOpsPage() {
                       Admin Operations
                     </h1>
                     <p className='max-w-3xl text-sm leading-6 text-slate-300 sm:text-base'>
-                      Manage operational admin access, scopes, and master-admin transfer from one restricted surface.
+                      Manage operational admin access, scopes, and master-admin transfer from one
+                      restricted surface.
                     </p>
                   </div>
                 </div>
 
                 <div className='grid gap-3 sm:grid-cols-3 lg:min-w-[520px]'>
                   <MetricPill label='Role' value='Master' icon={ShieldCheck} tone='cyan' />
-                  <MetricPill label='Active' value={`${activeAdmins.length}`} icon={BadgeCheck} tone='emerald' />
-                  <MetricPill label='Disabled' value={`${disabledAdmins.length}`} icon={KeyRound} tone='amber' />
+                  <MetricPill
+                    label='Active'
+                    value={`${activeAdmins.length}`}
+                    icon={BadgeCheck}
+                    tone='emerald'
+                  />
+                  <MetricPill
+                    label='Disabled'
+                    value={`${disabledAdmins.length}`}
+                    icon={KeyRound}
+                    tone='amber'
+                  />
                 </div>
               </div>
             </header>
@@ -88,7 +111,8 @@ export default async function AdminOpsPage() {
                   <div>
                     <h2 className='text-base font-semibold text-white'>Master Transfer</h2>
                     <p className='mt-1 text-sm leading-6 text-slate-400'>
-                      Move master privileges to another Codex Christi user after password and OTP confirmation.
+                      Move master privileges to another Codex Christi user after password and OTP
+                      confirmation.
                     </p>
                   </div>
                   <span className='grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-rose-300/20 bg-rose-300/10 text-rose-100'>
@@ -111,7 +135,8 @@ export default async function AdminOpsPage() {
                   </div>
                   <h2 className='text-base font-semibold text-white'>Audit Logs</h2>
                   <p className='mt-1 max-w-3xl text-sm leading-6 text-slate-400'>
-                    Review admin actions, outcomes, targets, and request fingerprints from the Admin Ops Ledger.
+                    Review admin actions, outcomes, targets, and request fingerprints from the Admin
+                    Ops Ledger.
                   </p>
                 </div>
                 <span className='inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-cyan-100 transition group-hover:border-cyan-300/30'>
@@ -120,11 +145,18 @@ export default async function AdminOpsPage() {
               </div>
             </Link>
 
+            <AdminNotificationRecipientSettings
+              groups={notificationRecipientGroups}
+              adminOptions={adminRecipientOptions}
+            />
+
             <section className='rounded-lg border border-white/10 bg-slate-950/72 p-4 supports-[backdrop-filter]:backdrop-blur-xl sm:p-5'>
               <div className='mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
                 <div>
                   <h2 className='text-base font-semibold text-white'>Admin Users</h2>
-                  <p className='mt-1 text-sm text-slate-400'>Latest rows from the Admin Ops Ledger.</p>
+                  <p className='mt-1 text-sm text-slate-400'>
+                    Latest rows from the Admin Ops Ledger.
+                  </p>
                 </div>
                 <span className='rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-300'>
                   {adminUsers.length} shown
@@ -193,7 +225,9 @@ function AdminUserCard({ adminUser }: { adminUser: AdminUserSummary }) {
           </h3>
           <p className='mt-1 truncate text-xs text-slate-500'>{adminUser.codexUserId}</p>
         </div>
-        <span className={`shrink-0 whitespace-nowrap rounded-md border px-2 py-1 text-xs ${statusClass}`}>
+        <span
+          className={`shrink-0 whitespace-nowrap rounded-md border px-2 py-1 text-xs ${statusClass}`}
+        >
           {adminUser.status}
         </span>
       </div>

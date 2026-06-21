@@ -11,9 +11,11 @@ const DEFAULT_PENDING_SEND_LIMIT = 25;
 export const ADMIN_NOTIFICATION_TYPE = {
   PAID_ORDER_RECOVERY_REQUIRED: 'paid_order_recovery_required',
   PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED: 'paid_order_fulfillment_push_accepted',
+  PAYMENT_RECONCILIATION_REQUIRED: 'payment_reconciliation_required',
 } as const;
 
 export const ADMIN_NOTIFICATION_STAGE = {
+  PAYMENT: 'payment',
   FULFILLMENT: 'fulfillment',
 } as const;
 
@@ -44,6 +46,12 @@ type AdminRecoveryNotificationPayload = {
   receiptLink?: string | null;
   supportReference: string;
   adminDetailUrl: string;
+  alertLabel?: string;
+  eyebrow?: string;
+  heading?: string;
+  intro?: string;
+  buttonLabel?: string;
+  footnote?: string;
 };
 
 type AdminFulfillmentPushAcceptedNotificationPayload = {
@@ -86,6 +94,13 @@ type EnqueueAdminFulfillmentPushAcceptedNotificationProps = {
   merchizeExternalOrderNumber?: string | null;
   merchizeOrderId?: string | null;
   merchizeOrderCode?: string | null;
+};
+
+type EnqueueAdminPaymentReconciliationNotificationProps = Omit<
+  EnqueueAdminRecoveryNotificationProps,
+  'type' | 'stage' | 'recipientGroupKey' | 'severity'
+> & {
+  severity?: (typeof ADMIN_NOTIFICATION_SEVERITY)[keyof typeof ADMIN_NOTIFICATION_SEVERITY];
 };
 
 function getConfiguredAdminRecipients() {
@@ -161,7 +176,7 @@ function buildAdminRecoveryAlertEmailHtml(payload: AdminRecoveryNotificationPayl
                       <span style="display:inline-block;margin-left:12px;font-size:12px;letter-spacing:0.22em;text-transform:uppercase;color:#94a3b8;vertical-align:middle;">Codex Christi Ops</span>
                     </td>
                     <td align="right" style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#fbbf24;">
-                      Recovery Alert
+                      ${escapeHtml(payload.alertLabel ?? 'Recovery Alert')}
                     </td>
                   </tr>
                 </table>
@@ -169,10 +184,13 @@ function buildAdminRecoveryAlertEmailHtml(payload: AdminRecoveryNotificationPayl
             </tr>
             <tr>
               <td style="border:1px solid rgba(96,165,250,0.22);border-radius:22px;background:#0b1020;padding:28px;">
-                <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#60a5fa;font-weight:700;">Paid Order Requires Attention</div>
-                <h1 style="margin:12px 0 8px;font-size:24px;line-height:1.25;color:#ffffff;">A paid checkout stopped during fulfillment</h1>
+                <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#60a5fa;font-weight:700;">${escapeHtml(payload.eyebrow ?? 'Paid Order Requires Attention')}</div>
+                <h1 style="margin:12px 0 8px;font-size:24px;line-height:1.25;color:#ffffff;">${escapeHtml(payload.heading ?? 'A paid checkout stopped during fulfillment')}</h1>
                 <p style="margin:0 0 22px;font-size:14px;line-height:1.65;color:#cbd5e1;">
-                  This order is already paid, but the fulfillment stage did not complete cleanly. Review the transaction before the customer needs to contact support.
+                  ${escapeHtml(
+                    payload.intro ??
+                      'This order is already paid, but the fulfillment stage did not complete cleanly. Review the transaction before the customer needs to contact support.',
+                  )}
                 </p>
 
                 <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;border:1px solid rgba(148,163,184,0.16);border-radius:16px;background:#0f172a;">
@@ -206,10 +224,13 @@ function buildAdminRecoveryAlertEmailHtml(payload: AdminRecoveryNotificationPayl
                   ${issueRows}
                 </table>
 
-                <a href="${escapeHtml(payload.adminDetailUrl)}" style="display:inline-block;border-radius:12px;background:#dbeafe;color:#0f172a;text-decoration:none;font-size:13px;font-weight:700;padding:12px 18px;">Open Recovery Detail</a>
+                <a href="${escapeHtml(payload.adminDetailUrl)}" style="display:inline-block;border-radius:12px;background:#dbeafe;color:#0f172a;text-decoration:none;font-size:13px;font-weight:700;padding:12px 18px;">${escapeHtml(payload.buttonLabel ?? 'Open Recovery Detail')}</a>
 
                 <p style="margin:20px 0 0;font-size:12px;line-height:1.6;color:#64748b;">
-                  This is an internal operations alert. The customer has already paid; treat this as a recovery task, not a failed checkout attempt.
+                  ${escapeHtml(
+                    payload.footnote ??
+                      'This is an internal operations alert. The customer has already paid; treat this as a recovery task, not a failed checkout attempt.',
+                  )}
                 </p>
               </td>
             </tr>
@@ -308,6 +329,18 @@ export async function enqueueAdminRecoveryNotification({
     receiptLink,
     supportReference,
     adminDetailUrl: buildAdminOrderRecoveryUrl(orderToken),
+    ...(type === ADMIN_NOTIFICATION_TYPE.PAYMENT_RECONCILIATION_REQUIRED
+      ? {
+          alertLabel: 'Payment Alert',
+          eyebrow: 'Payment Reconciliation Required',
+          heading: 'A PayPal payment row needs review',
+          intro:
+            'PayPal and the local ledger may be out of sync. Review the payment state before fulfillment, refund, or customer follow-up decisions.',
+          buttonLabel: 'Open Payment Detail',
+          footnote:
+            'This is an internal payment operations alert. Do not recapture or fulfill until PayPal capture status is verified.',
+        }
+      : {}),
   };
 
   const result = await db.adminNotificationOutbox.createMany({
@@ -333,6 +366,19 @@ export async function enqueueAdminRecoveryNotification({
   });
 
   return { created: result.count, skipped: false as const };
+}
+
+export async function enqueueAdminPaymentReconciliationNotification({
+  severity = ADMIN_NOTIFICATION_SEVERITY.CRITICAL,
+  ...props
+}: EnqueueAdminPaymentReconciliationNotificationProps) {
+  return enqueueAdminRecoveryNotification({
+    ...props,
+    type: ADMIN_NOTIFICATION_TYPE.PAYMENT_RECONCILIATION_REQUIRED,
+    stage: ADMIN_NOTIFICATION_STAGE.PAYMENT,
+    severity,
+    recipientGroupKey: ADMIN_NOTIFICATION_RECIPIENT_GROUP_KEY.PAYMENT_ISSUES,
+  });
 }
 
 export async function enqueueAdminFulfillmentPushAcceptedNotification({
@@ -424,14 +470,17 @@ async function sendAdminRecoveryNotificationRow(
     return { id: row.id, ok: false as const, error: 'Missing recipient email.' };
   }
 
-  const isPushAccepted =
-    row.type === ADMIN_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED;
+  const isPushAccepted = row.type === ADMIN_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED;
+  const isPaymentReconciliation =
+    row.type === ADMIN_NOTIFICATION_TYPE.PAYMENT_RECONCILIATION_REQUIRED;
 
   try {
     const { sendMailFromPrimaryAgent } = await import('@/lib/zeptomail/sendMailFromPrimaryAgent');
     const subject = isPushAccepted
       ? `Paid order pushed to fulfillment · ${(row.payload as AdminFulfillmentPushAcceptedNotificationPayload).supportReference.slice(0, 8)}`
-      : `Paid order recovery required · ${(row.payload as AdminRecoveryNotificationPayload).supportReference}`;
+      : isPaymentReconciliation
+        ? `Payment reconciliation required · ${(row.payload as AdminRecoveryNotificationPayload).supportReference}`
+        : `Paid order recovery required · ${(row.payload as AdminRecoveryNotificationPayload).supportReference}`;
     const htmlbody = isPushAccepted
       ? buildAdminFulfillmentPushAcceptedEmailHtml(
           row.payload as AdminFulfillmentPushAcceptedNotificationPayload,
