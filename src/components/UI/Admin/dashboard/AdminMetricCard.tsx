@@ -24,7 +24,10 @@ type AdminMetricCardProps = {
 export default function AdminMetricCard({ card, index, reduceMotion }: AdminMetricCardProps) {
   const Icon = card.icon;
   const cardBody = (
-    <AdminGlassPanel className='group relative min-h-[156px] overflow-hidden p-4 transition hover:border-white/20 hover:bg-slate-900/60 sm:min-h-[178px] sm:p-5'>
+    <AdminGlassPanel
+      interactive={Boolean(card.href)}
+      className='group relative min-h-[156px] overflow-hidden p-4 sm:min-h-[178px] sm:p-5'
+    >
       <div className='flex items-start justify-between gap-3'>
         <div className='flex items-center gap-4'>
           <Icon className={toneClass[card.tone]} size={26} />

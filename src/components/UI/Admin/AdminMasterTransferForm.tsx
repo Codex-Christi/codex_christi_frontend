@@ -9,6 +9,11 @@ import {
   type MasterAdminTransferCompleteActionState,
   type MasterAdminTransferStartActionState,
 } from '@/app/admin/admin-ops/actions';
+import {
+  adminFieldClass,
+  adminInsetSurfaceClass,
+} from '@/components/UI/Admin/dashboard/AdminGlassPanel';
+import { cn } from '@/lib/utils';
 
 const initialStartState: MasterAdminTransferStartActionState = {
   error: null,
@@ -71,7 +76,7 @@ export default function AdminMasterTransferForm() {
       </form>
 
       {startState.challenge ? (
-        <form action={completeAction} className='space-y-3 rounded-lg border border-white/10 bg-white/[0.03] p-3'>
+        <form action={completeAction} className={cn(adminInsetSurfaceClass, 'space-y-3 p-3')}>
           <input type='hidden' name='challengeId' value={startState.challenge.challengeId} />
           <div className='flex items-start gap-2 text-xs leading-5 text-slate-300'>
             <ShieldCheck size={16} className='mt-0.5 shrink-0 text-cyan-200' />
@@ -137,7 +142,7 @@ function TextField({
         minLength={minLength}
         maxLength={maxLength}
         required={required}
-        className='h-10 rounded-lg border border-white/10 bg-slate-950/80 px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40'
+        className={adminFieldClass}
       />
     </label>
   );

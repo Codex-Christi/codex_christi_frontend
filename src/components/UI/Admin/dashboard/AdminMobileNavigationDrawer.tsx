@@ -33,10 +33,10 @@ export default function AdminMobileNavigationDrawer({
 
   return (
     <Drawer direction='left' open={open} onOpenChange={onOpenChange}>
-      <DrawerOverlay className='bg-slate-950/35 !backdrop-blur-[3px] lg:hidden' />
+      <DrawerOverlay className='bg-[#141923]/42 !backdrop-blur-[3px] lg:hidden' />
       <DrawerContent
         data-testid='admin-mobile-navigation-drawer'
-        className='!fixed !bottom-0 !left-0 !z-[500] h-[100dvh] min-h-[100dvh] w-full max-w-[360px] overflow-hidden !rounded-none border-r border-white/10 bg-slate-950/76 shadow-[24px_0_80px_rgba(0,0,0,0.46)] after:!hidden supports-[backdrop-filter]:backdrop-blur-2xl lg:hidden'
+        className='!fixed !bottom-0 !left-0 !z-[500] h-[100dvh] min-h-[100dvh] w-full max-w-[360px] overflow-hidden !rounded-none border-r border-white/[0.055] bg-[rgba(20,25,35,0.82)] shadow-[24px_0_70px_rgba(0,0,0,0.30)] after:!hidden supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 lg:hidden'
       >
         <DrawerTitle className='sr-only'>Admin navigation</DrawerTitle>
         <DrawerDescription className='sr-only'>
@@ -46,7 +46,7 @@ export default function AdminMobileNavigationDrawer({
         <div className='flex h-full flex-col'>
           <div className='flex min-h-20 items-center justify-between border-b border-white/10 px-4'>
             <Link
-              href='/admin/shop'
+              href='/admin'
               className='flex items-center gap-3'
               onClick={() => onOpenChange(false)}
             >

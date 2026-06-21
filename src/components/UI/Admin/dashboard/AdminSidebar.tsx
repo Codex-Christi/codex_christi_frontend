@@ -7,10 +7,10 @@ import type { AdminShopScope } from './adminShopDashboardTypes';
 
 export default function AdminSidebar({ scope }: { scope: AdminShopScope }) {
   return (
-    <aside className='hidden border-r border-white/10 bg-slate-950/58 supports-[backdrop-filter]:backdrop-blur-xl lg:fixed lg:left-0 lg:top-0 lg:z-50 lg:block lg:h-dvh lg:w-[250px]'>
+    <aside className='hidden border-r border-white/[0.055] bg-[rgba(20,25,35,0.80)] shadow-[12px_0_38px_rgba(0,0,0,0.14)] supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 lg:fixed lg:left-0 lg:top-0 lg:z-50 lg:block lg:h-dvh lg:w-[250px]'>
       <div className='flex h-full min-h-0 flex-col'>
         <Link
-          href='/admin/shop'
+          href='/admin'
           className='flex h-20 items-center gap-3 border-b border-white/10 px-5'
         >
           <Image

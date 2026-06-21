@@ -62,6 +62,13 @@ export type AdminAuditLogFilters = {
   targetId?: string;
 };
 
+export type AdminOpsDashboardSummary = {
+  activeAdmins: number;
+  disabledAdmins: number;
+  recentAuditIssues: number;
+  recentAuditWindowHours: number;
+};
+
 export type AdminUserProvisionInput = {
   codexUserId: string;
   email: string | null;
@@ -227,6 +234,29 @@ export async function listAdminUsersForDashboard(): Promise<AdminUserSummary[]> 
     role: normalizeAdminRole(row.role),
     scopes: normalizeAdminScopes(row.scopes),
   }));
+}
+
+export async function getAdminOpsDashboardSummary(): Promise<AdminOpsDashboardSummary> {
+  const recentAuditWindowHours = 24;
+  const recentAuditSince = new Date(Date.now() - recentAuditWindowHours * 60 * 60 * 1000);
+  const prisma = getAdminOpsLedgerPrisma();
+  const [activeAdmins, disabledAdmins, recentAuditIssues] = await Promise.all([
+    prisma.adminUser.count({ where: { status: 'active' } }),
+    prisma.adminUser.count({ where: { status: 'disabled' } }),
+    prisma.adminAuditLog.count({
+      where: {
+        createdAt: { gte: recentAuditSince },
+        outcome: { in: ['failure', 'blocked'] },
+      },
+    }),
+  ]);
+
+  return {
+    activeAdmins,
+    disabledAdmins,
+    recentAuditIssues,
+    recentAuditWindowHours,
+  };
 }
 
 export async function listAdminAuditLogsForDashboard({

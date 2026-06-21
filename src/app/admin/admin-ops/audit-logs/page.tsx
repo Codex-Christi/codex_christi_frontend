@@ -13,6 +13,12 @@ import {
   type AdminAuditLogSummary,
 } from '@/lib/admin/admin-auth-ledger';
 import { isMasterAdminRole } from '@/lib/admin/admin-config';
+import AdminGlassPanel, {
+  adminFieldClass,
+  adminInsetSurfaceClass,
+  adminPageMainClass,
+  getAdminGlassPanelClassName,
+} from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import CometsContainer from '@/components/UI/general/CometsContainer';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
 import { requireAdminPage } from '@/lib/admin/require-admin';
@@ -42,9 +48,9 @@ export default async function AdminAuditLogsPage({
   return (
     <DefaultPageWrapper hasMainNav>
       <CometsContainer>
-        <main className='min-h-dvh bg-slate-950/54 px-4 pb-6 pt-24 text-slate-50 supports-[backdrop-filter]:backdrop-blur-[1px] sm:px-6 lg:px-8'>
+        <main className={adminPageMainClass}>
           <div className='mx-auto flex w-full max-w-[1400px] flex-col gap-6'>
-            <header className='rounded-lg border border-white/10 bg-slate-950/72 p-5 shadow-2xl shadow-black/20 supports-[backdrop-filter]:backdrop-blur-xl sm:p-6'>
+            <AdminGlassPanel className='p-5 sm:p-6'>
               <div className='flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between'>
                 <div className='min-w-0 space-y-4'>
                   <Link
@@ -78,9 +84,9 @@ export default async function AdminAuditLogsPage({
                   />
                 </div>
               </div>
-            </header>
+            </AdminGlassPanel>
 
-            <section className='rounded-lg border border-white/10 bg-slate-950/72 p-4 supports-[backdrop-filter]:backdrop-blur-xl sm:p-5'>
+            <AdminGlassPanel className='p-4 sm:p-5'>
               <div className='mb-4 flex items-center justify-between gap-3'>
                 <div>
                   <h2 className='text-base font-semibold text-white'>Filters</h2>
@@ -107,7 +113,7 @@ export default async function AdminAuditLogsPage({
                   <select
                     name='outcome'
                     defaultValue={filters.outcome ?? ''}
-                    className='h-10 rounded-lg border border-white/10 bg-slate-950/80 px-3 text-sm text-white outline-none focus:border-cyan-300/40'
+                    className={adminFieldClass}
                   >
                     <option value=''>Any</option>
                     {outcomeOptions.map((outcome) => (
@@ -133,9 +139,9 @@ export default async function AdminAuditLogsPage({
                   Reset
                 </Link>
               </form>
-            </section>
+            </AdminGlassPanel>
 
-            <section className='rounded-lg border border-white/10 bg-slate-950/72 p-4 supports-[backdrop-filter]:backdrop-blur-xl sm:p-5'>
+            <AdminGlassPanel className='p-4 sm:p-5'>
               <div className='mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
                 <div>
                   <h2 className='text-base font-semibold text-white'>Recent Activity</h2>
@@ -157,7 +163,7 @@ export default async function AdminAuditLogsPage({
                   No audit logs match these filters.
                 </p>
               )}
-            </section>
+            </AdminGlassPanel>
           </div>
         </main>
       </CometsContainer>
@@ -181,7 +187,7 @@ function TextField({
         name={name}
         defaultValue={defaultValue}
         autoComplete='off'
-        className='h-10 rounded-lg border border-white/10 bg-slate-950/80 px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40'
+        className={adminFieldClass}
       />
     </label>
   );
@@ -218,7 +224,7 @@ function AuditLogCard({ auditLog }: { auditLog: AdminAuditLogSummary }) {
   const metadata = formatMetadata(auditLog.metadata);
 
   return (
-    <article className='rounded-lg border border-white/10 bg-white/[0.03] p-4'>
+    <article className={getAdminGlassPanelClassName('p-4')}>
       <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
         <div className='min-w-0 space-y-2'>
           <div className='flex flex-wrap items-center gap-2'>
@@ -243,7 +249,7 @@ function AuditLogCard({ auditLog }: { auditLog: AdminAuditLogSummary }) {
       </div>
 
       {metadata ? (
-        <pre className='mt-3 max-h-44 overflow-auto rounded-lg border border-white/10 bg-slate-950/80 p-3 text-xs leading-5 text-slate-300'>
+        <pre className={`${adminInsetSurfaceClass} mt-3 max-h-44 overflow-auto p-3 text-xs leading-5 text-slate-300`}>
           {metadata}
         </pre>
       ) : null}

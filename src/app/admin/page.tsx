@@ -14,11 +14,18 @@ import {
 } from 'lucide-react';
 import { isAdminScopeAllowed, isMasterAdminRole } from '@/lib/admin/admin-config';
 import AdminSystemTimeGreeting from '@/components/UI/Admin/AdminSystemTimeGreeting';
+import AdminGlassPanel, {
+  adminInsetSurfaceClass,
+  adminPageMainClass,
+  getAdminGlassPanelClassName,
+} from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import CometsContainer from '@/components/UI/general/CometsContainer';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
+import { getAdminOpsDashboardSummary } from '@/lib/admin/admin-auth-ledger';
 import { requireAdminPage } from '@/lib/admin/require-admin';
 import { getUser } from '@/lib/funcs/userProfileFetchers/getUser';
 import { listAdminPaidOrderRecoveryRows } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
+import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
   title: 'Admin | Codex Christi',
@@ -46,9 +53,13 @@ export default async function AdminPage() {
   const canAccessShop = isAdminScopeAllowed(admin.scopes, 'shop', admin.role);
   const canViewAuditLogs = isAdminScopeAllowed(admin.scopes, 'audit.view', admin.role);
 
-  const [profile, recoveryRows] = await Promise.all([
+  const shouldLoadAdminOpsSummary = canManageAdmins || canViewAuditLogs;
+  const [profile, recoveryRows, adminOpsSummary] = await Promise.all([
     getUser().catch(() => undefined),
     canAccessShop ? listAdminPaidOrderRecoveryRows().catch(() => []) : Promise.resolve([]),
+    shouldLoadAdminOpsSummary
+      ? getAdminOpsDashboardSummary().catch(() => null)
+      : Promise.resolve(null),
   ]);
   const displayName =
     profile?.first_name?.trim() || profile?.username?.trim() || `Admin ${admin.userID.slice(0, 8)}`;
@@ -62,9 +73,9 @@ export default async function AdminPage() {
   return (
     <DefaultPageWrapper hasMainNav>
       <CometsContainer>
-        <main className='min-h-dvh bg-slate-950/54 px-4 pb-6 pt-24 text-slate-50 supports-[backdrop-filter]:backdrop-blur-[1px] sm:px-6 lg:px-8'>
+        <main className={adminPageMainClass}>
           <div className='mx-auto flex w-full max-w-[1500px] flex-col gap-6'>
-            <header className='rounded-lg border border-white/10 bg-slate-950/70 p-5 shadow-2xl shadow-black/20 supports-[backdrop-filter]:backdrop-blur-xl sm:p-6'>
+            <AdminGlassPanel className='p-5 sm:p-6'>
               <div className='flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between'>
                 <div className='min-w-0 space-y-4'>
                   <div className='inline-flex items-center gap-2 rounded-lg border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100'>
@@ -95,7 +106,7 @@ export default async function AdminPage() {
                   <StatusPill label='Admin Mode' value='Unlocked' tone='cyan' icon={Lock} />
                 </div>
               </div>
-            </header>
+            </AdminGlassPanel>
 
             <section className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]'>
               <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
@@ -106,6 +117,15 @@ export default async function AdminPage() {
                   icon={ShoppingBag}
                   status={canAccessShop ? 'Active' : 'Restricted'}
                   attention={canAccessShop ? `${attentionRows.length} attention` : 'No access'}
+                  metrics={
+                    canAccessShop
+                      ? [
+                          { label: 'Attention', value: `${attentionRows.length}`, tone: 'cyan' },
+                          { label: 'Failed', value: `${failedRows.length}`, tone: 'rose' },
+                          { label: 'Sync', value: `${syncRows.length}`, tone: 'amber' },
+                        ]
+                      : undefined
+                  }
                 />
                 {canManageAdmins ? (
                   <ProductCard
@@ -114,7 +134,27 @@ export default async function AdminPage() {
                     href='/admin/admin-ops'
                     icon={UserRoundCog}
                     status='Master only'
-                    attention='Access management'
+                    attention={
+                      adminOpsSummary
+                        ? `${adminOpsSummary.activeAdmins} active admins`
+                        : 'Access management'
+                    }
+                    metrics={
+                      adminOpsSummary
+                        ? [
+                            {
+                              label: 'Active',
+                              value: `${adminOpsSummary.activeAdmins}`,
+                              tone: 'emerald',
+                            },
+                            {
+                              label: 'Disabled',
+                              value: `${adminOpsSummary.disabledAdmins}`,
+                              tone: 'amber',
+                            },
+                          ]
+                        : undefined
+                    }
                   />
                 ) : null}
                 {canViewAuditLogs && !canManageAdmins ? (
@@ -124,7 +164,22 @@ export default async function AdminPage() {
                     href='/admin/admin-ops/audit-logs'
                     icon={ScrollText}
                     status='Audit'
-                    attention='Recent activity'
+                    attention={
+                      adminOpsSummary
+                        ? `${adminOpsSummary.recentAuditIssues} issues in ${adminOpsSummary.recentAuditWindowHours}h`
+                        : 'Recent activity'
+                    }
+                    metrics={
+                      adminOpsSummary
+                        ? [
+                            {
+                              label: 'Issues',
+                              value: `${adminOpsSummary.recentAuditIssues}`,
+                              tone: adminOpsSummary.recentAuditIssues ? 'amber' : 'emerald',
+                            },
+                          ]
+                        : undefined
+                    }
                   />
                 ) : null}
                 <ProductCard
@@ -142,23 +197,23 @@ export default async function AdminPage() {
               </div>
 
               <aside className='space-y-4'>
-                <section className='rounded-lg border border-white/10 bg-slate-950/70 p-4 supports-[backdrop-filter]:backdrop-blur-xl'>
+                <AdminGlassPanel className='p-4'>
                   <h2 className='text-sm font-semibold text-white'>Pending Attention</h2>
                   <div className='mt-4 space-y-3'>
                     <AttentionRow label='Paid order recovery' value={attentionRows.length} />
                     <AttentionRow label='Failed rows' value={failedRows.length} tone='rose' />
                     <AttentionRow label='Provider sync' value={syncRows.length} tone='amber' />
                   </div>
-                </section>
+                </AdminGlassPanel>
 
-                <section className='rounded-lg border border-white/10 bg-slate-950/70 p-4 supports-[backdrop-filter]:backdrop-blur-xl'>
+                <AdminGlassPanel className='p-4'>
                   <h2 className='text-sm font-semibold text-white'>Daily Note</h2>
                   <p className='mt-3 text-sm leading-6 text-slate-300'>
                     {dailyJokes[dailyIndex % dailyJokes.length]}
                   </p>
-                </section>
+                </AdminGlassPanel>
 
-                <section className='rounded-lg border border-white/10 bg-slate-950/70 p-4 supports-[backdrop-filter]:backdrop-blur-xl'>
+                <AdminGlassPanel className='p-4'>
                   <div className='flex items-center justify-between gap-3'>
                     <h2 className='text-sm font-semibold text-white'>Admin Access</h2>
                     <span className='rounded-md border border-emerald-300/20 bg-emerald-300/10 px-2 py-1 text-xs text-emerald-100'>
@@ -176,7 +231,7 @@ export default async function AdminPage() {
                       </span>
                     ))}
                   </div>
-                </section>
+                </AdminGlassPanel>
               </aside>
             </section>
           </div>
@@ -198,13 +253,13 @@ function StatusPill({
   icon: typeof CheckCircle2;
 }) {
   const toneClass = {
-    cyan: 'text-cyan-200 bg-cyan-300/10 border-cyan-300/20',
-    emerald: 'text-emerald-200 bg-emerald-300/10 border-emerald-300/20',
-    amber: 'text-amber-200 bg-amber-300/10 border-amber-300/20',
+    cyan: 'text-cyan-100 bg-cyan-300/[0.06]',
+    emerald: 'text-emerald-100 bg-emerald-300/[0.06]',
+    amber: 'text-amber-100 bg-amber-300/[0.06]',
   }[tone];
 
   return (
-    <div className={`rounded-lg border px-3 py-3 ${toneClass}`}>
+    <div className={`rounded-lg px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] ${toneClass}`}>
       <div className='flex items-center gap-2 text-xs uppercase tracking-[0.14em]'>
         <Icon size={14} />
         {label}
@@ -220,6 +275,7 @@ function ProductCard({
   icon: Icon,
   status,
   attention,
+  metrics,
   href,
 }: {
   title: string;
@@ -227,16 +283,22 @@ function ProductCard({
   icon: typeof ShoppingBag;
   status: string;
   attention?: string;
+  metrics?: ProductMetric[];
   href?: string;
 }) {
   const body = (
-    <article className='group flex min-h-[250px] flex-col justify-between rounded-lg border border-white/10 bg-slate-950/70 p-5 transition hover:border-cyan-300/30 hover:bg-slate-900/72 supports-[backdrop-filter]:backdrop-blur-xl'>
+    <article
+      className={getAdminGlassPanelClassName(
+        'group flex min-h-[250px] flex-col justify-between p-5',
+        { interactive: Boolean(href) },
+      )}
+    >
       <div className='space-y-5'>
         <div className='flex items-start justify-between gap-3'>
-          <span className='grid h-11 w-11 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-cyan-200'>
+          <span className={cn(adminInsetSurfaceClass, 'grid h-11 w-11 place-items-center text-cyan-200')}>
             <Icon size={22} />
           </span>
-          <span className='rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-300'>
+          <span className='rounded-md bg-white/[0.035] px-2 py-1 text-xs text-slate-300'>
             {status}
           </span>
         </div>
@@ -244,13 +306,30 @@ function ProductCard({
           <h2 className='text-lg font-semibold text-white'>{title}</h2>
           <p className='text-sm leading-6 text-slate-300'>{description}</p>
         </div>
+        {metrics?.length ? (
+          <div className='grid gap-3 border-t border-white/[0.045] pt-3 sm:grid-cols-3'>
+            {metrics.map((metric) => (
+              <span
+                key={`${title}-${metric.label}`}
+                className='min-w-0 text-xs'
+              >
+                <span className='block truncate text-[10px] uppercase tracking-[0.12em] text-slate-500'>
+                  {metric.label}
+                </span>
+                <span className={cn('mt-1 block text-sm font-semibold', getMetricToneClass(metric.tone))}>
+                  {metric.value}
+                </span>
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      <div className='mt-6 flex items-center justify-between gap-3 border-t border-white/10 pt-4 text-sm'>
+      <div className='mt-6 flex items-center justify-between gap-3 border-t border-white/[0.045] pt-4 text-sm'>
         <span className='text-slate-400'>{attention ?? 'No active tool'}</span>
         <span className='inline-flex items-center gap-2 text-cyan-100'>
-          Open
-          <ArrowRight size={15} />
+          {href ? 'Open' : 'Unavailable'}
+          {href ? <ArrowRight size={15} /> : null}
         </span>
       </div>
     </article>
@@ -283,11 +362,26 @@ function AttentionRow({
   }[tone];
 
   return (
-    <div className='flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2'>
+    <div className={cn(adminInsetSurfaceClass, 'flex items-center justify-between gap-3 px-3 py-2')}>
       <span className='truncate text-sm text-slate-300'>{label}</span>
       <span className={`text-sm font-semibold ${toneClass}`}>{value}</span>
     </div>
   );
+}
+
+type ProductMetric = {
+  label: string;
+  value: string;
+  tone: 'cyan' | 'emerald' | 'amber' | 'rose';
+};
+
+function getMetricToneClass(tone: ProductMetric['tone']) {
+  return {
+    cyan: 'text-cyan-100',
+    emerald: 'text-emerald-100',
+    amber: 'text-amber-100',
+    rose: 'text-rose-100',
+  }[tone];
 }
 
 function getDailyIndex(date: Date, userID: string) {

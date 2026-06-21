@@ -14,6 +14,10 @@ import { isMasterAdminRole } from '@/lib/admin/admin-config';
 import AdminMasterTransferForm from '@/components/UI/Admin/AdminMasterTransferForm';
 import AdminNotificationRecipientSettings from '@/components/UI/Admin/AdminNotificationRecipientSettings';
 import AdminUserProvisioningForm from '@/components/UI/Admin/AdminUserProvisioningForm';
+import AdminGlassPanel, {
+  adminPageMainClass,
+  getAdminGlassPanelClassName,
+} from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import CometsContainer from '@/components/UI/general/CometsContainer';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
 import { listAdminNotificationRecipientGroupsForDashboard } from '@/lib/admin/admin-notification-recipients';
@@ -45,9 +49,9 @@ export default async function AdminOpsPage() {
   return (
     <DefaultPageWrapper hasMainNav>
       <CometsContainer>
-        <main className='min-h-dvh bg-slate-950/54 px-4 pb-6 pt-24 text-slate-50 supports-[backdrop-filter]:backdrop-blur-[1px] sm:px-6 lg:px-8'>
+        <main className={adminPageMainClass}>
           <div className='mx-auto flex w-full max-w-[1400px] flex-col gap-6'>
-            <header className='rounded-lg border border-white/10 bg-slate-950/72 p-5 shadow-2xl shadow-black/20 supports-[backdrop-filter]:backdrop-blur-xl sm:p-6'>
+            <AdminGlassPanel className='p-5 sm:p-6'>
               <div className='flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between'>
                 <div className='min-w-0 space-y-4'>
                   <Link
@@ -88,10 +92,10 @@ export default async function AdminOpsPage() {
                   />
                 </div>
               </div>
-            </header>
+            </AdminGlassPanel>
 
             <section className='grid items-start gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]'>
-              <section className='rounded-lg border border-white/10 bg-slate-950/72 p-4 supports-[backdrop-filter]:backdrop-blur-xl sm:p-5'>
+              <AdminGlassPanel className='p-4 sm:p-5'>
                 <div className='mb-4 flex items-center justify-between gap-3'>
                   <div>
                     <h2 className='text-base font-semibold text-white'>Operational Admins</h2>
@@ -104,9 +108,9 @@ export default async function AdminOpsPage() {
                   </span>
                 </div>
                 <AdminUserProvisioningForm />
-              </section>
+              </AdminGlassPanel>
 
-              <section className='rounded-lg border border-white/10 bg-slate-950/72 p-4 supports-[backdrop-filter]:backdrop-blur-xl sm:p-5'>
+              <AdminGlassPanel className='p-4 sm:p-5'>
                 <div className='mb-4 flex items-center justify-between gap-3'>
                   <div>
                     <h2 className='text-base font-semibold text-white'>Master Transfer</h2>
@@ -120,12 +124,14 @@ export default async function AdminOpsPage() {
                   </span>
                 </div>
                 <AdminMasterTransferForm />
-              </section>
+              </AdminGlassPanel>
             </section>
 
             <Link
               href='/admin/admin-ops/audit-logs'
-              className='group rounded-lg border border-white/10 bg-slate-950/72 p-4 transition hover:border-cyan-300/30 hover:bg-slate-900/72 supports-[backdrop-filter]:backdrop-blur-xl sm:p-5'
+              className={getAdminGlassPanelClassName('group p-4 sm:p-5', {
+                interactive: true,
+              })}
             >
               <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
                 <div className='min-w-0'>
@@ -150,7 +156,7 @@ export default async function AdminOpsPage() {
               adminOptions={adminRecipientOptions}
             />
 
-            <section className='rounded-lg border border-white/10 bg-slate-950/72 p-4 supports-[backdrop-filter]:backdrop-blur-xl sm:p-5'>
+            <AdminGlassPanel className='p-4 sm:p-5'>
               <div className='mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
                 <div>
                   <h2 className='text-base font-semibold text-white'>Admin Users</h2>
@@ -174,7 +180,7 @@ export default async function AdminOpsPage() {
                   Admin ops ledger users could not be loaded.
                 </p>
               )}
-            </section>
+            </AdminGlassPanel>
           </div>
         </main>
       </CometsContainer>
@@ -217,7 +223,7 @@ function AdminUserCard({ adminUser }: { adminUser: AdminUserSummary }) {
       : 'border-slate-300/15 bg-white/[0.04] text-slate-300';
 
   return (
-    <article className='min-h-[150px] rounded-lg border border-white/10 bg-white/[0.03] p-4'>
+    <article className={getAdminGlassPanelClassName('min-h-[150px] p-4')}>
       <div className='flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-3'>
         <div className='min-w-0'>
           <h3 className='truncate text-sm font-semibold text-white'>

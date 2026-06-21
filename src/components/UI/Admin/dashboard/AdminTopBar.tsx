@@ -10,12 +10,12 @@ type AdminTopBarProps = {
 
 export default function AdminTopBar({ title, subtitle, onOpenMobileNav }: AdminTopBarProps) {
   return (
-    <header className='sticky top-0 z-40 flex min-h-20 flex-wrap items-center gap-3 border-b border-white/10 bg-slate-950/74 px-3 py-3 supports-[backdrop-filter]:backdrop-blur-xl sm:gap-4 sm:px-5 lg:fixed lg:left-[250px] lg:right-0 lg:top-0 lg:h-20 lg:flex-nowrap'>
+    <header className='sticky top-0 z-40 flex min-h-20 flex-wrap items-center gap-3 border-b border-white/[0.055] bg-[rgba(20,25,35,0.80)] px-3 py-3 shadow-[0_12px_32px_rgba(0,0,0,0.13)] supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 sm:gap-4 sm:px-5 lg:fixed lg:left-[250px] lg:right-0 lg:top-0 lg:h-20 lg:flex-nowrap'>
       <button
         type='button'
         aria-label='Open admin navigation'
         onClick={onOpenMobileNav}
-        className='grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200 lg:hidden'
+        className='grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-slate-200 lg:hidden'
       >
         <Menu size={18} />
       </button>
@@ -25,7 +25,7 @@ export default function AdminTopBar({ title, subtitle, onOpenMobileNav }: AdminT
         <p className='truncate text-xs text-slate-400'>{subtitle}</p>
       </div>
 
-      <div className='order-last flex min-w-full flex-1 items-center gap-2 rounded-lg border border-white/10 bg-slate-900/55 px-3 py-2 text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:order-none sm:min-w-[320px] lg:min-w-[280px] xl:min-w-[320px] xl:max-w-[470px]'>
+      <div className='order-last flex min-w-full flex-1 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:order-none sm:min-w-[320px] lg:min-w-[280px] xl:min-w-[320px] xl:max-w-[470px]'>
         <Search size={16} />
         <span className='truncate text-sm'>Search orders, support refs, emails...</span>
         <kbd className='ml-auto rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[11px] text-slate-400'>
@@ -34,7 +34,7 @@ export default function AdminTopBar({ title, subtitle, onOpenMobileNav }: AdminT
       </div>
 
       <div className='ml-auto flex items-center gap-3'>
-        <span className='hidden items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-100 xl:inline-flex'>
+        <span className='hidden items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-sm text-slate-100 xl:inline-flex'>
           <span className='h-2 w-2 rounded-full bg-emerald-300' />
           Production
           <ChevronDown size={14} />
@@ -50,7 +50,7 @@ export default function AdminTopBar({ title, subtitle, onOpenMobileNav }: AdminT
         <Link
           href='/admin/logout'
           aria-label='Lock admin session'
-          className='grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200 transition hover:border-cyan-300/30 hover:text-cyan-100'
+          className='grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-slate-200 transition hover:border-cyan-300/25 hover:bg-white/[0.06] hover:text-cyan-100'
         >
           <Lock size={17} />
         </Link>
@@ -58,7 +58,7 @@ export default function AdminTopBar({ title, subtitle, onOpenMobileNav }: AdminT
         <button
           type='button'
           aria-label='Notifications'
-          className='relative grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200'
+          className='relative grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-slate-200'
         >
           <Image
             src='/media/img/general/notifications-icon.svg'

@@ -6,6 +6,8 @@ import {
   unlockAdminAction,
   type AdminUnlockActionState,
 } from '@/app/admin/unlock/actions';
+import { adminInsetSurfaceClass } from '@/components/UI/Admin/dashboard/AdminGlassPanel';
+import { cn } from '@/lib/utils';
 
 const initialState: AdminUnlockActionState = {
   error: null,
@@ -26,7 +28,7 @@ export default function AdminUnlockForm({ nextPath }: { nextPath: string }) {
         <label className='sr-only' htmlFor='admin-password'>
           Admin password
         </label>
-        <div className='flex h-12 items-center gap-3 rounded-lg border border-white/10 bg-slate-950/72 px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] focus-within:border-cyan-300/40'>
+        <div className={cn(adminInsetSurfaceClass, 'flex h-12 items-center gap-3 px-3 focus-within:border-cyan-300/40')}>
           <KeyRound size={18} className='shrink-0 text-slate-400' />
           <input
             id='admin-password'
@@ -56,4 +58,3 @@ export default function AdminUnlockForm({ nextPath }: { nextPath: string }) {
     </form>
   );
 }
-

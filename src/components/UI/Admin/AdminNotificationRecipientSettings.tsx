@@ -6,6 +6,10 @@ import {
   saveAdminNotificationRecipientGroupAction,
   type AdminNotificationRecipientGroupActionState,
 } from '@/app/admin/admin-ops/actions';
+import AdminGlassPanel, {
+  adminFieldClass,
+  adminInsetSurfaceClass,
+} from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import type { AdminNotificationRecipientGroupSummary } from '@/lib/admin/admin-notification-recipients';
 import { cn } from '@/lib/utils';
 
@@ -31,7 +35,7 @@ export default function AdminNotificationRecipientSettings({
   adminOptions,
 }: AdminNotificationRecipientSettingsProps) {
   return (
-    <section className='rounded-lg border border-white/10 bg-slate-950/72 p-4 supports-[backdrop-filter]:backdrop-blur-xl sm:p-5'>
+    <AdminGlassPanel className='p-4 sm:p-5'>
       <div className='mb-4 flex items-center justify-between gap-3'>
         <div>
           <h2 className='text-base font-semibold text-white'>Notification Recipients</h2>
@@ -50,7 +54,7 @@ export default function AdminNotificationRecipientSettings({
           <RecipientGroupForm key={group.key} group={group} adminOptions={adminOptions} />
         ))}
       </div>
-    </section>
+    </AdminGlassPanel>
   );
 }
 
@@ -95,7 +99,7 @@ function RecipientGroupForm({
   };
 
   return (
-    <form action={formAction} className='rounded-lg border border-white/10 bg-white/[0.03] p-4'>
+    <form action={formAction} className={cn(adminInsetSurfaceClass, 'p-4')}>
       <input type='hidden' name='key' value={group.key} />
       {emails.map((email) => (
         <input key={email} type='hidden' name='recipientEmails' value={email} />
@@ -119,7 +123,7 @@ function RecipientGroupForm({
       </div>
 
       <div className='mt-4 grid gap-3'>
-        <label className='flex min-h-10 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/40 px-3 text-xs text-slate-200'>
+        <label className={cn(adminInsetSurfaceClass, 'flex min-h-10 items-center gap-2 px-3 text-xs text-slate-200')}>
           <input
             type='checkbox'
             name='enabled'
@@ -131,7 +135,7 @@ function RecipientGroupForm({
           Send this notification type
         </label>
 
-        <label className='flex min-h-10 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/40 px-3 text-xs text-slate-200'>
+        <label className={cn(adminInsetSurfaceClass, 'flex min-h-10 items-center gap-2 px-3 text-xs text-slate-200')}>
           <input
             type='checkbox'
             name='includeMasterAdmins'
@@ -143,7 +147,7 @@ function RecipientGroupForm({
           Include active master admins
         </label>
 
-        <div className='rounded-lg border border-white/10 bg-slate-950/55 p-3'>
+        <div className={cn(adminInsetSurfaceClass, 'p-3')}>
           <div className='flex flex-wrap gap-2'>
             {emails.map((email) => (
               <span
@@ -177,7 +181,7 @@ function RecipientGroupForm({
                 type='text'
                 inputMode='email'
                 placeholder='Add admin or custom email'
-                className='h-10 w-full rounded-lg border border-white/10 bg-slate-950/80 px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40'
+                className={cn(adminFieldClass, 'w-full')}
               />
             </div>
             <button

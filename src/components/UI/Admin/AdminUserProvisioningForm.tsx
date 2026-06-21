@@ -6,6 +6,11 @@ import {
   provisionAdminUserAction,
   type AdminUserProvisionActionState,
 } from '@/app/admin/admin-ops/actions';
+import {
+  adminFieldClass,
+  adminInsetSurfaceClass,
+} from '@/components/UI/Admin/dashboard/AdminGlassPanel';
+import { cn } from '@/lib/utils';
 
 const initialState: AdminUserProvisionActionState = {
   error: null,
@@ -56,7 +61,7 @@ export default function AdminUserProvisioningForm() {
           <select
             name='role'
             defaultValue='admin'
-            className='h-10 rounded-lg border border-white/10 bg-slate-950/80 px-3 text-sm text-white outline-none focus:border-cyan-300/40'
+            className={adminFieldClass}
           >
             {roleOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -72,7 +77,7 @@ export default function AdminUserProvisioningForm() {
             {scopeOptions.map((option) => (
               <label
                 key={option.value}
-                className='flex min-h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-2 text-xs text-slate-200'
+                className={cn(adminInsetSurfaceClass, 'flex min-h-9 items-center gap-2 px-2 text-xs text-slate-200')}
               >
                 <input
                   type='checkbox'
@@ -92,7 +97,7 @@ export default function AdminUserProvisioningForm() {
           <select
             name='status'
             defaultValue='active'
-            className='h-10 rounded-lg border border-white/10 bg-slate-950/80 px-3 text-sm text-white outline-none focus:border-cyan-300/40'
+            className={adminFieldClass}
           >
             <option value='active'>Active</option>
             <option value='disabled'>Disabled</option>
@@ -144,7 +149,7 @@ function TextField({
         type={type}
         autoComplete={autoComplete}
         required={required}
-        className='h-10 rounded-lg border border-white/10 bg-slate-950/80 px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300/40'
+        className={adminFieldClass}
       />
     </label>
   );
