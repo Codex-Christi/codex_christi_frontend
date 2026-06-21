@@ -16,6 +16,8 @@ export const CUSTOMER_NOTIFICATION_STATUS = {
 } as const;
 
 type CustomerNotificationDb = Pick<typeof paypalTxLedger, 'customerNotificationOutbox'>;
+type CustomerNotificationOutboxDelegate = CustomerNotificationDb['customerNotificationOutbox'];
+type CustomerNotificationRow = Awaited<ReturnType<CustomerNotificationOutboxDelegate['findFirst']>>;
 
 type CustomerFulfillmentPushAcceptedPayload = {
   orderToken: string;
@@ -34,6 +36,10 @@ type EnqueueCustomerFulfillmentPushAcceptedProps = {
   customerEmail: string;
   receiptLink?: string | null;
 };
+
+function getCustomerNotificationOutboxDelegate(db: CustomerNotificationDb = paypalTxLedger) {
+  return (db as Partial<CustomerNotificationDb>).customerNotificationOutbox ?? null;
+}
 
 function escapeHtml(value: string) {
   return value
@@ -113,10 +119,17 @@ export async function enqueueCustomerFulfillmentPushAcceptedNotification({
   customerEmail,
   receiptLink,
 }: EnqueueCustomerFulfillmentPushAcceptedProps) {
+  const outbox = getCustomerNotificationOutboxDelegate(db);
   const recipient = normalizeEmail(customerEmail);
 
   if (!recipient) {
     return { created: 0, skipped: true as const };
+  }
+
+  if (!outbox) {
+    throw new Error(
+      'Customer notification outbox is unavailable. Regenerate the PayPal ledger Prisma client and restart the server.',
+    );
   }
 
   const payload: CustomerFulfillmentPushAcceptedPayload = {
@@ -128,7 +141,7 @@ export async function enqueueCustomerFulfillmentPushAcceptedNotification({
     supportReference: orderToken,
   };
 
-  const result = await db.customerNotificationOutbox.createMany({
+  const result = await outbox.createMany({
     data: [
       {
         orderToken,
@@ -147,10 +160,19 @@ export async function enqueueCustomerFulfillmentPushAcceptedNotification({
 }
 
 async function sendCustomerNotificationRow(
-  row: Awaited<ReturnType<typeof paypalTxLedger.customerNotificationOutbox.findFirst>>,
+  row: CustomerNotificationRow,
+  outbox: CustomerNotificationOutboxDelegate | null = getCustomerNotificationOutboxDelegate(),
 ) {
   if (!row) {
     return { id: null, ok: false as const, error: 'Notification row was not found.' };
+  }
+
+  if (!outbox) {
+    return {
+      id: row.id,
+      ok: false as const,
+      error: 'Customer notification outbox is unavailable. Regenerate the PayPal ledger Prisma client and restart the server.',
+    };
   }
 
   const payload = row.payload as CustomerFulfillmentPushAcceptedPayload;
@@ -171,7 +193,7 @@ async function sendCustomerNotificationRow(
       htmlbody: buildCustomerFulfillmentPushAcceptedEmailHtml(payload),
     });
 
-    await paypalTxLedger.customerNotificationOutbox.update({
+    await outbox.update({
       where: { id: row.id },
       data: {
         status: CUSTOMER_NOTIFICATION_STATUS.SENT,
@@ -186,7 +208,7 @@ async function sendCustomerNotificationRow(
   } catch (error) {
     const message = error instanceof Error ? error.message : JSON.stringify(error);
 
-    await paypalTxLedger.customerNotificationOutbox.update({
+    await outbox.update({
       where: { id: row.id },
       data: {
         status: CUSTOMER_NOTIFICATION_STATUS.FAILED,
@@ -201,7 +223,10 @@ async function sendCustomerNotificationRow(
 }
 
 export async function sendPendingCustomerNotifications(limit = DEFAULT_PENDING_SEND_LIMIT) {
-  const rows = await paypalTxLedger.customerNotificationOutbox.findMany({
+  const outbox = getCustomerNotificationOutboxDelegate();
+  if (!outbox) return [];
+
+  const rows = await outbox.findMany({
     where: {
       status: {
         in: [CUSTOMER_NOTIFICATION_STATUS.PENDING, CUSTOMER_NOTIFICATION_STATUS.FAILED],
@@ -214,14 +239,17 @@ export async function sendPendingCustomerNotifications(limit = DEFAULT_PENDING_S
   const results = [];
 
   for (const row of rows) {
-    results.push(await sendCustomerNotificationRow(row));
+    results.push(await sendCustomerNotificationRow(row, outbox));
   }
 
   return results;
 }
 
 export async function sendPendingCustomerNotificationsForOrder(orderToken: string) {
-  const rows = await paypalTxLedger.customerNotificationOutbox.findMany({
+  const outbox = getCustomerNotificationOutboxDelegate();
+  if (!outbox) return [];
+
+  const rows = await outbox.findMany({
     where: {
       orderToken,
       status: {
@@ -234,14 +262,23 @@ export async function sendPendingCustomerNotificationsForOrder(orderToken: strin
   const results = [];
 
   for (const row of rows) {
-    results.push(await sendCustomerNotificationRow(row));
+    results.push(await sendCustomerNotificationRow(row, outbox));
   }
 
   return results;
 }
 
 export async function resendCustomerNotification(id: string) {
-  const row = await paypalTxLedger.customerNotificationOutbox.update({
+  const outbox = getCustomerNotificationOutboxDelegate();
+  if (!outbox) {
+    return {
+      id,
+      ok: false as const,
+      error: 'Customer notification outbox is unavailable. Regenerate the PayPal ledger Prisma client and restart the server.',
+    };
+  }
+
+  const row = await outbox.update({
     where: { id },
     data: {
       status: CUSTOMER_NOTIFICATION_STATUS.PENDING,
@@ -249,5 +286,15 @@ export async function resendCustomerNotification(id: string) {
     },
   });
 
-  return sendCustomerNotificationRow(row);
+  return sendCustomerNotificationRow(row, outbox);
+}
+
+export async function listCustomerNotificationsForOrder(orderToken: string) {
+  const outbox = getCustomerNotificationOutboxDelegate();
+  if (!outbox) return [];
+
+  return outbox.findMany({
+    where: { orderToken },
+    orderBy: { createdAt: 'desc' },
+  });
 }

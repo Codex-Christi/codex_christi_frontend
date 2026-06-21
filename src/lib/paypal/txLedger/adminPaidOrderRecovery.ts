@@ -5,6 +5,7 @@ import { formatDistanceToNowStrict } from 'date-fns';
 import { getRecoveryScannerMinAgeMinutes } from '@/lib/paypal/txLedger/processingPolicy';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+import { listCustomerNotificationsForOrder } from '@/lib/paypal/txLedger/customerNotificationOutbox';
 import {
   getMerchizeFulfillmentOpsPrisma,
   isMerchizeFulfillmentOpsDatabaseConfigured,
@@ -788,10 +789,7 @@ export async function getAdminPaidOrderRecoveryDetail(orderToken: string) {
     where: { orderToken: row.orderToken },
     orderBy: { createdAt: 'desc' },
   });
-  const customerNotifications = await paypalTxLedger.customerNotificationOutbox.findMany({
-    where: { orderToken: row.orderToken },
-    orderBy: { createdAt: 'desc' },
-  });
+  const customerNotifications = await listCustomerNotificationsForOrder(row.orderToken);
   const webhookEvents = row.paypalOrderId
     ? await paypalTxLedger.paypalWebhookEvent.findMany({
         where: { paypalOrderId: row.paypalOrderId },
