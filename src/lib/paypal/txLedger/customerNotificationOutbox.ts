@@ -239,3 +239,15 @@ export async function sendPendingCustomerNotificationsForOrder(orderToken: strin
 
   return results;
 }
+
+export async function resendCustomerNotification(id: string) {
+  const row = await paypalTxLedger.customerNotificationOutbox.update({
+    where: { id },
+    data: {
+      status: CUSTOMER_NOTIFICATION_STATUS.PENDING,
+      lastErrorMessage: null,
+    },
+  });
+
+  return sendCustomerNotificationRow(row);
+}

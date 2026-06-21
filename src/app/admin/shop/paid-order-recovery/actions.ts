@@ -13,6 +13,7 @@ import {
   resendAdminRecoveryNotification,
   suppressAdminRecoveryNotification,
 } from '@/lib/paypal/txLedger/adminNotificationOutbox';
+import { resendCustomerNotification } from '@/lib/paypal/txLedger/customerNotificationOutbox';
 import {
   runPayPalRecoveryScanner,
   runSelectedPayPalRecoveryScanner,
@@ -290,6 +291,65 @@ export async function suppressAdminRecoveryNotificationAction({
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'Notification suppress failed.',
+    };
+  }
+}
+
+export async function resendCustomerNotificationAction({
+  notificationId,
+  orderToken,
+}: {
+  notificationId: string;
+  orderToken: string;
+}): Promise<AdminNotificationActionResult> {
+  try {
+    const admin = await requireAdminAction('shop.recovery.run');
+    await writeAdminAuditLog({
+      actor: admin,
+      action: 'shop.paid_order_recovery.customer_notification_resend',
+      targetType: 'customerNotification',
+      targetId: notificationId,
+      outcome: 'started',
+      metadata: { orderToken },
+    });
+
+    const result = await resendCustomerNotification(notificationId);
+
+    revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+
+    if (!result.ok) {
+      await writeAdminAuditLog({
+        actor: admin,
+        action: 'shop.paid_order_recovery.customer_notification_resend',
+        targetType: 'customerNotification',
+        targetId: notificationId,
+        outcome: 'failure',
+        metadata: { orderToken, error: result.error ?? 'Customer notification resend failed.' },
+      });
+
+      return {
+        ok: false,
+        error: result.error ?? 'Customer notification resend failed.',
+      };
+    }
+
+    await writeAdminAuditLog({
+      actor: admin,
+      action: 'shop.paid_order_recovery.customer_notification_resend',
+      targetType: 'customerNotification',
+      targetId: notificationId,
+      outcome: 'success',
+      metadata: { orderToken },
+    });
+
+    return {
+      ok: true,
+      message: 'Customer notification resent successfully.',
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Customer notification resend failed.',
     };
   }
 }

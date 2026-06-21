@@ -132,6 +132,7 @@ Implemented behavior:
 - Successful push acceptance creates `paid_order_fulfillment_push_accepted` rows in `CustomerNotificationOutbox` and sends the customer-safe "we're working on your order" email.
 - Successful push acceptance also creates low-severity `paid_order_fulfillment_push_accepted` rows in `AdminNotificationOutbox`, routed through `paid_order_fulfillment_success`.
 - The admin detail page shows admin notification history and customer notification history without dumping raw provider payloads.
+- Failed or pending customer notification rows can be resent from the paid-order recovery detail page.
 
 Remaining follow-up work:
 
