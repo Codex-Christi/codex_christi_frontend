@@ -13,6 +13,7 @@ import {
   UserRoundCog,
 } from 'lucide-react';
 import { isAdminScopeAllowed, isMasterAdminRole } from '@/lib/admin/admin-config';
+import AdminSystemTimeGreeting from '@/components/UI/Admin/AdminSystemTimeGreeting';
 import CometsContainer from '@/components/UI/general/CometsContainer';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
 import { requireAdminPage } from '@/lib/admin/require-admin';
@@ -51,9 +52,7 @@ export default async function AdminPage() {
   ]);
   const displayName =
     profile?.first_name?.trim() || profile?.username?.trim() || `Admin ${admin.userID.slice(0, 8)}`;
-  const now = new Date();
-  const greeting = getTimeGreeting(now);
-  const dailyIndex = getDailyIndex(now, admin.userID);
+  const dailyIndex = getDailyIndex(new Date(), admin.userID);
   const attentionRows = recoveryRows.filter((row) =>
     ['failed', 'recovery', 'pending', 'sync'].includes(row.status),
   );
@@ -73,9 +72,7 @@ export default async function AdminPage() {
                     Admin
                   </div>
                   <div className='space-y-2'>
-                    <h1 className='text-3xl font-semibold tracking-normal text-white sm:text-4xl'>
-                      {greeting}, {displayName}
-                    </h1>
+                    <AdminSystemTimeGreeting displayName={displayName} />
                     <p className='max-w-3xl text-sm leading-6 text-slate-300 sm:text-base'>
                       {dailyFacts[dailyIndex % dailyFacts.length]}
                     </p>
@@ -189,20 +186,6 @@ export default async function AdminPage() {
   );
 }
 
-function getTimeGreeting(date: Date) {
-  const hour = date.getHours();
-
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
-}
-
-function getDailyIndex(date: Date, userID: string) {
-  const dateKey = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
-
-  return [...`${dateKey}-${userID}`].reduce((sum, char) => sum + char.charCodeAt(0), 0);
-}
-
 function StatusPill({
   label,
   value,
@@ -305,4 +288,10 @@ function AttentionRow({
       <span className={`text-sm font-semibold ${toneClass}`}>{value}</span>
     </div>
   );
+}
+
+function getDailyIndex(date: Date, userID: string) {
+  const dateKey = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+
+  return [...`${dateKey}-${userID}`].reduce((sum, char) => sum + char.charCodeAt(0), 0);
 }
