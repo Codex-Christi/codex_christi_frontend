@@ -266,38 +266,19 @@ export async function getAdminOpsDashboardSummary(): Promise<AdminOpsDashboardSu
 
 export async function listAdminAuditLogsForDashboard({
   filters = {},
+  skip = 0,
   take = 100,
 }: {
   filters?: AdminAuditLogFilters;
+  skip?: number;
   take?: number;
 } = {}): Promise<AdminAuditLogSummary[]> {
-  const where: Prisma.AdminAuditLogWhereInput = {};
-  const action = filters.action?.trim();
-  const actorCodexUserId = filters.actorCodexUserId?.trim();
-  const targetId = filters.targetId?.trim();
-  const outcome = normalizeAuditOutcome(filters.outcome);
-
-  if (action) {
-    where.action = { contains: action.slice(0, 128) };
-  }
-
-  if (actorCodexUserId) {
-    where.actorCodexUserId = actorCodexUserId.slice(0, 128);
-  }
-
-  if (targetId) {
-    where.targetId = { contains: targetId.slice(0, 128) };
-  }
-
-  if (outcome) {
-    where.outcome = outcome;
-  }
-
   const rows = await getAdminOpsLedgerPrisma().adminAuditLog.findMany({
-    where,
+    where: buildAdminAuditLogWhere(filters),
     orderBy: {
       createdAt: 'desc',
     },
+    skip: Math.max(skip, 0),
     take: Math.min(Math.max(take, 1), 250),
     select: {
       id: true,
@@ -314,6 +295,16 @@ export async function listAdminAuditLogsForDashboard({
   });
 
   return rows;
+}
+
+export async function countAdminAuditLogsForDashboard({
+  filters = {},
+}: {
+  filters?: AdminAuditLogFilters;
+} = {}) {
+  return getAdminOpsLedgerPrisma().adminAuditLog.count({
+    where: buildAdminAuditLogWhere(filters),
+  });
 }
 
 export async function deleteAdminAuditLogsByCreatedAtRange({ from, to }: AdminAuditLogDeleteRange) {
@@ -467,6 +458,32 @@ function normalizeAdminUserAuthRecord(row: unknown): AdminUserAuthRecord | null 
 
 function toJsonObject(value: Record<string, unknown>): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function buildAdminAuditLogWhere(filters: AdminAuditLogFilters) {
+  const where: Prisma.AdminAuditLogWhereInput = {};
+  const action = filters.action?.trim();
+  const actorCodexUserId = filters.actorCodexUserId?.trim();
+  const targetId = filters.targetId?.trim();
+  const outcome = normalizeAuditOutcome(filters.outcome);
+
+  if (action) {
+    where.action = { contains: action.slice(0, 128) };
+  }
+
+  if (actorCodexUserId) {
+    where.actorCodexUserId = actorCodexUserId.slice(0, 128);
+  }
+
+  if (targetId) {
+    where.targetId = { contains: targetId.slice(0, 128) };
+  }
+
+  if (outcome) {
+    where.outcome = outcome;
+  }
+
+  return where;
 }
 
 function normalizeAuditOutcome(value: string | null | undefined) {

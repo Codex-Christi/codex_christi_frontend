@@ -3,6 +3,8 @@ import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   DatabaseZap,
   Filter,
@@ -13,6 +15,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import {
+  countAdminAuditLogsForDashboard,
   listAdminAuditLogsForDashboard,
   type AdminAuditLogFilters,
   type AdminAuditLogSummary,
@@ -41,27 +44,38 @@ export const metadata: Metadata = {
 };
 
 const outcomeOptions = ['success', 'failure', 'blocked', 'started'] as const;
+const ACTIVITY_PAGE_SIZE = 25;
 
 export default async function AdminSecurityRecordsPage({
   searchParams,
 }: AdminSecurityRecordsPageProps) {
   const params = (await searchParams) ?? {};
   const filters = getAuditLogFilters(params);
+  const requestedPage = getPositiveIntegerParam(params.page) ?? 1;
   const admin = await requireAdminPage({
     scope: 'audit.view',
     returnPath: '/admin/admin-ops/security-records',
   });
   const isMasterAdmin = isMasterAdminRole(admin.role);
-  const [auditLogs, maintenancePreview] = await Promise.all([
-    listAdminAuditLogsForDashboard({ filters }),
+  const [auditLogCount, maintenancePreview] = await Promise.all([
+    countAdminAuditLogsForDashboard({ filters }),
     isMasterAdmin
       ? previewAdminOpsLedgerMinimumStoragePrune().catch(() => null)
       : Promise.resolve(null),
   ]);
+  const totalPages = Math.max(1, Math.ceil(auditLogCount / ACTIVITY_PAGE_SIZE));
+  const currentPage = Math.min(requestedPage, totalPages);
+  const auditLogs = await listAdminAuditLogsForDashboard({
+    filters,
+    skip: (currentPage - 1) * ACTIVITY_PAGE_SIZE,
+    take: ACTIVITY_PAGE_SIZE,
+  });
   const backHref = isMasterAdmin ? '/admin/admin-ops' : '/admin';
   const eligibleTotal = maintenancePreview
     ? getAdminOpsLedgerPruneTotal(maintenancePreview.eligible)
     : 0;
+  const currentPageStart = auditLogCount ? (currentPage - 1) * ACTIVITY_PAGE_SIZE + 1 : 0;
+  const currentPageEnd = Math.min(currentPage * ACTIVITY_PAGE_SIZE, auditLogCount);
 
   return (
     <div className='mx-auto flex w-full max-w-[1400px] flex-col gap-6 px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
@@ -92,8 +106,8 @@ export default async function AdminSecurityRecordsPage({
 
           <div className='grid gap-3 sm:grid-cols-3 lg:min-w-[520px]'>
             <MetricPill
-              label='Visible'
-              value={`${auditLogs.length}`}
+              label='Matches'
+              value={`${auditLogCount}`}
               icon={ScrollText}
               tone='cyan'
             />
@@ -200,20 +214,29 @@ export default async function AdminSecurityRecordsPage({
             <div>
               <h2 className='text-base font-semibold text-white'>Recent Activity</h2>
               <p className='mt-1 text-sm text-slate-400'>
-                Newest matching events, capped at 100 rows.
+                Newest matching events, paginated for faster review.
               </p>
             </div>
             <span className='rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-300'>
-              {auditLogs.length} shown
+              {auditLogCount
+                ? `${currentPageStart}-${currentPageEnd} of ${auditLogCount}`
+                : '0 shown'}
             </span>
           </div>
 
           {auditLogs.length ? (
-            <div className='grid gap-3'>
-              {auditLogs.map((auditLog) => (
-                <AuditLogCard key={auditLog.id} auditLog={auditLog} />
-              ))}
-            </div>
+            <>
+              <div className='grid gap-3'>
+                {auditLogs.map((auditLog) => (
+                  <AuditLogCard key={auditLog.id} auditLog={auditLog} />
+                ))}
+              </div>
+              <PaginationControls
+                currentPage={currentPage}
+                filters={filters}
+                totalPages={totalPages}
+              />
+            </>
           ) : (
             <p className='rounded-lg border border-amber-300/15 bg-amber-300/10 px-3 py-2 text-sm text-amber-100'>
               No audit logs match these filters.
@@ -299,6 +322,126 @@ export default async function AdminSecurityRecordsPage({
       ) : null}
     </div>
   );
+}
+
+function PaginationControls({
+  currentPage,
+  filters,
+  totalPages,
+}: {
+  currentPage: number;
+  filters: AdminAuditLogFilters;
+  totalPages: number;
+}) {
+  if (totalPages <= 1) {
+    return null;
+  }
+
+  return (
+    <nav
+      aria-label='Admin activity pagination'
+      className='mt-4 flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between'
+    >
+      <p className='text-xs text-slate-500'>
+        Page {currentPage} of {totalPages}
+      </p>
+      <div className='flex flex-wrap items-center gap-2'>
+        <PaginationLink
+          disabled={currentPage <= 1}
+          href={buildSecurityRecordsHref({ filters, page: currentPage - 1 })}
+          label='Previous'
+          icon='previous'
+        />
+        {getPaginationItems(currentPage, totalPages).map((item, index) =>
+          item === 'ellipsis' ? (
+            <span
+              key={`ellipsis-${index}`}
+              className='grid h-9 min-w-9 place-items-center rounded-lg border border-white/10 bg-white/[0.025] px-2 text-xs text-slate-500'
+            >
+              ...
+            </span>
+          ) : (
+            <Link
+              key={item}
+              href={buildSecurityRecordsHref({ filters, page: item })}
+              aria-current={item === currentPage ? 'page' : undefined}
+              className={`grid h-9 min-w-9 place-items-center rounded-lg border px-2 text-sm font-semibold transition ${
+                item === currentPage
+                  ? 'border-cyan-300/30 bg-cyan-300/15 text-cyan-100'
+                  : 'border-white/10 bg-white/[0.04] text-slate-300 hover:border-cyan-300/25 hover:text-cyan-100'
+              }`}
+            >
+              {item}
+            </Link>
+          ),
+        )}
+        <PaginationLink
+          disabled={currentPage >= totalPages}
+          href={buildSecurityRecordsHref({ filters, page: currentPage + 1 })}
+          label='Next'
+          icon='next'
+        />
+      </div>
+    </nav>
+  );
+}
+
+function PaginationLink({
+  disabled,
+  href,
+  icon,
+  label,
+}: {
+  disabled: boolean;
+  href: string;
+  icon: 'next' | 'previous';
+  label: string;
+}) {
+  const Icon = icon === 'previous' ? ChevronLeft : ChevronRight;
+
+  if (disabled) {
+    return (
+      <span className='inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-white/5 bg-white/[0.02] px-3 text-sm font-semibold text-slate-600'>
+        {icon === 'previous' ? <Icon size={15} /> : null}
+        {label}
+        {icon === 'next' ? <Icon size={15} /> : null}
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className='inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-300/25 hover:text-cyan-100'
+    >
+      {icon === 'previous' ? <Icon size={15} /> : null}
+      {label}
+      {icon === 'next' ? <Icon size={15} /> : null}
+    </Link>
+  );
+}
+
+function getPaginationItems(currentPage: number, totalPages: number) {
+  const items: Array<number | 'ellipsis'> = [];
+  let previousIncludedPage = 0;
+
+  for (let page = 1; page <= totalPages; page += 1) {
+    const shouldInclude =
+      page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1;
+
+    if (!shouldInclude) {
+      continue;
+    }
+
+    if (previousIncludedPage && page - previousIncludedPage > 1) {
+      items.push('ellipsis');
+    }
+
+    items.push(page);
+    previousIncludedPage = page;
+  }
+
+  return items;
 }
 
 function AnchorCard({
@@ -492,6 +635,44 @@ function getSingleParam(value: string | string[] | undefined) {
   const trimmed = raw?.trim();
 
   return trimmed || undefined;
+}
+
+function getPositiveIntegerParam(value: string | string[] | undefined) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = Number.parseInt(raw ?? '', 10);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function buildSecurityRecordsHref({
+  filters,
+  page,
+}: {
+  filters: AdminAuditLogFilters;
+  page: number;
+}) {
+  const params = new URLSearchParams();
+
+  setSearchParam(params, 'action', filters.action);
+  setSearchParam(params, 'actorCodexUserId', filters.actorCodexUserId);
+  setSearchParam(params, 'targetId', filters.targetId);
+  setSearchParam(params, 'outcome', filters.outcome);
+
+  if (page > 1) {
+    params.set('page', `${page}`);
+  }
+
+  const query = params.toString();
+
+  return `/admin/admin-ops/security-records${query ? `?${query}` : ''}#activity`;
+}
+
+function setSearchParam(params: URLSearchParams, key: string, value: string | undefined) {
+  const trimmed = value?.trim();
+
+  if (trimmed) {
+    params.set(key, trimmed);
+  }
 }
 
 function formatMetadata(metadata: unknown) {
