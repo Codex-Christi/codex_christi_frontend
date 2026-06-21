@@ -123,3 +123,27 @@ model AdminNotificationOutbox {
   @@index([status])
   @@index([createdAt])
 }
+
+model CustomerNotificationOutbox {
+  id               String    @id @default(cuid())
+  orderToken       String
+  paypalOrderId    String?
+  type             String
+  status           String    @default("pending")
+  dedupeKey        String    @unique
+  recipient        String
+  payload          Json
+  attemptCount     Int       @default(0)
+  lastAttemptAt    DateTime?
+  sentAt           DateTime?
+  lastErrorMessage String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([orderToken])
+  @@index([paypalOrderId])
+  @@index([type])
+  @@index([status])
+  @@index([recipient])
+  @@index([createdAt])
+}

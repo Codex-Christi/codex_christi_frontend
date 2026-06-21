@@ -8,6 +8,7 @@ import { isActiveAdminStatus, isMasterAdminRole, normalizeAdminRole } from './ad
 
 export const ADMIN_NOTIFICATION_RECIPIENT_GROUP_KEY = {
   PAID_ORDER_FULFILLMENT_ISSUES: 'paid_order_fulfillment_issues',
+  PAID_ORDER_FULFILLMENT_SUCCESS: 'paid_order_fulfillment_success',
   PAYMENT_ISSUES: 'payment_issues',
   GENERAL_ADMIN_OPS: 'general_admin_ops',
 } as const;

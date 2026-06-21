@@ -64,7 +64,9 @@ function withStepStatus(
 function buildErrorSteps(data: PayPalTxPaymentStatusResponse) {
   let steps = createSteps();
   const isFulfillmentReview =
-    data.status === 'fulfillment_blocked' || data.status === 'fulfillment_failed';
+    data.status === 'fulfillment_blocked' ||
+    data.status === 'fulfillment_failed' ||
+    data.status === 'fulfillment_attention_required';
   const message = isFulfillmentReview
     ? 'Our team is reviewing the fulfillment handoff before your order moves forward.'
     : (data.error?.message ?? 'Payment processing failed');
@@ -102,7 +104,9 @@ export function mapLedgerToProcessingState(
     supportReference: data.orderToken,
     shortSupportReference: data.orderToken.slice(0, 8),
     needsManualReview:
-      data.status === 'fulfillment_blocked' || data.status === 'fulfillment_failed',
+      data.status === 'fulfillment_blocked' ||
+      data.status === 'fulfillment_failed' ||
+      data.status === 'fulfillment_attention_required',
   };
 
   if (data.status === 'completed') {
@@ -151,6 +155,7 @@ export function mapLedgerToProcessingState(
     data.status === 'refunded' ||
     data.status === 'fulfillment_blocked' ||
     data.status === 'fulfillment_failed' ||
+    data.status === 'fulfillment_attention_required' ||
     data.error?.message
   ) {
     return {

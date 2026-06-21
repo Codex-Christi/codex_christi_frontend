@@ -17,17 +17,25 @@ import {
 } from '@/lib/paypal/txLedger/sendMerchizeFulfillmentOrder';
 import { registerAcceptedMerchizeFulfillmentProcess } from '@/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentProcess';
 import {
+  recordMerchizeFulfillmentPushDisabledByConfig,
   MerchizeFulfillmentPushError,
   pushMerchizeFulfillmentOrderToProduction,
 } from '@/lib/merchizeFulfillmentOps/pushMerchizeFulfillmentOrderToProduction';
+import { isMerchizeFulfillmentPushEnabled } from '@/lib/merchizeFulfillmentOps/pushPolicy';
 import { CODEX_CHRISTI_FULFILLMENT_IDENTIFIER } from '@/lib/merchizeFulfillmentOps/fulfillmentIdentifier';
 import { syncMerchizeFulfillmentOrder } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOrder';
 import { syncMerchizeFulfillmentOperationalSnapshots } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOperationalSnapshots';
 import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/lib/merchizeFulfillmentOps/merchizeMapper';
 import {
+  enqueueAdminFulfillmentPushAcceptedNotification,
   enqueueAdminRecoveryNotification,
+  ADMIN_NOTIFICATION_SEVERITY,
   sendPendingAdminRecoveryNotificationsForOrder,
 } from '@/lib/paypal/txLedger/adminNotificationOutbox';
+import {
+  enqueueCustomerFulfillmentPushAcceptedNotification,
+  sendPendingCustomerNotificationsForOrder,
+} from '@/lib/paypal/txLedger/customerNotificationOutbox';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
@@ -35,6 +43,10 @@ import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/
 import type { CartVariant } from '@/stores/shop_stores/cartStore';
 
 const POST_PROCESSING_LEASE_MS = 5 * 60_000;
+
+type RunPaidFulfillmentProcessingOptions = {
+  overrideMerchizeFulfillmentPushDisabled?: boolean;
+};
 
 function buildPaymentReceiptPayload(args: PaymentReceiptProps) {
   return encryptForPostProcessingServerAction(JSON.stringify(args));
@@ -135,7 +147,145 @@ async function markFulfillmentFailedAndNotify(args: {
   );
 }
 
-export async function runPaidFulfillmentProcessing(orderToken: string) {
+async function markFulfillmentAttentionRequiredAndNotify(args: {
+  orderToken: string;
+  lockId: string;
+  row: {
+    paypalOrderId: string | null;
+    customerName: string;
+    customerEmail: string;
+    receiptLink: string | null;
+  };
+  errorCode: string;
+  errorMessage: string;
+  issueSummary?: string[];
+  requestPayload?: unknown;
+  responsePayload?: unknown;
+  merchizeFulfillmentProcessingId?: string | null;
+  merchizeProviderOrderId?: string | null;
+  merchizeProviderOrderCode?: string | null;
+}) {
+  await paypalTxLedger.$transaction(async (tx) => {
+    await tx.paypalIntent.updateMany({
+      where: { orderToken: args.orderToken, postProcessingLockId: args.lockId },
+      data: {
+        status: PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED,
+        lastErrorCode: args.errorCode,
+        lastErrorMessage: args.errorMessage,
+        merchizeFulfillmentRequestPayload:
+          args.requestPayload === undefined ? undefined : toLedgerJson(args.requestPayload),
+        merchizeFulfillmentResponsePayload:
+          args.responsePayload === undefined ? undefined : toLedgerJson(args.responsePayload),
+        merchizeFulfillmentProcessingId: args.merchizeFulfillmentProcessingId ?? undefined,
+        merchizeProviderOrderId: args.merchizeProviderOrderId ?? undefined,
+        merchizeProviderOrderCode: args.merchizeProviderOrderCode ?? undefined,
+        postProcessingLockId: null,
+        postProcessingLockedAt: null,
+        postProcessingLockExpiresAt: null,
+      } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
+    });
+
+    await enqueueAdminRecoveryNotification({
+      db: tx,
+      orderToken: args.orderToken,
+      paypalOrderId: args.row.paypalOrderId,
+      customerName: args.row.customerName,
+      customerEmail: args.row.customerEmail,
+      ledgerStatus: PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED,
+      errorCode: args.errorCode,
+      errorMessage: args.errorMessage,
+      issueSummary: args.issueSummary ?? [args.errorMessage],
+      receiptLink: args.row.receiptLink,
+      severity: ADMIN_NOTIFICATION_SEVERITY.WARNING,
+    });
+  });
+
+  await sendPendingAdminRecoveryNotificationsForOrder(args.orderToken).catch(
+    (notificationError) => {
+      console.error('[AdminNotificationOutbox] failed to send fulfillment attention alert', {
+        orderToken: args.orderToken,
+        error:
+          notificationError instanceof Error
+            ? notificationError.message
+            : String(notificationError),
+      });
+    },
+  );
+}
+
+async function notifyFulfillmentPushAccepted(args: {
+  orderToken: string;
+  row: {
+    paypalOrderId: string | null;
+    customerName: string;
+    customerEmail: string;
+    receiptLink: string | null;
+  };
+  merchizeExternalOrderNumber?: string | null;
+  merchizeOrderId?: string | null;
+  merchizeOrderCode?: string | null;
+}) {
+  await enqueueCustomerFulfillmentPushAcceptedNotification({
+    orderToken: args.orderToken,
+    paypalOrderId: args.row.paypalOrderId,
+    customerName: args.row.customerName,
+    customerEmail: args.row.customerEmail,
+    receiptLink: args.row.receiptLink,
+  }).catch((notificationError) => {
+    console.error('[CustomerNotificationOutbox] failed to enqueue fulfillment success alert', {
+      orderToken: args.orderToken,
+      error:
+        notificationError instanceof Error
+          ? notificationError.message
+          : String(notificationError),
+    });
+  });
+
+  await enqueueAdminFulfillmentPushAcceptedNotification({
+    orderToken: args.orderToken,
+    paypalOrderId: args.row.paypalOrderId,
+    customerName: args.row.customerName,
+    customerEmail: args.row.customerEmail,
+    receiptLink: args.row.receiptLink,
+    merchizeExternalOrderNumber: args.merchizeExternalOrderNumber,
+    merchizeOrderId: args.merchizeOrderId,
+    merchizeOrderCode: args.merchizeOrderCode,
+  }).catch((notificationError) => {
+    console.error('[AdminNotificationOutbox] failed to enqueue fulfillment success alert', {
+      orderToken: args.orderToken,
+      error:
+        notificationError instanceof Error
+          ? notificationError.message
+          : String(notificationError),
+    });
+  });
+
+  await Promise.all([
+    sendPendingCustomerNotificationsForOrder(args.orderToken).catch((notificationError) => {
+      console.error('[CustomerNotificationOutbox] failed to send fulfillment success alert', {
+        orderToken: args.orderToken,
+        error:
+          notificationError instanceof Error
+            ? notificationError.message
+            : String(notificationError),
+      });
+    }),
+    sendPendingAdminRecoveryNotificationsForOrder(args.orderToken).catch((notificationError) => {
+      console.error('[AdminNotificationOutbox] failed to send fulfillment success alert', {
+        orderToken: args.orderToken,
+        error:
+          notificationError instanceof Error
+            ? notificationError.message
+            : String(notificationError),
+      });
+    }),
+  ]);
+}
+
+export async function runPaidFulfillmentProcessing(
+  orderToken: string,
+  options: RunPaidFulfillmentProcessingOptions = {},
+) {
   const now = new Date();
   const lockId = randomUUID();
   const leaseExpiresAt = new Date(now.getTime() + POST_PROCESSING_LEASE_MS);
@@ -343,6 +493,38 @@ export async function runPaidFulfillmentProcessing(orderToken: string) {
         return;
       }
 
+      if (
+        !options.overrideMerchizeFulfillmentPushDisabled &&
+        !isMerchizeFulfillmentPushEnabled()
+      ) {
+        const message =
+          'Merchize push-to-fulfillment is disabled by MERCHIZE_FULFILLMENT_PUSH_ENABLED=false.';
+        await recordMerchizeFulfillmentPushDisabledByConfig({
+          orderToken,
+          merchizeExternalOrderNumber,
+          merchizeOrderCode: merchizeProviderOrderCode,
+          identifier: CODEX_CHRISTI_FULFILLMENT_IDENTIFIER,
+        });
+        await markFulfillmentAttentionRequiredAndNotify({
+          orderToken,
+          lockId,
+          row,
+          errorCode: 'MERCHIZE_PUSH_DISABLED_BY_CONFIG',
+          errorMessage: message,
+          issueSummary: [
+            'Payment-side work completed and the provider order was registered.',
+            'Merchize push-to-fulfillment was skipped because production push is disabled by configuration.',
+            'Use master-admin manual release when this order is safe to push.',
+          ],
+          requestPayload: fulfillmentRequestPayload,
+          responsePayload: fulfillmentResponsePayload,
+          merchizeFulfillmentProcessingId,
+          merchizeProviderOrderId,
+          merchizeProviderOrderCode,
+        });
+        return;
+      }
+
       try {
         await pushMerchizeFulfillmentOrderToProduction({
           orderToken,
@@ -392,6 +574,14 @@ export async function runPaidFulfillmentProcessing(orderToken: string) {
           merchizeExternalOrderNumber,
           error: snapshotError instanceof Error ? snapshotError.message : String(snapshotError),
         });
+      });
+
+      await notifyFulfillmentPushAccepted({
+        orderToken,
+        row,
+        merchizeExternalOrderNumber,
+        merchizeOrderId: sync.merchizeOrderId,
+        merchizeOrderCode: merchizeProviderOrderCode,
       });
     } else {
       await markFulfillmentFailedAndNotify({

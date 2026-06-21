@@ -40,7 +40,7 @@ Implemented before the dashboard revamp continues:
 
 Dashboard/admin work should continue from these states:
 
-- Query and display `fulfillment_failed` and `fulfillment_blocked` rows.
+- Query and display `fulfillment_failed`, `fulfillment_blocked`, and `fulfillment_attention_required` rows.
 - Show `lastErrorCode`, `lastErrorMessage`, `merchizeFulfillmentRequestPayload`, and `merchizeFulfillmentResponsePayload`.
 - Show the Merchize external order number from the wrapped Django process response when present.
 - Show Merchize provider detail IDs only after the external-number lookup returns them.
@@ -122,37 +122,36 @@ A real user can pay successfully, but post-payment processing can fail after Pay
 
 The admin tooling must make these cases visible and recoverable without relying on the shopper's browser session.
 
-### Current Notification Gaps After Merchize Push Wiring
+### Current Notification Behavior After Merchize Push Wiring
 
-The current fulfillment runner sends internal recovery notifications for failure/blocking states, but it does not send customer or admin success emails when Merchize push-to-fulfillment succeeds.
+The fulfillment runner now sends tracked notifications for both blocking states and successful push-to-fulfillment.
 
-Missing follow-up work:
+Implemented behavior:
 
-- Add a tracked customer notification/outbox row after push acceptance, then send a customer-safe "we're working on your order" email.
-- Add an admin-visible success event for `push_accepted`; do not default to admin success emails unless operations explicitly wants that volume.
-- Keep using the fulfillment issue recipient group for failures and future `attention_required` states.
+- Failure/blocking/attention states create durable `AdminNotificationOutbox` rows and attempt email delivery through `paid_order_fulfillment_issues`, with `ORDER_RECOVERY_ADMIN_EMAILS` as the bootstrap fallback.
+- Successful push acceptance creates `paid_order_fulfillment_push_accepted` rows in `CustomerNotificationOutbox` and sends the customer-safe "we're working on your order" email.
+- Successful push acceptance also creates low-severity `paid_order_fulfillment_push_accepted` rows in `AdminNotificationOutbox`, routed through `paid_order_fulfillment_success`.
+- The admin detail page shows admin notification history and customer notification history without dumping raw provider payloads.
+
+Remaining follow-up work:
+
 - Escalate repeated progress/tracking/invoice snapshot failures into admin-visible reconciliation states.
+- Add customer tracking/update emails only after tracking data is present and customer-safe.
 - Add admin pause/resume/cancel controls only with reason capture, audit logging, confirmation, and step-up auth.
 
 ### Push-Disabled Semi-Real Test Contract
 
 Current runtime status:
 
-- There is no implemented `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false` guard yet.
-- A fresh checkout with live Merchize credentials will still attempt the real `POST /order/external/orders/push` call after the accepted Django process/import and provider sync stages.
-- The current admin notification path sends durable outbox rows and email attempts only for failure/blocking states, not successful push acceptance.
-- There is no customer success email after automatic or manual push acceptance yet.
-- The existing admin `Push To Fulfillment`/retry action is resumable, but it is not a master-admin-only password override flow.
-
-Target admin behavior before using this as a semi-real provider test:
-
-- When `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false`, stop before provider push and persist an explicit push-disabled production gate state.
-- Enqueue and send an internal paid-order recovery notification for that stopped state, using the configured recipient group/fallback email list.
-- Show a clear admin action on the paid-order recovery detail page: provider push is disabled by configuration, and the order is waiting for manual release.
-- Manual release must require master admin authorization, fresh password step-up, explicit confirmation, and an admin reason.
-- Manual release must resume only the remaining provider push stage. It must not replay PayPal capture, receipt upload, Django payment save, or an already accepted Django process/import.
-- On manual release success, record `push_accepted`, set `releasedToProductionAt`, complete the paid fulfillment runner, and enqueue the customer-safe post-push notification once that customer outbox exists.
-- On manual release failure, keep the order recoverable, persist `push_failed`, and send the internal recovery notification/email.
+- `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false` is implemented as a server-only production push gate.
+- A fresh checkout with live Merchize credentials will complete payment-owned stages, Django payment save, accepted Django process/import, provider registration, and provider lookup/detail sync, then stop before the real `POST /order/external/orders/push` call.
+- The stopped state is explicit: PayPal ledger `status = fulfillment_attention_required`, `lastErrorCode = MERCHIZE_PUSH_DISABLED_BY_CONFIG`, Merchize Ops `syncStatus = push_to_fulfillment_disabled`, and `productionGateStatus = push_disabled`.
+- The stopped state enqueues and sends an internal paid-order recovery notification using the configured recipient group/fallback email list.
+- The paid-order recovery detail page shows a manual release form only when the row is waiting at the push-disabled gate.
+- Manual release requires master admin authorization, fresh password step-up, explicit browser confirmation, and an admin reason.
+- Manual release resumes the paid fulfillment runner with `overrideMerchizeFulfillmentPushDisabled: true`. It must not replay PayPal capture, receipt upload, Django payment save, or an already accepted Django process/import.
+- On manual release success, Merchize Ops records `push_accepted`, sets `releasedToProductionAt`, the PayPal ledger becomes `completed`, and customer/admin success notifications are enqueued and sent.
+- On manual release failure, the order remains recoverable, provider push failure state is persisted where available, and the internal recovery notification/email path remains active.
 
 Target customer behavior during a push-disabled test:
 
@@ -168,16 +167,16 @@ Use the full current runbook in `MERCHIZE_FULFILLMENT_OPS_GUIDE.md` for checkout
 2. Search by the copied `orderToken`, PayPal order ID, or customer email only in the secured admin UI.
 3. Open `/admin/shop/paid-order-recovery/[orderToken]`.
 4. Confirm the detail page shows the PayPal ledger stage, receipt state, Django payment-save custom ID, Merchize external order number when known, Merchize Ops sync status, production gate status, and notification history.
-5. For successful push acceptance, confirm the detail page shows `push_accepted`/`push_to_fulfillment_accepted`; do not expect a customer success email or admin success email yet.
+5. For successful push acceptance, confirm the detail page shows `push_accepted`/`push_to_fulfillment_accepted`, admin notification history, and customer notification history.
 6. For failure or blocked states, confirm a notification outbox row exists and that resend/suppress actions work without changing the PayPal ledger stage.
-7. If using the current retry button, confirm it resumes through `runPaidFulfillmentProcessing(orderToken)` without replaying PayPal capture, receipt upload, Django payment save, or an already accepted Django process response.
+7. For `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false`, confirm the row shows `fulfillment_attention_required`, the manual release form appears, the master-admin password/reason are required, and release resumes through `runPaidFulfillmentProcessing(orderToken, { overrideMerchizeFulfillmentPushDisabled: true })` without replaying PayPal capture, receipt upload, Django payment save, or an already accepted Django process response.
 
 Current expected notification behavior:
 
 - Failure/blocking states should create durable `AdminNotificationOutbox` rows and attempt email delivery.
-- Successful automatic push acceptance does not create a success email.
-- Successful manual retry/push does not create a customer success email yet.
-- A future push-disabled gate should create an admin recovery notification, but that gate is not implemented yet.
+- Push-disabled attention-required states should create durable `AdminNotificationOutbox` rows and attempt email delivery.
+- Successful automatic push acceptance creates customer and admin success notification rows and attempts delivery.
+- Successful manual release creates the same customer and admin success notification rows, deduped by order/recipient/type.
 
 ## Naming Rules
 
@@ -383,6 +382,7 @@ Use current values from `src/lib/paypal/txLedger/status.ts`:
 - `payment_saved`: Django payment save succeeded; fulfillment may still be pending.
 - `fulfillment_blocked`: local fulfillment payload validation failed before the provider call; admin repair is required.
 - `fulfillment_failed`: Django/Merchize fulfillment returned a business failure after the HTTP request succeeded.
+- `fulfillment_attention_required`: payment-owned stages and provider registration/sync can be complete, but an operator-controlled gate or recoverable provider condition requires admin action before final completion.
 - `completed`: all post-processing completed.
 - `pending`: generic waiting state.
 - `refunded`: payment was refunded.
@@ -397,6 +397,7 @@ Unresolved paid statuses for recovery:
   'payment_saved',
   'fulfillment_blocked',
   'fulfillment_failed',
+  'fulfillment_attention_required',
   'error',
 ];
 ```

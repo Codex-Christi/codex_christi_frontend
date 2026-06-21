@@ -122,7 +122,13 @@ export default function AdminNotificationHistoryPanel({
                 <p className='truncate font-medium text-slate-200'>
                   {notification.recipient ?? 'No recipient'}
                 </p>
-                <p className='mt-1 text-xs text-slate-500'>{notification.createdAt}</p>
+                <p className='mt-1 text-xs text-slate-500'>
+                  {notification.type.replaceAll('_', ' ')}
+                  {notification.errorCode ? ` · ${notification.errorCode}` : ''}
+                </p>
+                <p className='mt-1 text-xs text-slate-600'>
+                  {notification.createdAt} · {notification.severity}
+                </p>
               </div>
               <span
                 className={cn(

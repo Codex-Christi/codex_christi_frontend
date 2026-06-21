@@ -10,6 +10,7 @@ const DEFAULT_PENDING_SEND_LIMIT = 25;
 
 export const ADMIN_NOTIFICATION_TYPE = {
   PAID_ORDER_RECOVERY_REQUIRED: 'paid_order_recovery_required',
+  PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED: 'paid_order_fulfillment_push_accepted',
 } as const;
 
 export const ADMIN_NOTIFICATION_STAGE = {
@@ -17,6 +18,7 @@ export const ADMIN_NOTIFICATION_STAGE = {
 } as const;
 
 export const ADMIN_NOTIFICATION_SEVERITY = {
+  INFO: 'info',
   WARNING: 'warning',
   CRITICAL: 'critical',
 } as const;
@@ -44,6 +46,19 @@ type AdminRecoveryNotificationPayload = {
   adminDetailUrl: string;
 };
 
+type AdminFulfillmentPushAcceptedNotificationPayload = {
+  orderToken: string;
+  paypalOrderId?: string | null;
+  customerName: string;
+  customerEmail: string;
+  receiptLink?: string | null;
+  supportReference: string;
+  merchizeExternalOrderNumber?: string | null;
+  merchizeOrderId?: string | null;
+  merchizeOrderCode?: string | null;
+  adminDetailUrl: string;
+};
+
 type EnqueueAdminRecoveryNotificationProps = {
   db?: AdminNotificationDb;
   orderToken: string;
@@ -59,6 +74,18 @@ type EnqueueAdminRecoveryNotificationProps = {
   stage?: (typeof ADMIN_NOTIFICATION_STAGE)[keyof typeof ADMIN_NOTIFICATION_STAGE];
   severity?: (typeof ADMIN_NOTIFICATION_SEVERITY)[keyof typeof ADMIN_NOTIFICATION_SEVERITY];
   recipientGroupKey?: string;
+};
+
+type EnqueueAdminFulfillmentPushAcceptedNotificationProps = {
+  db?: AdminNotificationDb;
+  orderToken: string;
+  paypalOrderId?: string | null;
+  customerName: string;
+  customerEmail: string;
+  receiptLink?: string | null;
+  merchizeExternalOrderNumber?: string | null;
+  merchizeOrderId?: string | null;
+  merchizeOrderCode?: string | null;
 };
 
 function getConfiguredAdminRecipients() {
@@ -194,6 +221,55 @@ function buildAdminRecoveryAlertEmailHtml(payload: AdminRecoveryNotificationPayl
 </html>`;
 }
 
+function buildAdminFulfillmentPushAcceptedEmailHtml(
+  payload: AdminFulfillmentPushAcceptedNotificationPayload,
+) {
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#05070d;color:#f8fafc;font-family:Arial,Helvetica,sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#05070d;padding:28px 14px;">
+      <tr>
+        <td align="center">
+          <table width="100%" cellpadding="0" cellspacing="0" style="max-width:680px;">
+            <tr>
+              <td style="border:1px solid rgba(52,211,153,0.2);border-radius:22px;background:#0b1020;padding:28px;">
+                <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#34d399;font-weight:700;">Fulfillment Push Accepted</div>
+                <h1 style="margin:12px 0 8px;font-size:24px;line-height:1.25;color:#ffffff;">A paid order moved to fulfillment</h1>
+                <p style="margin:0 0 22px;font-size:14px;line-height:1.65;color:#cbd5e1;">
+                  Payment, receipt, Django payment save, Django fulfillment processing, provider detail sync, and Merchize push-to-fulfillment completed.
+                </p>
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;border:1px solid rgba(148,163,184,0.16);border-radius:16px;background:#0f172a;">
+                  <tr>
+                    <td style="padding:16px 18px 6px;color:#94a3b8;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;">Customer</td>
+                    <td style="padding:16px 18px 6px;color:#94a3b8;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;">Support Ref</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:0 18px 16px;color:#f8fafc;font-size:14px;line-height:1.5;">
+                      ${escapeHtml(payload.customerName)}<br />
+                      <span style="color:#94a3b8;">${escapeHtml(payload.customerEmail)}</span>
+                    </td>
+                    <td style="padding:0 18px 16px;color:#e2e8f0;font-size:13px;line-height:1.5;">${escapeHtml(payload.supportReference)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:14px 18px 6px;border-top:1px solid rgba(148,163,184,0.16);color:#94a3b8;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;">Merchize External Number</td>
+                    <td style="padding:14px 18px 6px;border-top:1px solid rgba(148,163,184,0.16);color:#94a3b8;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;">Merchize Order ID</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:0 18px 16px;color:#d1fae5;font-size:13px;line-height:1.5;">${escapeHtml(payload.merchizeExternalOrderNumber ?? 'Unavailable')}</td>
+                    <td style="padding:0 18px 16px;color:#d1fae5;font-size:13px;line-height:1.5;">${escapeHtml(payload.merchizeOrderId ?? payload.merchizeOrderCode ?? 'Unavailable')}</td>
+                  </tr>
+                </table>
+                <a href="${escapeHtml(payload.adminDetailUrl)}" style="display:inline-block;border-radius:12px;background:#d1fae5;color:#064e3b;text-decoration:none;font-size:13px;font-weight:700;padding:12px 18px;">Open Order Detail</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
 export async function enqueueAdminRecoveryNotification({
   db = paypalTxLedger,
   orderToken,
@@ -259,6 +335,67 @@ export async function enqueueAdminRecoveryNotification({
   return { created: result.count, skipped: false as const };
 }
 
+export async function enqueueAdminFulfillmentPushAcceptedNotification({
+  db = paypalTxLedger,
+  orderToken,
+  paypalOrderId,
+  customerName,
+  customerEmail,
+  receiptLink,
+  merchizeExternalOrderNumber,
+  merchizeOrderId,
+  merchizeOrderCode,
+}: EnqueueAdminFulfillmentPushAcceptedNotificationProps) {
+  const type = ADMIN_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED;
+  const stage = ADMIN_NOTIFICATION_STAGE.FULFILLMENT;
+  const severity = ADMIN_NOTIFICATION_SEVERITY.INFO;
+  const recipients = await resolveAdminNotificationRecipients({
+    groupKey: ADMIN_NOTIFICATION_RECIPIENT_GROUP_KEY.PAID_ORDER_FULFILLMENT_SUCCESS,
+    fallbackEmails: getConfiguredAdminRecipients(),
+  });
+
+  if (recipients.length === 0) {
+    return { created: 0, skipped: true as const };
+  }
+
+  const payload: AdminFulfillmentPushAcceptedNotificationPayload = {
+    orderToken,
+    paypalOrderId,
+    customerName,
+    customerEmail,
+    receiptLink,
+    supportReference: orderToken,
+    merchizeExternalOrderNumber,
+    merchizeOrderId,
+    merchizeOrderCode,
+    adminDetailUrl: buildAdminOrderRecoveryUrl(orderToken),
+  };
+
+  const result = await db.adminNotificationOutbox.createMany({
+    data: recipients.map((recipient) => ({
+      orderToken,
+      paypalOrderId,
+      type,
+      stage,
+      errorCode: 'PUSH_ACCEPTED',
+      severity,
+      status: ADMIN_NOTIFICATION_STATUS.PENDING,
+      dedupeKey: buildNotificationDedupeKey({
+        orderToken,
+        recipient,
+        type,
+        stage,
+        errorCode: 'PUSH_ACCEPTED',
+      }),
+      recipient,
+      payload,
+    })),
+    skipDuplicates: true,
+  });
+
+  return { created: result.count, skipped: false as const };
+}
+
 export async function listAdminNotificationsForOrder(orderToken: string) {
   return paypalTxLedger.adminNotificationOutbox.findMany({
     where: { orderToken },
@@ -287,10 +424,19 @@ async function sendAdminRecoveryNotificationRow(
     return { id: row.id, ok: false as const, error: 'Missing recipient email.' };
   }
 
-  const payload = row.payload as AdminRecoveryNotificationPayload;
+  const isPushAccepted =
+    row.type === ADMIN_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED;
 
   try {
     const { sendMailFromPrimaryAgent } = await import('@/lib/zeptomail/sendMailFromPrimaryAgent');
+    const subject = isPushAccepted
+      ? `Paid order pushed to fulfillment · ${(row.payload as AdminFulfillmentPushAcceptedNotificationPayload).supportReference.slice(0, 8)}`
+      : `Paid order recovery required · ${(row.payload as AdminRecoveryNotificationPayload).supportReference}`;
+    const htmlbody = isPushAccepted
+      ? buildAdminFulfillmentPushAcceptedEmailHtml(
+          row.payload as AdminFulfillmentPushAcceptedNotificationPayload,
+        )
+      : buildAdminRecoveryAlertEmailHtml(row.payload as AdminRecoveryNotificationPayload);
 
     await sendMailFromPrimaryAgent({
       emailReceipents: [
@@ -301,8 +447,8 @@ async function sendAdminRecoveryNotificationRow(
           },
         },
       ],
-      subject: `Paid order recovery required · ${payload.supportReference}`,
-      htmlbody: buildAdminRecoveryAlertEmailHtml(payload),
+      subject,
+      htmlbody,
     });
 
     await paypalTxLedger.adminNotificationOutbox.update({

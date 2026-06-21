@@ -32,6 +32,7 @@ const ADMIN_RECOVERY_STATUSES = [
   PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
   PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED,
   PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
+  PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED,
   PAYPAL_LEDGER_STATUS.ERROR,
   PAYPAL_LEDGER_STATUS.COMPLETED,
 ] as const;
@@ -71,6 +72,7 @@ function needsProviderDetailSync(payload: unknown, merchizeOpsSyncStatus?: strin
     MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_PENDING,
     MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_ACCEPTED,
     MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_FAILED,
+    MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_DISABLED,
   ]);
 
   return (
@@ -125,6 +127,7 @@ function mapLedgerStatusToAdminStatus(status: string): PaidOrderRecoveryRow['sta
   ) {
     return 'failed';
   }
+  if (status === PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED) return 'attention';
   if (
     status === PAYPAL_LEDGER_STATUS.CAPTURED ||
     status === PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED
@@ -137,6 +140,8 @@ function mapLedgerStatusToAdminStatus(status: string): PaidOrderRecoveryRow['sta
 function getStepLabel(status: string) {
   if (status === PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED) return 'Fulfillment Blocked';
   if (status === PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED) return 'Fulfillment Failed';
+  if (status === PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED)
+    return 'Fulfillment Attention Required';
   if (status === PAYPAL_LEDGER_STATUS.PAYMENT_SAVED) return 'Payment Saved';
   if (status === PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED) return 'Receipt Prepared';
   if (status === PAYPAL_LEDGER_STATUS.CAPTURED) return 'Payment Captured';
@@ -149,6 +154,7 @@ function getErrorLabel(errorCode: string | null, errorMessage: string | null) {
   if (!errorCode && !errorMessage) return '—';
   if (errorCode === 'FULFILLMENT_PAYLOAD_INVALID') return 'Payload Validation Failed';
   if (errorCode === 'FULFILLMENT_PROVIDER_REJECTED') return 'Provider Rejected Fulfillment';
+  if (errorCode === 'MERCHIZE_PUSH_DISABLED_BY_CONFIG') return 'Push Disabled by Config';
   if (errorCode === 'POST_PROCESSING_FAILED') return 'Post-processing Failed';
   return errorMessage ?? errorCode ?? 'Unknown error';
 }
@@ -254,6 +260,15 @@ function buildTimeline(row: {
       state: 'failed',
     });
   } else if (
+    row.merchizeFulfillmentOpsProductionGateStatus ===
+    MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_DISABLED
+  ) {
+    items.push({
+      label: 'Merchize Push Disabled by Config',
+      time: updated,
+      state: 'pending',
+    });
+  } else if (
     row.merchizeFulfillmentOpsSyncStatus === MERCHIZE_FULFILLMENT_SYNC_STATUS.DETAIL_SYNCED
   ) {
     items.push({
@@ -264,6 +279,7 @@ function buildTimeline(row: {
   } else if (
     row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED ||
     row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED ||
+    row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED ||
     row.status === PAYPAL_LEDGER_STATUS.ERROR
   ) {
     items.push({
@@ -272,7 +288,9 @@ function buildTimeline(row: {
           ? 'Fulfillment Blocked'
           : row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED
             ? 'Fulfillment Failed'
-            : 'Post-processing Failed',
+            : row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED
+              ? 'Fulfillment Attention Required'
+              : 'Post-processing Failed',
       time: updated,
       state: 'failed',
     });
@@ -520,7 +538,11 @@ function buildActivity(row: {
       label: 'Recovery required',
       description: row.lastErrorMessage,
       time: formatLongDate(row.updatedAt),
-      tone: row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED ? 'amber' : 'rose',
+      tone:
+        row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED ||
+        row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED
+          ? 'amber'
+          : 'rose',
     });
   }
 
@@ -625,6 +647,11 @@ function buildDetail(row: {
     row.merchizeFulfillmentResponsePayload,
     row.merchizeFulfillmentOps?.syncStatus,
   );
+  const requiresPushOverride =
+    row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED &&
+    (row.lastErrorCode === 'MERCHIZE_PUSH_DISABLED_BY_CONFIG' ||
+      row.merchizeFulfillmentOps?.productionGateStatus ===
+        MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_DISABLED);
 
   return {
     customerName: row.customerName,
@@ -686,6 +713,7 @@ function buildDetail(row: {
     scannerState: getScannerState(row),
     merchizeFulfillmentOps: row.merchizeFulfillmentOps,
     needsProviderDetailSync: providerDetailSyncNeeded,
+    requiresPushOverride,
     rawDebug: {
       orderToken: row.orderToken,
       userId: row.userId,
@@ -702,6 +730,7 @@ function buildDetail(row: {
       merchizeExternalOrderNumber,
       merchizeFulfillmentOps: row.merchizeFulfillmentOps,
       needsProviderDetailSync: providerDetailSyncNeeded,
+      requiresPushOverride,
       scannerState: getScannerState(row),
       webhookEvents: row.webhookEvents,
     },
@@ -759,6 +788,10 @@ export async function getAdminPaidOrderRecoveryDetail(orderToken: string) {
     where: { orderToken: row.orderToken },
     orderBy: { createdAt: 'desc' },
   });
+  const customerNotifications = await paypalTxLedger.customerNotificationOutbox.findMany({
+    where: { orderToken: row.orderToken },
+    orderBy: { createdAt: 'desc' },
+  });
   const webhookEvents = row.paypalOrderId
     ? await paypalTxLedger.paypalWebhookEvent.findMany({
         where: { paypalOrderId: row.paypalOrderId },
@@ -789,5 +822,6 @@ export async function getAdminPaidOrderRecoveryDetail(orderToken: string) {
       merchizeFulfillmentOpsReleasedToProductionAt: merchizeOpsSummary?.releasedToProductionAt,
     }),
     notifications,
+    customerNotifications,
   };
 }

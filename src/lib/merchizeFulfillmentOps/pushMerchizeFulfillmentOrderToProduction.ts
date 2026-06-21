@@ -135,6 +135,63 @@ function getPushError(error: unknown) {
   };
 }
 
+export async function recordMerchizeFulfillmentPushDisabledByConfig(input: PushInput) {
+  const reference = buildReference(input);
+  const requestSummary = buildRequestSummary(reference);
+  const prisma = isMerchizeFulfillmentOpsDatabaseConfigured()
+    ? getMerchizeFulfillmentOpsPrisma()
+    : null;
+
+  if (!prisma) {
+    return { ok: false as const, reason: 'database_not_configured' };
+  }
+
+  const order = await prisma.merchizeFulfillmentOrder.findFirst({
+    where: { orderToken: input.orderToken },
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  if (!order) {
+    return { ok: false as const, reason: 'order_not_found' };
+  }
+
+  const now = new Date();
+  const message =
+    'Merchize push-to-fulfillment is disabled by MERCHIZE_FULFILLMENT_PUSH_ENABLED=false.';
+
+  await prisma.$transaction(async (tx) => {
+    await tx.merchizeFulfillmentOrder.update({
+      where: { id: order.id },
+      data: {
+        syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_DISABLED,
+        productionGateStatus: MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_DISABLED,
+        lastSyncErrorCode: 'MERCHIZE_PUSH_DISABLED_BY_CONFIG',
+        lastSyncErrorMessage: message,
+      },
+    });
+
+    await tx.merchizeFulfillmentSyncAttempt.create({
+      data: {
+        merchizeFulfillmentOrderId: order.id,
+        orderToken: input.orderToken,
+        action: PUSH_ACTION,
+        status: MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.SKIPPED,
+        requestSummary: summarizeProviderRequest(requestSummary),
+        responseSummary: summarizeProviderResponse({
+          skipped: true,
+          reason: 'MERCHIZE_FULFILLMENT_PUSH_ENABLED=false',
+        }),
+        errorCode: 'MERCHIZE_PUSH_DISABLED_BY_CONFIG',
+        errorMessage: message,
+        startedAt: now,
+        finishedAt: now,
+      },
+    });
+  });
+
+  return { ok: true as const };
+}
+
 export async function pushMerchizeFulfillmentOrderToProduction(
   input: PushInput,
 ): Promise<PushResult> {

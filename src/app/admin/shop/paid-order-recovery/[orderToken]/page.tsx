@@ -55,6 +55,18 @@ export default async function AdminPaidOrderRecoveryDetailPage({
               timeline={recovery.timeline}
               notifications={recovery.notifications.map((notification) => ({
                 id: notification.id,
+                type: notification.type,
+                errorCode: notification.errorCode,
+                severity: notification.severity,
+                status: notification.status,
+                recipient: notification.recipient,
+                createdAt: notification.createdAt.toISOString(),
+                sentAt: notification.sentAt?.toISOString() ?? null,
+                lastErrorMessage: notification.lastErrorMessage,
+              }))}
+              customerNotifications={recovery.customerNotifications.map((notification) => ({
+                id: notification.id,
+                type: notification.type,
                 status: notification.status,
                 recipient: notification.recipient,
                 createdAt: notification.createdAt.toISOString(),

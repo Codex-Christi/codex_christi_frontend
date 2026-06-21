@@ -29,6 +29,7 @@ const paidOrderRecoveryStatusClass: Record<PaidOrderRecoveryRow['status'], strin
   pending: 'border-blue-300/20 bg-blue-400/12 text-blue-200',
   completed: 'border-emerald-300/20 bg-emerald-400/12 text-emerald-200',
   sync: 'border-cyan-300/20 bg-cyan-400/12 text-cyan-100',
+  attention: 'border-amber-300/20 bg-amber-400/12 text-amber-200',
 };
 
 const paidOrderRecoveryStatusLabel: Record<PaidOrderRecoveryRow['status'], string> = {
@@ -37,6 +38,7 @@ const paidOrderRecoveryStatusLabel: Record<PaidOrderRecoveryRow['status'], strin
   pending: 'pending',
   completed: 'completed',
   sync: 'sync needed',
+  attention: 'attention',
 };
 
 export function AdminToolStateBadge({ state }: { state: ToolState }) {

@@ -1,8 +1,14 @@
 'use server';
 
+import argon2 from 'argon2';
 import { revalidatePath } from 'next/cache';
-import { writeAdminAuditLog } from '@/lib/admin/admin-auth-ledger';
-import { requireAdminAction } from '@/lib/admin/require-admin';
+import {
+  getActiveAdminUserByCodexUserId,
+  getAdminUnlockRateLimit,
+  recordAdminUnlockAttempt,
+  writeAdminAuditLog,
+} from '@/lib/admin/admin-auth-ledger';
+import { requireAdminAction, requireMasterAdminAction } from '@/lib/admin/require-admin';
 import {
   resendAdminRecoveryNotification,
   suppressAdminRecoveryNotification,
@@ -20,8 +26,102 @@ import { syncMerchizeFulfillmentOrder } from '@/lib/merchizeFulfillmentOps/syncM
 import { syncMerchizeFulfillmentOperationalSnapshots } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOperationalSnapshots';
 import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/lib/merchizeFulfillmentOps/merchizeMapper';
 import { CODEX_CHRISTI_FULFILLMENT_IDENTIFIER } from '@/lib/merchizeFulfillmentOps/fulfillmentIdentifier';
+import {
+  getMerchizeFulfillmentOpsPrisma,
+  isMerchizeFulfillmentOpsDatabaseConfigured,
+} from '@/lib/prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOpsPrisma';
 
 type AdminNotificationActionResult = { ok: true; message: string } | { ok: false; error: string };
+
+async function verifyMasterAdminPasswordStepUp({
+  password,
+  action,
+  targetId,
+}: {
+  password: string;
+  action: string;
+  targetId: string;
+}) {
+  const admin = await requireMasterAdminAction();
+  const adminUser = await getActiveAdminUserByCodexUserId(admin.userID);
+
+  if (!adminUser) {
+    throw new Error('Master admin account could not be loaded.');
+  }
+
+  const rateLimit = await getAdminUnlockRateLimit(adminUser.codexUserId);
+  if (rateLimit.locked) {
+    await writeAdminAuditLog({
+      actor: admin,
+      action,
+      targetType: 'orderToken',
+      targetId,
+      outcome: 'blocked',
+      metadata: { reason: 'step_up_rate_limited' },
+    });
+    throw new Error(
+      `Too many failed password attempts. Try again in ${rateLimit.retryAfterSeconds ?? 900} seconds.`,
+    );
+  }
+
+  if (!password.trim()) {
+    throw new Error('Master admin password is required.');
+  }
+
+  const passwordMatches = await argon2.verify(adminUser.passwordHash, password).catch(() => false);
+
+  await recordAdminUnlockAttempt({
+    adminUser,
+    success: passwordMatches,
+    failureReason: passwordMatches ? undefined : 'invalid_step_up_password',
+  });
+
+  if (!passwordMatches) {
+    await writeAdminAuditLog({
+      actor: admin,
+      action,
+      targetType: 'orderToken',
+      targetId,
+      outcome: 'failure',
+      metadata: { reason: 'invalid_step_up_password' },
+    });
+    throw new Error('Master admin password is incorrect.');
+  }
+
+  return admin;
+}
+
+async function writeMerchizeFulfillmentAdminAction(args: {
+  orderToken: string;
+  action: string;
+  actor: string;
+  reason?: string | null;
+  status: string;
+  errorMessage?: string | null;
+  metadata?: Record<string, unknown>;
+}) {
+  if (!isMerchizeFulfillmentOpsDatabaseConfigured()) return;
+
+  const prisma = getMerchizeFulfillmentOpsPrisma();
+  const order = await prisma.merchizeFulfillmentOrder.findFirst({
+    where: { orderToken: args.orderToken },
+    orderBy: { updatedAt: 'desc' },
+    select: { id: true },
+  });
+
+  await prisma.merchizeFulfillmentAdminAction.create({
+    data: {
+      merchizeFulfillmentOrderId: order?.id,
+      orderToken: args.orderToken,
+      action: args.action,
+      actor: args.actor,
+      reason: args.reason,
+      status: args.status,
+      errorMessage: args.errorMessage,
+      metadata: args.metadata ? JSON.parse(JSON.stringify(args.metadata)) : undefined,
+    },
+  });
+}
 
 export type AdminRecoveryScannerActionResult =
   | {
@@ -276,6 +376,171 @@ export async function retryAdminPaidOrderRecoveryAction({
     return {
       ok: false,
       error: error instanceof Error ? error.message : 'Retry failed.',
+    };
+  }
+}
+
+export async function overrideMerchizePushDisabledAndReleaseAction({
+  orderToken,
+  password,
+  reason,
+}: {
+  orderToken: string;
+  password: string;
+  reason: string;
+}): Promise<AdminNotificationActionResult> {
+  const action = 'shop.paid_order_recovery.override_push_disabled_release';
+
+  try {
+    const releaseReason = reason.trim();
+
+    if (!releaseReason) {
+      return {
+        ok: false,
+        error: 'A release reason is required.',
+      };
+    }
+
+    const admin = await verifyMasterAdminPasswordStepUp({
+      password,
+      action,
+      targetId: orderToken,
+    });
+
+    await writeAdminAuditLog({
+      actor: admin,
+      action,
+      targetType: 'orderToken',
+      targetId: orderToken,
+      outcome: 'started',
+      metadata: { hasReason: true },
+    });
+
+    const rejectAfterStepUp = async (error: string) => {
+      await writeMerchizeFulfillmentAdminAction({
+        orderToken,
+        action: 'manual_push_disabled_override',
+        actor: admin.userID,
+        reason: releaseReason,
+        status: 'failed',
+        errorMessage: error,
+      });
+      await writeAdminAuditLog({
+        actor: admin,
+        action,
+        targetType: 'orderToken',
+        targetId: orderToken,
+        outcome: 'failure',
+        metadata: { error },
+      });
+
+      return {
+        ok: false as const,
+        error,
+      };
+    };
+
+    await writeMerchizeFulfillmentAdminAction({
+      orderToken,
+      action: 'manual_push_disabled_override',
+      actor: admin.userID,
+      reason: releaseReason,
+      status: 'started',
+    });
+
+    const existing = await paypalTxLedger.paypalIntent.findUnique({
+      where: { orderToken },
+      select: {
+        status: true,
+        lastErrorCode: true,
+        processingCompletedAt: true,
+        postProcessingLockExpiresAt: true,
+      },
+    });
+
+    if (!existing) {
+      return rejectAfterStepUp('Recovery row was not found.');
+    }
+
+    if (existing.processingCompletedAt) {
+      return rejectAfterStepUp('This order is already completed.');
+    }
+
+    if (
+      existing.status !== 'fulfillment_attention_required' ||
+      existing.lastErrorCode !== 'MERCHIZE_PUSH_DISABLED_BY_CONFIG'
+    ) {
+      return rejectAfterStepUp('This order is not waiting on the push-disabled release gate.');
+    }
+
+    if (existing.postProcessingLockExpiresAt && existing.postProcessingLockExpiresAt > new Date()) {
+      return rejectAfterStepUp('This order is already being processed.');
+    }
+
+    await runPaidFulfillmentProcessing(orderToken, {
+      overrideMerchizeFulfillmentPushDisabled: true,
+    });
+
+    revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+    revalidatePath('/admin/shop/paid-order-recovery');
+
+    const updated = await paypalTxLedger.paypalIntent.findUnique({
+      where: { orderToken },
+      select: {
+        status: true,
+        processingCompletedAt: true,
+        lastErrorMessage: true,
+      },
+    });
+
+    if (updated?.processingCompletedAt) {
+      await writeMerchizeFulfillmentAdminAction({
+        orderToken,
+        action: 'manual_push_disabled_override',
+        actor: admin.userID,
+        reason: releaseReason,
+        status: 'succeeded',
+      });
+      await writeAdminAuditLog({
+        actor: admin,
+        action,
+        targetType: 'orderToken',
+        targetId: orderToken,
+        outcome: 'success',
+      });
+
+      return {
+        ok: true,
+        message: 'Push override completed and the order moved to fulfillment.',
+      };
+    }
+
+    const error = updated?.lastErrorMessage ?? `Release ended in ${updated?.status ?? 'unknown'}.`;
+    await writeMerchizeFulfillmentAdminAction({
+      orderToken,
+      action: 'manual_push_disabled_override',
+      actor: admin.userID,
+      reason: releaseReason,
+      status: 'failed',
+      errorMessage: error,
+    });
+    await writeAdminAuditLog({
+      actor: admin,
+      action,
+      targetType: 'orderToken',
+      targetId: orderToken,
+      outcome: 'failure',
+      metadata: { error },
+    });
+
+    return {
+      ok: false,
+      error,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Push override failed.',
     };
   }
 }

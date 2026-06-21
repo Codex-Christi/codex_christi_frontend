@@ -305,68 +305,61 @@ Implementation rules:
 - Persist progress into `merchizeProgressPayload`, tracking into `merchizeTrackingPayload`, and invoice/cost state into `merchizeFulfillmentCostPayload`.
 - Snapshot sync failures should create failed sync attempts and admin-visible reconciliation state, but they should not undo a successful push-to-fulfillment completion.
 
-## Current post-push notification and reconciliation gaps
+## Current post-push notifications and reconciliation gaps
 
-The current implemented runtime records successful push-to-fulfillment in Merchize Fulfillment Ops and completes the PayPal TX ledger row, but it does not yet send customer or admin success emails.
+The runtime now records successful push-to-fulfillment in Merchize Fulfillment Ops, completes the PayPal TX ledger row, and creates tracked success notifications.
 
-Missing customer-facing work:
+Implemented customer-facing behavior:
 
-- Add an idempotent customer order-status notification after `pushMerchizeFulfillmentOrderToProduction(...)` succeeds.
-- Use a durable outbox or equivalent tracked notification row; do not send the email as an untracked side effect inside the runner.
-- Suggested event name: `paid_order_fulfillment_push_accepted`.
-- Suggested customer copy: payment received, order is now being prepared, support reference is `orderToken`, receipt link when available.
-- Do not include raw provider payloads, full internal IDs, or address data beyond what is already safe for the customer confirmation context.
+- After `pushMerchizeFulfillmentOrderToProduction(...)` succeeds, the runner enqueues and sends `paid_order_fulfillment_push_accepted`.
+- Customer delivery uses `CustomerNotificationOutbox` in the PayPal TX ledger so the send attempt is durable and visible in admin detail.
+- Customer copy stays safe: payment received, the order is being prepared, support reference is `orderToken`, and receipt link when available.
+- Customer emails must not include raw provider payloads, full internal provider IDs, or address data beyond what already belongs in the customer confirmation context.
 
-Missing admin-facing work:
+Implemented admin-facing behavior:
 
-- Do not email admins for every successful push by default unless operations explicitly wants a low-severity success stream.
-- Persist a protected admin-visible operational event for successful push acceptance, with `orderToken`, `merchizeExternalOrderNumber`, `merchizeOrderId` when known, `productionGateStatus = push_accepted`, and `releasedToProductionAt`.
-- Continue sending admin recovery emails for failure/blocking states such as payload invalid, provider rejected, lookup failed, push failed, missing external number, and future `attention_required` states.
-- Add optional recipient-group routing for success events separately from `paid_order_fulfillment_issues` if success emails are requested later.
+- Successful push acceptance enqueues `paid_order_fulfillment_push_accepted` in `AdminNotificationOutbox`.
+- Success emails route through `paid_order_fulfillment_success`, falling back to `ORDER_RECOVERY_ADMIN_EMAILS` only when Admin Ops recipients are unavailable.
+- Failure/blocking/attention states still route through `paid_order_fulfillment_issues`.
+- Admin success rows include `orderToken`, `merchizeExternalOrderNumber`, `merchizeOrderId` when known, `merchizeOrderCode`, and the recovery detail URL.
 
-Missing post-push escalation work:
+Remaining post-push escalation work:
 
 - Convert progress/tracking/invoice snapshot failures into admin-visible reconciliation states when they persist after retry.
 - Add explicit classification rules for `attention_required`, `blocked`, `address_review_required`, `product_unavailable`, `tracking_synced`, and `reconciled`.
 - Add customer tracking/update emails only after tracking data is present and customer-safe.
 
-Missing dangerous admin action work:
+Remaining dangerous admin action work:
 
-- Adapter methods exist for pause/resume/cancel, but admin UI actions still need reason capture, audit logging, confirmation, and eventual step-up auth before production use.
+- Push-disabled manual release has master-admin step-up, reason capture, confirmation, and audit logging.
+- Pause/resume/cancel provider actions still need reason capture, audit logging, confirmation, and eventual step-up auth before production use.
 - Cancel remains out of automatic workflow scope.
 
 ## Semi-real provider test with push disabled
 
 Current runtime status:
 
-- The committed runner does not currently read `MERCHIZE_FULFILLMENT_PUSH_ENABLED`, `MERCHIZE_PUSH_ENABLED`, or any equivalent push-disable flag.
-- Setting a push-enabled env var to `false` is therefore not a safe way to run a semi-real payment test today.
-- If live Merchize credentials and a live Merchize base URL are configured, `runPaidFulfillmentProcessing(orderToken)` will call `POST /order/external/orders/push` after Django process acceptance, external-number lookup, and provider detail sync.
-- A fresh checkout where the push call fails or returns a rejected response becomes `fulfillment_failed`; it enqueues and attempts to send the internal paid-order recovery notification.
-- A fresh checkout where push is accepted becomes `completed`; it does not yet send a customer success email or admin success email.
+- `MERCHIZE_FULFILLMENT_PUSH_ENABLED` is the server-only push gate. Empty or missing means enabled. Valid explicit values are `true` and `false`.
+- When `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false`, the runner completes the payment-owned stages, calls Django payment save, calls Django fulfillment process/import, registers the accepted Merchize process, runs external-number lookup/detail sync when safe, and stops before `POST /order/external/orders/push`.
+- The stopped state is explicit: PayPal ledger `status = fulfillment_attention_required`, `lastErrorCode = MERCHIZE_PUSH_DISABLED_BY_CONFIG`, Merchize Ops `syncStatus = push_to_fulfillment_disabled`, and `productionGateStatus = push_disabled`.
+- The stopped state creates a durable admin notification outbox row and attempts to send the configured internal email, because this is an operator action item.
+- The customer confirmation page does not expose provider internals. It shows the customer-safe manual-review/preparation state and the `orderToken` support reference.
+- The confirmation page must not show raw Merchize IDs, raw Django process payloads, customer address payloads, or admin-only error detail.
 
-Target test-safe behavior before relying on a real payment flow:
+Implemented admin override behavior:
 
-- Add a server-only boolean gate named `MERCHIZE_FULFILLMENT_PUSH_ENABLED`.
-- When `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false`, the runner should complete the payment-owned stages, call Django payment save, call Django fulfillment process/import, register the accepted Merchize process, run external-number lookup/detail sync when safe, and then stop before `POST /order/external/orders/push`.
-- The stopped state should be explicit, for example `productionGateStatus = push_disabled` or `push_paused_by_config`, and should not be marked as PayPal ledger `completed`.
-- The stopped state should create a durable admin notification outbox row and send the configured internal email, because this is an operator action item.
-- The customer confirmation page should not expose provider internals. It should show that payment was received, receipt/payment records are prepared when available, the order is under fulfillment review/preparation, and the `orderToken` support reference.
-- The confirmation page should not show raw Merchize IDs, raw Django process payloads, customer address payloads, or admin-only error detail.
+- Admin recovery shows that provider push is disabled by configuration and offers a master-admin-only manual release on the order detail page.
+- Manual release requires master admin authorization, fresh password step-up, browser confirmation, and an admin reason.
+- Manual release calls `runPaidFulfillmentProcessing(orderToken, { overrideMerchizeFulfillmentPushDisabled: true })`.
+- The runner lease and existing ledger fields prevent replay of PayPal capture, receipt generation, Django payment save, and an already accepted Django process/import.
+- On override success, Merchize Ops persists `push_accepted`, sets `releasedToProductionAt`, the PayPal ledger is completed, operational snapshots run as non-blocking reconciliation, and customer/admin success notifications are enqueued and sent.
+- On override failure, Merchize Ops persists `push_failed` when the provider push failed, the row remains recoverable, and the internal recovery notification/email path stays active.
 
-Target admin override behavior:
+Implemented customer/admin notification behavior:
 
-- Admin recovery should show that provider push is disabled by configuration and offer an explicit `Push To Fulfillment` override only on the order detail page.
-- The override must require master admin authorization, a fresh step-up password check, a confirmation prompt, and an admin reason.
-- The override should call only the remaining provider push stage. It must not replay PayPal capture, receipt generation, Django payment save, or the accepted Django process/import.
-- On override success, persist `push_accepted`, set `releasedToProductionAt`, complete the paid fulfillment runner, and run progress/tracking/invoice snapshots as non-blocking reconciliation.
-- On override failure, persist `push_failed`, keep the row recoverable, enqueue and send the internal recovery notification, and leave payment-owned side effects untouched.
-
-Target customer/admin notification behavior:
-
-- Customer email after automatic or manual push acceptance is not implemented yet. Add an idempotent customer notification/outbox event before enabling this in production.
-- Admin emails should be sent for push-disabled, push-failed, lookup-failed, provider-rejected, payload-invalid, and future attention-required states.
-- Admin success emails for every pushed order should stay optional; if enabled, route them through a separate low-severity recipient group instead of `paid_order_fulfillment_issues`.
+- Customer email after automatic or manual push acceptance is tracked in `CustomerNotificationOutbox`.
+- Admin emails are sent for push-disabled, push-failed, lookup-failed, provider-rejected, payload-invalid, and future attention-required states.
+- Admin success emails for pushed orders route through `paid_order_fulfillment_success` so they can be separated from the higher-signal `paid_order_fulfillment_issues` stream.
 
 ## Current UI-led end-to-end verification runbook
 
@@ -375,7 +368,7 @@ Use this runbook to test the committed flow from the storefront UI, then verify 
 Safety rule:
 
 - Do not run this against a live Merchize store unless the test order is intentionally allowed to be pushed to fulfillment.
-- The current implementation does not honor `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false`.
+- Set `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false` for a semi-real checkout that should stop before provider push.
 - The Django `/orders/process/{custom_id}` stage can create/import the external order before the Next.js Merchize Ops push stage runs. Use a staging Django backend or a provider mock if the test must not touch production fulfillment.
 
 Preflight commands:
@@ -403,6 +396,7 @@ MERCHIZE_FULFILLMENT_OPS_NEON_BRANCH=dev
 PAYPAL_TX_LEDGER_ENABLE_CAPTURE_ROUTE_RUNNER=true
 PAYPAL_TX_LEDGER_ENABLE_STATUS_ROUTE_RESUME=true
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
+MERCHIZE_FULFILLMENT_PUSH_ENABLED=false # semi-real no-push test
 ```
 
 Provider safety setup:
@@ -447,8 +441,8 @@ Expected current successful path:
 - PayPal ledger row has `status = completed` and `processingCompletedAt` set.
 - Merchize Fulfillment Ops row has `syncStatus = push_to_fulfillment_accepted`, `productionGateStatus = push_accepted`, and `releasedToProductionAt` set.
 - Sync attempts include `registration`, `external_lookup`, `detail_lookup`, `push_to_fulfillment`, and best-effort operational snapshot attempts for progress, tracking, and invoice.
-- No customer success email is sent yet.
-- No admin success email is sent yet.
+- Customer notification outbox has `paid_order_fulfillment_push_accepted` for the customer recipient.
+- Admin notification outbox has `paid_order_fulfillment_push_accepted` for each configured success recipient.
 
 Expected current failure path:
 
@@ -457,6 +451,15 @@ Expected current failure path:
 - PayPal ledger row is `fulfillment_failed` or `fulfillment_blocked`.
 - Admin notification outbox receives a row and the runner attempts to send the configured admin email.
 - Admin recovery can retry the remaining paid fulfillment runner without replaying PayPal capture.
+
+Expected push-disabled path:
+
+- Confirmation page shows the customer-safe manual-review/preparation state, not final fulfillment success.
+- PayPal ledger row has `status = fulfillment_attention_required`, `processingCompletedAt = null`, and `lastErrorCode = MERCHIZE_PUSH_DISABLED_BY_CONFIG`.
+- Merchize Fulfillment Ops row has `syncStatus = push_to_fulfillment_disabled` and `productionGateStatus = push_disabled`.
+- Admin notification outbox receives a warning row for the stopped state and the runner attempts to send the configured admin email.
+- No customer success email is sent before manual release.
+- The admin detail page shows the master-admin manual release form. Successful release moves the order to the successful path above without replaying payment-owned stages.
 
 Server verification without dumping raw payloads:
 
@@ -529,6 +532,20 @@ select
   "sentAt",
   "lastErrorMessage"
 from "AdminNotificationOutbox"
+where "orderToken" = '<orderToken>'
+order by "createdAt" asc;
+```
+
+Customer notification check:
+
+```sql
+select
+  "type",
+  "status",
+  "recipient",
+  "sentAt",
+  "lastErrorMessage"
+from "CustomerNotificationOutbox"
 where "orderToken" = '<orderToken>'
 order by "createdAt" asc;
 ```
@@ -717,7 +734,7 @@ Rules:
 
 - `MerchizeFulfillmentOrder` must not replace `PaypalIntent`.
 - `PaypalIntent` owns payment, receipt, Django save, and Django process completion.
-- `MerchizeFulfillmentOrder` owns provider lifecycle after Django accepted the fulfillment push.
+- `MerchizeFulfillmentOrder` owns provider lifecycle after Django accepted the fulfillment process/import and the Next.js runner begins provider push/sync control.
 - Use `orderToken` for customer support, URLs, and admin handoff.
 - Use `djangoPaymentSaveCustomId` for Django `/orders/process/{custom_id}` correlation.
 - Use `merchizeExternalOrderNumber` for Merchize external-number lookup.

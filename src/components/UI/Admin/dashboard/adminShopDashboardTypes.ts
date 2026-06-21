@@ -37,7 +37,7 @@ export type NavItem = {
 
 export type PaidOrderRecoveryRow = {
   orderToken: string;
-  status: 'failed' | 'recovery' | 'pending' | 'completed' | 'sync';
+  status: 'failed' | 'recovery' | 'pending' | 'completed' | 'sync' | 'attention';
   customer: string;
   amount: string;
   step: string;
@@ -137,12 +137,26 @@ export type PaidOrderRecoveryDetail = {
   merchizeFulfillmentOps: MerchizeFulfillmentOpsAdminSummary | null;
   rawDebug: Record<string, unknown>;
   needsProviderDetailSync: boolean;
+  requiresPushOverride: boolean;
 };
 
 export type AdminNotificationHistoryItem = {
   id: string;
+  type: string;
+  errorCode: string | null;
+  severity: string;
   status: string;
   recipient: string | null;
+  createdAt: string;
+  sentAt: string | null;
+  lastErrorMessage: string | null;
+};
+
+export type CustomerNotificationHistoryItem = {
+  id: string;
+  type: string;
+  status: string;
+  recipient: string;
   createdAt: string;
   sentAt: string | null;
   lastErrorMessage: string | null;

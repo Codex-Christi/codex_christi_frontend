@@ -12,6 +12,7 @@ import {
 import PaidOrderRecoveryWebhookScannerSummary from './PaidOrderRecoveryWebhookScannerSummary';
 import type {
   AdminNotificationHistoryItem,
+  CustomerNotificationHistoryItem,
   PaidOrderRecoveryDetail,
   PaidOrderRecoveryRow,
   TimelineItem,
@@ -22,6 +23,7 @@ type PaidOrderRecoveryDetailPanelProps = {
   detail: PaidOrderRecoveryDetail;
   timeline?: TimelineItem[];
   notifications?: AdminNotificationHistoryItem[];
+  customerNotifications?: CustomerNotificationHistoryItem[];
   onClose?: () => void;
   variant?: 'panel' | 'page';
 };
@@ -31,6 +33,7 @@ export default function PaidOrderRecoveryDetailPanel({
   detail,
   timeline = [],
   notifications = [],
+  customerNotifications = [],
   onClose,
   variant = 'panel',
 }: PaidOrderRecoveryDetailPanelProps) {
@@ -107,7 +110,11 @@ export default function PaidOrderRecoveryDetailPanel({
               orderToken={recovery.orderToken}
             />
             <PaidOrderRecoveryActivitySection detail={detail} />
-            <NotificationsPanel notifications={notifications} orderToken={recovery.orderToken} />
+            <NotificationsPanel
+              notifications={notifications}
+              customerNotifications={customerNotifications}
+              orderToken={recovery.orderToken}
+            />
           </div>
 
           <div className='space-y-4'>
@@ -138,9 +145,11 @@ function TimelinePanel({ timeline }: { timeline: TimelineItem[] }) {
 
 function NotificationsPanel({
   notifications,
+  customerNotifications,
   orderToken,
 }: {
   notifications: AdminNotificationHistoryItem[];
+  customerNotifications: CustomerNotificationHistoryItem[];
   orderToken: string;
 }) {
   return (
@@ -151,8 +160,63 @@ function NotificationsPanel({
       </div>
       <div className='p-4 sm:p-5'>
         <AdminNotificationHistoryPanel notifications={notifications} orderToken={orderToken} />
+        <CustomerNotificationHistoryPanel notifications={customerNotifications} />
       </div>
     </AdminGlassPanel>
+  );
+}
+
+function CustomerNotificationHistoryPanel({
+  notifications,
+}: {
+  notifications: CustomerNotificationHistoryItem[];
+}) {
+  return (
+    <div className='mt-4 border-t border-white/10 pt-4'>
+      <h4 className='text-xs font-semibold uppercase tracking-[0.12em] text-slate-500'>
+        Customer Notifications
+      </h4>
+      {!notifications.length ? (
+        <p className='mt-3 text-sm text-slate-500'>No customer notifications recorded.</p>
+      ) : (
+        <div className='mt-3 space-y-3'>
+          {notifications.map((notification) => (
+            <div
+              key={notification.id}
+              className='rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm'
+            >
+              <div className='flex items-start justify-between gap-3'>
+                <div className='min-w-0'>
+                  <p className='truncate font-medium text-slate-200'>{notification.recipient}</p>
+                  <p className='mt-1 text-xs text-slate-500'>
+                    {notification.type.replaceAll('_', ' ')}
+                  </p>
+                  <p className='mt-1 text-xs text-slate-600'>{notification.createdAt}</p>
+                </div>
+                <span
+                  className={cn(
+                    'rounded-md border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em]',
+                    notification.status === 'sent' &&
+                      'border-emerald-300/15 bg-emerald-300/8 text-emerald-200',
+                    notification.status === 'failed' &&
+                      'border-rose-300/15 bg-rose-300/8 text-rose-200',
+                    notification.status === 'pending' &&
+                      'border-amber-300/15 bg-amber-300/8 text-amber-200',
+                  )}
+                >
+                  {notification.status}
+                </span>
+              </div>
+              {notification.lastErrorMessage ? (
+                <p className='mt-2 text-xs leading-5 text-rose-300'>
+                  {notification.lastErrorMessage}
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -174,6 +238,7 @@ function RecoveryActionsPanel({
           orderToken={recovery.orderToken}
           isCompleted={recovery.status === 'completed'}
           needsProviderDetailSync={detail.needsProviderDetailSync}
+          requiresPushOverride={detail.requiresPushOverride}
         />
         <button
           type='button'

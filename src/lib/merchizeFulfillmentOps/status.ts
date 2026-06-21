@@ -11,6 +11,7 @@ export const MERCHIZE_FULFILLMENT_SYNC_STATUS = {
   PUSH_PENDING: 'push_to_fulfillment_pending',
   PUSH_ACCEPTED: 'push_to_fulfillment_accepted',
   PUSH_FAILED: 'push_to_fulfillment_failed',
+  PUSH_DISABLED: 'push_to_fulfillment_disabled',
   MANUAL_REVIEW_REQUIRED: 'manual_review_required',
 } as const;
 
@@ -28,5 +29,6 @@ export const MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS = {
   PUSH_PENDING: 'push_pending',
   PUSH_ACCEPTED: 'push_accepted',
   PUSH_FAILED: 'push_failed',
+  PUSH_DISABLED: 'push_disabled',
   HELD: 'held',
 } as const;
