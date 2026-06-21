@@ -5,7 +5,7 @@ import { Clock3, Loader2, Trash2 } from 'lucide-react';
 import {
   clearAdminAuditLogsByTimeRangeAction,
   type ClearAdminAuditLogsActionState,
-} from '@/app/admin/(dashboard)/admin-ops/audit-logs/actions';
+} from '@/app/admin/(dashboard)/admin-ops/security-records/actions';
 import { adminFieldClass } from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import {
   AlertDialog,
@@ -60,7 +60,7 @@ export default function AdminAuditLogClearRangeDialog() {
           <AlertDialogTitle className='text-white'>Clear admin audit logs</AlertDialogTitle>
           <AlertDialogDescription className='text-slate-400'>
             Select a created-at range to delete matching audit events. Clear-operation audit events
-            are preserved.
+            are preserved. Your master admin password is required.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -94,6 +94,17 @@ export default function AdminAuditLogClearRangeDialog() {
             <Clock3 size={15} className='mt-0.5 shrink-0' />
             Times use {timeZoneLabel}. Only master admins can clear audit logs.
           </div>
+
+          <label className='grid gap-1 text-xs font-medium text-slate-300'>
+            Master admin password
+            <input
+              type='password'
+              name='password'
+              required
+              autoComplete='current-password'
+              className={adminFieldClass}
+            />
+          </label>
 
           {state.error ? <Message tone='rose'>{state.error}</Message> : null}
           {state.success ? <Message tone='emerald'>{state.success}</Message> : null}

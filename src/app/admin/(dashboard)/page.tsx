@@ -153,9 +153,9 @@ export default async function AdminPage() {
           ) : null}
           {canViewAuditLogs && !canManageAdmins ? (
             <ProductCard
-              title='Audit Logs'
-              description='Review admin actions, outcomes, targets, and request fingerprints.'
-              href='/admin/admin-ops/audit-logs'
+              title='Admin Security Records'
+              description='Review admin activity, outcomes, targets, and request fingerprints.'
+              href='/admin/admin-ops/security-records'
               icon={ScrollText}
               status='Audit'
               attention={

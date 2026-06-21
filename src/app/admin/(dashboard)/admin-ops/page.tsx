@@ -111,12 +111,12 @@ export default async function AdminOpsPage() {
         </AdminOpsLinkCard>
 
         <AdminOpsLinkCard
-          href='/admin/admin-ops/audit-logs'
-          eyebrow='Audit'
+          href='/admin/admin-ops/security-records'
+          eyebrow='Security'
           icon={ScrollText}
-          title='Audit Logs'
-          description='Review admin actions, outcomes, targets, and request fingerprints from the Admin Ops Ledger.'
-          actionLabel='Open Logs'
+          title='Admin Security Records'
+          description='Review admin activity and manage retention cleanup for security records.'
+          actionLabel='Open Records'
         />
       </section>
 

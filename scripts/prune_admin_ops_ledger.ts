@@ -1,14 +1,20 @@
 import dotenv from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
+import {
+  pruneAdminOpsLedger,
+  type AdminOpsLedgerRetentionPolicy,
+} from '../src/lib/admin/admin-ops-ledger-maintenance-core';
 import { normalizePostgresSslMode } from '../src/lib/prisma/postgresSslMode';
 import { PrismaClient } from '../src/lib/prisma/adminOpsLedger/generated/adminOpsLedger/client';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 
-const DEFAULT_UNLOCK_ATTEMPT_RETENTION_HOURS = 24;
-const DEFAULT_AUDIT_LOG_RETENTION_DAYS = 30;
-const DEFAULT_MASTER_TRANSFER_CHALLENGE_RETENTION_HOURS = 24;
+const DEFAULT_RETENTION_POLICY: AdminOpsLedgerRetentionPolicy = {
+  unlockAttemptRetentionHours: 24,
+  auditLogRetentionDays: 30,
+  masterTransferChallengeRetentionHours: 24,
+};
 
 function getConnectionString() {
   const connectionString =
@@ -37,55 +43,32 @@ function getPositiveNumberEnv(name: string, fallback: number) {
   return parsed;
 }
 
+function getRetentionPolicyFromEnv(): AdminOpsLedgerRetentionPolicy {
+  return {
+    unlockAttemptRetentionHours: getPositiveNumberEnv(
+      'ADMIN_UNLOCK_ATTEMPT_RETENTION_HOURS',
+      DEFAULT_RETENTION_POLICY.unlockAttemptRetentionHours,
+    ),
+    auditLogRetentionDays: getPositiveNumberEnv(
+      'ADMIN_AUDIT_LOG_RETENTION_DAYS',
+      DEFAULT_RETENTION_POLICY.auditLogRetentionDays,
+    ),
+    masterTransferChallengeRetentionHours: getPositiveNumberEnv(
+      'ADMIN_MASTER_TRANSFER_CHALLENGE_RETENTION_HOURS',
+      DEFAULT_RETENTION_POLICY.masterTransferChallengeRetentionHours,
+    ),
+  };
+}
+
 async function main() {
-  const unlockAttemptRetentionHours = getPositiveNumberEnv(
-    'ADMIN_UNLOCK_ATTEMPT_RETENTION_HOURS',
-    DEFAULT_UNLOCK_ATTEMPT_RETENTION_HOURS,
-  );
-  const auditLogRetentionDays = getPositiveNumberEnv(
-    'ADMIN_AUDIT_LOG_RETENTION_DAYS',
-    DEFAULT_AUDIT_LOG_RETENTION_DAYS,
-  );
-  const masterTransferChallengeRetentionHours = getPositiveNumberEnv(
-    'ADMIN_MASTER_TRANSFER_CHALLENGE_RETENTION_HOURS',
-    DEFAULT_MASTER_TRANSFER_CHALLENGE_RETENTION_HOURS,
-  );
   const adapter = new PrismaPg({
     connectionString: normalizePostgresSslMode(getConnectionString()),
   });
   const prisma = new PrismaClient({ adapter });
-  const now = Date.now();
-  const unlockAttemptCutoff = new Date(
-    now - unlockAttemptRetentionHours * 60 * 60 * 1000,
-  );
-  const auditLogCutoff = new Date(now - auditLogRetentionDays * 24 * 60 * 60 * 1000);
-  const masterTransferChallengeCutoff = new Date(
-    now - masterTransferChallengeRetentionHours * 60 * 60 * 1000,
-  );
-
-  const [unlockAttempts, auditLogs, masterTransferChallenges] = await prisma.$transaction([
-    prisma.adminUnlockAttempt.deleteMany({
-      where: {
-        createdAt: {
-          lt: unlockAttemptCutoff,
-        },
-      },
-    }),
-    prisma.adminAuditLog.deleteMany({
-      where: {
-        createdAt: {
-          lt: auditLogCutoff,
-        },
-      },
-    }),
-    prisma.adminMasterTransferChallenge.deleteMany({
-      where: {
-        createdAt: {
-          lt: masterTransferChallengeCutoff,
-        },
-      },
-    }),
-  ]);
+  const result = await pruneAdminOpsLedger({
+    policy: getRetentionPolicyFromEnv(),
+    prisma,
+  });
 
   await prisma.$disconnect();
 
@@ -94,15 +77,18 @@ async function main() {
       {
         ok: true,
         retention: {
-          unlockAttemptRetentionHours,
-          auditLogRetentionDays,
-          masterTransferChallengeRetentionHours,
+          unlockAttemptRetentionHours: result.policy.unlockAttemptRetentionHours,
+          auditLogRetentionDays: result.policy.auditLogRetentionDays,
+          masterTransferChallengeRetentionHours:
+            result.policy.masterTransferChallengeRetentionHours,
         },
-        deleted: {
-          unlockAttempts: unlockAttempts.count,
-          auditLogs: auditLogs.count,
-          masterTransferChallenges: masterTransferChallenges.count,
+        cutoffs: {
+          unlockAttemptCreatedBefore: result.cutoffs.unlockAttemptCreatedBefore.toISOString(),
+          auditLogCreatedBefore: result.cutoffs.auditLogCreatedBefore.toISOString(),
+          masterTransferChallengeCreatedBefore:
+            result.cutoffs.masterTransferChallengeCreatedBefore.toISOString(),
         },
+        deleted: result.deleted,
       },
       null,
       2,
