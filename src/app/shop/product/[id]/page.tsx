@@ -4,11 +4,13 @@ import { getProductMetaDataOnly } from './productDetailsSSR';
 import { notFound } from 'next/navigation';
 import serialize from 'serialize-javascript';
 import { extractProductMetaDescriptionFromHtml } from '@/lib/utils/extract-plain-text-from-html';
+import { getBasicProductFromSnapshot } from '@/lib/merchizeStorefront/snapshot';
 import {
   ProductDescriptionSection,
   ProductFeedbackSection,
 } from '@/components/UI/Shop/ProductDetails/ProductStaticSections';
 import { getShopSiteUrl } from '@/lib/siteBaseUrls';
+import { getPublishedShopProductPreview } from '@/lib/utils/shopHomePageProductsData';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -16,6 +18,7 @@ type PageProps = {
 
 export const revalidate = 3600;
 export const dynamicParams = true;
+const SHOP_SITE_NAME = 'Codex Christi Shop';
 
 export async function generateStaticParams() {
   return [];
@@ -23,17 +26,72 @@ export async function generateStaticParams() {
 
 function resolveProductImageUrl(image: string | undefined | null) {
   if (!image) return undefined;
+  if (image.startsWith('/')) return getShopSiteUrl(image);
   const imageUrl = image.startsWith('http') ? image : `https://d2dytk4tvgwhb4.cloudfront.net/${image}`;
   return imageUrl.replace(/\/thumb\.jpg(?:[?#].*)?$/i, '');
 }
 
+function getSnapshotMissProductMetadata(productId: string): Metadata {
+  const publishedProduct = getPublishedShopProductPreview(productId);
+
+  if (publishedProduct) {
+    const title = `${publishedProduct.title} | ${SHOP_SITE_NAME}`;
+    const description = `Shop ${publishedProduct.title} from Codex Christi.`;
+    const imageUrl = resolveProductImageUrl(publishedProduct.imagePath);
+
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        ...(imageUrl ? { images: [{ url: imageUrl }] } : {}),
+        url: getShopSiteUrl(`/product/${productId}`),
+        locale: 'en_US',
+        siteName: SHOP_SITE_NAME,
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title,
+        description,
+        ...(imageUrl ? { images: imageUrl } : {}),
+      },
+      other: {
+        'og:type': 'product',
+        'og:product:price:amount': publishedProduct.retailPrice,
+        'og:product:price:currency': 'USD',
+      },
+    };
+  }
+
+  return {
+    title: `Product metadata unavailable | ${SHOP_SITE_NAME}`,
+    description: 'This product page is not ready for search indexing.',
+    robots: {
+      index: false,
+      follow: false,
+    },
+    openGraph: {
+      title: `Product metadata unavailable | ${SHOP_SITE_NAME}`,
+      description: 'This product page is not ready for search indexing.',
+      url: getShopSiteUrl(`/product/${productId}`),
+      locale: 'en_US',
+      siteName: SHOP_SITE_NAME,
+    },
+  };
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+
   try {
-    const { id } = await params;
-    const productMetaData = await getProductMetaDataOnly(id);
+    // Keep route metadata off Merchize; publishable SEO data must be warmed into snapshots.
+    const productMetaData = await getBasicProductFromSnapshot(id);
+    if (!productMetaData) return getSnapshotMissProductMetadata(id);
+
     const firstImageUrl = resolveProductImageUrl(productMetaData.image);
 
-    const title = `${productMetaData.title} | Codex Christi Shop`;
+    const title = `${productMetaData.title} | ${SHOP_SITE_NAME}`;
     const description = extractProductMetaDescriptionFromHtml(
       productMetaData.description,
       productMetaData.title,
@@ -48,7 +106,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         ...(firstImageUrl ? { images: [{ url: firstImageUrl }] } : {}),
         url: getShopSiteUrl(`/product/${id}`),
         locale: 'en_US',
-        siteName: 'Codex Christi Shop',
+        siteName: SHOP_SITE_NAME,
       },
       twitter: {
         card: 'summary_large_image',
@@ -63,11 +121,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
         // Add other product-specific tags as needed
       },
     };
-  } catch {
-    // fallback metadata or suppress entirely
-    return {
-      title: 'Product not found',
-    };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.warn('[product.generateMetadata] snapshot metadata lookup failed:', errorMessage);
+    return getSnapshotMissProductMetadata(id);
   }
 }
 

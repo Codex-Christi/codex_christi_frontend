@@ -103,3 +103,35 @@ export const categoriesObj = {
     ],
   },
 } as const;
+
+type HomePageProduct = {
+  readonly image_name: string;
+  readonly img_alt: string;
+  readonly productId: string;
+  readonly usdCentsBase: number;
+};
+
+const categoryShopProducts = Object.values(categoriesObj).flatMap(
+  (category): HomePageProduct[] => [...category.content],
+);
+
+const publishedShopProducts: readonly HomePageProduct[] = [
+  ...launchMerchProducts,
+  ...categoryShopProducts,
+] as const;
+
+export const PUBLISHED_SHOP_PRODUCT_IDS = [
+  ...new Set(publishedShopProducts.map((product) => product.productId)),
+];
+
+export function getPublishedShopProductPreview(productId: string) {
+  const product = publishedShopProducts.find((item) => item.productId === productId);
+  if (!product) return null;
+
+  return {
+    productId: product.productId,
+    title: product.img_alt,
+    imagePath: `/${product.image_name}`,
+    retailPrice: (product.usdCentsBase / 100).toFixed(2),
+  };
+}

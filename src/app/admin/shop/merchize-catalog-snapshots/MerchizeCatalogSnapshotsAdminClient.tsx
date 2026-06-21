@@ -138,10 +138,15 @@ export default function MerchizeCatalogSnapshotsAdminClient({
         const failureText = res.failures.length
           ? ` Failures: ${res.failures.map((failure) => failure.category).join(', ')}.`
           : '';
+        const productFailureText = res.productSnapshotFailures.length
+          ? ` Product snapshot failures: ${res.productSnapshotFailures
+              .map((failure) => failure.productId)
+              .join(', ')}.`
+          : '';
         const revalidationText = res.revalidatedPaths.length
           ? ` Revalidated public paths: ${res.revalidatedPaths.length}.`
           : '';
-        const msg = `Storefront snapshots refreshed. Pages: ${res.pagesFetched}, products seen: ${res.productsSeen}.${revalidationText}${failureText}`;
+        const msg = `Storefront snapshots refreshed. Pages: ${res.pagesFetched}, products seen: ${res.productsSeen}, published products attempted: ${res.publishedProductsAttempted}.${revalidationText}${failureText}${productFailureText}`;
 
         setStatus({
           type: res.ok ? 'success' : 'error',

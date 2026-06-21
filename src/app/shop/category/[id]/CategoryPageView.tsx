@@ -3,6 +3,11 @@ import dynamic from 'next/dynamic';
 import { notFound } from 'next/navigation';
 import { fetchCategoryProducts, getCategoryMetadataFromMerchize } from './categoryDetailsSSR';
 import { getShopSiteUrl } from '@/lib/siteBaseUrls';
+import {
+  getCategoryMetadataFromSnapshot,
+  normalizeStorefrontCategorySlug,
+} from '@/lib/merchizeStorefront/snapshot';
+import { STOREFRONT_SNAPSHOT_CATEGORY_SLUGS } from '@/lib/merchizeStorefront/categories';
 
 const ProductList = dynamic(
   () =>
@@ -14,22 +19,53 @@ const PaginationControls = dynamic(
 );
 
 export const CATEGORY_PAGE_SIZE = 15;
+const SHOP_SITE_NAME = 'Codex Christi Shop';
+
+function displayCategoryName(categorySlug: string) {
+  return normalizeStorefrontCategorySlug(categorySlug)
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function fallbackCategoryMetadata(categoryName: string) {
+  const name = displayCategoryName(categoryName) || 'Shop';
+
+  return {
+    cover: null,
+    description: `Shop ${name} from Codex Christi.`,
+    name,
+  };
+}
+
+function isPublishedCategory(categoryName: string) {
+  const categorySlug = normalizeStorefrontCategorySlug(categoryName);
+  return STOREFRONT_SNAPSHOT_CATEGORY_SLUGS.some((slug) => slug === categorySlug);
+}
 
 export async function generateCategoryPageMetadata(
   categoryName: string,
   page = 1,
 ): Promise<Metadata> {
+  // Keep route metadata off Merchize; publishable SEO data must be warmed into snapshots.
+  const categoryMetaData = await getCategoryMetadataFromSnapshot(categoryName).catch((err) => {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.warn('[category.generateMetadata] snapshot metadata lookup failed:', errorMessage);
+    return null;
+  });
+
+  const { cover, description, name } = categoryMetaData ?? fallbackCategoryMetadata(categoryName);
+  const shouldIndex = Boolean(categoryMetaData) || isPublishedCategory(categoryName);
+  const title =
+    page > 1 ? `${name} - Page ${page} | ${SHOP_SITE_NAME}` : `${name} | ${SHOP_SITE_NAME}`;
+  const urlSuffix = page > 1 ? `/page/${page}` : '';
+
   try {
-    const categoryMetaData = await getCategoryMetadataFromMerchize(categoryName);
-
-    const { cover, description, name } = categoryMetaData;
-    const title =
-      page > 1 ? `${name} - Page ${page} | Codex Christi Shop` : `${name} | Codex Christi Shop`;
-    const urlSuffix = page > 1 ? `/page/${page}` : '';
-
     return {
       title,
       description,
+      ...(shouldIndex ? {} : { robots: { index: false, follow: false } }),
       openGraph: {
         title,
         description,
@@ -37,7 +73,7 @@ export async function generateCategoryPageMetadata(
         type: 'website',
         url: getShopSiteUrl(`/category/${categoryName}${urlSuffix}`),
         locale: 'en_US',
-        siteName: 'Codex Christi Shop',
+        siteName: SHOP_SITE_NAME,
       },
       twitter: {
         card: 'summary_large_image',
@@ -48,9 +84,10 @@ export async function generateCategoryPageMetadata(
     };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    console.warn('[category.generateMetadata] metadata fetch failed:', errorMessage);
+    console.warn('[category.generateMetadata] metadata build failed:', errorMessage);
     return {
-      title: 'Product not found',
+      title,
+      description,
     };
   }
 }

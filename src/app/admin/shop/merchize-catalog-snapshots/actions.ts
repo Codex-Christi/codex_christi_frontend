@@ -11,7 +11,9 @@ import {
   fetchCategoryProducts,
   getCategoryMetadataFromMerchize,
 } from '@/app/shop/category/[id]/categoryDetailsSSR';
+import { fetchBaseProduct } from '@/app/shop/product/[id]/productDetailsSSR';
 import { getCategoryPagePath } from '@/lib/utils/shop/categoryPagePath';
+import { PUBLISHED_SHOP_PRODUCT_IDS } from '@/lib/utils/shopHomePageProductsData';
 
 // const v = await merchizeCatalogPrisma.variant.findUnique({
 //   where: { sku: 'FBJSVN000000AA02' },
@@ -99,16 +101,35 @@ export async function refreshStorefrontSnapshotsAction() {
 
   const pageSize = 50;
   const failures: Array<{ category: string; message: string }> = [];
+  const productSnapshotFailures: Array<{ productId: string; message: string }> = [];
   const categoryTotalPages = new Map<string, number>();
-  const productIds = new Set<string>();
+  const productIds = new Set<string>(PUBLISHED_SHOP_PRODUCT_IDS);
   let productsSeen = 0;
   let pagesFetched = 0;
   const refreshStartedAt = Date.now();
 
   console.info('[merchizeCatalogSnapshots.refreshStorefrontSnapshots] start', {
     categories: STOREFRONT_SNAPSHOT_CATEGORY_SLUGS.length,
+    publishedProducts: PUBLISHED_SHOP_PRODUCT_IDS.length,
     pageSize,
   });
+
+  for (const productId of PUBLISHED_SHOP_PRODUCT_IDS) {
+    try {
+      await fetchBaseProduct(productId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[merchizeCatalogSnapshots.refreshStorefrontSnapshots] product:failed', {
+        productId,
+        message,
+      });
+
+      productSnapshotFailures.push({
+        productId,
+        message,
+      });
+    }
+  }
 
   for (const [index, category] of STOREFRONT_SNAPSHOT_CATEGORY_SLUGS.entries()) {
     const categoryStartedAt = Date.now();
@@ -184,9 +205,11 @@ export async function refreshStorefrontSnapshotsAction() {
     productIds,
   });
   const result = {
-    ok: failures.length === 0,
+    ok: failures.length === 0 && productSnapshotFailures.length === 0,
     productsSeen,
     pagesFetched,
+    publishedProductsAttempted: PUBLISHED_SHOP_PRODUCT_IDS.length,
+    productSnapshotFailures,
     categoriesAttempted: STOREFRONT_SNAPSHOT_CATEGORY_SLUGS.length,
     failures,
     stats,
@@ -198,7 +221,9 @@ export async function refreshStorefrontSnapshotsAction() {
     categoriesAttempted: result.categoriesAttempted,
     pagesFetched: result.pagesFetched,
     productsSeen: result.productsSeen,
+    publishedProductsAttempted: result.publishedProductsAttempted,
     failures: result.failures.map((failure) => failure.category),
+    productSnapshotFailures: result.productSnapshotFailures.map((failure) => failure.productId),
     revalidatedPaths: result.revalidatedPaths.length,
     elapsedMs: Date.now() - refreshStartedAt,
   });
