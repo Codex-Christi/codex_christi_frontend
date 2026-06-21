@@ -14,6 +14,7 @@ import { isMasterAdminRole } from '@/lib/admin/admin-config';
 import AdminMasterTransferForm from '@/components/UI/Admin/AdminMasterTransferForm';
 import AdminNotificationRecipientSettings from '@/components/UI/Admin/AdminNotificationRecipientSettings';
 import AdminUserProvisioningForm from '@/components/UI/Admin/AdminUserProvisioningForm';
+import AdminAmbientSlideshow from '@/components/UI/Admin/dashboard/AdminAmbientSlideshow';
 import AdminGlassPanel, {
   adminPageMainClass,
   getAdminGlassPanelClassName,
@@ -50,7 +51,8 @@ export default async function AdminOpsPage() {
     <DefaultPageWrapper hasMainNav>
       <CometsContainer>
         <main className={adminPageMainClass}>
-          <div className='mx-auto flex w-full max-w-[1400px] flex-col gap-6'>
+          <AdminAmbientSlideshow />
+          <div className='relative z-10 mx-auto flex w-full max-w-[1400px] flex-col gap-6'>
             <AdminGlassPanel className='p-5 sm:p-6'>
               <div className='flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between'>
                 <div className='min-w-0 space-y-4'>

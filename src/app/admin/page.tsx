@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { isAdminScopeAllowed, isMasterAdminRole } from '@/lib/admin/admin-config';
 import AdminSystemTimeGreeting from '@/components/UI/Admin/AdminSystemTimeGreeting';
+import AdminAmbientSlideshow from '@/components/UI/Admin/dashboard/AdminAmbientSlideshow';
 import AdminGlassPanel, {
   adminInsetSurfaceClass,
   adminPageMainClass,
@@ -74,7 +75,8 @@ export default async function AdminPage() {
     <DefaultPageWrapper hasMainNav>
       <CometsContainer>
         <main className={adminPageMainClass}>
-          <div className='mx-auto flex w-full max-w-[1500px] flex-col gap-6'>
+          <AdminAmbientSlideshow />
+          <div className='relative z-10 mx-auto flex w-full max-w-[1500px] flex-col gap-6'>
             <AdminGlassPanel className='p-5 sm:p-6'>
               <div className='flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between'>
                 <div className='min-w-0 space-y-4'>

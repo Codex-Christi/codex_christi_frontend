@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import AdminAmbientSlideshow from './dashboard/AdminAmbientSlideshow';
 import AdminMobileNavigationDrawer from './dashboard/AdminMobileNavigationDrawer';
 import AdminSidebar from './dashboard/AdminSidebar';
 import AdminTopBar from './dashboard/AdminTopBar';
@@ -17,15 +18,8 @@ export default function AdminShopShell({ scope, title, subtitle, children }: Adm
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
-    <main className='relative min-h-dvh overflow-x-hidden bg-[#141923] text-slate-50'>
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_74%_18%,rgba(14,165,233,0.10),transparent_23%),linear-gradient(180deg,rgba(30,35,47,0.78),rgba(16,21,31,0.94))]'
-      />
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-0 z-0 bg-[rgba(255,248,232,0.018)] supports-[backdrop-filter]:backdrop-blur-[1.5px]'
-      />
+    <main className='relative isolate min-h-dvh overflow-x-hidden bg-[#141923] text-slate-50'>
+      <AdminAmbientSlideshow />
 
       <AdminMobileNavigationDrawer
         scope={scope}

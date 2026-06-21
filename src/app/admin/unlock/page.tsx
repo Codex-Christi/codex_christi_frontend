@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import AdminUnlockForm from '@/components/UI/Admin/AdminUnlockForm';
+import AdminAmbientSlideshow from '@/components/UI/Admin/dashboard/AdminAmbientSlideshow';
 import AdminGlassPanel from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import CometsContainer from '@/components/UI/general/CometsContainer';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
@@ -41,8 +42,9 @@ export default async function AdminUnlockPage({ searchParams }: AdminUnlockPageP
   return (
     <DefaultPageWrapper hasMainNav>
       <CometsContainer>
-        <main className='grid min-h-dvh place-items-center bg-[#171b25]/88 px-4 py-24 text-slate-50 [background:linear-gradient(180deg,rgba(30,35,47,0.82),rgba(17,23,33,0.94))]'>
-          <AdminGlassPanel className='w-full max-w-[520px] p-5 sm:p-7'>
+        <main className='relative isolate grid min-h-dvh overflow-hidden place-items-center bg-[#141923] px-4 py-24 text-slate-50'>
+          <AdminAmbientSlideshow />
+          <AdminGlassPanel className='relative z-10 w-full max-w-[520px] p-5 sm:p-7'>
             <div className='mb-7 space-y-2'>
               <p className='text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200'>
                 Codex Christi Admin

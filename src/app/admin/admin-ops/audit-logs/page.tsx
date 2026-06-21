@@ -13,6 +13,7 @@ import {
   type AdminAuditLogSummary,
 } from '@/lib/admin/admin-auth-ledger';
 import { isMasterAdminRole } from '@/lib/admin/admin-config';
+import AdminAmbientSlideshow from '@/components/UI/Admin/dashboard/AdminAmbientSlideshow';
 import AdminGlassPanel, {
   adminFieldClass,
   adminInsetSurfaceClass,
@@ -49,7 +50,8 @@ export default async function AdminAuditLogsPage({
     <DefaultPageWrapper hasMainNav>
       <CometsContainer>
         <main className={adminPageMainClass}>
-          <div className='mx-auto flex w-full max-w-[1400px] flex-col gap-6'>
+          <AdminAmbientSlideshow />
+          <div className='relative z-10 mx-auto flex w-full max-w-[1400px] flex-col gap-6'>
             <AdminGlassPanel className='p-5 sm:p-6'>
               <div className='flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between'>
                 <div className='min-w-0 space-y-4'>
