@@ -59,6 +59,7 @@ export type AdminAuditLogFilters = {
   action?: string;
   actorCodexUserId?: string;
   outcome?: string;
+  since?: '24h';
   targetId?: string;
 };
 
@@ -88,6 +89,19 @@ export type AdminAuditActor =
   | Pick<AdminUserAuthRecord, 'id' | 'codexUserId'>
   | { adminUserId: string; userID: string }
   | null;
+
+const adminAuditLogSummarySelect = {
+  id: true,
+  actorCodexUserId: true,
+  action: true,
+  targetType: true,
+  targetId: true,
+  outcome: true,
+  metadata: true,
+  ipHash: true,
+  userAgentHash: true,
+  createdAt: true,
+} satisfies Prisma.AdminAuditLogSelect;
 
 export async function getActiveAdminUserByCodexUserId(codexUserId: string) {
   const row = await getAdminOpsLedgerPrisma().adminUser.findUnique({
@@ -280,21 +294,27 @@ export async function listAdminAuditLogsForDashboard({
     },
     skip: Math.max(skip, 0),
     take: Math.min(Math.max(take, 1), 250),
-    select: {
-      id: true,
-      actorCodexUserId: true,
-      action: true,
-      targetType: true,
-      targetId: true,
-      outcome: true,
-      metadata: true,
-      ipHash: true,
-      userAgentHash: true,
-      createdAt: true,
-    },
+    select: adminAuditLogSummarySelect,
   });
 
   return rows;
+}
+
+export async function listAdminAuditLogsForExport({
+  filters = {},
+  take = 1000,
+}: {
+  filters?: AdminAuditLogFilters;
+  take?: number;
+} = {}): Promise<AdminAuditLogSummary[]> {
+  return getAdminOpsLedgerPrisma().adminAuditLog.findMany({
+    where: buildAdminAuditLogWhere(filters),
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: Math.min(Math.max(take, 1), 1000),
+    select: adminAuditLogSummarySelect,
+  });
 }
 
 export async function countAdminAuditLogsForDashboard({
@@ -466,6 +486,7 @@ function buildAdminAuditLogWhere(filters: AdminAuditLogFilters) {
   const actorCodexUserId = filters.actorCodexUserId?.trim();
   const targetId = filters.targetId?.trim();
   const outcome = normalizeAuditOutcome(filters.outcome);
+  const since = normalizeAuditSince(filters.since);
 
   if (action) {
     where.action = { contains: action.slice(0, 128) };
@@ -483,6 +504,10 @@ function buildAdminAuditLogWhere(filters: AdminAuditLogFilters) {
     where.outcome = outcome;
   }
 
+  if (since === '24h') {
+    where.createdAt = { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) };
+  }
+
   return where;
 }
 
@@ -490,4 +515,8 @@ function normalizeAuditOutcome(value: string | null | undefined) {
   const outcome = value?.trim();
 
   return ['success', 'failure', 'blocked', 'started'].includes(outcome ?? '') ? outcome : undefined;
+}
+
+function normalizeAuditSince(value: string | null | undefined) {
+  return value?.trim() === '24h' ? '24h' : undefined;
 }

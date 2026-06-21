@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Clock3,
   DatabaseZap,
+  Download,
   Filter,
   KeyRound,
   RotateCcw,
@@ -44,13 +45,18 @@ export const metadata: Metadata = {
 };
 
 const outcomeOptions = ['success', 'failure', 'blocked', 'started'] as const;
-const ACTIVITY_PAGE_SIZE = 25;
+const activityPageSizeOptions = [25, 50, 100] as const;
+const DEFAULT_ACTIVITY_PAGE_SIZE = 25;
+type ActivityPageSize = (typeof activityPageSizeOptions)[number];
+type ActivityView = 'compact' | 'detail';
 
 export default async function AdminSecurityRecordsPage({
   searchParams,
 }: AdminSecurityRecordsPageProps) {
   const params = (await searchParams) ?? {};
   const filters = getAuditLogFilters(params);
+  const pageSize = getActivityPageSize(params.pageSize);
+  const activityView = getActivityView(params.view);
   const requestedPage = getPositiveIntegerParam(params.page) ?? 1;
   const admin = await requireAdminPage({
     scope: 'audit.view',
@@ -63,19 +69,19 @@ export default async function AdminSecurityRecordsPage({
       ? previewAdminOpsLedgerMinimumStoragePrune().catch(() => null)
       : Promise.resolve(null),
   ]);
-  const totalPages = Math.max(1, Math.ceil(auditLogCount / ACTIVITY_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(auditLogCount / pageSize));
   const currentPage = Math.min(requestedPage, totalPages);
   const auditLogs = await listAdminAuditLogsForDashboard({
     filters,
-    skip: (currentPage - 1) * ACTIVITY_PAGE_SIZE,
-    take: ACTIVITY_PAGE_SIZE,
+    skip: (currentPage - 1) * pageSize,
+    take: pageSize,
   });
   const backHref = isMasterAdmin ? '/admin/admin-ops' : '/admin';
   const eligibleTotal = maintenancePreview
     ? getAdminOpsLedgerPruneTotal(maintenancePreview.eligible)
     : 0;
-  const currentPageStart = auditLogCount ? (currentPage - 1) * ACTIVITY_PAGE_SIZE + 1 : 0;
-  const currentPageEnd = Math.min(currentPage * ACTIVITY_PAGE_SIZE, auditLogCount);
+  const currentPageStart = auditLogCount ? (currentPage - 1) * pageSize + 1 : 0;
+  const currentPageEnd = Math.min(currentPage * pageSize, auditLogCount);
 
   return (
     <div className='mx-auto flex w-full max-w-[1400px] flex-col gap-6 px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
@@ -159,7 +165,7 @@ export default async function AdminSecurityRecordsPage({
             <div>
               <h2 className='text-base font-semibold text-white'>Filters</h2>
               <p className='mt-1 text-sm leading-6 text-slate-400'>
-                Narrow by action, actor, target, or outcome.
+                Narrow by action, actor, target, outcome, or common review presets.
               </p>
             </div>
             <span className='grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-cyan-300/20 bg-cyan-300/10 text-cyan-100'>
@@ -167,7 +173,52 @@ export default async function AdminSecurityRecordsPage({
             </span>
           </div>
 
-          <form className='grid gap-3 lg:grid-cols-[1fr_1fr_1fr_180px_auto_auto] lg:items-end'>
+          <div className='mb-4 flex flex-wrap gap-2'>
+            <QuickFilterLink
+              active={filters.outcome === 'failure'}
+              href={buildSecurityRecordsHref({
+                filters: toggleAuditFilter(filters, 'outcome', 'failure'),
+                page: 1,
+                pageSize,
+                view: activityView,
+              })}
+              label='Failures'
+            />
+            <QuickFilterLink
+              active={filters.outcome === 'blocked'}
+              href={buildSecurityRecordsHref({
+                filters: toggleAuditFilter(filters, 'outcome', 'blocked'),
+                page: 1,
+                pageSize,
+                view: activityView,
+              })}
+              label='Blocked'
+            />
+            <QuickFilterLink
+              active={filters.actorCodexUserId === admin.userID}
+              href={buildSecurityRecordsHref({
+                filters: toggleAuditFilter(filters, 'actorCodexUserId', admin.userID),
+                page: 1,
+                pageSize,
+                view: activityView,
+              })}
+              label='My actions'
+            />
+            <QuickFilterLink
+              active={filters.since === '24h'}
+              href={buildSecurityRecordsHref({
+                filters: toggleAuditFilter(filters, 'since', '24h'),
+                page: 1,
+                pageSize,
+                view: activityView,
+              })}
+              label='Last 24h'
+            />
+          </div>
+
+          <form className='grid gap-3 lg:grid-cols-[1fr_1fr_1fr_150px_120px_auto_auto] lg:items-end'>
+            <input type='hidden' name='view' value={activityView} />
+            {filters.since ? <input type='hidden' name='since' value={filters.since} /> : null}
             <TextField label='Action contains' name='action' defaultValue={filters.action} />
             <TextField
               label='Actor Codex Christi user ID'
@@ -192,6 +243,17 @@ export default async function AdminSecurityRecordsPage({
               </select>
             </label>
 
+            <label className='grid gap-1 text-xs font-medium text-slate-300'>
+              Rows
+              <select name='pageSize' defaultValue={`${pageSize}`} className={adminFieldClass}>
+                {activityPageSizeOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <button
               type='submit'
               className='inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-cyan-300 px-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200'
@@ -210,31 +272,52 @@ export default async function AdminSecurityRecordsPage({
         </AdminGlassPanel>
 
         <AdminGlassPanel className='p-4 sm:p-5'>
-          <div className='mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+          <div className='mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between'>
             <div>
               <h2 className='text-base font-semibold text-white'>Recent Activity</h2>
               <p className='mt-1 text-sm text-slate-400'>
                 Newest matching events, paginated for faster review.
               </p>
             </div>
-            <span className='rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-300'>
-              {auditLogCount
-                ? `${currentPageStart}-${currentPageEnd} of ${auditLogCount}`
-                : '0 shown'}
-            </span>
+            <div className='flex flex-wrap items-center gap-2'>
+              <ActivityViewToggle
+                currentView={activityView}
+                filters={filters}
+                page={currentPage}
+                pageSize={pageSize}
+              />
+              <Link
+                href={buildSecurityRecordsExportHref(filters)}
+                className='inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-300/25 hover:text-cyan-100'
+              >
+                <Download size={15} />
+                CSV
+              </Link>
+              <span className='rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-300'>
+                {auditLogCount
+                  ? `${currentPageStart}-${currentPageEnd} of ${auditLogCount}`
+                  : '0 shown'}
+              </span>
+            </div>
           </div>
 
           {auditLogs.length ? (
             <>
               <div className='grid gap-3'>
                 {auditLogs.map((auditLog) => (
-                  <AuditLogCard key={auditLog.id} auditLog={auditLog} />
+                  <AuditLogCard
+                    key={auditLog.id}
+                    auditLog={auditLog}
+                    compact={activityView === 'compact'}
+                  />
                 ))}
               </div>
               <PaginationControls
                 currentPage={currentPage}
                 filters={filters}
+                pageSize={pageSize}
                 totalPages={totalPages}
+                view={activityView}
               />
             </>
           ) : (
@@ -327,11 +410,15 @@ export default async function AdminSecurityRecordsPage({
 function PaginationControls({
   currentPage,
   filters,
+  pageSize,
   totalPages,
+  view,
 }: {
   currentPage: number;
   filters: AdminAuditLogFilters;
+  pageSize: ActivityPageSize;
   totalPages: number;
+  view: ActivityView;
 }) {
   if (totalPages <= 1) {
     return null;
@@ -348,7 +435,7 @@ function PaginationControls({
       <div className='flex flex-wrap items-center gap-2'>
         <PaginationLink
           disabled={currentPage <= 1}
-          href={buildSecurityRecordsHref({ filters, page: currentPage - 1 })}
+          href={buildSecurityRecordsHref({ filters, page: currentPage - 1, pageSize, view })}
           label='Previous'
           icon='previous'
         />
@@ -363,7 +450,7 @@ function PaginationControls({
           ) : (
             <Link
               key={item}
-              href={buildSecurityRecordsHref({ filters, page: item })}
+              href={buildSecurityRecordsHref({ filters, page: item, pageSize, view })}
               aria-current={item === currentPage ? 'page' : undefined}
               className={`grid h-9 min-w-9 place-items-center rounded-lg border px-2 text-sm font-semibold transition ${
                 item === currentPage
@@ -377,7 +464,7 @@ function PaginationControls({
         )}
         <PaginationLink
           disabled={currentPage >= totalPages}
-          href={buildSecurityRecordsHref({ filters, page: currentPage + 1 })}
+          href={buildSecurityRecordsHref({ filters, page: currentPage + 1, pageSize, view })}
           label='Next'
           icon='next'
         />
@@ -417,6 +504,59 @@ function PaginationLink({
       {icon === 'previous' ? <Icon size={15} /> : null}
       {label}
       {icon === 'next' ? <Icon size={15} /> : null}
+    </Link>
+  );
+}
+
+function ActivityViewToggle({
+  currentView,
+  filters,
+  page,
+  pageSize,
+}: {
+  currentView: ActivityView;
+  filters: AdminAuditLogFilters;
+  page: number;
+  pageSize: ActivityPageSize;
+}) {
+  return (
+    <div className='inline-flex h-9 overflow-hidden rounded-lg border border-white/10 bg-white/[0.04] p-0.5'>
+      {(['detail', 'compact'] as const).map((view) => (
+        <Link
+          key={view}
+          href={buildSecurityRecordsHref({ filters, page, pageSize, view })}
+          className={`inline-flex items-center px-3 text-sm font-semibold capitalize transition ${
+            currentView === view
+              ? 'rounded-md bg-cyan-300 text-slate-950'
+              : 'text-slate-300 hover:text-cyan-100'
+          }`}
+        >
+          {view}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function QuickFilterLink({
+  active,
+  href,
+  label,
+}: {
+  active: boolean;
+  href: string;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`inline-flex h-8 items-center rounded-lg border px-3 text-xs font-semibold transition ${
+        active
+          ? 'border-cyan-300/35 bg-cyan-300/15 text-cyan-100'
+          : 'border-white/10 bg-white/[0.04] text-slate-300 hover:border-cyan-300/25 hover:text-cyan-100'
+      }`}
+    >
+      {label}
     </Link>
   );
 }
@@ -578,13 +718,19 @@ function RetentionCard({
   );
 }
 
-function AuditLogCard({ auditLog }: { auditLog: AdminAuditLogSummary }) {
+function AuditLogCard({
+  auditLog,
+  compact,
+}: {
+  auditLog: AdminAuditLogSummary;
+  compact: boolean;
+}) {
   const metadata = formatMetadata(auditLog.metadata);
 
   return (
-    <article className={getAdminGlassPanelClassName('p-4')}>
+    <article className={getAdminGlassPanelClassName(compact ? 'p-3' : 'p-4')}>
       <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
-        <div className='min-w-0 space-y-2'>
+        <div className={compact ? 'min-w-0 space-y-1.5' : 'min-w-0 space-y-2'}>
           <div className='flex flex-wrap items-center gap-2'>
             <span
               className={`rounded-md border px-2 py-1 text-xs ${getOutcomeClass(auditLog.outcome)}`}
@@ -596,19 +742,21 @@ function AuditLogCard({ auditLog }: { auditLog: AdminAuditLogSummary }) {
             </time>
           </div>
           <h3 className='break-words text-sm font-semibold text-white'>{auditLog.action}</h3>
-          <p className='break-words text-xs leading-5 text-slate-400'>
+          <p className={`break-words text-xs text-slate-400 ${compact ? '' : 'leading-5'}`}>
             Actor: {auditLog.actorCodexUserId ?? 'system'} · Target: {auditLog.targetType ?? 'none'}{' '}
             {auditLog.targetId ? `/ ${auditLog.targetId}` : ''}
           </p>
         </div>
 
-        <div className='grid shrink-0 gap-1 text-xs text-slate-500 lg:min-w-[220px]'>
-          <span className='truncate'>IP: {auditLog.ipHash ?? 'none'}</span>
-          <span className='truncate'>UA: {auditLog.userAgentHash ?? 'none'}</span>
-        </div>
+        {compact ? null : (
+          <div className='grid shrink-0 gap-1 text-xs text-slate-500 lg:min-w-[220px]'>
+            <span className='truncate'>IP: {auditLog.ipHash ?? 'none'}</span>
+            <span className='truncate'>UA: {auditLog.userAgentHash ?? 'none'}</span>
+          </div>
+        )}
       </div>
 
-      {metadata ? (
+      {!compact && metadata ? (
         <pre
           className={`${adminInsetSurfaceClass} mt-3 max-h-44 overflow-auto p-3 text-xs leading-5 text-slate-300`}
         >
@@ -626,6 +774,7 @@ function getAuditLogFilters(
     action: getSingleParam(params.action),
     actorCodexUserId: getSingleParam(params.actorCodexUserId),
     outcome: getSingleParam(params.outcome),
+    since: getAuditLogSinceParam(params.since),
     targetId: getSingleParam(params.targetId),
   };
 }
@@ -644,12 +793,43 @@ function getPositiveIntegerParam(value: string | string[] | undefined) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
+function getActivityPageSize(value: string | string[] | undefined): ActivityPageSize {
+  const parsed = getPositiveIntegerParam(value);
+
+  return activityPageSizeOptions.includes(parsed as ActivityPageSize)
+    ? (parsed as ActivityPageSize)
+    : DEFAULT_ACTIVITY_PAGE_SIZE;
+}
+
+function getActivityView(value: string | string[] | undefined): ActivityView {
+  return getSingleParam(value) === 'compact' ? 'compact' : 'detail';
+}
+
+function getAuditLogSinceParam(value: string | string[] | undefined) {
+  return getSingleParam(value) === '24h' ? '24h' : undefined;
+}
+
+function toggleAuditFilter<Key extends keyof AdminAuditLogFilters>(
+  filters: AdminAuditLogFilters,
+  key: Key,
+  value: NonNullable<AdminAuditLogFilters[Key]>,
+): AdminAuditLogFilters {
+  return {
+    ...filters,
+    [key]: filters[key] === value ? undefined : value,
+  };
+}
+
 function buildSecurityRecordsHref({
   filters,
   page,
+  pageSize = DEFAULT_ACTIVITY_PAGE_SIZE,
+  view = 'detail',
 }: {
   filters: AdminAuditLogFilters;
   page: number;
+  pageSize?: ActivityPageSize;
+  view?: ActivityView;
 }) {
   const params = new URLSearchParams();
 
@@ -657,14 +837,37 @@ function buildSecurityRecordsHref({
   setSearchParam(params, 'actorCodexUserId', filters.actorCodexUserId);
   setSearchParam(params, 'targetId', filters.targetId);
   setSearchParam(params, 'outcome', filters.outcome);
+  setSearchParam(params, 'since', filters.since);
 
   if (page > 1) {
     params.set('page', `${page}`);
   }
 
+  if (pageSize !== DEFAULT_ACTIVITY_PAGE_SIZE) {
+    params.set('pageSize', `${pageSize}`);
+  }
+
+  if (view !== 'detail') {
+    params.set('view', view);
+  }
+
   const query = params.toString();
 
   return `/admin/admin-ops/security-records${query ? `?${query}` : ''}#activity`;
+}
+
+function buildSecurityRecordsExportHref(filters: AdminAuditLogFilters) {
+  const params = new URLSearchParams();
+
+  setSearchParam(params, 'action', filters.action);
+  setSearchParam(params, 'actorCodexUserId', filters.actorCodexUserId);
+  setSearchParam(params, 'targetId', filters.targetId);
+  setSearchParam(params, 'outcome', filters.outcome);
+  setSearchParam(params, 'since', filters.since);
+
+  const query = params.toString();
+
+  return `/admin/admin-ops/security-records/export${query ? `?${query}` : ''}`;
 }
 
 function setSearchParam(params: URLSearchParams, key: string, value: string | undefined) {
