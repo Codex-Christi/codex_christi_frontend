@@ -119,12 +119,13 @@ export default function AdminAmbientSlideshow() {
           </span>
         );
       })}
+      <div className={styles.imageTone} data-admin-ambient-image-tone />
       <CometsContainer
         variant='overlay'
         className={styles.comets}
         cometClassName={styles.cometField}
       />
-      <div className={styles.scrim} data-admin-ambient-scrim />
+      <div className={styles.foregroundVeil} data-admin-ambient-foreground-veil />
     </div>
   );
 }

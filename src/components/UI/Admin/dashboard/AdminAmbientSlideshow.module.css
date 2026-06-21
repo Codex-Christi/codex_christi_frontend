@@ -11,6 +11,7 @@
 .slide {
   position: absolute;
   inset: 0;
+  z-index: 0;
   opacity: 0;
   transition: opacity 1800ms ease-in-out;
   will-change: opacity;
@@ -34,26 +35,38 @@
 }
 
 .image {
-  filter: brightness(0.52) contrast(1.08) saturate(0.86);
+  filter: blur(1.4px) brightness(0.56) contrast(1.06) saturate(0.84);
   object-fit: cover;
   object-position: var(--admin-ambient-position, center);
+  transform: scale(1.012);
+}
+
+.imageTone {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(8, 12, 20, 0.5), rgba(8, 12, 20, 0.74) 58%, rgba(8, 12, 20, 0.88)),
+    linear-gradient(90deg, rgba(13, 18, 28, 0.3), transparent 42%, rgba(13, 18, 28, 0.34));
 }
 
 .comets {
-  opacity: 0.64;
+  z-index: 2;
+  opacity: 0.78;
   mix-blend-mode: screen;
 }
 
 .cometField {
-  filter: drop-shadow(0 0 10px rgba(148, 210, 255, 0.18));
+  filter: drop-shadow(0 0 12px rgba(148, 210, 255, 0.24));
 }
 
-.scrim {
+.foregroundVeil {
   position: absolute;
   inset: 0;
+  z-index: 3;
   background:
-    linear-gradient(180deg, rgba(8, 12, 20, 0.56), rgba(8, 12, 20, 0.78) 58%, rgba(8, 12, 20, 0.9)),
-    linear-gradient(90deg, rgba(13, 18, 28, 0.24), transparent 38%, rgba(13, 18, 28, 0.3));
+    radial-gradient(circle at 50% 18%, transparent 0, rgba(8, 12, 20, 0.18) 62%),
+    linear-gradient(180deg, rgba(8, 12, 20, 0.08), rgba(8, 12, 20, 0.28));
 }
 
 @media (prefers-reduced-motion: reduce), (prefers-reduced-transparency: reduce) {
@@ -66,13 +79,26 @@
     opacity: 0.68;
   }
 
-  .scrim {
+  .image {
+    filter: brightness(0.52) contrast(1.06) saturate(0.82);
+    transform: none;
+  }
+
+  .imageTone {
     background:
       linear-gradient(180deg, rgba(8, 12, 20, 0.66), rgba(8, 12, 20, 0.9)),
       linear-gradient(90deg, rgba(13, 18, 28, 0.3), transparent 38%, rgba(13, 18, 28, 0.36));
   }
 
   .comets {
-    opacity: 0.36;
+    opacity: 0.48;
+  }
+
+  .cometField {
+    filter: none;
+  }
+
+  .foregroundVeil {
+    background: linear-gradient(180deg, rgba(8, 12, 20, 0.08), rgba(8, 12, 20, 0.24));
   }
 }
