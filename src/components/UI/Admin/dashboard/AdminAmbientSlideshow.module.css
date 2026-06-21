@@ -24,6 +24,7 @@
 }
 
 .image {
+  filter: brightness(0.62) contrast(1.06) saturate(0.88);
   object-fit: cover;
   object-position: var(--admin-ambient-position, center);
 }
