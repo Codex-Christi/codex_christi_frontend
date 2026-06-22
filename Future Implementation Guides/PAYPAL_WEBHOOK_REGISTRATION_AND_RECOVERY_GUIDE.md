@@ -196,7 +196,8 @@ NEXT_PUBLIC_PAYPAL_PAYMENT_MODE=sandbox
 NEXT_PUBLIC_PAYPAL_SANDBOX_CLIENT_ID=...
 PAYPAL_SANDBOX_CLIENT_ID=...
 PAYPAL_SANDBOX_CLIENT_SECRET=...
-PAYPAL_SANDBOX_WEBHOOK_ID=...
+PAYPAL_SANDBOX_NGROK_WEBHOOK_ID=...
+PAYPAL_SANDBOX_PRODUCTION_WEBHOOK_ID=...
 
 # Live payment mode: real payments
 PAYPAL_PAYMENT_MODE=live
@@ -204,7 +205,7 @@ NEXT_PUBLIC_PAYPAL_PAYMENT_MODE=live
 NEXT_PUBLIC_PAYPAL_LIVE_CLIENT_ID=...
 PAYPAL_LIVE_CLIENT_ID=...
 PAYPAL_LIVE_CLIENT_SECRET=...
-PAYPAL_LIVE_WEBHOOK_ID=...
+PAYPAL_LIVE_PRODUCTION_WEBHOOK_ID=...
 ```
 
 The repository currently resolves these values in:
@@ -216,18 +217,20 @@ src/lib/paypal/serverPayPalConfig.ts
 Resolution rules:
 
 - `PAYPAL_PAYMENT_MODE=live` uses live credentials and live webhook ID.
-- `PAYPAL_PAYMENT_MODE=sandbox` uses sandbox credentials and sandbox webhook ID.
+- `PAYPAL_PAYMENT_MODE=sandbox` uses sandbox credentials and sandbox webhook IDs.
+- In production deployments, `PAYPAL_SANDBOX_PRODUCTION_WEBHOOK_ID` is preferred when set. If it is missing, verification falls back to the ngrok sandbox webhook ID.
+- In local/non-production runs, `PAYPAL_SANDBOX_NGROK_WEBHOOK_ID` is preferred when set.
+- `PAYPAL_SANDBOX_ADDITIONAL_WEBHOOK_IDS` can hold a comma-separated list for temporary migration windows.
 - `NEXT_PUBLIC_PAYPAL_PAYMENT_MODE` should match `PAYPAL_PAYMENT_MODE`.
-- Generic fallback env vars are intentionally not used by the current implementation.
 
 ## Domain Strategy
 
 Use one canonical listener URL per PayPal app/payment mode. PayPal posts events to the listener URL registered under the app that created the transaction.
 
-Live payment mode should use a stable production listener URL, for example:
+Production-deployed sandbox testing and live payment mode should use the stable production listener URL for the PayPal app/payment mode being registered:
 
 ```txt
-https://codexchristi.shop/next-api/paypal/webhooks/ledger-transaction-events
+https://codexchristi.org/next-api/paypal/webhooks/ledger-transaction-events
 ```
 
 If two public domains point to the same app, do not register both as PayPal webhook listeners for the same app/events unless duplicate delivery is intentional.
@@ -248,8 +251,7 @@ Staging:
 stable staging HTTPS URL registered under the Sandbox app.
 
 Production-deployed app while still using sandbox payments:
-stable production HTTPS URL registered under the Sandbox app,
-or ngrok only if you intentionally want sandbox webhooks to reach local dev instead.
+stable production HTTPS URL registered under the Sandbox app.
 
 Live payment mode:
 canonical production HTTPS URL registered under the Live app.
@@ -392,14 +394,17 @@ https://{ngrok-host}/next-api/paypal/webhooks/ledger-transaction-events
 or:
 
 ```txt
-https://{deployed-host}/next-api/paypal/webhooks/ledger-transaction-events
+https://codexchristi.org/next-api/paypal/webhooks/ledger-transaction-events
 ```
 
 3. Store the generated sandbox webhook ID:
 
 ```txt
-PAYPAL_SANDBOX_WEBHOOK_ID=...
+PAYPAL_SANDBOX_NGROK_WEBHOOK_ID=...        # preferred current ngrok listener name
+PAYPAL_SANDBOX_PRODUCTION_WEBHOOK_ID=...   # codexchristi.org listener registered under the Sandbox app
 ```
+
+If you already have a sandbox webhook registered to ngrok, keep that ID in `PAYPAL_SANDBOX_NGROK_WEBHOOK_ID`. Register the production URL as a second sandbox webhook and store that new ID in `PAYPAL_SANDBOX_PRODUCTION_WEBHOOK_ID`.
 
 4. Set:
 
@@ -419,13 +424,13 @@ Only do this when real payments are ready:
 2. Register that listener under the PayPal Live app:
 
 ```txt
-https://codexchristi.shop/next-api/paypal/webhooks/ledger-transaction-events
+https://codexchristi.org/next-api/paypal/webhooks/ledger-transaction-events
 ```
 
 3. Store the generated live webhook ID:
 
 ```txt
-PAYPAL_LIVE_WEBHOOK_ID=...
+PAYPAL_LIVE_PRODUCTION_WEBHOOK_ID=...
 ```
 
 4. Set:
@@ -492,8 +497,8 @@ Admin UI should eventually expose:
 
 - Sandbox webhook ID is separate from live webhook ID.
 - A production-deployed app can still use sandbox PayPal payment mode until real payments are ready.
-- Sandbox payment mode uses sandbox credentials and `PAYPAL_SANDBOX_WEBHOOK_ID`.
-- Live payment mode uses live credentials and `PAYPAL_LIVE_WEBHOOK_ID`.
+- Sandbox payment mode uses sandbox credentials and `PAYPAL_SANDBOX_NGROK_WEBHOOK_ID` / `PAYPAL_SANDBOX_PRODUCTION_WEBHOOK_ID`.
+- Live payment mode uses live credentials and `PAYPAL_LIVE_PRODUCTION_WEBHOOK_ID`.
 - Live payment mode uses a stable production domain, not ngrok.
 - Only one canonical live payment listener domain is registered for PayPal webhook delivery.
 - Deployed environments have `PAYPAL_WEBHOOK_SIGNATURE_VERIFICATION=required` for real PayPal deliveries.

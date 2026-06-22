@@ -13,6 +13,10 @@ DEFAULT_EVENTS=(
   "PAYMENT.CAPTURE.REFUNDED"
 )
 
+WEBHOOK_PATH="/next-api/paypal/webhooks/ledger-transaction-events"
+WEBHOOK_NEXT_API_PREFIX="/next-api"
+CANONICAL_PRODUCTION_WEBHOOK_BASE_URL="${PAYPAL_PRODUCTION_WEBHOOK_BASE_URL:-https://codexchristi.org}"
+
 trim() {
   local value="$1"
   value="${value#"${value%%[![:space:]]*}"}"
@@ -104,12 +108,44 @@ build_webhook_url() {
   local raw="$1"
   local normalized="${raw%/}"
 
-  if [[ "$normalized" == http://* || "$normalized" == https://* ]]; then
-    printf '%s/next-api/paypal/webhooks/ledger-transaction-events' "$normalized"
+  if [[ "$normalized" == *"$WEBHOOK_PATH" ]]; then
+    printf '%s' "$normalized"
     return
   fi
 
-  printf 'https://%s.ngrok-free.app/next-api/paypal/webhooks/ledger-transaction-events' "$normalized"
+  if [[ "$normalized" == http://* || "$normalized" == https://* ]]; then
+    if [[ "$normalized" == *"$WEBHOOK_NEXT_API_PREFIX" ]]; then
+      printf '%s/paypal/webhooks/ledger-transaction-events' "$normalized"
+      return
+    fi
+
+    printf '%s%s' "$normalized" "$WEBHOOK_PATH"
+    return
+  fi
+
+  printf 'https://%s.ngrok-free.app%s' "$normalized" "$WEBHOOK_PATH"
+}
+
+is_ngrok_webhook_target() {
+  local raw="$1"
+  local normalized="$raw"
+
+  [[ "$normalized" == *"ngrok-free.app"* || ( "$normalized" != http://* && "$normalized" != https://* ) ]]
+}
+
+is_canonical_production_webhook_target() {
+  local raw="$1"
+  local normalized="${raw%/}"
+  local canonical="${CANONICAL_PRODUCTION_WEBHOOK_BASE_URL%/}"
+
+  [[ "$normalized" == "$canonical"* ]]
+}
+
+is_production_deployment_context() {
+  local env_name="${PAYPAL_WEBHOOK_DEPLOYMENT_ENV:-${APP_ENV:-${NODE_ENV:-}}}"
+  env_name="$(tr '[:upper:]' '[:lower:]' <<< "${env_name:-}")"
+
+  [[ "$env_name" == "production" ]]
 }
 
 require_command curl
@@ -142,24 +178,38 @@ client_secret="$(prompt_secret_with_mode "PayPal client secret")"
 
 # Let the caller choose the exact listener URL target.
 # Payment mode selects the PayPal API/app. The listener URL is separate.
-# Sandbox mode can target ngrok or a deployed HTTPS URL; live mode should target the stable production URL.
+# A production deployment can still register its stable production listener under the Sandbox app
+# while PAYPAL_PAYMENT_MODE=sandbox and NEXT_PUBLIC_PAYPAL_PAYMENT_MODE=sandbox.
+# Live mode should target the stable production URL.
 echo
 echo "Webhook base URL input examples:"
 echo "- Full base URL: https://codexchristi.org"
-echo "- Full shop URL: https://codexchristi.shop"
+echo "- Next API base URL: https://codexchristi.org/next-api"
+echo "- Full webhook URL: https://codexchristi.org/next-api/paypal/webhooks/ledger-transaction-events"
 echo "- Ngrok subdomain only: my-paypal-dev-tunnel"
 echo "- Full ngrok URL: https://my-paypal-dev-tunnel.ngrok-free.app"
 echo
-echo "Do not include the webhook path itself; the script appends:"
-echo "- /next-api/paypal/webhooks/ledger-transaction-events"
+echo "If you provide only a base URL or ngrok subdomain, the script appends:"
+echo "- $WEBHOOK_PATH"
 echo
 echo "Spaces before or after your input are trimmed automatically."
 echo
-read -r -p "Webhook base URL or ngrok subdomain: " webhook_target
+default_webhook_target=""
+if is_production_deployment_context; then
+  default_webhook_target="$CANONICAL_PRODUCTION_WEBHOOK_BASE_URL"
+fi
+
+if [[ -n "$default_webhook_target" ]]; then
+  read -r -p "Webhook base URL, full webhook URL, or ngrok subdomain (default: $default_webhook_target): " webhook_target
+  webhook_target="${webhook_target:-$default_webhook_target}"
+else
+  read -r -p "Webhook base URL, full webhook URL, or ngrok subdomain: " webhook_target
+fi
+
 webhook_target="$(trim "$webhook_target")"
 
 if [[ -z "$webhook_target" ]]; then
-  echo "Webhook base URL or ngrok subdomain is required." >&2
+  echo "Webhook base URL, full webhook URL, or ngrok subdomain is required." >&2
   exit 1
 fi
 
@@ -238,9 +288,19 @@ if [[ -n "$result_webhook_id" ]]; then
 fi
 
 if [[ "$payment_mode" == "sandbox" ]]; then
-  echo "Suggested env: PAYPAL_SANDBOX_WEBHOOK_ID=$result_webhook_id"
+  if is_canonical_production_webhook_target "$webhook_target"; then
+    echo "Suggested env for production-deployed sandbox: PAYPAL_SANDBOX_PRODUCTION_WEBHOOK_ID=$result_webhook_id"
+  elif is_ngrok_webhook_target "$webhook_target"; then
+    echo "Suggested env for ngrok sandbox: PAYPAL_SANDBOX_NGROK_WEBHOOK_ID=$result_webhook_id"
+  else
+    echo "Suggested env for this sandbox listener: PAYPAL_SANDBOX_ADDITIONAL_WEBHOOK_IDS=$result_webhook_id"
+  fi
 else
-  echo "Suggested env: PAYPAL_LIVE_WEBHOOK_ID=$result_webhook_id"
+  if is_canonical_production_webhook_target "$webhook_target"; then
+    echo "Suggested env for production live: PAYPAL_LIVE_PRODUCTION_WEBHOOK_ID=$result_webhook_id"
+  else
+    echo "Suggested env for this live listener: PAYPAL_LIVE_ADDITIONAL_WEBHOOK_IDS=$result_webhook_id"
+  fi
 fi
 
 if [[ "$print_token" == "y" || "$print_token" == "yes" ]]; then

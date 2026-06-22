@@ -34,6 +34,14 @@ const FULFILLMENT_RECOVERY_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
 ]);
 
+type PayPalWebhookVerificationHeaders = {
+  paypalAuthAlgo: string;
+  paypalCertUrl: string;
+  paypalTransmissionId: string;
+  paypalTransmissionSig: string;
+  paypalTransmissionTime: string;
+};
+
 function shouldVerifyWebhookSignature() {
   const configured = (process.env.PAYPAL_WEBHOOK_SIGNATURE_VERIFICATION ?? '').toLowerCase();
 
@@ -43,6 +51,35 @@ function shouldVerifyWebhookSignature() {
   throw new Error(
     'Invalid PAYPAL_WEBHOOK_SIGNATURE_VERIFICATION. Expected "required" or "disabled".',
   );
+}
+
+async function verifyWebhookSignatureWithAnyConfiguredWebhookId({
+  event,
+  webhookIds,
+  headers,
+}: {
+  event: PayPalWebhookEvent;
+  webhookIds: string[];
+  headers: PayPalWebhookVerificationHeaders;
+}) {
+  for (const webhookId of webhookIds) {
+    try {
+      const ok = await verifyWebhookSignature({
+        event,
+        webhookId,
+        ...headers,
+      });
+
+      if (ok) return true;
+    } catch (error) {
+      console.warn('[PayPal Webhook] signature verification failed for configured webhook ID', {
+        webhookId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return false;
 }
 
 async function updateLedgerFromWebhook(args: {
@@ -166,18 +203,20 @@ export async function POST(req: Request) {
     eventId = event.id;
 
     if (shouldVerify) {
-      if (!config.webhookId) {
-        throw new Error('Missing PayPal webhook ID for the selected payment mode.');
+      if (!config.webhookIds.length) {
+        throw new Error('Missing PayPal webhook ID(s) for the selected payment mode.');
       }
 
-      const ok = await verifyWebhookSignature({
+      const ok = await verifyWebhookSignatureWithAnyConfiguredWebhookId({
         event,
-        webhookId: config.webhookId,
-        paypalAuthAlgo: requiredHeader(req, 'paypal-auth-algo'),
-        paypalCertUrl: requiredHeader(req, 'paypal-cert-url'),
-        paypalTransmissionId: requiredHeader(req, 'paypal-transmission-id'),
-        paypalTransmissionSig: requiredHeader(req, 'paypal-transmission-sig'),
-        paypalTransmissionTime: requiredHeader(req, 'paypal-transmission-time'),
+        webhookIds: config.webhookIds,
+        headers: {
+          paypalAuthAlgo: requiredHeader(req, 'paypal-auth-algo'),
+          paypalCertUrl: requiredHeader(req, 'paypal-cert-url'),
+          paypalTransmissionId: requiredHeader(req, 'paypal-transmission-id'),
+          paypalTransmissionSig: requiredHeader(req, 'paypal-transmission-sig'),
+          paypalTransmissionTime: requiredHeader(req, 'paypal-transmission-time'),
+        },
       });
 
       if (!ok) {
