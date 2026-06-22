@@ -74,7 +74,7 @@ export default function AdminPayPalLedgerWebhooksClient({
           Shop dashboard
         </Link>
 
-        <div className='grid gap-3 md:grid-cols-4'>
+        <div className='grid gap-3 md:grid-cols-5'>
           <MetricCard label='Activation' value={dashboard.activationSource} tone='cyan' />
           <MetricCard
             label='Payment Mode'
@@ -97,6 +97,11 @@ export default function AdminPayPalLedgerWebhooksClient({
                   : 'emerald'
             }
           />
+          <MetricCard
+            label='DB Target'
+            value={dashboard.databaseTarget.label}
+            tone={dashboard.databaseTarget.tone}
+          />
         </div>
 
         <AdminGlassPanel className='p-4 sm:p-5'>
@@ -115,11 +120,26 @@ export default function AdminPayPalLedgerWebhooksClient({
               </p>
             </div>
 
-            <div className='grid gap-2 text-xs text-slate-400 sm:grid-cols-2 lg:min-w-[360px]'>
+            <div className='grid gap-2 text-xs text-slate-400 sm:grid-cols-2 lg:min-w-[620px] xl:grid-cols-3'>
               <StatusPill
                 label='Ledger DB'
                 value={dashboard.databaseConfigured ? 'configured' : 'missing'}
-                tone={dashboard.databaseConfigured ? 'emerald' : 'rose'}
+                tone={dashboard.databaseTarget.tone}
+              />
+              <StatusPill
+                label='Ledger branch'
+                value={dashboard.databaseTarget.selectedBranch ?? 'none'}
+                tone={dashboard.databaseTarget.tone}
+              />
+              <StatusPill
+                label='Branch source'
+                value={formatDatabaseSelectionSource(dashboard.databaseTarget.selectionSource)}
+                tone={dashboard.databaseTarget.selectionSource === 'fallback' ? 'amber' : 'slate'}
+              />
+              <StatusPill
+                label='DB URL env'
+                value={formatDatabaseUrlPresence(dashboard.databaseTarget)}
+                tone={dashboard.databaseTarget.prodDevUrlsMatch ? 'rose' : 'slate'}
               />
               <StatusPill
                 label='Notifications'
@@ -137,6 +157,24 @@ export default function AdminPayPalLedgerWebhooksClient({
             <p className='mt-4 rounded-lg border border-rose-300/20 bg-rose-400/10 px-3 py-2 text-sm leading-6 text-rose-100'>
               {dashboard.paymentModeError}
             </p>
+          ) : null}
+          {dashboard.databaseTarget.warnings.length ? (
+            <div className='mt-4 space-y-2'>
+              {dashboard.databaseTarget.warnings.map((warning) => (
+                <div
+                  key={warning.code}
+                  className={cn(
+                    'flex gap-2 rounded-lg border px-3 py-2 text-sm leading-6',
+                    warning.severity === 'critical'
+                      ? 'border-rose-300/20 bg-rose-400/10 text-rose-100'
+                      : 'border-amber-300/20 bg-amber-300/10 text-amber-100',
+                  )}
+                >
+                  <AlertTriangle size={16} className='mt-1 shrink-0' />
+                  <span>{warning.message}</span>
+                </div>
+              ))}
+            </div>
           ) : null}
           {state.error || state.success ? (
             <p className='sr-only' aria-live='polite'>
@@ -164,6 +202,19 @@ export default function AdminPayPalLedgerWebhooksClient({
       </section>
     </div>
   );
+}
+
+function formatDatabaseSelectionSource(
+  source: PayPalLedgerWebhookDashboard['databaseTarget']['selectionSource'],
+) {
+  return source.replaceAll('_', ' ');
+}
+
+function formatDatabaseUrlPresence(target: PayPalLedgerWebhookDashboard['databaseTarget']) {
+  const prod = target.prodUrlConfigured ? 'prod set' : 'prod missing';
+  const dev = target.devUrlConfigured ? 'dev set' : 'dev missing';
+
+  return `${prod} · ${dev}`;
 }
 
 function WebhookBindingCard({

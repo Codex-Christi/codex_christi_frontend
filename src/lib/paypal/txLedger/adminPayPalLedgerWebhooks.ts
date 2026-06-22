@@ -12,8 +12,10 @@ import {
 } from '@/lib/paypal/ledgerWebhookConfig';
 import { registerPayPalLedgerWebhook } from '@/lib/paypal/payPalWebhookRegistry';
 import {
+  getPaypalTxLedgerDatabaseStatus,
   isPaypalTxLedgerDatabaseConfigured,
   paypalTxLedger,
+  type PaypalTxLedgerDatabaseStatus,
 } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import {
   enqueueAdminPayPalLedgerWebhookDriftNotification,
@@ -55,6 +57,7 @@ export type PayPalLedgerWebhookDashboard = {
   activationSource: PayPalLedgerWebhookActivationSource;
   currentPaymentMode: 'sandbox' | 'live' | null;
   databaseConfigured: boolean;
+  databaseTarget: PayPalLedgerWebhookDatabaseTargetStatus;
   generatedAt: string;
   paymentModeError: string | null;
   requiredEvents: string[];
@@ -66,6 +69,23 @@ export type PayPalLedgerWebhookDashboard = {
     inSyncCount: number;
     notificationDueCount: number;
   };
+};
+
+export type PayPalLedgerWebhookDatabaseTargetWarning = {
+  code:
+    | 'dev_runtime_using_prod_branch'
+    | 'invalid_branch_env'
+    | 'missing_ledger_database'
+    | 'prod_dev_urls_match'
+    | 'production_using_dev_branch';
+  message: string;
+  severity: 'critical' | 'warning';
+};
+
+export type PayPalLedgerWebhookDatabaseTargetStatus = PaypalTxLedgerDatabaseStatus & {
+  label: string;
+  tone: 'amber' | 'emerald' | 'rose';
+  warnings: PayPalLedgerWebhookDatabaseTargetWarning[];
 };
 
 export type SavePayPalLedgerWebhookBindingInput = {
@@ -108,7 +128,8 @@ export async function getPayPalLedgerWebhookDashboard({
 } = {}): Promise<PayPalLedgerWebhookDashboard> {
   const activationSource = getPayPalLedgerWebhookActivationSource();
   const paymentModeState = getOptionalConfiguredPayPalPaymentMode();
-  const databaseConfigured = isPaypalTxLedgerDatabaseConfigured();
+  const databaseTarget = getPayPalLedgerWebhookDatabaseTargetStatus();
+  const databaseConfigured = databaseTarget.configured;
   const rows = await getPayPalLedgerWebhookDashboardRows({ databaseConfigured });
 
   if (databaseConfigured) {
@@ -129,6 +150,7 @@ export async function getPayPalLedgerWebhookDashboard({
     activationSource,
     currentPaymentMode: paymentModeState.paymentMode,
     databaseConfigured,
+    databaseTarget,
     generatedAt: new Date().toISOString(),
     paymentModeError: paymentModeState.error,
     requiredEvents: [...PAYPAL_LEDGER_WEBHOOK_REQUIRED_EVENTS],
@@ -140,6 +162,68 @@ export async function getPayPalLedgerWebhookDashboard({
       inSyncCount,
       notificationDueCount,
     },
+  };
+}
+
+function getPayPalLedgerWebhookDatabaseTargetStatus(): PayPalLedgerWebhookDatabaseTargetStatus {
+  const status = getPaypalTxLedgerDatabaseStatus();
+  const warnings: PayPalLedgerWebhookDatabaseTargetWarning[] = [];
+
+  if (!status.configured) {
+    warnings.push({
+      code: 'missing_ledger_database',
+      message: 'No PayPal TX ledger database URL is configured.',
+      severity: 'critical',
+    });
+  }
+
+  if (status.invalidExplicitBranchConfigured) {
+    warnings.push({
+      code: 'invalid_branch_env',
+      message: 'PAYPAL_TX_LEDGER_NEON_BRANCH is set but is not "prod" or "dev".',
+      severity: 'warning',
+    });
+  }
+
+  if (status.nodeEnv === 'production' && status.selectedBranch === 'dev') {
+    warnings.push({
+      code: 'production_using_dev_branch',
+      message:
+        'Production runtime is using the dev PayPal TX ledger branch. Production webhooks can process local/dev test rows.',
+      severity: 'critical',
+    });
+  }
+
+  if (status.nodeEnv !== 'production' && status.selectedBranch === 'prod') {
+    warnings.push({
+      code: 'dev_runtime_using_prod_branch',
+      message:
+        'Non-production runtime is using the prod PayPal TX ledger branch. Local testing can touch production ledger rows.',
+      severity: 'warning',
+    });
+  }
+
+  if (status.prodDevUrlsMatch) {
+    warnings.push({
+      code: 'prod_dev_urls_match',
+      message:
+        'Prod and dev PayPal TX ledger URLs appear identical. Separate webhook tests may still hit the same ledger rows.',
+      severity: 'critical',
+    });
+  }
+
+  const hasCriticalWarning = warnings.some((warning) => warning.severity === 'critical');
+  const label = status.selectedBranch
+    ? `${status.selectedBranch} branch`
+    : status.configured
+      ? 'configured'
+      : 'missing';
+
+  return {
+    ...status,
+    label,
+    tone: hasCriticalWarning ? 'rose' : warnings.length ? 'amber' : 'emerald',
+    warnings,
   };
 }
 
