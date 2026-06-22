@@ -1,0 +1,382 @@
+'use client';
+
+import Link from 'next/link';
+import { useActionState } from 'react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  Database,
+  KeyRound,
+  Loader2,
+  Power,
+  PowerOff,
+  Save,
+  ShieldCheck,
+} from 'lucide-react';
+import {
+  savePayPalLedgerWebhookBindingAction,
+  type PayPalLedgerWebhookBindingActionState,
+} from '@/app/admin/(dashboard)/shop/paypal-webhooks/actions';
+import type {
+  PayPalLedgerWebhookDashboard,
+  PayPalLedgerWebhookDashboardBinding,
+} from '@/lib/paypal/txLedger/adminPayPalLedgerWebhooks';
+import { cn } from '@/lib/utils';
+import AdminGlassPanel, { adminFieldClass } from './dashboard/AdminGlassPanel';
+
+type AdminPayPalLedgerWebhooksClientProps = {
+  dashboard: PayPalLedgerWebhookDashboard;
+};
+
+const initialState: PayPalLedgerWebhookBindingActionState = {
+  error: null,
+  success: null,
+};
+
+export default function AdminPayPalLedgerWebhooksClient({
+  dashboard,
+}: AdminPayPalLedgerWebhooksClientProps) {
+  const [state, formAction, pending] = useActionState(
+    savePayPalLedgerWebhookBindingAction,
+    initialState,
+  );
+
+  return (
+    <div className='px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
+      <section className='mx-auto max-w-[1600px] space-y-4'>
+        <Link
+          href='/admin/shop'
+          className='inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-200 transition hover:border-cyan-300/30 hover:text-cyan-100'
+        >
+          <ArrowLeft size={16} />
+          Shop dashboard
+        </Link>
+
+        <div className='grid gap-3 md:grid-cols-4'>
+          <MetricCard label='Activation' value={dashboard.activationSource} tone='cyan' />
+          <MetricCard
+            label='Payment Mode'
+            value={dashboard.currentPaymentMode ?? 'missing'}
+            tone={dashboard.currentPaymentMode ? 'emerald' : 'rose'}
+          />
+          <MetricCard
+            label='Active DB'
+            value={`${dashboard.summary.activeDbBindings}`}
+            tone={dashboard.summary.activeDbBindings ? 'emerald' : 'amber'}
+          />
+          <MetricCard
+            label='Env Drift'
+            value={`${dashboard.summary.driftCount + dashboard.summary.envMissingCount}`}
+            tone={
+              dashboard.summary.envMissingCount
+                ? 'rose'
+                : dashboard.summary.driftCount
+                  ? 'amber'
+                  : 'emerald'
+            }
+          />
+        </div>
+
+        <AdminGlassPanel className='p-4 sm:p-5'>
+          <div className='flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between'>
+            <div className='min-w-0'>
+              <div className='inline-flex items-center gap-2 rounded-lg border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-100'>
+                <ShieldCheck size={14} />
+                PayPal Ledger Webhooks
+              </div>
+              <h2 className='mt-3 text-base font-semibold text-white'>
+                Ledger transaction webhook trust
+              </h2>
+              <p className='mt-1 max-w-3xl text-sm leading-6 text-slate-400'>
+                Runtime verification uses env values in env mode. In hybrid mode, active DB bindings
+                are tried first and env values remain fallback.
+              </p>
+            </div>
+
+            <div className='grid gap-2 text-xs text-slate-400 sm:grid-cols-2 lg:min-w-[360px]'>
+              <StatusPill
+                label='Ledger DB'
+                value={dashboard.databaseConfigured ? 'configured' : 'missing'}
+                tone={dashboard.databaseConfigured ? 'emerald' : 'rose'}
+              />
+              <StatusPill
+                label='Notifications'
+                value={
+                  dashboard.summary.notificationDueCount
+                    ? `${dashboard.summary.notificationDueCount} queued`
+                    : 'clear'
+                }
+                tone={dashboard.summary.notificationDueCount ? 'amber' : 'emerald'}
+              />
+            </div>
+          </div>
+
+          {dashboard.paymentModeError ? (
+            <p className='mt-4 rounded-lg border border-rose-300/20 bg-rose-400/10 px-3 py-2 text-sm leading-6 text-rose-100'>
+              {dashboard.paymentModeError}
+            </p>
+          ) : null}
+          {state.error ? (
+            <p className='mt-4 rounded-lg border border-rose-300/20 bg-rose-400/10 px-3 py-2 text-sm leading-6 text-rose-100'>
+              {state.error}
+            </p>
+          ) : null}
+          {state.success ? (
+            <p className='mt-4 rounded-lg border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-sm leading-6 text-emerald-100'>
+              {state.success}
+            </p>
+          ) : null}
+
+          <div className='mt-4 grid gap-2 text-xs text-slate-400 md:grid-cols-2 xl:grid-cols-3'>
+            {dashboard.requiredEvents.map((eventName) => (
+              <span
+                key={eventName}
+                className='rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 font-mono text-[11px] text-slate-300'
+              >
+                {eventName}
+              </span>
+            ))}
+          </div>
+        </AdminGlassPanel>
+
+        <div className='grid gap-4 xl:grid-cols-3'>
+          {dashboard.rows.map((row) => (
+            <WebhookBindingCard key={row.key} pending={pending} row={row} formAction={formAction} />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function WebhookBindingCard({
+  formAction,
+  pending,
+  row,
+}: {
+  formAction: (payload: FormData) => void;
+  pending: boolean;
+  row: PayPalLedgerWebhookDashboardBinding;
+}) {
+  return (
+    <AdminGlassPanel className='flex min-h-[520px] flex-col p-4 sm:p-5'>
+      <div className='flex items-start justify-between gap-3'>
+        <div className='min-w-0'>
+          <div className='flex flex-wrap items-center gap-2'>
+            <h3 className='text-base font-semibold text-white'>{row.label}</h3>
+            <span
+              className={cn(
+                'rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em]',
+                row.isActive
+                  ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
+                  : 'border-white/10 bg-white/[0.04] text-slate-400',
+              )}
+            >
+              {row.isActive ? 'active' : 'inactive'}
+            </span>
+          </div>
+          <p className='mt-1 text-xs text-slate-500'>
+            {row.paypalPaymentMode} · {row.deploymentTarget.replaceAll('_', ' ')}
+          </p>
+        </div>
+        <StatusIcon tone={row.syncTone} />
+      </div>
+
+      <div className='mt-4 grid gap-2 text-xs'>
+        <StatusPill label='Sync' value={row.syncStatusLabel} tone={row.syncTone} />
+        <StatusPill
+          label='Current mode'
+          value={row.activationRelevant ? 'relevant' : 'not selected'}
+          tone={row.activationRelevant ? 'cyan' : 'slate'}
+        />
+      </div>
+
+      <div className='mt-4 space-y-3'>
+        <ValueBlock label='Env variable' value={row.envVarName} mono />
+        <ValueBlock label='Runtime env value' value={row.envWebhookId ?? 'not set'} mono />
+        <ValueBlock label='Latest DB value' value={row.dbWebhookId ?? 'not set'} mono />
+        <ValueBlock label='Webhook URL' value={row.webhookUrl ?? 'not set'} />
+        <ValueBlock label='Expected URL' value={row.expectedUrl ?? 'ngrok/custom target'} />
+      </div>
+
+      {row.dbWebhookId ? (
+        <div className='mt-4 rounded-lg border border-amber-300/20 bg-amber-300/10 p-3'>
+          <p className='text-xs font-semibold uppercase tracking-[0.12em] text-amber-100'>
+            Env counterpart
+          </p>
+          <p className='mt-2 break-all font-mono text-xs leading-5 text-amber-50'>
+            {row.envSuggestedLine}
+          </p>
+        </div>
+      ) : null}
+
+      <form action={formAction} className='mt-auto space-y-3 pt-5'>
+        <input type='hidden' name='key' value={row.key} />
+        <label className='block'>
+          <span className='text-xs font-medium text-slate-400'>Webhook ID</span>
+          <input
+            name='webhookId'
+            defaultValue={row.dbWebhookId ?? ''}
+            className={cn(adminFieldClass, 'mt-1 w-full font-mono')}
+            placeholder='WH-...'
+          />
+        </label>
+        <label className='block'>
+          <span className='text-xs font-medium text-slate-400'>Webhook URL</span>
+          <input
+            name='webhookUrl'
+            defaultValue={row.webhookUrl ?? ''}
+            className={cn(adminFieldClass, 'mt-1 w-full')}
+            placeholder={row.expectedUrl ?? 'https://...'}
+          />
+        </label>
+        <label className='block'>
+          <span className='text-xs font-medium text-slate-400'>Master admin password</span>
+          <input
+            name='masterAdminPassword'
+            type='password'
+            autoComplete='current-password'
+            className={cn(adminFieldClass, 'mt-1 w-full')}
+            placeholder='Required for every change'
+          />
+        </label>
+
+        <div className='grid gap-2 sm:grid-cols-3'>
+          <ActionButton intent='save' pending={pending} icon='save' label='Save' />
+          <ActionButton intent='activate' pending={pending} icon='activate' label='Activate' />
+          <ActionButton intent='deactivate' pending={pending} icon='deactivate' label='Disable' />
+        </div>
+      </form>
+    </AdminGlassPanel>
+  );
+}
+
+function ActionButton({
+  icon,
+  intent,
+  label,
+  pending,
+}: {
+  icon: 'activate' | 'deactivate' | 'save';
+  intent: 'activate' | 'deactivate' | 'save';
+  label: string;
+  pending: boolean;
+}) {
+  const Icon = icon === 'save' ? Save : icon === 'activate' ? Power : PowerOff;
+
+  return (
+    <button
+      type='submit'
+      name='intent'
+      value={intent}
+      disabled={pending}
+      className={cn(
+        'inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
+        intent === 'activate'
+          ? 'bg-cyan-300 text-slate-950 hover:bg-cyan-200'
+          : 'border border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-300/30',
+      )}
+    >
+      {pending ? <Loader2 size={16} className='animate-spin' /> : <Icon size={16} />}
+      {label}
+    </button>
+  );
+}
+
+function MetricCard({
+  label,
+  tone,
+  value,
+}: {
+  label: string;
+  tone: 'amber' | 'cyan' | 'emerald' | 'rose';
+  value: string;
+}) {
+  const toneClass = {
+    amber: 'text-amber-100',
+    cyan: 'text-cyan-100',
+    emerald: 'text-emerald-100',
+    rose: 'text-rose-100',
+  }[tone];
+
+  return (
+    <AdminGlassPanel className='p-4'>
+      <p className='text-xs uppercase tracking-[0.12em] text-slate-500'>{label}</p>
+      <p className={cn('mt-2 text-2xl font-semibold tracking-normal', toneClass)}>{value}</p>
+    </AdminGlassPanel>
+  );
+}
+
+function StatusPill({
+  label,
+  tone,
+  value,
+}: {
+  label: string;
+  tone: 'amber' | 'cyan' | 'emerald' | 'rose' | 'slate';
+  value: string;
+}) {
+  const toneClass = {
+    amber: 'border-amber-300/20 bg-amber-300/10 text-amber-100',
+    cyan: 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100',
+    emerald: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100',
+    rose: 'border-rose-300/20 bg-rose-300/10 text-rose-100',
+    slate: 'border-white/10 bg-white/[0.04] text-slate-300',
+  }[tone];
+
+  return (
+    <div className={cn('rounded-lg border px-3 py-2', toneClass)}>
+      <span className='block text-[11px] uppercase tracking-[0.12em] opacity-70'>{label}</span>
+      <span className='mt-1 block text-sm font-semibold'>{value}</span>
+    </div>
+  );
+}
+
+function StatusIcon({ tone }: { tone: PayPalLedgerWebhookDashboardBinding['syncTone'] }) {
+  const className = {
+    amber: 'border-amber-300/20 bg-amber-300/10 text-amber-100',
+    emerald: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100',
+    rose: 'border-rose-300/20 bg-rose-300/10 text-rose-100',
+    slate: 'border-white/10 bg-white/[0.04] text-slate-400',
+  }[tone];
+  const Icon = tone === 'emerald' ? CheckCircle2 : tone === 'slate' ? Database : AlertTriangle;
+
+  return (
+    <span
+      className={cn(
+        'inline-flex h-10 w-10 items-center justify-center rounded-lg border',
+        className,
+      )}
+    >
+      <Icon size={18} />
+    </span>
+  );
+}
+
+function ValueBlock({
+  label,
+  mono = false,
+  value,
+}: {
+  label: string;
+  mono?: boolean;
+  value: string;
+}) {
+  return (
+    <div className='rounded-lg border border-white/10 bg-white/[0.03] p-3'>
+      <div className='flex items-center gap-2 text-[11px] uppercase tracking-[0.12em] text-slate-500'>
+        {mono ? <KeyRound size={12} /> : null}
+        {label}
+      </div>
+      <p
+        className={cn(
+          'mt-2 min-h-[20px] break-all text-sm leading-5 text-slate-200',
+          mono && 'font-mono text-xs text-cyan-100',
+        )}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}

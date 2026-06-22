@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import AdminShopDashboardClient from '@/components/UI/Admin/AdminShopDashboardClient';
 import { requireAdminPage } from '@/lib/admin/require-admin';
+import { getPayPalLedgerWebhookDashboard } from '@/lib/paypal/txLedger/adminPayPalLedgerWebhooks';
 import { listAdminPaidOrderRecoveryRows } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
 import { getPayPalPaymentReconciliationDashboardSummary } from '@/lib/paypal/txLedger/paymentReconciliation';
 
@@ -15,9 +16,10 @@ export default async function ShopAdminPage() {
     scope: 'shop',
     returnPath: '/admin/shop',
   });
-  const [recoveryRows, reconciliationSummary] = await Promise.all([
+  const [recoveryRows, reconciliationSummary, webhookDashboard] = await Promise.all([
     listAdminPaidOrderRecoveryRows().then((result) => result.rows),
     getPayPalPaymentReconciliationDashboardSummary(),
+    getPayPalLedgerWebhookDashboard(),
   ]);
 
   return (
@@ -26,6 +28,10 @@ export default async function ShopAdminPage() {
       paymentReconciliationAttentionCount={reconciliationSummary.total}
       paymentReconciliationCriticalCount={reconciliationSummary.critical}
       paymentReconciliationWarningCount={reconciliationSummary.warning}
+      paypalWebhookAttentionCount={
+        webhookDashboard.summary.driftCount + webhookDashboard.summary.envMissingCount
+      }
+      paypalWebhookActiveDbCount={webhookDashboard.summary.activeDbBindings}
     />
   );
 }

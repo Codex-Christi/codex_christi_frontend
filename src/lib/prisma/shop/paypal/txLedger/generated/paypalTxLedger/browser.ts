@@ -28,6 +28,11 @@ export type PaypalIntent = Prisma.PaypalIntentModel
  */
 export type PaypalWebhookEvent = Prisma.PaypalWebhookEventModel
 /**
+ * Model PaypalLedgerTransactionWebhookBinding
+ *
+ */
+export type PaypalLedgerTransactionWebhookBinding = Prisma.PaypalLedgerTransactionWebhookBindingModel
+/**
  * Model CheckoutRecoveryOtpChallenge
  *
  */

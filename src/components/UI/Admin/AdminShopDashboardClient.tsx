@@ -1,7 +1,7 @@
 'use client';
 
 import { useReducedMotion } from 'framer-motion';
-import { BarChart3, ClipboardList, PackageCheck, RefreshCw, Store } from 'lucide-react';
+import { BarChart3, ClipboardList, PackageCheck, RefreshCw, Store, Webhook } from 'lucide-react';
 import AdminMetricCard from './dashboard/AdminMetricCard';
 import PaidOrderRecoveryQueuePanel from './dashboard/PaidOrderRecoveryQueuePanel';
 import type { MetricCard, PaidOrderRecoveryRow } from './dashboard/adminShopDashboardTypes';
@@ -10,6 +10,8 @@ type AdminShopDashboardClientProps = {
   paymentReconciliationAttentionCount?: number;
   paymentReconciliationCriticalCount?: number;
   paymentReconciliationWarningCount?: number;
+  paypalWebhookActiveDbCount?: number;
+  paypalWebhookAttentionCount?: number;
   recoveryRows: PaidOrderRecoveryRow[];
 };
 
@@ -17,6 +19,8 @@ export default function AdminShopDashboardClient({
   paymentReconciliationAttentionCount = 0,
   paymentReconciliationCriticalCount = 0,
   paymentReconciliationWarningCount = 0,
+  paypalWebhookActiveDbCount = 0,
+  paypalWebhookAttentionCount = 0,
   recoveryRows,
 }: AdminShopDashboardClientProps) {
   const reduceMotion = useReducedMotion();
@@ -24,6 +28,8 @@ export default function AdminShopDashboardClient({
     paymentReconciliationAttentionCount,
     paymentReconciliationCriticalCount,
     paymentReconciliationWarningCount,
+    paypalWebhookActiveDbCount,
+    paypalWebhookAttentionCount,
     recoveryRows,
   });
 
@@ -51,11 +57,15 @@ function getImplementedShopMetricCards({
   paymentReconciliationAttentionCount,
   paymentReconciliationCriticalCount,
   paymentReconciliationWarningCount,
+  paypalWebhookActiveDbCount,
+  paypalWebhookAttentionCount,
   recoveryRows,
 }: {
   paymentReconciliationAttentionCount: number;
   paymentReconciliationCriticalCount: number;
   paymentReconciliationWarningCount: number;
+  paypalWebhookActiveDbCount: number;
+  paypalWebhookAttentionCount: number;
   recoveryRows: PaidOrderRecoveryRow[];
 }): MetricCard[] {
   const failedRows = recoveryRows.filter((row) => row.status === 'failed');
@@ -118,6 +128,20 @@ function getImplementedShopMetricCards({
         : paymentReconciliationAttentionCount
           ? 'amber'
           : 'emerald',
+    },
+    {
+      title: 'PayPal Webhooks',
+      metric: `${paypalWebhookAttentionCount}`,
+      caption: paypalWebhookAttentionCount
+        ? 'env update needed'
+        : paypalWebhookActiveDbCount
+          ? `${paypalWebhookActiveDbCount} active DB`
+          : 'env-managed trust',
+      action: 'Open Webhooks',
+      href: '/admin/shop/paypal-webhooks',
+      icon: Webhook,
+      state: paypalWebhookAttentionCount ? 'review' : 'healthy',
+      tone: paypalWebhookAttentionCount ? 'amber' : 'emerald',
     },
     {
       title: 'Catalog & Snapshots',

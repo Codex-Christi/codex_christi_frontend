@@ -82,6 +82,42 @@ model PaypalWebhookEvent {
   @@index([createdAt])
 }
 
+model PaypalLedgerTransactionWebhookBinding {
+  id                        String    @id @default(cuid())
+  key                       String    @unique
+  paypalPaymentMode         String
+  deploymentTarget          String
+  envVarName                String
+  label                     String
+  webhookId                 String
+  webhookUrl                String?
+  expectedUrl               String?
+  eventTypes                String[]  @default([])
+  isActive                  Boolean   @default(false)
+  lastSyncStatus            String    @default("unknown")
+  lastSyncSummary           String?
+  lastObservedEnvWebhookId  String?
+  lastCheckedAt             DateTime?
+  lastNotifiedAt            DateTime?
+  lastNotificationDedupeKey String?
+  createdByAdminId          String?
+  createdByCodexUserId      String?
+  updatedByAdminId          String?
+  updatedByCodexUserId      String?
+  activatedByAdminId        String?
+  activatedByCodexUserId    String?
+  activatedAt               DateTime?
+  deactivatedAt             DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  @@index([paypalPaymentMode, isActive])
+  @@index([deploymentTarget])
+  @@index([envVarName])
+  @@index([lastSyncStatus])
+  @@index([updatedAt])
+}
+
 model CheckoutRecoveryOtpChallenge {
   id           String    @id @default(cuid())
   email        String

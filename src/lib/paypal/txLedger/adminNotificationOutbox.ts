@@ -12,12 +12,14 @@ const DEFAULT_PENDING_SEND_LIMIT = 25;
 export const ADMIN_NOTIFICATION_TYPE = {
   PAID_ORDER_RECOVERY_REQUIRED: 'paid_order_recovery_required',
   PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED: 'paid_order_fulfillment_push_accepted',
+  PAYPAL_LEDGER_WEBHOOK_DRIFT: 'paypal_ledger_webhook_drift',
   PAYMENT_RECONCILIATION_REQUIRED: 'payment_reconciliation_required',
 } as const;
 
 export const ADMIN_NOTIFICATION_STAGE = {
   PAYMENT: 'payment',
   FULFILLMENT: 'fulfillment',
+  WEBHOOK: 'webhook',
 } as const;
 
 export const ADMIN_NOTIFICATION_SEVERITY = {
@@ -68,6 +70,18 @@ type AdminFulfillmentPushAcceptedNotificationPayload = {
   adminDetailUrl: string;
 };
 
+type AdminPayPalLedgerWebhookDriftNotificationPayload = {
+  activationSource: string;
+  dashboardUrl: string;
+  dbWebhookId?: string | null;
+  envVarName: string;
+  envWebhookId?: string | null;
+  label: string;
+  message: string;
+  supportReference: string;
+  syncStatus: string;
+};
+
 type EnqueueAdminRecoveryNotificationProps = {
   db?: AdminNotificationDb;
   orderToken: string;
@@ -104,6 +118,17 @@ type EnqueueAdminPaymentReconciliationNotificationProps = Omit<
   severity?: (typeof ADMIN_NOTIFICATION_SEVERITY)[keyof typeof ADMIN_NOTIFICATION_SEVERITY];
 };
 
+type EnqueueAdminPayPalLedgerWebhookDriftNotificationProps = {
+  activationSource: string;
+  dbWebhookId?: string | null;
+  envVarName: string;
+  envWebhookId?: string | null;
+  label: string;
+  message: string;
+  severity?: (typeof ADMIN_NOTIFICATION_SEVERITY)[keyof typeof ADMIN_NOTIFICATION_SEVERITY];
+  syncStatus: string;
+};
+
 function getConfiguredAdminRecipients() {
   return (process.env.ORDER_RECOVERY_ADMIN_EMAILS ?? '')
     .split(',')
@@ -113,6 +138,10 @@ function getConfiguredAdminRecipients() {
 
 function buildAdminOrderRecoveryUrl(orderToken: string) {
   return getMainSiteUrl(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+}
+
+function buildAdminPayPalLedgerWebhooksUrl() {
+  return getMainSiteUrl('/admin/shop/paypal-webhooks');
 }
 
 function buildNotificationDedupeKey({
@@ -129,6 +158,10 @@ function buildNotificationDedupeKey({
   errorCode: string;
 }) {
   return [type, stage, orderToken, errorCode, recipient].join(':');
+}
+
+function buildGenericNotificationDedupeKey(parts: string[]) {
+  return parts.join(':');
 }
 
 function toIssueSummary(errorMessage: string) {
@@ -292,6 +325,63 @@ function buildAdminFulfillmentPushAcceptedEmailHtml(
 </html>`;
 }
 
+function buildAdminPayPalLedgerWebhookDriftEmailHtml(
+  payload: AdminPayPalLedgerWebhookDriftNotificationPayload,
+) {
+  const dbValue = payload.dbWebhookId?.trim() || 'not set';
+  const envValue = payload.envWebhookId?.trim() || 'not set';
+
+  return `
+    <div style="margin:0;padding:0;background:#020617;color:#e2e8f0;font-family:Inter,Arial,sans-serif;">
+      <table role="presentation" style="width:100%;border-collapse:collapse;background:#020617;">
+        <tr>
+          <td style="padding:32px 18px;">
+            <table role="presentation" style="width:100%;max-width:680px;margin:0 auto;border-collapse:collapse;border:1px solid rgba(148,163,184,0.22);border-radius:20px;overflow:hidden;background:#0f172a;">
+              <tr>
+                <td style="padding:26px 28px 22px;background:#111827;">
+                  <p style="margin:0 0 10px;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#fbbf24;font-weight:700;">PayPal Ledger Webhook Operations</p>
+                  <h1 style="margin:0;font-size:24px;line-height:1.25;color:#ffffff;">Webhook env drift needs review</h1>
+                  <p style="margin:12px 0 0;font-size:14px;line-height:1.7;color:#cbd5e1;">${escapeHtml(payload.message)}</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:22px 28px;">
+                  <table role="presentation" style="width:100%;border-collapse:collapse;">
+                    <tr>
+                      <td style="padding:10px 0;color:#94a3b8;font-size:13px;">Binding</td>
+                      <td style="padding:10px 0;color:#f8fafc;font-size:13px;font-weight:700;text-align:right;">${escapeHtml(payload.label)}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:10px 0;color:#94a3b8;font-size:13px;">Env variable</td>
+                      <td style="padding:10px 0;color:#bae6fd;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right;">${escapeHtml(payload.envVarName)}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:10px 0;color:#94a3b8;font-size:13px;">DB webhook ID</td>
+                      <td style="padding:10px 0;color:#f8fafc;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right;">${escapeHtml(dbValue)}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:10px 0;color:#94a3b8;font-size:13px;">Runtime env ID</td>
+                      <td style="padding:10px 0;color:#f8fafc;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right;">${escapeHtml(envValue)}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:10px 0;color:#94a3b8;font-size:13px;">Activation source</td>
+                      <td style="padding:10px 0;color:#f8fafc;font-size:13px;text-align:right;">${escapeHtml(payload.activationSource)}</td>
+                    </tr>
+                  </table>
+                  <div style="margin-top:22px;">
+                    <a href="${escapeHtml(payload.dashboardUrl)}" style="display:inline-block;border-radius:12px;background:#fbbf24;color:#111827;text-decoration:none;font-size:13px;font-weight:800;padding:12px 18px;">Open Webhook Dashboard</a>
+                  </div>
+                  <p style="margin:18px 0 0;font-size:12px;line-height:1.6;color:#94a3b8;">Update the deployment environment when the DB value is the intended trusted webhook ID. Hybrid mode keeps env fallback available for break-glass verification.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+}
+
 export async function enqueueAdminRecoveryNotification({
   db = paypalTxLedger,
   orderToken,
@@ -380,6 +470,66 @@ export async function enqueueAdminPaymentReconciliationNotification({
     severity,
     recipientGroupKey: ADMIN_NOTIFICATION_RECIPIENT_GROUP_KEY.PAYMENT_ISSUES,
   });
+}
+
+export async function enqueueAdminPayPalLedgerWebhookDriftNotification({
+  activationSource,
+  dbWebhookId,
+  envVarName,
+  envWebhookId,
+  label,
+  message,
+  severity = ADMIN_NOTIFICATION_SEVERITY.WARNING,
+  syncStatus,
+}: EnqueueAdminPayPalLedgerWebhookDriftNotificationProps) {
+  const recipients = await resolveAdminNotificationRecipients({
+    groupKey: ADMIN_NOTIFICATION_RECIPIENT_GROUP_KEY.PAYPAL_LEDGER_WEBHOOK_OPERATIONS,
+    fallbackEmails: getConfiguredAdminRecipients(),
+  });
+
+  if (recipients.length === 0) {
+    return { created: 0, dedupeBase: null, skipped: true as const };
+  }
+
+  const dashboardUrl = buildAdminPayPalLedgerWebhooksUrl();
+  const supportReference = envVarName;
+  const payload: AdminPayPalLedgerWebhookDriftNotificationPayload = {
+    activationSource,
+    dashboardUrl,
+    dbWebhookId,
+    envVarName,
+    envWebhookId,
+    label,
+    message,
+    supportReference,
+    syncStatus,
+  };
+  const dedupeBase = buildGenericNotificationDedupeKey([
+    ADMIN_NOTIFICATION_TYPE.PAYPAL_LEDGER_WEBHOOK_DRIFT,
+    ADMIN_NOTIFICATION_STAGE.WEBHOOK,
+    envVarName,
+    syncStatus,
+    dbWebhookId || 'no_db_id',
+    envWebhookId || 'no_env_id',
+  ]);
+
+  const result = await paypalTxLedger.adminNotificationOutbox.createMany({
+    data: recipients.map((recipient) => ({
+      orderToken: null,
+      paypalOrderId: null,
+      type: ADMIN_NOTIFICATION_TYPE.PAYPAL_LEDGER_WEBHOOK_DRIFT,
+      stage: ADMIN_NOTIFICATION_STAGE.WEBHOOK,
+      errorCode: 'WEBHOOK_ENV_DB_DRIFT',
+      severity,
+      status: ADMIN_NOTIFICATION_STATUS.PENDING,
+      dedupeKey: `${dedupeBase}:${recipient}`,
+      recipient,
+      payload,
+    })),
+    skipDuplicates: true,
+  });
+
+  return { created: result.count, dedupeBase, skipped: false as const };
 }
 
 export async function enqueueAdminFulfillmentPushAcceptedNotification({
@@ -474,19 +624,27 @@ async function sendAdminRecoveryNotificationRow(
   const isPushAccepted = row.type === ADMIN_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED;
   const isPaymentReconciliation =
     row.type === ADMIN_NOTIFICATION_TYPE.PAYMENT_RECONCILIATION_REQUIRED;
+  const isPayPalLedgerWebhookDrift =
+    row.type === ADMIN_NOTIFICATION_TYPE.PAYPAL_LEDGER_WEBHOOK_DRIFT;
 
   try {
     const { sendMailFromPrimaryAgent } = await import('@/lib/zeptomail/sendMailFromPrimaryAgent');
     const subject = isPushAccepted
       ? `Paid order pushed to fulfillment · ${(row.payload as AdminFulfillmentPushAcceptedNotificationPayload).supportReference.slice(0, 8)}`
-      : isPaymentReconciliation
-        ? `Payment reconciliation required · ${(row.payload as AdminRecoveryNotificationPayload).supportReference}`
-        : `Paid order recovery required · ${(row.payload as AdminRecoveryNotificationPayload).supportReference}`;
+      : isPayPalLedgerWebhookDrift
+        ? `PayPal ledger webhook env drift · ${(row.payload as AdminPayPalLedgerWebhookDriftNotificationPayload).envVarName}`
+        : isPaymentReconciliation
+          ? `Payment reconciliation required · ${(row.payload as AdminRecoveryNotificationPayload).supportReference}`
+          : `Paid order recovery required · ${(row.payload as AdminRecoveryNotificationPayload).supportReference}`;
     const htmlbody = isPushAccepted
       ? buildAdminFulfillmentPushAcceptedEmailHtml(
           row.payload as AdminFulfillmentPushAcceptedNotificationPayload,
         )
-      : buildAdminRecoveryAlertEmailHtml(row.payload as AdminRecoveryNotificationPayload);
+      : isPayPalLedgerWebhookDrift
+        ? buildAdminPayPalLedgerWebhookDriftEmailHtml(
+            row.payload as AdminPayPalLedgerWebhookDriftNotificationPayload,
+          )
+        : buildAdminRecoveryAlertEmailHtml(row.payload as AdminRecoveryNotificationPayload);
 
     await sendMailFromPrimaryAgent({
       emailReceipents: [
@@ -541,6 +699,34 @@ export async function sendPendingAdminRecoveryNotifications(limit = DEFAULT_PEND
     take: limit,
   });
 
+  const results = [];
+
+  for (const row of rows) {
+    results.push(await sendAdminRecoveryNotificationRow(row));
+  }
+
+  return results;
+}
+
+export async function sendPendingAdminNotificationsByDedupePrefix({
+  dedupePrefix,
+  limit = DEFAULT_PENDING_SEND_LIMIT,
+}: {
+  dedupePrefix: string;
+  limit?: number;
+}) {
+  const rows = await paypalTxLedger.adminNotificationOutbox.findMany({
+    where: {
+      dedupeKey: {
+        startsWith: `${dedupePrefix}:`,
+      },
+      status: {
+        in: [ADMIN_NOTIFICATION_STATUS.PENDING, ADMIN_NOTIFICATION_STATUS.FAILED],
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: limit,
+  });
   const results = [];
 
   for (const row of rows) {

@@ -9,6 +9,7 @@ export type AdminDashboardSection =
   | 'shop'
   | 'shop-catalog-snapshots'
   | 'shop-paid-order-recovery'
+  | 'shop-paypal-webhooks'
   | 'shop-payment-reconciliation';
 
 export type AdminDashboardIcon = ComponentType<{

@@ -1,5 +1,6 @@
 import { after } from 'next/server';
 
+import { resolvePayPalLedgerTrustedWebhookIds } from '@/lib/paypal/ledgerWebhookTrust';
 import { getServerPayPalConfig } from '@/lib/paypal/serverPayPalConfig';
 import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
@@ -196,6 +197,7 @@ export async function POST(req: Request) {
 
   try {
     const config = getServerPayPalConfig();
+    const trustResolution = await resolvePayPalLedgerTrustedWebhookIds(config.paymentMode);
     const shouldVerify = shouldVerifyWebhookSignature();
 
     const raw = await req.text();
@@ -203,13 +205,13 @@ export async function POST(req: Request) {
     eventId = event.id;
 
     if (shouldVerify) {
-      if (!config.webhookIds.length) {
+      if (!trustResolution.webhookIds.length) {
         throw new Error('Missing PayPal webhook ID(s) for the selected payment mode.');
       }
 
       const ok = await verifyWebhookSignatureWithAnyConfiguredWebhookId({
         event,
-        webhookIds: config.webhookIds,
+        webhookIds: trustResolution.webhookIds,
         headers: {
           paypalAuthAlgo: requiredHeader(req, 'paypal-auth-algo'),
           paypalCertUrl: requiredHeader(req, 'paypal-cert-url'),

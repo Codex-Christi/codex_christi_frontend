@@ -7,6 +7,7 @@ import {
 import { isActiveAdminStatus, isMasterAdminRole, normalizeAdminRole } from './admin-config';
 
 export const ADMIN_NOTIFICATION_RECIPIENT_GROUP_KEY = {
+  PAYPAL_LEDGER_WEBHOOK_OPERATIONS: 'paypal_ledger_webhook_operations',
   PAID_ORDER_FULFILLMENT_ISSUES: 'paid_order_fulfillment_issues',
   PAID_ORDER_FULFILLMENT_SUCCESS: 'paid_order_fulfillment_success',
   PAYMENT_ISSUES: 'payment_issues',
@@ -23,6 +24,12 @@ export const ADMIN_NOTIFICATION_GLOBAL_DEFAULTS_DEFINITION = {
 } as const;
 
 export const ADMIN_NOTIFICATION_RECIPIENT_GROUP_DEFINITIONS = [
+  {
+    key: ADMIN_NOTIFICATION_RECIPIENT_GROUP_KEY.PAYPAL_LEDGER_WEBHOOK_OPERATIONS,
+    label: 'PayPal Ledger Webhook Operations',
+    description:
+      'PayPal ledger transaction webhook registration, activation, drift, and signature trust alerts.',
+  },
   {
     key: ADMIN_NOTIFICATION_RECIPIENT_GROUP_KEY.PAYMENT_ISSUES,
     label: 'Payment Issues',

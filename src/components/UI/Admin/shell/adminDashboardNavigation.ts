@@ -7,6 +7,7 @@ import {
   Settings,
   ShoppingBag,
   Store,
+  Webhook,
 } from 'lucide-react';
 import type {
   AdminDashboardAccess,
@@ -56,6 +57,14 @@ export const adminDashboardNavigationGroups: AdminDashboardNavigationGroup[] = [
         icon: RotateCcw,
         requiredAccess: 'canAccessShopTools',
         section: 'shop-payment-reconciliation',
+      },
+      {
+        title: 'PayPal Webhooks',
+        description: 'Ledger webhook trust bindings',
+        href: '/admin/shop/paypal-webhooks',
+        icon: Webhook,
+        requiredAccess: 'canAccessShopTools',
+        section: 'shop-paypal-webhooks',
       },
       {
         title: 'Catalog & Snapshots',
@@ -132,6 +141,15 @@ const pageConfigs: Array<[prefix: string, config: AdminDashboardPageConfig]> = [
       title: 'PayPal Reconciliation',
       subtitle: 'Payment truth checks before fulfillment recovery',
       searchPlaceholder: 'Search PayPal order tokens, capture IDs, customers...',
+    },
+  ],
+  [
+    '/admin/shop/paypal-webhooks',
+    {
+      section: 'shop-paypal-webhooks',
+      title: 'PayPal Ledger Webhooks',
+      subtitle: 'Env and DB trust bindings for ledger transaction webhook verification',
+      searchPlaceholder: 'Search webhook IDs, env variables, targets...',
     },
   ],
   [
