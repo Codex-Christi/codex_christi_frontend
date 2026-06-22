@@ -61,6 +61,9 @@ export type PaypalIntentMinAggregateOutputType = {
   lastErrorCode: string | null
   lastErrorMessage: string | null
   retryCount: number | null
+  processingTriggerSource: string | null
+  processingTriggerDetail: string | null
+  processingTriggeredAt: Date | null
   postProcessingLockId: string | null
   postProcessingLockedAt: Date | null
   postProcessingLockExpiresAt: Date | null
@@ -96,6 +99,9 @@ export type PaypalIntentMaxAggregateOutputType = {
   lastErrorCode: string | null
   lastErrorMessage: string | null
   retryCount: number | null
+  processingTriggerSource: string | null
+  processingTriggerDetail: string | null
+  processingTriggeredAt: Date | null
   postProcessingLockId: string | null
   postProcessingLockedAt: Date | null
   postProcessingLockExpiresAt: Date | null
@@ -141,6 +147,9 @@ export type PaypalIntentCountAggregateOutputType = {
   lastErrorCode: number
   lastErrorMessage: number
   retryCount: number
+  processingTriggerSource: number
+  processingTriggerDetail: number
+  processingTriggeredAt: number
   postProcessingLockId: number
   postProcessingLockedAt: number
   postProcessingLockExpiresAt: number
@@ -186,6 +195,9 @@ export type PaypalIntentMinAggregateInputType = {
   lastErrorCode?: true
   lastErrorMessage?: true
   retryCount?: true
+  processingTriggerSource?: true
+  processingTriggerDetail?: true
+  processingTriggeredAt?: true
   postProcessingLockId?: true
   postProcessingLockedAt?: true
   postProcessingLockExpiresAt?: true
@@ -221,6 +233,9 @@ export type PaypalIntentMaxAggregateInputType = {
   lastErrorCode?: true
   lastErrorMessage?: true
   retryCount?: true
+  processingTriggerSource?: true
+  processingTriggerDetail?: true
+  processingTriggeredAt?: true
   postProcessingLockId?: true
   postProcessingLockedAt?: true
   postProcessingLockExpiresAt?: true
@@ -266,6 +281,9 @@ export type PaypalIntentCountAggregateInputType = {
   lastErrorCode?: true
   lastErrorMessage?: true
   retryCount?: true
+  processingTriggerSource?: true
+  processingTriggerDetail?: true
+  processingTriggeredAt?: true
   postProcessingLockId?: true
   postProcessingLockedAt?: true
   postProcessingLockExpiresAt?: true
@@ -398,6 +416,9 @@ export type PaypalIntentGroupByOutputType = {
   lastErrorCode: string | null
   lastErrorMessage: string | null
   retryCount: number
+  processingTriggerSource: string | null
+  processingTriggerDetail: string | null
+  processingTriggeredAt: Date | null
   postProcessingLockId: string | null
   postProcessingLockedAt: Date | null
   postProcessingLockExpiresAt: Date | null
@@ -466,6 +487,9 @@ export type PaypalIntentWhereInput = {
   lastErrorCode?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   lastErrorMessage?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   retryCount?: Prisma.IntFilter<"PaypalIntent"> | number
+  processingTriggerSource?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  processingTriggerDetail?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  processingTriggeredAt?: Prisma.DateTimeNullableFilter<"PaypalIntent"> | Date | string | null
   postProcessingLockId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   postProcessingLockedAt?: Prisma.DateTimeNullableFilter<"PaypalIntent"> | Date | string | null
   postProcessingLockExpiresAt?: Prisma.DateTimeNullableFilter<"PaypalIntent"> | Date | string | null
@@ -511,6 +535,9 @@ export type PaypalIntentOrderByWithRelationInput = {
   lastErrorCode?: Prisma.SortOrderInput | Prisma.SortOrder
   lastErrorMessage?: Prisma.SortOrderInput | Prisma.SortOrder
   retryCount?: Prisma.SortOrder
+  processingTriggerSource?: Prisma.SortOrderInput | Prisma.SortOrder
+  processingTriggerDetail?: Prisma.SortOrderInput | Prisma.SortOrder
+  processingTriggeredAt?: Prisma.SortOrderInput | Prisma.SortOrder
   postProcessingLockId?: Prisma.SortOrderInput | Prisma.SortOrder
   postProcessingLockedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   postProcessingLockExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -559,6 +586,9 @@ export type PaypalIntentWhereUniqueInput = Prisma.AtLeast<{
   lastErrorCode?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   lastErrorMessage?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   retryCount?: Prisma.IntFilter<"PaypalIntent"> | number
+  processingTriggerSource?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  processingTriggerDetail?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  processingTriggeredAt?: Prisma.DateTimeNullableFilter<"PaypalIntent"> | Date | string | null
   postProcessingLockId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   postProcessingLockedAt?: Prisma.DateTimeNullableFilter<"PaypalIntent"> | Date | string | null
   postProcessingLockExpiresAt?: Prisma.DateTimeNullableFilter<"PaypalIntent"> | Date | string | null
@@ -604,6 +634,9 @@ export type PaypalIntentOrderByWithAggregationInput = {
   lastErrorCode?: Prisma.SortOrderInput | Prisma.SortOrder
   lastErrorMessage?: Prisma.SortOrderInput | Prisma.SortOrder
   retryCount?: Prisma.SortOrder
+  processingTriggerSource?: Prisma.SortOrderInput | Prisma.SortOrder
+  processingTriggerDetail?: Prisma.SortOrderInput | Prisma.SortOrder
+  processingTriggeredAt?: Prisma.SortOrderInput | Prisma.SortOrder
   postProcessingLockId?: Prisma.SortOrderInput | Prisma.SortOrder
   postProcessingLockedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   postProcessingLockExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -657,6 +690,9 @@ export type PaypalIntentScalarWhereWithAggregatesInput = {
   lastErrorCode?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
   lastErrorMessage?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
   retryCount?: Prisma.IntWithAggregatesFilter<"PaypalIntent"> | number
+  processingTriggerSource?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
+  processingTriggerDetail?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
+  processingTriggeredAt?: Prisma.DateTimeNullableWithAggregatesFilter<"PaypalIntent"> | Date | string | null
   postProcessingLockId?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
   postProcessingLockedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"PaypalIntent"> | Date | string | null
   postProcessingLockExpiresAt?: Prisma.DateTimeNullableWithAggregatesFilter<"PaypalIntent"> | Date | string | null
@@ -702,6 +738,9 @@ export type PaypalIntentCreateInput = {
   lastErrorCode?: string | null
   lastErrorMessage?: string | null
   retryCount?: number
+  processingTriggerSource?: string | null
+  processingTriggerDetail?: string | null
+  processingTriggeredAt?: Date | string | null
   postProcessingLockId?: string | null
   postProcessingLockedAt?: Date | string | null
   postProcessingLockExpiresAt?: Date | string | null
@@ -747,6 +786,9 @@ export type PaypalIntentUncheckedCreateInput = {
   lastErrorCode?: string | null
   lastErrorMessage?: string | null
   retryCount?: number
+  processingTriggerSource?: string | null
+  processingTriggerDetail?: string | null
+  processingTriggeredAt?: Date | string | null
   postProcessingLockId?: string | null
   postProcessingLockedAt?: Date | string | null
   postProcessingLockExpiresAt?: Date | string | null
@@ -792,6 +834,9 @@ export type PaypalIntentUpdateInput = {
   lastErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   retryCount?: Prisma.IntFieldUpdateOperationsInput | number
+  processingTriggerSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingTriggerDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingTriggeredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   postProcessingLockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   postProcessingLockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   postProcessingLockExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -837,6 +882,9 @@ export type PaypalIntentUncheckedUpdateInput = {
   lastErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   retryCount?: Prisma.IntFieldUpdateOperationsInput | number
+  processingTriggerSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingTriggerDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingTriggeredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   postProcessingLockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   postProcessingLockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   postProcessingLockExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -882,6 +930,9 @@ export type PaypalIntentCreateManyInput = {
   lastErrorCode?: string | null
   lastErrorMessage?: string | null
   retryCount?: number
+  processingTriggerSource?: string | null
+  processingTriggerDetail?: string | null
+  processingTriggeredAt?: Date | string | null
   postProcessingLockId?: string | null
   postProcessingLockedAt?: Date | string | null
   postProcessingLockExpiresAt?: Date | string | null
@@ -927,6 +978,9 @@ export type PaypalIntentUpdateManyMutationInput = {
   lastErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   retryCount?: Prisma.IntFieldUpdateOperationsInput | number
+  processingTriggerSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingTriggerDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingTriggeredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   postProcessingLockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   postProcessingLockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   postProcessingLockExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -972,6 +1026,9 @@ export type PaypalIntentUncheckedUpdateManyInput = {
   lastErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   retryCount?: Prisma.IntFieldUpdateOperationsInput | number
+  processingTriggerSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingTriggerDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  processingTriggeredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   postProcessingLockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   postProcessingLockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   postProcessingLockExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1017,6 +1074,9 @@ export type PaypalIntentCountOrderByAggregateInput = {
   lastErrorCode?: Prisma.SortOrder
   lastErrorMessage?: Prisma.SortOrder
   retryCount?: Prisma.SortOrder
+  processingTriggerSource?: Prisma.SortOrder
+  processingTriggerDetail?: Prisma.SortOrder
+  processingTriggeredAt?: Prisma.SortOrder
   postProcessingLockId?: Prisma.SortOrder
   postProcessingLockedAt?: Prisma.SortOrder
   postProcessingLockExpiresAt?: Prisma.SortOrder
@@ -1056,6 +1116,9 @@ export type PaypalIntentMaxOrderByAggregateInput = {
   lastErrorCode?: Prisma.SortOrder
   lastErrorMessage?: Prisma.SortOrder
   retryCount?: Prisma.SortOrder
+  processingTriggerSource?: Prisma.SortOrder
+  processingTriggerDetail?: Prisma.SortOrder
+  processingTriggeredAt?: Prisma.SortOrder
   postProcessingLockId?: Prisma.SortOrder
   postProcessingLockedAt?: Prisma.SortOrder
   postProcessingLockExpiresAt?: Prisma.SortOrder
@@ -1091,6 +1154,9 @@ export type PaypalIntentMinOrderByAggregateInput = {
   lastErrorCode?: Prisma.SortOrder
   lastErrorMessage?: Prisma.SortOrder
   retryCount?: Prisma.SortOrder
+  processingTriggerSource?: Prisma.SortOrder
+  processingTriggerDetail?: Prisma.SortOrder
+  processingTriggeredAt?: Prisma.SortOrder
   postProcessingLockId?: Prisma.SortOrder
   postProcessingLockedAt?: Prisma.SortOrder
   postProcessingLockExpiresAt?: Prisma.SortOrder
@@ -1166,6 +1232,9 @@ export type PaypalIntentSelect<ExtArgs extends runtime.Types.Extensions.Internal
   lastErrorCode?: boolean
   lastErrorMessage?: boolean
   retryCount?: boolean
+  processingTriggerSource?: boolean
+  processingTriggerDetail?: boolean
+  processingTriggeredAt?: boolean
   postProcessingLockId?: boolean
   postProcessingLockedAt?: boolean
   postProcessingLockExpiresAt?: boolean
@@ -1211,6 +1280,9 @@ export type PaypalIntentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   lastErrorCode?: boolean
   lastErrorMessage?: boolean
   retryCount?: boolean
+  processingTriggerSource?: boolean
+  processingTriggerDetail?: boolean
+  processingTriggeredAt?: boolean
   postProcessingLockId?: boolean
   postProcessingLockedAt?: boolean
   postProcessingLockExpiresAt?: boolean
@@ -1256,6 +1328,9 @@ export type PaypalIntentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   lastErrorCode?: boolean
   lastErrorMessage?: boolean
   retryCount?: boolean
+  processingTriggerSource?: boolean
+  processingTriggerDetail?: boolean
+  processingTriggeredAt?: boolean
   postProcessingLockId?: boolean
   postProcessingLockedAt?: boolean
   postProcessingLockExpiresAt?: boolean
@@ -1301,6 +1376,9 @@ export type PaypalIntentSelectScalar = {
   lastErrorCode?: boolean
   lastErrorMessage?: boolean
   retryCount?: boolean
+  processingTriggerSource?: boolean
+  processingTriggerDetail?: boolean
+  processingTriggeredAt?: boolean
   postProcessingLockId?: boolean
   postProcessingLockedAt?: boolean
   postProcessingLockExpiresAt?: boolean
@@ -1309,7 +1387,7 @@ export type PaypalIntentSelectScalar = {
   updatedAt?: boolean
 }
 
-export type PaypalIntentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderToken" | "paypalOrderId" | "paypalAuthorizationId" | "djangoOrderIntentUuid" | "djangoOrderIntentOrderId" | "customerName" | "customerEmail" | "userId" | "countryIso2" | "countryIso3" | "initialCurrency" | "cartSnapshot" | "shippingSnapshot" | "authorizePayload" | "capturePayload" | "djangoOrderIntentPayload" | "djangoOrderIntentVerifyPayload" | "djangoPaymentSaveResponsePayload" | "merchizeFulfillmentRequestPayload" | "merchizeFulfillmentResponsePayload" | "merchizeFulfillmentProcessingId" | "merchizeProviderOrderId" | "merchizeProviderOrderCode" | "fulfillmentAddressOverride" | "fulfillmentAddressOverrideReason" | "fulfillmentAddressOverriddenBy" | "fulfillmentAddressOverriddenAt" | "djangoPaymentSaveCustomId" | "receiptLink" | "receiptFile" | "status" | "lastEventType" | "lastErrorCode" | "lastErrorMessage" | "retryCount" | "postProcessingLockId" | "postProcessingLockedAt" | "postProcessingLockExpiresAt" | "processingCompletedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["paypalIntent"]>
+export type PaypalIntentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderToken" | "paypalOrderId" | "paypalAuthorizationId" | "djangoOrderIntentUuid" | "djangoOrderIntentOrderId" | "customerName" | "customerEmail" | "userId" | "countryIso2" | "countryIso3" | "initialCurrency" | "cartSnapshot" | "shippingSnapshot" | "authorizePayload" | "capturePayload" | "djangoOrderIntentPayload" | "djangoOrderIntentVerifyPayload" | "djangoPaymentSaveResponsePayload" | "merchizeFulfillmentRequestPayload" | "merchizeFulfillmentResponsePayload" | "merchizeFulfillmentProcessingId" | "merchizeProviderOrderId" | "merchizeProviderOrderCode" | "fulfillmentAddressOverride" | "fulfillmentAddressOverrideReason" | "fulfillmentAddressOverriddenBy" | "fulfillmentAddressOverriddenAt" | "djangoPaymentSaveCustomId" | "receiptLink" | "receiptFile" | "status" | "lastEventType" | "lastErrorCode" | "lastErrorMessage" | "retryCount" | "processingTriggerSource" | "processingTriggerDetail" | "processingTriggeredAt" | "postProcessingLockId" | "postProcessingLockedAt" | "postProcessingLockExpiresAt" | "processingCompletedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["paypalIntent"]>
 
 export type $PaypalIntentPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "PaypalIntent"
@@ -1351,6 +1429,9 @@ export type $PaypalIntentPayload<ExtArgs extends runtime.Types.Extensions.Intern
     lastErrorCode: string | null
     lastErrorMessage: string | null
     retryCount: number
+    processingTriggerSource: string | null
+    processingTriggerDetail: string | null
+    processingTriggeredAt: Date | null
     postProcessingLockId: string | null
     postProcessingLockedAt: Date | null
     postProcessingLockExpiresAt: Date | null
@@ -1816,6 +1897,9 @@ export interface PaypalIntentFieldRefs {
   readonly lastErrorCode: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly lastErrorMessage: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly retryCount: Prisma.FieldRef<"PaypalIntent", 'Int'>
+  readonly processingTriggerSource: Prisma.FieldRef<"PaypalIntent", 'String'>
+  readonly processingTriggerDetail: Prisma.FieldRef<"PaypalIntent", 'String'>
+  readonly processingTriggeredAt: Prisma.FieldRef<"PaypalIntent", 'DateTime'>
   readonly postProcessingLockId: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly postProcessingLockedAt: Prisma.FieldRef<"PaypalIntent", 'DateTime'>
   readonly postProcessingLockExpiresAt: Prisma.FieldRef<"PaypalIntent", 'DateTime'>

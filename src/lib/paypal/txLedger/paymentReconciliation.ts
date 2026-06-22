@@ -507,7 +507,10 @@ async function handleCapturedPayment({
   });
 
   try {
-    await runPaidFulfillmentProcessing(row.orderToken);
+    await runPaidFulfillmentProcessing(row.orderToken, {
+      triggerDetail: 'capture_reconciled_and_fulfillment_resumed',
+      triggerSource: 'payment_reconciliation',
+    });
 
     return {
       orderToken: row.orderToken,

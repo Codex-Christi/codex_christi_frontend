@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { createHash } from 'crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { normalizePostgresSslMode } from '@/lib/prisma/postgresSslMode';
 import { PrismaClient } from './txLedger/generated/paypalTxLedger/client';
@@ -13,13 +14,16 @@ export type PaypalTxLedgerBranchSelectionSource =
 
 export type PaypalTxLedgerDatabaseStatus = {
   configured: boolean;
+  devUrlFingerprint: string | null;
   devUrlConfigured: boolean;
   explicitBranch: PaypalTxLedgerBranch | null;
   invalidExplicitBranchConfigured: boolean;
   nodeEnv: string;
   prodDevUrlsMatch: boolean;
+  prodUrlFingerprint: string | null;
   prodUrlConfigured: boolean;
   selectedBranch: PaypalTxLedgerBranch | null;
+  selectedUrlFingerprint: string | null;
   selectionSource: PaypalTxLedgerBranchSelectionSource;
 };
 
@@ -38,6 +42,12 @@ function normalizeComparableConnectionString(value: string | undefined) {
   return value?.trim() ? normalizePostgresSslMode(value).trim() : null;
 }
 
+function fingerprintConnectionString(value: string | null) {
+  if (!value) return null;
+
+  return createHash('sha256').update(value).digest('hex').slice(0, 12);
+}
+
 function resolvePaypalLedgerConnection(): PaypalTxLedgerConnectionResolution {
   const explicitBranch = normalizePaypalTxLedgerBranch(process.env.PAYPAL_TX_LEDGER_NEON_BRANCH);
   const invalidExplicitBranchConfigured = Boolean(
@@ -48,6 +58,7 @@ function resolvePaypalLedgerConnection(): PaypalTxLedgerConnectionResolution {
   const normalizedProdUrl = normalizeComparableConnectionString(prodUrl);
   const normalizedDevUrl = normalizeComparableConnectionString(devUrl);
   const baseStatus = {
+    devUrlFingerprint: fingerprintConnectionString(normalizedDevUrl),
     devUrlConfigured: Boolean(normalizedDevUrl),
     explicitBranch,
     invalidExplicitBranchConfigured,
@@ -55,6 +66,7 @@ function resolvePaypalLedgerConnection(): PaypalTxLedgerConnectionResolution {
     prodDevUrlsMatch: Boolean(
       normalizedProdUrl && normalizedDevUrl && normalizedProdUrl === normalizedDevUrl,
     ),
+    prodUrlFingerprint: fingerprintConnectionString(normalizedProdUrl),
     prodUrlConfigured: Boolean(normalizedProdUrl),
   };
 
@@ -65,6 +77,7 @@ function resolvePaypalLedgerConnection(): PaypalTxLedgerConnectionResolution {
         ...baseStatus,
         configured: Boolean(normalizedProdUrl),
         selectedBranch: normalizedProdUrl ? 'prod' : null,
+        selectedUrlFingerprint: fingerprintConnectionString(normalizedProdUrl),
         selectionSource: normalizedProdUrl ? 'explicit' : 'unconfigured',
       },
     };
@@ -77,6 +90,7 @@ function resolvePaypalLedgerConnection(): PaypalTxLedgerConnectionResolution {
         ...baseStatus,
         configured: Boolean(normalizedDevUrl),
         selectedBranch: normalizedDevUrl ? 'dev' : null,
+        selectedUrlFingerprint: fingerprintConnectionString(normalizedDevUrl),
         selectionSource: normalizedDevUrl ? 'explicit' : 'unconfigured',
       },
     };
@@ -89,6 +103,7 @@ function resolvePaypalLedgerConnection(): PaypalTxLedgerConnectionResolution {
         ...baseStatus,
         configured: true,
         selectedBranch: 'dev',
+        selectedUrlFingerprint: fingerprintConnectionString(normalizedDevUrl),
         selectionSource: 'node_env_default',
       },
     };
@@ -101,6 +116,7 @@ function resolvePaypalLedgerConnection(): PaypalTxLedgerConnectionResolution {
         ...baseStatus,
         configured: true,
         selectedBranch: 'prod',
+        selectedUrlFingerprint: fingerprintConnectionString(normalizedProdUrl),
         selectionSource: process.env.NODE_ENV === 'production' ? 'node_env_default' : 'fallback',
       },
     };
@@ -113,6 +129,7 @@ function resolvePaypalLedgerConnection(): PaypalTxLedgerConnectionResolution {
         ...baseStatus,
         configured: true,
         selectedBranch: 'dev',
+        selectedUrlFingerprint: fingerprintConnectionString(normalizedDevUrl),
         selectionSource: 'fallback',
       },
     };
@@ -124,6 +141,7 @@ function resolvePaypalLedgerConnection(): PaypalTxLedgerConnectionResolution {
       ...baseStatus,
       configured: false,
       selectedBranch: null,
+      selectedUrlFingerprint: null,
       selectionSource: 'unconfigured',
     },
   };

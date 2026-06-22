@@ -29,9 +29,12 @@ export default async function ShopAdminPage() {
       paymentReconciliationCriticalCount={reconciliationSummary.critical}
       paymentReconciliationWarningCount={reconciliationSummary.warning}
       paypalWebhookAttentionCount={
-        webhookDashboard.summary.driftCount + webhookDashboard.summary.envMissingCount
+        webhookDashboard.summary.driftCount +
+        webhookDashboard.summary.envMissingCount +
+        webhookDashboard.summary.safetyWarningCount
       }
       paypalWebhookActiveDbCount={webhookDashboard.summary.activeDbBindings}
+      paypalWebhookSafetyWarnings={webhookDashboard.safetyWarnings}
     />
   );
 }

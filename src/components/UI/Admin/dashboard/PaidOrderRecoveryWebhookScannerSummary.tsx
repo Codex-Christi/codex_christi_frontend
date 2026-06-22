@@ -10,6 +10,7 @@ export default function PaidOrderRecoveryWebhookScannerSummary({
   detail,
 }: PaidOrderRecoveryWebhookScannerSummaryProps) {
   const latestWebhook = detail.webhookEvents[0];
+  const latestWebhookSource = latestWebhook ? getWebhookSourceLabel(latestWebhook) : null;
   const scannerIsEligible = detail.scannerState.eligible;
 
   return (
@@ -55,6 +56,17 @@ export default function PaidOrderRecoveryWebhookScannerSummary({
                 <p className='mt-1 text-xs text-slate-500'>
                   {latestWebhook.processingStatus} · attempts {latestWebhook.attemptCount}
                 </p>
+                <p className='mt-2 text-xs leading-5 text-slate-400'>
+                  Accepted via {latestWebhookSource}
+                  {latestWebhook.webhookVerificationMode
+                    ? ` · ${latestWebhook.webhookVerificationMode} verification`
+                    : ''}
+                </p>
+                {latestWebhook.matchedWebhookId ? (
+                  <p className='mt-1 font-mono text-[11px] text-cyan-100'>
+                    {latestWebhook.matchedWebhookId}
+                  </p>
+                ) : null}
               </div>
               <div className='flex items-center gap-2 text-xs text-slate-500 sm:justify-end'>
                 <Clock3 size={13} />
@@ -77,6 +89,16 @@ export default function PaidOrderRecoveryWebhookScannerSummary({
       </div>
     </section>
   );
+}
+
+function getWebhookSourceLabel(webhook: PaidOrderRecoveryDetail['webhookEvents'][number]) {
+  if (webhook.matchedWebhookLabel) return webhook.matchedWebhookLabel;
+  if (webhook.matchedWebhookBindingKey)
+    return webhook.matchedWebhookBindingKey.replaceAll('_', ' ');
+  if (webhook.matchedWebhookSource) return webhook.matchedWebhookSource.replaceAll('_', ' ');
+  if (webhook.webhookVerificationMode === 'disabled') return 'signature verification disabled';
+
+  return 'unrecorded webhook source';
 }
 
 function StatusTile({

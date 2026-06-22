@@ -46,6 +46,9 @@ model PaypalIntent {
   lastErrorCode                      String?
   lastErrorMessage                   String?
   retryCount                         Int       @default(0)
+  processingTriggerSource            String?
+  processingTriggerDetail            String?
+  processingTriggeredAt              DateTime?
   postProcessingLockId               String?
   postProcessingLockedAt             DateTime?
   postProcessingLockExpiresAt        DateTime?
@@ -59,24 +62,34 @@ model PaypalIntent {
   @@index([djangoPaymentSaveCustomId])
   @@index([status])
   @@index([createdAt])
+  @@index([processingTriggerSource])
   @@index([postProcessingLockExpiresAt])
 }
 
 model PaypalWebhookEvent {
-  id               String    @id @default(cuid())
-  eventId          String    @unique
-  eventType        String
-  paypalOrderId    String?
-  payload          Json
-  processingStatus String    @default("received")
-  attemptCount     Int       @default(0)
-  lastAttemptAt    DateTime?
-  processedAt      DateTime?
-  lastErrorMessage String?
-  createdAt        DateTime  @default(now())
+  id                       String    @id @default(cuid())
+  eventId                  String    @unique
+  eventType                String
+  orderToken               String?
+  paypalOrderId            String?
+  payload                  Json
+  matchedWebhookId         String?
+  matchedWebhookSource     String?
+  matchedWebhookBindingKey String?
+  matchedWebhookLabel      String?
+  webhookVerificationMode  String?
+  processingStatus         String    @default("received")
+  attemptCount             Int       @default(0)
+  lastAttemptAt            DateTime?
+  processedAt              DateTime?
+  lastErrorMessage         String?
+  createdAt                DateTime  @default(now())
 
+  @@index([orderToken])
   @@index([paypalOrderId])
   @@index([eventType])
+  @@index([matchedWebhookSource])
+  @@index([matchedWebhookBindingKey])
   @@index([processingStatus])
   @@index([processedAt])
   @@index([createdAt])

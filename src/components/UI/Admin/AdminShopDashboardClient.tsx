@@ -1,10 +1,25 @@
 'use client';
 
 import { useReducedMotion } from 'framer-motion';
-import { BarChart3, ClipboardList, PackageCheck, RefreshCw, Store, Webhook } from 'lucide-react';
+import {
+  AlertTriangle,
+  BarChart3,
+  ClipboardList,
+  PackageCheck,
+  RefreshCw,
+  Store,
+  Webhook,
+} from 'lucide-react';
 import AdminMetricCard from './dashboard/AdminMetricCard';
+import AdminGlassPanel from './dashboard/AdminGlassPanel';
 import PaidOrderRecoveryQueuePanel from './dashboard/PaidOrderRecoveryQueuePanel';
 import type { MetricCard, PaidOrderRecoveryRow } from './dashboard/adminShopDashboardTypes';
+
+type PayPalWebhookSafetyWarning = {
+  code: string;
+  message: string;
+  severity: 'critical' | 'warning';
+};
 
 type AdminShopDashboardClientProps = {
   paymentReconciliationAttentionCount?: number;
@@ -12,6 +27,7 @@ type AdminShopDashboardClientProps = {
   paymentReconciliationWarningCount?: number;
   paypalWebhookActiveDbCount?: number;
   paypalWebhookAttentionCount?: number;
+  paypalWebhookSafetyWarnings?: PayPalWebhookSafetyWarning[];
   recoveryRows: PaidOrderRecoveryRow[];
 };
 
@@ -21,6 +37,7 @@ export default function AdminShopDashboardClient({
   paymentReconciliationWarningCount = 0,
   paypalWebhookActiveDbCount = 0,
   paypalWebhookAttentionCount = 0,
+  paypalWebhookSafetyWarnings = [],
   recoveryRows,
 }: AdminShopDashboardClientProps) {
   const reduceMotion = useReducedMotion();
@@ -36,6 +53,24 @@ export default function AdminShopDashboardClient({
   return (
     <div className='grid gap-4 px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:gap-5 sm:px-5'>
       <section className='min-w-0 space-y-5'>
+        {paypalWebhookSafetyWarnings.length ? (
+          <AdminGlassPanel className='border-amber-300/20 bg-amber-300/[0.04] p-4'>
+            <div className='flex items-start gap-3'>
+              <span className='mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-amber-300/25 bg-amber-300/10 text-amber-100'>
+                <AlertTriangle size={17} />
+              </span>
+              <div className='min-w-0'>
+                <p className='text-sm font-semibold text-white'>PayPal webhook safety warning</p>
+                <div className='mt-2 space-y-1 text-sm leading-6 text-slate-300'>
+                  {paypalWebhookSafetyWarnings.slice(0, 3).map((warning) => (
+                    <p key={warning.code}>{warning.message}</p>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </AdminGlassPanel>
+        ) : null}
+
         <div className='grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3'>
           {metricCards.map((card, index) => (
             <AdminMetricCard

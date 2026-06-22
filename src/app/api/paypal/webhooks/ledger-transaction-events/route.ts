@@ -1,6 +1,7 @@
 import { after } from 'next/server';
 
 import { resolvePayPalLedgerTrustedWebhookIds } from '@/lib/paypal/ledgerWebhookTrust';
+import type { PayPalLedgerTrustedWebhookCandidate } from '@/lib/paypal/ledgerWebhookTrust';
 import { getServerPayPalConfig } from '@/lib/paypal/serverPayPalConfig';
 import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
@@ -55,32 +56,32 @@ function shouldVerifyWebhookSignature() {
 }
 
 async function verifyWebhookSignatureWithAnyConfiguredWebhookId({
+  candidates,
   event,
-  webhookIds,
   headers,
 }: {
+  candidates: PayPalLedgerTrustedWebhookCandidate[];
   event: PayPalWebhookEvent;
-  webhookIds: string[];
   headers: PayPalWebhookVerificationHeaders;
 }) {
-  for (const webhookId of webhookIds) {
+  for (const candidate of candidates) {
     try {
       const ok = await verifyWebhookSignature({
         event,
-        webhookId,
+        webhookId: candidate.webhookId,
         ...headers,
       });
 
-      if (ok) return true;
+      if (ok) return candidate;
     } catch (error) {
       console.warn('[PayPal Webhook] signature verification failed for configured webhook ID', {
-        webhookId,
+        webhookId: candidate.webhookId,
         error: error instanceof Error ? error.message : String(error),
       });
     }
   }
 
-  return false;
+  return null;
 }
 
 async function updateLedgerFromWebhook(args: {
@@ -199,6 +200,7 @@ export async function POST(req: Request) {
     const config = getServerPayPalConfig();
     const trustResolution = await resolvePayPalLedgerTrustedWebhookIds(config.paymentMode);
     const shouldVerify = shouldVerifyWebhookSignature();
+    let matchedWebhook: PayPalLedgerTrustedWebhookCandidate | null = null;
 
     const raw = await req.text();
     const event = JSON.parse(raw) as PayPalWebhookEvent;
@@ -209,9 +211,9 @@ export async function POST(req: Request) {
         throw new Error('Missing PayPal webhook ID(s) for the selected payment mode.');
       }
 
-      const ok = await verifyWebhookSignatureWithAnyConfiguredWebhookId({
+      matchedWebhook = await verifyWebhookSignatureWithAnyConfiguredWebhookId({
+        candidates: trustResolution.candidates,
         event,
-        webhookIds: trustResolution.webhookIds,
         headers: {
           paypalAuthAlgo: requiredHeader(req, 'paypal-auth-algo'),
           paypalCertUrl: requiredHeader(req, 'paypal-cert-url'),
@@ -221,7 +223,7 @@ export async function POST(req: Request) {
         },
       });
 
-      if (!ok) {
+      if (!matchedWebhook) {
         return new Response('Invalid signature', { status: 400 });
       }
     } else {
@@ -237,9 +239,16 @@ export async function POST(req: Request) {
     const delivery = await ensureWebhookDeliveryRecord({
       eventId: event.id,
       eventType: event.event_type,
+      matchedWebhookBindingKey: matchedWebhook?.bindingKey,
+      matchedWebhookId: matchedWebhook?.webhookId,
+      matchedWebhookLabel: matchedWebhook?.label,
+      matchedWebhookSource:
+        matchedWebhook?.source ?? (shouldVerify ? trustResolution.source : null),
+      orderToken: correlation?.source === 'order_token' ? correlation.orderToken : undefined,
       paypalOrderId:
         correlation?.source === 'paypal_order_id' ? correlation.paypalOrderId : undefined,
       payload: event,
+      webhookVerificationMode: shouldVerify ? 'required' : 'disabled',
     });
 
     if (delivery.processedAt) {
@@ -289,7 +298,10 @@ export async function POST(req: Request) {
       // ACK fast so provider retries are driven by our DB state, not route latency.
       after(async () => {
         try {
-          await runPaidFulfillmentProcessing(row.orderToken);
+          await runPaidFulfillmentProcessing(row.orderToken, {
+            triggerDetail: matchedWebhook?.label ?? event.id,
+            triggerSource: 'webhook',
+          });
           await markWebhookProcessed(event.id);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);

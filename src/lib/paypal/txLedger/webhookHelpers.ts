@@ -113,24 +113,48 @@ export async function verifyWebhookSignature(args: {
 export async function ensureWebhookDeliveryRecord(args: {
   eventId: string;
   eventType: string;
+  matchedWebhookBindingKey?: string | null;
+  matchedWebhookId?: string | null;
+  matchedWebhookLabel?: string | null;
+  matchedWebhookSource?: string | null;
+  orderToken?: string;
   paypalOrderId?: string;
   payload: unknown;
+  webhookVerificationMode?: string | null;
 }) {
-  const existing = await paypalTxLedger.paypalWebhookEvent.findUnique({
-    where: { eventId: args.eventId },
-  });
+  try {
+    return await paypalTxLedger.paypalWebhookEvent.create({
+      data: {
+        eventId: args.eventId,
+        eventType: args.eventType,
+        matchedWebhookBindingKey: args.matchedWebhookBindingKey ?? null,
+        matchedWebhookId: args.matchedWebhookId ?? null,
+        matchedWebhookLabel: args.matchedWebhookLabel ?? null,
+        matchedWebhookSource: args.matchedWebhookSource ?? null,
+        orderToken: args.orderToken ?? null,
+        paypalOrderId: args.paypalOrderId ?? null,
+        payload: args.payload as Prisma.InputJsonValue,
+        processingStatus: 'received',
+        webhookVerificationMode: args.webhookVerificationMode ?? null,
+      },
+    });
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
 
-  if (existing) return existing;
+    const existing = await paypalTxLedger.paypalWebhookEvent.findUnique({
+      where: { eventId: args.eventId },
+    });
 
-  return paypalTxLedger.paypalWebhookEvent.create({
-    data: {
-      eventId: args.eventId,
-      eventType: args.eventType,
-      paypalOrderId: args.paypalOrderId ?? null,
-      payload: args.payload as Prisma.InputJsonValue,
-      processingStatus: 'received',
-    },
-  });
+    if (existing) return existing;
+
+    throw error;
+  }
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'P2002');
 }
 
 async function updateWebhookEvent(

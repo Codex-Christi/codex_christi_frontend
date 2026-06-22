@@ -150,7 +150,10 @@ export async function runPayPalRecoveryScanner(args?: {
 
   for (const candidate of candidates) {
     try {
-      await runPaidFulfillmentProcessing(candidate.orderToken);
+      await runPaidFulfillmentProcessing(candidate.orderToken, {
+        triggerDetail: 'scheduled_recovery_scan',
+        triggerSource: 'recovery_scanner',
+      });
 
       const updated = await paypalTxLedger.paypalIntent.findUnique({
         where: { orderToken: candidate.orderToken },
@@ -228,7 +231,10 @@ export async function runSelectedPayPalRecoveryScanner(args: {
 
   for (const candidate of candidates) {
     try {
-      await runPaidFulfillmentProcessing(candidate.orderToken);
+      await runPaidFulfillmentProcessing(candidate.orderToken, {
+        triggerDetail: 'selected_recovery_scan',
+        triggerSource: 'recovery_scanner',
+      });
 
       const updated = await paypalTxLedger.paypalIntent.findUnique({
         where: { orderToken: candidate.orderToken },

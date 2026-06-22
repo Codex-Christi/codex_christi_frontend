@@ -137,6 +137,16 @@ export default function AdminPayPalLedgerWebhooksClient({
                 tone={dashboard.databaseTarget.selectionSource === 'fallback' ? 'amber' : 'slate'}
               />
               <StatusPill
+                label='DB fingerprint'
+                value={dashboard.databaseTarget.selectedUrlFingerprint ?? 'none'}
+                tone={dashboard.databaseTarget.selectedUrlFingerprint ? 'cyan' : 'rose'}
+              />
+              <StatusPill
+                label='PayPal app'
+                value={formatPayPalAppFingerprint(dashboard)}
+                tone={dashboard.paypalApp.currentClientIdConfigured ? 'cyan' : 'rose'}
+              />
+              <StatusPill
                 label='DB URL env'
                 value={formatDatabaseUrlPresence(dashboard.databaseTarget)}
                 tone={dashboard.databaseTarget.prodDevUrlsMatch ? 'rose' : 'slate'}
@@ -158,9 +168,9 @@ export default function AdminPayPalLedgerWebhooksClient({
               {dashboard.paymentModeError}
             </p>
           ) : null}
-          {dashboard.databaseTarget.warnings.length ? (
+          {dashboard.safetyWarnings.length ? (
             <div className='mt-4 space-y-2'>
-              {dashboard.databaseTarget.warnings.map((warning) => (
+              {dashboard.safetyWarnings.map((warning) => (
                 <div
                   key={warning.code}
                   className={cn(
@@ -215,6 +225,13 @@ function formatDatabaseUrlPresence(target: PayPalLedgerWebhookDashboard['databas
   const dev = target.devUrlConfigured ? 'dev set' : 'dev missing';
 
   return `${prod} · ${dev}`;
+}
+
+function formatPayPalAppFingerprint(dashboard: PayPalLedgerWebhookDashboard) {
+  const mode = dashboard.currentPaymentMode ?? 'missing';
+  const fingerprint = dashboard.paypalApp.currentClientIdFingerprint ?? 'none';
+
+  return `${mode} ${fingerprint}`;
 }
 
 function WebhookBindingCard({

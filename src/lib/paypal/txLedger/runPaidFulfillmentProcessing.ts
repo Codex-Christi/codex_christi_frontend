@@ -47,6 +47,13 @@ const POST_PROCESSING_LEASE_MS = 5 * 60_000;
 
 type RunPaidFulfillmentProcessingOptions = {
   overrideMerchizeFulfillmentPushDisabled?: boolean;
+  triggerDetail?: string;
+  triggerSource?:
+    | 'capture_route'
+    | 'manual_admin'
+    | 'payment_reconciliation'
+    | 'recovery_scanner'
+    | 'webhook';
 };
 
 function buildPaymentReceiptPayload(args: PaymentReceiptProps) {
@@ -298,6 +305,9 @@ export async function runPaidFulfillmentProcessing(
       postProcessingLockId: lockId,
       postProcessingLockedAt: now,
       postProcessingLockExpiresAt: leaseExpiresAt,
+      processingTriggerDetail: options.triggerDetail ?? null,
+      processingTriggerSource: options.triggerSource ?? null,
+      processingTriggeredAt: now,
     },
   });
 

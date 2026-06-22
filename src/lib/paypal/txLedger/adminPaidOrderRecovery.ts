@@ -174,10 +174,12 @@ function normalizeRecoverySearch(search: string | null | undefined) {
   return search?.trim().slice(0, 160) ?? '';
 }
 
-export function normalizePaidOrderRecoveryFilters(filters: {
-  search?: string | null;
-  status?: string | null;
-} = {}): PaidOrderRecoveryFilters {
+export function normalizePaidOrderRecoveryFilters(
+  filters: {
+    search?: string | null;
+    status?: string | null;
+  } = {},
+): PaidOrderRecoveryFilters {
   return {
     search: normalizeRecoverySearch(filters.search),
     status: normalizeRecoveryStatusFilter(filters.status),
@@ -306,14 +308,19 @@ function mapLedgerRowToPaidOrderRecoveryRow(row: {
   initialCurrency: string | null;
   merchizeFulfillmentResponsePayload: unknown;
   merchizeFulfillmentOpsSyncStatus?: string | null;
+  latestWebhookSourceLabel?: string | null;
   lastErrorCode: string | null;
   lastErrorMessage: string | null;
+  processingTriggerDetail?: string | null;
+  processingTriggeredAt?: Date | null;
+  processingTriggerSource?: string | null;
   updatedAt: Date;
 }): PaidOrderRecoveryRow {
   const providerDetailSyncNeeded = needsProviderDetailSync(
     row.merchizeFulfillmentResponsePayload,
     row.merchizeFulfillmentOpsSyncStatus,
   );
+  const processingSource = getProcessingSourceDisplay(row);
 
   return {
     orderToken: row.orderToken,
@@ -324,10 +331,45 @@ function mapLedgerRowToPaidOrderRecoveryRow(row: {
     error: providerDetailSyncNeeded
       ? 'Fulfillment accepted; sync provider details'
       : getErrorLabel(row.lastErrorCode, row.lastErrorMessage),
+    processingSourceLabel: processingSource.label,
+    processingSourceTone: processingSource.tone,
     supportRef: row.orderToken.slice(0, 8).toUpperCase(),
     updated: formatUpdated(row.updatedAt),
     needsProviderDetailSync: providerDetailSyncNeeded,
   };
+}
+
+function getProcessingSourceDisplay(row: {
+  latestWebhookSourceLabel?: string | null;
+  processingTriggerDetail?: string | null;
+  processingTriggerSource?: string | null;
+}): {
+  label: string;
+  tone: PaidOrderRecoveryRow['processingSourceTone'];
+} {
+  switch (row.processingTriggerSource) {
+    case 'webhook':
+      return {
+        label: row.processingTriggerDetail
+          ? `Webhook · ${row.processingTriggerDetail}`
+          : row.latestWebhookSourceLabel
+            ? `Webhook · ${row.latestWebhookSourceLabel}`
+            : 'Webhook',
+        tone: 'cyan',
+      };
+    case 'recovery_scanner':
+      return { label: 'Recovery scanner', tone: 'amber' };
+    case 'payment_reconciliation':
+      return { label: 'Reconciliation', tone: 'emerald' };
+    case 'manual_admin':
+      return { label: 'Manual admin', tone: 'rose' };
+    case 'capture_route':
+      return { label: 'Capture route', tone: 'slate' };
+    default:
+      return row.latestWebhookSourceLabel
+        ? { label: `Webhook · ${row.latestWebhookSourceLabel}`, tone: 'cyan' }
+        : { label: 'Not recorded', tone: 'slate' };
+  }
 }
 
 function buildTimeline(row: {
@@ -541,6 +583,67 @@ async function getMerchizeFulfillmentOpsSummaries(orderTokens: string[]) {
   return summaries;
 }
 
+async function getLatestWebhookSourceByOrder(
+  ledgerRows: Array<{ orderToken: string; paypalOrderId: string | null }>,
+) {
+  const latestByOrderToken = new Map<string, string>();
+  const uniqueOrderTokens = [...new Set(ledgerRows.map((row) => row.orderToken))];
+  const uniquePayPalOrderIds = [
+    ...new Set(
+      ledgerRows.map((row) => row.paypalOrderId).filter((value): value is string => Boolean(value)),
+    ),
+  ];
+  const orderTokenByPayPalOrderId = new Map(
+    ledgerRows.flatMap((row) => (row.paypalOrderId ? [[row.paypalOrderId, row.orderToken]] : [])),
+  );
+
+  if (!uniqueOrderTokens.length && !uniquePayPalOrderIds.length) return latestByOrderToken;
+
+  const rows = await paypalTxLedger.paypalWebhookEvent.findMany({
+    where: {
+      OR: [
+        { orderToken: { in: uniqueOrderTokens } },
+        ...(uniquePayPalOrderIds.length ? [{ paypalOrderId: { in: uniquePayPalOrderIds } }] : []),
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      matchedWebhookBindingKey: true,
+      matchedWebhookLabel: true,
+      matchedWebhookSource: true,
+      orderToken: true,
+      paypalOrderId: true,
+      webhookVerificationMode: true,
+    },
+  });
+
+  for (const row of rows) {
+    const orderToken =
+      row.orderToken ??
+      (row.paypalOrderId ? orderTokenByPayPalOrderId.get(row.paypalOrderId) : null);
+
+    if (!orderToken || latestByOrderToken.has(orderToken)) continue;
+
+    latestByOrderToken.set(orderToken, getWebhookSourceLabel(row));
+  }
+
+  return latestByOrderToken;
+}
+
+function getWebhookSourceLabel(row: {
+  matchedWebhookBindingKey?: string | null;
+  matchedWebhookLabel?: string | null;
+  matchedWebhookSource?: string | null;
+  webhookVerificationMode?: string | null;
+}) {
+  if (row.matchedWebhookLabel) return row.matchedWebhookLabel;
+  if (row.matchedWebhookBindingKey) return row.matchedWebhookBindingKey.replaceAll('_', ' ');
+  if (row.matchedWebhookSource) return row.matchedWebhookSource.replaceAll('_', ' ');
+  if (row.webhookVerificationMode === 'disabled') return 'Signature verification disabled';
+
+  return 'Webhook source not recorded';
+}
+
 function normalizeAddress(value: unknown): PaidOrderRecoveryAddress | null {
   const address = asRecord(value);
 
@@ -609,6 +712,9 @@ function buildActivity(row: {
   fulfillmentAddressOverriddenAt: Date | null;
   fulfillmentAddressOverrideReason: string | null;
   processingCompletedAt: Date | null;
+  processingTriggeredAt?: Date | null;
+  processingTriggerDetail?: string | null;
+  processingTriggerSource?: string | null;
   status: string;
   lastErrorMessage: string | null;
   webhookEvents: PaidOrderRecoveryWebhookEvent[];
@@ -643,6 +749,17 @@ function buildActivity(row: {
       }`,
       time: latestWebhook.processedAt ?? latestWebhook.lastAttemptAt ?? latestWebhook.createdAt,
       tone: latestWebhook.processingStatus === 'processed' ? 'emerald' : 'amber',
+    });
+  }
+
+  if (row.processingTriggerSource && row.processingTriggeredAt) {
+    activity.push({
+      label: 'Processing runner selected',
+      description: `${getRunnerSourceLabel(row.processingTriggerSource)} resumed post-payment processing${
+        row.processingTriggerDetail ? ` (${row.processingTriggerDetail})` : ''
+      }.`,
+      time: formatLongDate(row.processingTriggeredAt),
+      tone: row.processingTriggerSource === 'webhook' ? 'cyan' : 'amber',
     });
   }
 
@@ -688,6 +805,23 @@ function buildActivity(row: {
   return activity;
 }
 
+function getRunnerSourceLabel(source: string) {
+  switch (source) {
+    case 'capture_route':
+      return 'Capture route';
+    case 'manual_admin':
+      return 'Manual admin';
+    case 'payment_reconciliation':
+      return 'Payment reconciliation';
+    case 'recovery_scanner':
+      return 'Recovery scanner';
+    case 'webhook':
+      return 'Webhook';
+    default:
+      return source.replaceAll('_', ' ');
+  }
+}
+
 function mapWebhookEvent(event: {
   eventId: string;
   eventType: string;
@@ -697,6 +831,12 @@ function mapWebhookEvent(event: {
   processedAt: Date | null;
   lastAttemptAt: Date | null;
   lastErrorMessage: string | null;
+  matchedWebhookBindingKey: string | null;
+  matchedWebhookId: string | null;
+  matchedWebhookLabel: string | null;
+  matchedWebhookSource: string | null;
+  orderToken: string | null;
+  webhookVerificationMode: string | null;
 }): PaidOrderRecoveryWebhookEvent {
   return {
     eventId: event.eventId,
@@ -707,6 +847,12 @@ function mapWebhookEvent(event: {
     processedAt: event.processedAt ? formatLongDate(event.processedAt) : null,
     lastAttemptAt: event.lastAttemptAt ? formatLongDate(event.lastAttemptAt) : null,
     lastErrorMessage: event.lastErrorMessage,
+    matchedWebhookBindingKey: event.matchedWebhookBindingKey,
+    matchedWebhookId: event.matchedWebhookId,
+    matchedWebhookLabel: event.matchedWebhookLabel,
+    matchedWebhookSource: event.matchedWebhookSource,
+    orderToken: event.orderToken,
+    webhookVerificationMode: event.webhookVerificationMode,
   };
 }
 
@@ -772,6 +918,9 @@ function buildDetail(row: {
   merchizeProviderOrderId: string | null;
   merchizeProviderOrderCode: string | null;
   processingCompletedAt: Date | null;
+  processingTriggeredAt: Date | null;
+  processingTriggerDetail: string | null;
+  processingTriggerSource: string | null;
   postProcessingLockExpiresAt: Date | null;
   status: string;
   lastErrorMessage: string | null;
@@ -818,6 +967,8 @@ function buildDetail(row: {
       { label: 'Authenticated user ID', value: row.userId },
       { label: 'PayPal order ID', value: row.paypalOrderId },
       { label: 'PayPal capture proof', value: captureCompletion.reason },
+      { label: 'Processing source', value: row.processingTriggerSource },
+      { label: 'Processing source detail', value: row.processingTriggerDetail },
       { label: 'Django order intent UUID', value: row.djangoOrderIntentUuid },
       { label: 'Django order intent order ID', value: row.djangoOrderIntentOrderId },
       { label: 'Django payment save custom ID', value: row.djangoPaymentSaveCustomId },
@@ -880,6 +1031,9 @@ function buildDetail(row: {
       captureCompletion,
       scannerState: getScannerState(row),
       webhookEvents: row.webhookEvents,
+      processingTriggerSource: row.processingTriggerSource,
+      processingTriggerDetail: row.processingTriggerDetail,
+      processingTriggeredAt: row.processingTriggeredAt,
     },
   };
 }
@@ -908,18 +1062,24 @@ export async function listAdminPaidOrderRecoveryRows({
       initialCurrency: true,
       merchizeFulfillmentResponsePayload: true,
       merchizeProviderOrderId: true,
+      paypalOrderId: true,
       lastErrorCode: true,
       lastErrorMessage: true,
+      processingTriggerDetail: true,
+      processingTriggeredAt: true,
+      processingTriggerSource: true,
       updatedAt: true,
     },
   });
-  const merchizeOpsSummaries = await getMerchizeFulfillmentOpsSummaries(
-    rows.map((row) => row.orderToken),
-  );
+  const [merchizeOpsSummaries, latestWebhookSourceByOrderToken] = await Promise.all([
+    getMerchizeFulfillmentOpsSummaries(rows.map((row) => row.orderToken)),
+    getLatestWebhookSourceByOrder(rows),
+  ]);
   const mappedRows = rows
     .map((row) =>
       mapLedgerRowToPaidOrderRecoveryRow({
         ...row,
+        latestWebhookSourceLabel: latestWebhookSourceByOrderToken.get(row.orderToken),
         merchizeFulfillmentOpsSyncStatus: merchizeOpsSummaries.get(row.orderToken)?.syncStatus,
       }),
     )
@@ -959,13 +1119,16 @@ export async function getAdminPaidOrderRecoveryDetail(orderToken: string) {
     orderBy: { createdAt: 'desc' },
   });
   const customerNotifications = await listCustomerNotificationsForOrder(row.orderToken);
-  const webhookEvents = row.paypalOrderId
-    ? await paypalTxLedger.paypalWebhookEvent.findMany({
-        where: { paypalOrderId: row.paypalOrderId },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      })
-    : [];
+  const webhookEvents = await paypalTxLedger.paypalWebhookEvent.findMany({
+    where: {
+      OR: [
+        { orderToken: row.orderToken },
+        ...(row.paypalOrderId ? [{ paypalOrderId: row.paypalOrderId }] : []),
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 5,
+  });
   const mappedWebhookEvents = webhookEvents.map(mapWebhookEvent);
   const merchizeOpsSummary =
     (await getMerchizeFulfillmentOpsSummaries([row.orderToken])).get(row.orderToken) ?? null;

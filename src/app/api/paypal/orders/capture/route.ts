@@ -130,7 +130,10 @@ export async function POST(req: Request) {
 
     after(async () => {
       try {
-        await runPaidFulfillmentProcessing(token);
+        await runPaidFulfillmentProcessing(token, {
+          triggerDetail: reason,
+          triggerSource: 'capture_route',
+        });
       } catch (error) {
         console.error('[paypal.capture.post_processing_failed]', {
           requestId,

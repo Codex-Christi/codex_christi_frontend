@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { createHash } from 'crypto';
 import {
   getOptionalConfiguredPayPalPaymentMode,
   getPayPalLedgerWebhookActivationSource,
@@ -59,16 +60,32 @@ export type PayPalLedgerWebhookDashboard = {
   databaseConfigured: boolean;
   databaseTarget: PayPalLedgerWebhookDatabaseTargetStatus;
   generatedAt: string;
+  paypalApp: PayPalLedgerWebhookPayPalAppStatus;
   paymentModeError: string | null;
   requiredEvents: string[];
   rows: PayPalLedgerWebhookDashboardBinding[];
+  safetyWarnings: PayPalLedgerWebhookSafetyWarning[];
   summary: {
     activeDbBindings: number;
     driftCount: number;
     envMissingCount: number;
     inSyncCount: number;
     notificationDueCount: number;
+    safetyWarningCount: number;
   };
+};
+
+export type PayPalLedgerWebhookPayPalAppStatus = {
+  currentClientIdConfigured: boolean;
+  currentClientIdFingerprint: string | null;
+  liveClientIdFingerprint: string | null;
+  sandboxClientIdFingerprint: string | null;
+};
+
+export type PayPalLedgerWebhookSafetyWarning = {
+  code: string;
+  message: string;
+  severity: 'critical' | 'warning';
 };
 
 export type PayPalLedgerWebhookDatabaseTargetWarning = {
@@ -131,6 +148,12 @@ export async function getPayPalLedgerWebhookDashboard({
   const databaseTarget = getPayPalLedgerWebhookDatabaseTargetStatus();
   const databaseConfigured = databaseTarget.configured;
   const rows = await getPayPalLedgerWebhookDashboardRows({ databaseConfigured });
+  const paypalApp = getPayPalLedgerWebhookPayPalAppStatus(paymentModeState.paymentMode);
+  const safetyWarnings = getPayPalLedgerWebhookSafetyWarnings({
+    currentPaymentMode: paymentModeState.paymentMode,
+    databaseTarget,
+    rows,
+  });
 
   if (databaseConfigured) {
     await updatePayPalLedgerWebhookBindingSyncState(rows);
@@ -152,17 +175,76 @@ export async function getPayPalLedgerWebhookDashboard({
     databaseConfigured,
     databaseTarget,
     generatedAt: new Date().toISOString(),
+    paypalApp,
     paymentModeError: paymentModeState.error,
     requiredEvents: [...PAYPAL_LEDGER_WEBHOOK_REQUIRED_EVENTS],
     rows,
+    safetyWarnings,
     summary: {
       activeDbBindings,
       driftCount,
       envMissingCount,
       inSyncCount,
       notificationDueCount,
+      safetyWarningCount: safetyWarnings.length,
     },
   };
+}
+
+function fingerprintRuntimeValue(value: string | undefined) {
+  const normalized = value?.trim();
+
+  if (!normalized) return null;
+
+  return createHash('sha256').update(normalized).digest('hex').slice(0, 12);
+}
+
+function getPayPalLedgerWebhookPayPalAppStatus(
+  currentPaymentMode: 'sandbox' | 'live' | null,
+): PayPalLedgerWebhookPayPalAppStatus {
+  const sandboxClientIdFingerprint = fingerprintRuntimeValue(process.env.PAYPAL_SANDBOX_CLIENT_ID);
+  const liveClientIdFingerprint = fingerprintRuntimeValue(process.env.PAYPAL_LIVE_CLIENT_ID);
+  const currentClientIdFingerprint =
+    currentPaymentMode === 'live' ? liveClientIdFingerprint : sandboxClientIdFingerprint;
+
+  return {
+    currentClientIdConfigured: Boolean(currentClientIdFingerprint),
+    currentClientIdFingerprint,
+    liveClientIdFingerprint,
+    sandboxClientIdFingerprint,
+  };
+}
+
+function getPayPalLedgerWebhookSafetyWarnings({
+  currentPaymentMode,
+  databaseTarget,
+  rows,
+}: {
+  currentPaymentMode: 'sandbox' | 'live' | null;
+  databaseTarget: PayPalLedgerWebhookDatabaseTargetStatus;
+  rows: PayPalLedgerWebhookDashboardBinding[];
+}): PayPalLedgerWebhookSafetyWarning[] {
+  const warnings: PayPalLedgerWebhookSafetyWarning[] = [...databaseTarget.warnings];
+
+  if (currentPaymentMode === 'sandbox') {
+    const sandboxNgrokTrusted = rows.some(
+      (row) => row.key === 'sandbox_ngrok' && Boolean(row.dbWebhookId || row.envWebhookId),
+    );
+    const sandboxProductionTrusted = rows.some(
+      (row) => row.key === 'sandbox_production' && Boolean(row.dbWebhookId || row.envWebhookId),
+    );
+
+    if (sandboxNgrokTrusted && sandboxProductionTrusted) {
+      warnings.push({
+        code: 'sandbox_dual_listener_delivery',
+        message:
+          'Sandbox ngrok and production listeners are both trusted. If both are registered under the same PayPal sandbox app, PayPal can deliver the same event to both; compare PayPal app fingerprints across local and VPS for isolation.',
+        severity: 'warning',
+      });
+    }
+  }
+
+  return warnings;
 }
 
 function getPayPalLedgerWebhookDatabaseTargetStatus(): PayPalLedgerWebhookDatabaseTargetStatus {

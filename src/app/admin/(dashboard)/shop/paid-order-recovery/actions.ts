@@ -92,8 +92,7 @@ function parseStoredScannerRun(value: unknown): PayPalRecoveryScannerRunResult |
         return {
           orderToken: typeof candidate.orderToken === 'string' ? candidate.orderToken : '',
           status: typeof candidate.status === 'string' ? candidate.status : '',
-          customerEmail:
-            typeof candidate.customerEmail === 'string' ? candidate.customerEmail : '',
+          customerEmail: typeof candidate.customerEmail === 'string' ? candidate.customerEmail : '',
           createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : '',
           updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : '',
           reason: typeof candidate.reason === 'string' ? candidate.reason : '',
@@ -112,13 +111,10 @@ function parseStoredScannerRun(value: unknown): PayPalRecoveryScannerRunResult |
 
         return {
           orderToken: typeof result.orderToken === 'string' ? result.orderToken : '',
-          previousStatus:
-            typeof result.previousStatus === 'string' ? result.previousStatus : '',
+          previousStatus: typeof result.previousStatus === 'string' ? result.previousStatus : '',
           status: typeof result.status === 'string' ? result.status : null,
           processingCompletedAt:
-            typeof result.processingCompletedAt === 'string'
-              ? result.processingCompletedAt
-              : null,
+            typeof result.processingCompletedAt === 'string' ? result.processingCompletedAt : null,
           ok: typeof result.ok === 'boolean' ? result.ok : false,
           error: typeof result.error === 'string' ? result.error : null,
         };
@@ -564,7 +560,10 @@ export async function retryAdminPaidOrderRecoveryAction({
       };
     }
 
-    await runPaidFulfillmentProcessing(orderToken);
+    await runPaidFulfillmentProcessing(orderToken, {
+      triggerDetail: 'admin_retry_paid_order_recovery',
+      triggerSource: 'manual_admin',
+    });
 
     revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
     revalidatePath('/admin/shop/paid-order-recovery');
@@ -709,6 +708,8 @@ export async function overrideMerchizePushDisabledAndReleaseAction({
 
     await runPaidFulfillmentProcessing(orderToken, {
       overrideMerchizeFulfillmentPushDisabled: true,
+      triggerDetail: 'admin_push_disabled_override_release',
+      triggerSource: 'manual_admin',
     });
 
     revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);

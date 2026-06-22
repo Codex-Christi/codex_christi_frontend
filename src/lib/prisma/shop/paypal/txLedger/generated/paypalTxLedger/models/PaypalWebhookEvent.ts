@@ -38,7 +38,13 @@ export type PaypalWebhookEventMinAggregateOutputType = {
   id: string | null
   eventId: string | null
   eventType: string | null
+  orderToken: string | null
   paypalOrderId: string | null
+  matchedWebhookId: string | null
+  matchedWebhookSource: string | null
+  matchedWebhookBindingKey: string | null
+  matchedWebhookLabel: string | null
+  webhookVerificationMode: string | null
   processingStatus: string | null
   attemptCount: number | null
   lastAttemptAt: Date | null
@@ -51,7 +57,13 @@ export type PaypalWebhookEventMaxAggregateOutputType = {
   id: string | null
   eventId: string | null
   eventType: string | null
+  orderToken: string | null
   paypalOrderId: string | null
+  matchedWebhookId: string | null
+  matchedWebhookSource: string | null
+  matchedWebhookBindingKey: string | null
+  matchedWebhookLabel: string | null
+  webhookVerificationMode: string | null
   processingStatus: string | null
   attemptCount: number | null
   lastAttemptAt: Date | null
@@ -64,8 +76,14 @@ export type PaypalWebhookEventCountAggregateOutputType = {
   id: number
   eventId: number
   eventType: number
+  orderToken: number
   paypalOrderId: number
   payload: number
+  matchedWebhookId: number
+  matchedWebhookSource: number
+  matchedWebhookBindingKey: number
+  matchedWebhookLabel: number
+  webhookVerificationMode: number
   processingStatus: number
   attemptCount: number
   lastAttemptAt: number
@@ -88,7 +106,13 @@ export type PaypalWebhookEventMinAggregateInputType = {
   id?: true
   eventId?: true
   eventType?: true
+  orderToken?: true
   paypalOrderId?: true
+  matchedWebhookId?: true
+  matchedWebhookSource?: true
+  matchedWebhookBindingKey?: true
+  matchedWebhookLabel?: true
+  webhookVerificationMode?: true
   processingStatus?: true
   attemptCount?: true
   lastAttemptAt?: true
@@ -101,7 +125,13 @@ export type PaypalWebhookEventMaxAggregateInputType = {
   id?: true
   eventId?: true
   eventType?: true
+  orderToken?: true
   paypalOrderId?: true
+  matchedWebhookId?: true
+  matchedWebhookSource?: true
+  matchedWebhookBindingKey?: true
+  matchedWebhookLabel?: true
+  webhookVerificationMode?: true
   processingStatus?: true
   attemptCount?: true
   lastAttemptAt?: true
@@ -114,8 +144,14 @@ export type PaypalWebhookEventCountAggregateInputType = {
   id?: true
   eventId?: true
   eventType?: true
+  orderToken?: true
   paypalOrderId?: true
   payload?: true
+  matchedWebhookId?: true
+  matchedWebhookSource?: true
+  matchedWebhookBindingKey?: true
+  matchedWebhookLabel?: true
+  webhookVerificationMode?: true
   processingStatus?: true
   attemptCount?: true
   lastAttemptAt?: true
@@ -215,8 +251,14 @@ export type PaypalWebhookEventGroupByOutputType = {
   id: string
   eventId: string
   eventType: string
+  orderToken: string | null
   paypalOrderId: string | null
   payload: runtime.JsonValue
+  matchedWebhookId: string | null
+  matchedWebhookSource: string | null
+  matchedWebhookBindingKey: string | null
+  matchedWebhookLabel: string | null
+  webhookVerificationMode: string | null
   processingStatus: string
   attemptCount: number
   lastAttemptAt: Date | null
@@ -252,8 +294,14 @@ export type PaypalWebhookEventWhereInput = {
   id?: Prisma.StringFilter<"PaypalWebhookEvent"> | string
   eventId?: Prisma.StringFilter<"PaypalWebhookEvent"> | string
   eventType?: Prisma.StringFilter<"PaypalWebhookEvent"> | string
+  orderToken?: Prisma.StringNullableFilter<"PaypalWebhookEvent"> | string | null
   paypalOrderId?: Prisma.StringNullableFilter<"PaypalWebhookEvent"> | string | null
   payload?: Prisma.JsonFilter<"PaypalWebhookEvent">
+  matchedWebhookId?: Prisma.StringNullableFilter<"PaypalWebhookEvent"> | string | null
+  matchedWebhookSource?: Prisma.StringNullableFilter<"PaypalWebhookEvent"> | string | null
+  matchedWebhookBindingKey?: Prisma.StringNullableFilter<"PaypalWebhookEvent"> | string | null
+  matchedWebhookLabel?: Prisma.StringNullableFilter<"PaypalWebhookEvent"> | string | null
+  webhookVerificationMode?: Prisma.StringNullableFilter<"PaypalWebhookEvent"> | string | null
   processingStatus?: Prisma.StringFilter<"PaypalWebhookEvent"> | string
   attemptCount?: Prisma.IntFilter<"PaypalWebhookEvent"> | number
   lastAttemptAt?: Prisma.DateTimeNullableFilter<"PaypalWebhookEvent"> | Date | string | null
@@ -266,8 +314,14 @@ export type PaypalWebhookEventOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   eventId?: Prisma.SortOrder
   eventType?: Prisma.SortOrder
+  orderToken?: Prisma.SortOrderInput | Prisma.SortOrder
   paypalOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
   payload?: Prisma.SortOrder
+  matchedWebhookId?: Prisma.SortOrderInput | Prisma.SortOrder
+  matchedWebhookSource?: Prisma.SortOrderInput | Prisma.SortOrder
+  matchedWebhookBindingKey?: Prisma.SortOrderInput | Prisma.SortOrder
+  matchedWebhookLabel?: Prisma.SortOrderInput | Prisma.SortOrder
+  webhookVerificationMode?: Prisma.SortOrderInput | Prisma.SortOrder
   processingStatus?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
   lastAttemptAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -283,8 +337,14 @@ export type PaypalWebhookEventWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.PaypalWebhookEventWhereInput[]
   NOT?: Prisma.PaypalWebhookEventWhereInput | Prisma.PaypalWebhookEventWhereInput[]
   eventType?: Prisma.StringFilter<"PaypalWebhookEvent"> | string
+  orderToken?: Prisma.StringNullableFilter<"PaypalWebhookEvent"> | string | null
   paypalOrderId?: Prisma.StringNullableFilter<"PaypalWebhookEvent"> | string | null
   payload?: Prisma.JsonFilter<"PaypalWebhookEvent">
+  matchedWebhookId?: Prisma.StringNullableFilter<"PaypalWebhookEvent"> | string | null
+  matchedWebhookSource?: Prisma.StringNullableFilter<"PaypalWebhookEvent"> | string | null
+  matchedWebhookBindingKey?: Prisma.StringNullableFilter<"PaypalWebhookEvent"> | string | null
+  matchedWebhookLabel?: Prisma.StringNullableFilter<"PaypalWebhookEvent"> | string | null
+  webhookVerificationMode?: Prisma.StringNullableFilter<"PaypalWebhookEvent"> | string | null
   processingStatus?: Prisma.StringFilter<"PaypalWebhookEvent"> | string
   attemptCount?: Prisma.IntFilter<"PaypalWebhookEvent"> | number
   lastAttemptAt?: Prisma.DateTimeNullableFilter<"PaypalWebhookEvent"> | Date | string | null
@@ -297,8 +357,14 @@ export type PaypalWebhookEventOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   eventId?: Prisma.SortOrder
   eventType?: Prisma.SortOrder
+  orderToken?: Prisma.SortOrderInput | Prisma.SortOrder
   paypalOrderId?: Prisma.SortOrderInput | Prisma.SortOrder
   payload?: Prisma.SortOrder
+  matchedWebhookId?: Prisma.SortOrderInput | Prisma.SortOrder
+  matchedWebhookSource?: Prisma.SortOrderInput | Prisma.SortOrder
+  matchedWebhookBindingKey?: Prisma.SortOrderInput | Prisma.SortOrder
+  matchedWebhookLabel?: Prisma.SortOrderInput | Prisma.SortOrder
+  webhookVerificationMode?: Prisma.SortOrderInput | Prisma.SortOrder
   processingStatus?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
   lastAttemptAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -319,8 +385,14 @@ export type PaypalWebhookEventScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"PaypalWebhookEvent"> | string
   eventId?: Prisma.StringWithAggregatesFilter<"PaypalWebhookEvent"> | string
   eventType?: Prisma.StringWithAggregatesFilter<"PaypalWebhookEvent"> | string
+  orderToken?: Prisma.StringNullableWithAggregatesFilter<"PaypalWebhookEvent"> | string | null
   paypalOrderId?: Prisma.StringNullableWithAggregatesFilter<"PaypalWebhookEvent"> | string | null
   payload?: Prisma.JsonWithAggregatesFilter<"PaypalWebhookEvent">
+  matchedWebhookId?: Prisma.StringNullableWithAggregatesFilter<"PaypalWebhookEvent"> | string | null
+  matchedWebhookSource?: Prisma.StringNullableWithAggregatesFilter<"PaypalWebhookEvent"> | string | null
+  matchedWebhookBindingKey?: Prisma.StringNullableWithAggregatesFilter<"PaypalWebhookEvent"> | string | null
+  matchedWebhookLabel?: Prisma.StringNullableWithAggregatesFilter<"PaypalWebhookEvent"> | string | null
+  webhookVerificationMode?: Prisma.StringNullableWithAggregatesFilter<"PaypalWebhookEvent"> | string | null
   processingStatus?: Prisma.StringWithAggregatesFilter<"PaypalWebhookEvent"> | string
   attemptCount?: Prisma.IntWithAggregatesFilter<"PaypalWebhookEvent"> | number
   lastAttemptAt?: Prisma.DateTimeNullableWithAggregatesFilter<"PaypalWebhookEvent"> | Date | string | null
@@ -333,8 +405,14 @@ export type PaypalWebhookEventCreateInput = {
   id?: string
   eventId: string
   eventType: string
+  orderToken?: string | null
   paypalOrderId?: string | null
   payload: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  matchedWebhookId?: string | null
+  matchedWebhookSource?: string | null
+  matchedWebhookBindingKey?: string | null
+  matchedWebhookLabel?: string | null
+  webhookVerificationMode?: string | null
   processingStatus?: string
   attemptCount?: number
   lastAttemptAt?: Date | string | null
@@ -347,8 +425,14 @@ export type PaypalWebhookEventUncheckedCreateInput = {
   id?: string
   eventId: string
   eventType: string
+  orderToken?: string | null
   paypalOrderId?: string | null
   payload: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  matchedWebhookId?: string | null
+  matchedWebhookSource?: string | null
+  matchedWebhookBindingKey?: string | null
+  matchedWebhookLabel?: string | null
+  webhookVerificationMode?: string | null
   processingStatus?: string
   attemptCount?: number
   lastAttemptAt?: Date | string | null
@@ -361,8 +445,14 @@ export type PaypalWebhookEventUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   eventId?: Prisma.StringFieldUpdateOperationsInput | string
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
+  orderToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paypalOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   payload?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  matchedWebhookId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchedWebhookSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchedWebhookBindingKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchedWebhookLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  webhookVerificationMode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingStatus?: Prisma.StringFieldUpdateOperationsInput | string
   attemptCount?: Prisma.IntFieldUpdateOperationsInput | number
   lastAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -375,8 +465,14 @@ export type PaypalWebhookEventUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   eventId?: Prisma.StringFieldUpdateOperationsInput | string
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
+  orderToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paypalOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   payload?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  matchedWebhookId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchedWebhookSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchedWebhookBindingKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchedWebhookLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  webhookVerificationMode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingStatus?: Prisma.StringFieldUpdateOperationsInput | string
   attemptCount?: Prisma.IntFieldUpdateOperationsInput | number
   lastAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -389,8 +485,14 @@ export type PaypalWebhookEventCreateManyInput = {
   id?: string
   eventId: string
   eventType: string
+  orderToken?: string | null
   paypalOrderId?: string | null
   payload: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  matchedWebhookId?: string | null
+  matchedWebhookSource?: string | null
+  matchedWebhookBindingKey?: string | null
+  matchedWebhookLabel?: string | null
+  webhookVerificationMode?: string | null
   processingStatus?: string
   attemptCount?: number
   lastAttemptAt?: Date | string | null
@@ -403,8 +505,14 @@ export type PaypalWebhookEventUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   eventId?: Prisma.StringFieldUpdateOperationsInput | string
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
+  orderToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paypalOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   payload?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  matchedWebhookId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchedWebhookSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchedWebhookBindingKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchedWebhookLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  webhookVerificationMode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingStatus?: Prisma.StringFieldUpdateOperationsInput | string
   attemptCount?: Prisma.IntFieldUpdateOperationsInput | number
   lastAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -417,8 +525,14 @@ export type PaypalWebhookEventUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   eventId?: Prisma.StringFieldUpdateOperationsInput | string
   eventType?: Prisma.StringFieldUpdateOperationsInput | string
+  orderToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   paypalOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   payload?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  matchedWebhookId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchedWebhookSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchedWebhookBindingKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  matchedWebhookLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  webhookVerificationMode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingStatus?: Prisma.StringFieldUpdateOperationsInput | string
   attemptCount?: Prisma.IntFieldUpdateOperationsInput | number
   lastAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -431,8 +545,14 @@ export type PaypalWebhookEventCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   eventId?: Prisma.SortOrder
   eventType?: Prisma.SortOrder
+  orderToken?: Prisma.SortOrder
   paypalOrderId?: Prisma.SortOrder
   payload?: Prisma.SortOrder
+  matchedWebhookId?: Prisma.SortOrder
+  matchedWebhookSource?: Prisma.SortOrder
+  matchedWebhookBindingKey?: Prisma.SortOrder
+  matchedWebhookLabel?: Prisma.SortOrder
+  webhookVerificationMode?: Prisma.SortOrder
   processingStatus?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
   lastAttemptAt?: Prisma.SortOrder
@@ -449,7 +569,13 @@ export type PaypalWebhookEventMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   eventId?: Prisma.SortOrder
   eventType?: Prisma.SortOrder
+  orderToken?: Prisma.SortOrder
   paypalOrderId?: Prisma.SortOrder
+  matchedWebhookId?: Prisma.SortOrder
+  matchedWebhookSource?: Prisma.SortOrder
+  matchedWebhookBindingKey?: Prisma.SortOrder
+  matchedWebhookLabel?: Prisma.SortOrder
+  webhookVerificationMode?: Prisma.SortOrder
   processingStatus?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
   lastAttemptAt?: Prisma.SortOrder
@@ -462,7 +588,13 @@ export type PaypalWebhookEventMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   eventId?: Prisma.SortOrder
   eventType?: Prisma.SortOrder
+  orderToken?: Prisma.SortOrder
   paypalOrderId?: Prisma.SortOrder
+  matchedWebhookId?: Prisma.SortOrder
+  matchedWebhookSource?: Prisma.SortOrder
+  matchedWebhookBindingKey?: Prisma.SortOrder
+  matchedWebhookLabel?: Prisma.SortOrder
+  webhookVerificationMode?: Prisma.SortOrder
   processingStatus?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
   lastAttemptAt?: Prisma.SortOrder
@@ -481,8 +613,14 @@ export type PaypalWebhookEventSelect<ExtArgs extends runtime.Types.Extensions.In
   id?: boolean
   eventId?: boolean
   eventType?: boolean
+  orderToken?: boolean
   paypalOrderId?: boolean
   payload?: boolean
+  matchedWebhookId?: boolean
+  matchedWebhookSource?: boolean
+  matchedWebhookBindingKey?: boolean
+  matchedWebhookLabel?: boolean
+  webhookVerificationMode?: boolean
   processingStatus?: boolean
   attemptCount?: boolean
   lastAttemptAt?: boolean
@@ -495,8 +633,14 @@ export type PaypalWebhookEventSelectCreateManyAndReturn<ExtArgs extends runtime.
   id?: boolean
   eventId?: boolean
   eventType?: boolean
+  orderToken?: boolean
   paypalOrderId?: boolean
   payload?: boolean
+  matchedWebhookId?: boolean
+  matchedWebhookSource?: boolean
+  matchedWebhookBindingKey?: boolean
+  matchedWebhookLabel?: boolean
+  webhookVerificationMode?: boolean
   processingStatus?: boolean
   attemptCount?: boolean
   lastAttemptAt?: boolean
@@ -509,8 +653,14 @@ export type PaypalWebhookEventSelectUpdateManyAndReturn<ExtArgs extends runtime.
   id?: boolean
   eventId?: boolean
   eventType?: boolean
+  orderToken?: boolean
   paypalOrderId?: boolean
   payload?: boolean
+  matchedWebhookId?: boolean
+  matchedWebhookSource?: boolean
+  matchedWebhookBindingKey?: boolean
+  matchedWebhookLabel?: boolean
+  webhookVerificationMode?: boolean
   processingStatus?: boolean
   attemptCount?: boolean
   lastAttemptAt?: boolean
@@ -523,8 +673,14 @@ export type PaypalWebhookEventSelectScalar = {
   id?: boolean
   eventId?: boolean
   eventType?: boolean
+  orderToken?: boolean
   paypalOrderId?: boolean
   payload?: boolean
+  matchedWebhookId?: boolean
+  matchedWebhookSource?: boolean
+  matchedWebhookBindingKey?: boolean
+  matchedWebhookLabel?: boolean
+  webhookVerificationMode?: boolean
   processingStatus?: boolean
   attemptCount?: boolean
   lastAttemptAt?: boolean
@@ -533,7 +689,7 @@ export type PaypalWebhookEventSelectScalar = {
   createdAt?: boolean
 }
 
-export type PaypalWebhookEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "eventId" | "eventType" | "paypalOrderId" | "payload" | "processingStatus" | "attemptCount" | "lastAttemptAt" | "processedAt" | "lastErrorMessage" | "createdAt", ExtArgs["result"]["paypalWebhookEvent"]>
+export type PaypalWebhookEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "eventId" | "eventType" | "orderToken" | "paypalOrderId" | "payload" | "matchedWebhookId" | "matchedWebhookSource" | "matchedWebhookBindingKey" | "matchedWebhookLabel" | "webhookVerificationMode" | "processingStatus" | "attemptCount" | "lastAttemptAt" | "processedAt" | "lastErrorMessage" | "createdAt", ExtArgs["result"]["paypalWebhookEvent"]>
 
 export type $PaypalWebhookEventPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "PaypalWebhookEvent"
@@ -542,8 +698,14 @@ export type $PaypalWebhookEventPayload<ExtArgs extends runtime.Types.Extensions.
     id: string
     eventId: string
     eventType: string
+    orderToken: string | null
     paypalOrderId: string | null
     payload: runtime.JsonValue
+    matchedWebhookId: string | null
+    matchedWebhookSource: string | null
+    matchedWebhookBindingKey: string | null
+    matchedWebhookLabel: string | null
+    webhookVerificationMode: string | null
     processingStatus: string
     attemptCount: number
     lastAttemptAt: Date | null
@@ -976,8 +1138,14 @@ export interface PaypalWebhookEventFieldRefs {
   readonly id: Prisma.FieldRef<"PaypalWebhookEvent", 'String'>
   readonly eventId: Prisma.FieldRef<"PaypalWebhookEvent", 'String'>
   readonly eventType: Prisma.FieldRef<"PaypalWebhookEvent", 'String'>
+  readonly orderToken: Prisma.FieldRef<"PaypalWebhookEvent", 'String'>
   readonly paypalOrderId: Prisma.FieldRef<"PaypalWebhookEvent", 'String'>
   readonly payload: Prisma.FieldRef<"PaypalWebhookEvent", 'Json'>
+  readonly matchedWebhookId: Prisma.FieldRef<"PaypalWebhookEvent", 'String'>
+  readonly matchedWebhookSource: Prisma.FieldRef<"PaypalWebhookEvent", 'String'>
+  readonly matchedWebhookBindingKey: Prisma.FieldRef<"PaypalWebhookEvent", 'String'>
+  readonly matchedWebhookLabel: Prisma.FieldRef<"PaypalWebhookEvent", 'String'>
+  readonly webhookVerificationMode: Prisma.FieldRef<"PaypalWebhookEvent", 'String'>
   readonly processingStatus: Prisma.FieldRef<"PaypalWebhookEvent", 'String'>
   readonly attemptCount: Prisma.FieldRef<"PaypalWebhookEvent", 'Int'>
   readonly lastAttemptAt: Prisma.FieldRef<"PaypalWebhookEvent", 'DateTime'>

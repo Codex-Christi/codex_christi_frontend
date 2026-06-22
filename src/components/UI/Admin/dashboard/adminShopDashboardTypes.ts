@@ -34,6 +34,8 @@ export type PaidOrderRecoveryRow = {
   amount: string;
   step: string;
   error: string;
+  processingSourceLabel: string;
+  processingSourceTone: 'amber' | 'cyan' | 'emerald' | 'rose' | 'slate';
   supportRef: string;
   updated: string;
   needsProviderDetailSync?: boolean;
@@ -99,6 +101,12 @@ export type PaidOrderRecoveryWebhookEvent = {
   processedAt: string | null;
   lastAttemptAt: string | null;
   lastErrorMessage: string | null;
+  matchedWebhookBindingKey: string | null;
+  matchedWebhookId: string | null;
+  matchedWebhookLabel: string | null;
+  matchedWebhookSource: string | null;
+  orderToken: string | null;
+  webhookVerificationMode: string | null;
 };
 
 export type PaidOrderRecoveryActivityItem = {
