@@ -10,6 +10,7 @@ import {
   type PayPalLedgerWebhookActivationSource,
   type PayPalLedgerWebhookBindingKey,
 } from '@/lib/paypal/ledgerWebhookConfig';
+import { registerPayPalLedgerWebhook } from '@/lib/paypal/payPalWebhookRegistry';
 import {
   isPaypalTxLedgerDatabaseConfigured,
   paypalTxLedger,
@@ -74,6 +75,30 @@ export type SavePayPalLedgerWebhookBindingInput = {
   key: string;
   webhookId?: string | null;
   webhookUrl?: string | null;
+};
+
+export type RegisterPayPalLedgerWebhookBindingInput = {
+  actorAdminUserId: string;
+  actorCodexUserId: string;
+  key: string;
+  webhookUrl: string;
+};
+
+export type SyncPayPalLedgerWebhookEnvToDbInput = {
+  actorAdminUserId: string;
+  actorCodexUserId: string;
+  key: string;
+  webhookUrl?: string | null;
+};
+
+export type RegisterPayPalLedgerWebhookBindingResult = {
+  envVarName: string;
+  label: string;
+  paypalAction: 'created' | 'patched';
+  paypalPaymentMode: 'sandbox' | 'live';
+  previousWebhookIdSource: 'db' | 'env' | 'none';
+  webhookId: string;
+  webhookUrl: string;
 };
 
 export async function getPayPalLedgerWebhookDashboard({
@@ -217,6 +242,105 @@ export async function savePayPalLedgerWebhookBinding({
       updatedByCodexUserId: actorCodexUserId,
     },
   });
+}
+
+export async function registerPayPalLedgerWebhookBinding({
+  actorAdminUserId,
+  actorCodexUserId,
+  key,
+  webhookUrl,
+}: RegisterPayPalLedgerWebhookBindingInput): Promise<RegisterPayPalLedgerWebhookBindingResult> {
+  const definition = PAYPAL_LEDGER_WEBHOOK_BINDING_DEFINITIONS.find(
+    (candidate) => candidate.key === key,
+  );
+
+  if (!definition) {
+    throw new Error('Unsupported PayPal ledger webhook binding.');
+  }
+
+  if (!isPaypalTxLedgerDatabaseConfigured()) {
+    throw new Error('PayPal TX Ledger database is not configured.');
+  }
+
+  const existingBinding = await paypalTxLedger.paypalLedgerTransactionWebhookBinding.findUnique({
+    where: { key: definition.key },
+    select: { webhookId: true },
+  });
+  const envWebhookId = getPayPalLedgerWebhookEnvValue(definition.envVarName);
+  const existingWebhookId = existingBinding?.webhookId || envWebhookId;
+  const previousWebhookIdSource = existingBinding?.webhookId ? 'db' : envWebhookId ? 'env' : 'none';
+  const result = await registerPayPalLedgerWebhook({
+    paymentMode: definition.paypalPaymentMode,
+    webhookId: existingWebhookId,
+    webhookUrl,
+  });
+
+  await savePayPalLedgerWebhookBinding({
+    actorAdminUserId,
+    actorCodexUserId,
+    intent: 'activate',
+    key: definition.key,
+    webhookId: result.webhookId,
+    webhookUrl: result.webhookUrl,
+  });
+
+  return {
+    envVarName: definition.envVarName,
+    label: definition.label,
+    paypalAction: result.action,
+    paypalPaymentMode: definition.paypalPaymentMode,
+    previousWebhookIdSource,
+    webhookId: result.webhookId,
+    webhookUrl: result.webhookUrl,
+  };
+}
+
+export async function syncPayPalLedgerWebhookEnvToDbBinding({
+  actorAdminUserId,
+  actorCodexUserId,
+  key,
+  webhookUrl,
+}: SyncPayPalLedgerWebhookEnvToDbInput) {
+  const definition = PAYPAL_LEDGER_WEBHOOK_BINDING_DEFINITIONS.find(
+    (candidate) => candidate.key === key,
+  );
+
+  if (!definition) {
+    throw new Error('Unsupported PayPal ledger webhook binding.');
+  }
+
+  if (!isPaypalTxLedgerDatabaseConfigured()) {
+    throw new Error('PayPal TX Ledger database is not configured.');
+  }
+
+  const envWebhookId = getPayPalLedgerWebhookEnvValue(definition.envVarName);
+  if (!envWebhookId) {
+    throw new Error(`${definition.envVarName} is not set.`);
+  }
+
+  const existingBinding = await paypalTxLedger.paypalLedgerTransactionWebhookBinding.findUnique({
+    where: { key: definition.key },
+    select: { webhookId: true },
+  });
+
+  if (existingBinding?.webhookId) {
+    throw new Error('DB binding already has a webhook ID.');
+  }
+
+  await savePayPalLedgerWebhookBinding({
+    actorAdminUserId,
+    actorCodexUserId,
+    intent: 'activate',
+    key: definition.key,
+    webhookId: envWebhookId,
+    webhookUrl: webhookUrl?.trim() || getPayPalLedgerWebhookExpectedUrl(definition),
+  });
+
+  return {
+    envVarName: definition.envVarName,
+    label: definition.label,
+    webhookId: envWebhookId,
+  };
 }
 
 async function getPayPalLedgerWebhookDashboardRows({

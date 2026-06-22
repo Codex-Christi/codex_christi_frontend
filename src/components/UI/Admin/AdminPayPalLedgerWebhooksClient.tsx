@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -9,19 +9,20 @@ import {
   Database,
   KeyRound,
   Loader2,
-  Power,
   PowerOff,
-  Save,
   ShieldCheck,
+  Webhook,
 } from 'lucide-react';
 import {
   savePayPalLedgerWebhookBindingAction,
   type PayPalLedgerWebhookBindingActionState,
 } from '@/app/admin/(dashboard)/shop/paypal-webhooks/actions';
+import showErrorToast from '@/lib/error-toast';
 import type {
   PayPalLedgerWebhookDashboard,
   PayPalLedgerWebhookDashboardBinding,
 } from '@/lib/paypal/txLedger/adminPayPalLedgerWebhooks';
+import showSuccessToast from '@/lib/success-toast';
 import { cn } from '@/lib/utils';
 import AdminGlassPanel, { adminFieldClass } from './dashboard/AdminGlassPanel';
 
@@ -31,6 +32,7 @@ type AdminPayPalLedgerWebhooksClientProps = {
 
 const initialState: PayPalLedgerWebhookBindingActionState = {
   error: null,
+  messageId: null,
   success: null,
 };
 
@@ -41,6 +43,25 @@ export default function AdminPayPalLedgerWebhooksClient({
     savePayPalLedgerWebhookBindingAction,
     initialState,
   );
+
+  useEffect(() => {
+    if (!state.messageId) return;
+
+    if (state.error) {
+      showErrorToast({
+        header: 'Webhook update failed',
+        message: state.error,
+      });
+      return;
+    }
+
+    if (state.success) {
+      showSuccessToast({
+        header: 'Webhook update saved',
+        message: state.success,
+      });
+    }
+  }, [state.error, state.messageId, state.success]);
 
   return (
     <div className='px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
@@ -117,14 +138,9 @@ export default function AdminPayPalLedgerWebhooksClient({
               {dashboard.paymentModeError}
             </p>
           ) : null}
-          {state.error ? (
-            <p className='mt-4 rounded-lg border border-rose-300/20 bg-rose-400/10 px-3 py-2 text-sm leading-6 text-rose-100'>
-              {state.error}
-            </p>
-          ) : null}
-          {state.success ? (
-            <p className='mt-4 rounded-lg border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-sm leading-6 text-emerald-100'>
-              {state.success}
+          {state.error || state.success ? (
+            <p className='sr-only' aria-live='polite'>
+              {state.error ?? state.success}
             </p>
           ) : null}
 
@@ -159,6 +175,8 @@ function WebhookBindingCard({
   pending: boolean;
   row: PayPalLedgerWebhookDashboardBinding;
 }) {
+  const canSyncEnvToDb = Boolean(row.envWebhookId && !row.dbWebhookId);
+
   return (
     <AdminGlassPanel className='flex min-h-[520px] flex-col p-4 sm:p-5'>
       <div className='flex items-start justify-between gap-3'>
@@ -214,15 +232,6 @@ function WebhookBindingCard({
       <form action={formAction} className='mt-auto space-y-3 pt-5'>
         <input type='hidden' name='key' value={row.key} />
         <label className='block'>
-          <span className='text-xs font-medium text-slate-400'>Webhook ID</span>
-          <input
-            name='webhookId'
-            defaultValue={row.dbWebhookId ?? ''}
-            className={cn(adminFieldClass, 'mt-1 w-full font-mono')}
-            placeholder='WH-...'
-          />
-        </label>
-        <label className='block'>
           <span className='text-xs font-medium text-slate-400'>Webhook URL</span>
           <input
             name='webhookUrl'
@@ -242,10 +251,27 @@ function WebhookBindingCard({
           />
         </label>
 
-        <div className='grid gap-2 sm:grid-cols-3'>
-          <ActionButton intent='save' pending={pending} icon='save' label='Save' />
-          <ActionButton intent='activate' pending={pending} icon='activate' label='Activate' />
-          <ActionButton intent='deactivate' pending={pending} icon='deactivate' label='Disable' />
+        <div className='grid gap-2 sm:grid-cols-2'>
+          {canSyncEnvToDb ? (
+            <ActionButton
+              intent='sync_env_to_db'
+              pending={pending}
+              icon='sync'
+              label='Sync env to DB'
+            />
+          ) : null}
+          <ActionButton
+            intent='register'
+            pending={pending}
+            icon='register'
+            label='Register / Patch'
+          />
+          <ActionButton
+            intent='deactivate'
+            pending={pending}
+            icon='deactivate'
+            label='Disable DB'
+          />
         </div>
       </form>
     </AdminGlassPanel>
@@ -258,12 +284,12 @@ function ActionButton({
   label,
   pending,
 }: {
-  icon: 'activate' | 'deactivate' | 'save';
-  intent: 'activate' | 'deactivate' | 'save';
+  icon: 'deactivate' | 'register' | 'sync';
+  intent: 'deactivate' | 'register' | 'sync_env_to_db';
   label: string;
   pending: boolean;
 }) {
-  const Icon = icon === 'save' ? Save : icon === 'activate' ? Power : PowerOff;
+  const Icon = icon === 'register' ? Webhook : icon === 'sync' ? Database : PowerOff;
 
   return (
     <button
@@ -273,9 +299,11 @@ function ActionButton({
       disabled={pending}
       className={cn(
         'inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
-        intent === 'activate'
+        intent === 'register'
           ? 'bg-cyan-300 text-slate-950 hover:bg-cyan-200'
-          : 'border border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-300/30',
+          : intent === 'sync_env_to_db'
+            ? 'border border-amber-300/20 bg-amber-300/10 text-amber-100 hover:border-amber-200/40'
+            : 'border border-white/10 bg-white/[0.04] text-slate-200 hover:border-cyan-300/30',
       )}
     >
       {pending ? <Loader2 size={16} className='animate-spin' /> : <Icon size={16} />}

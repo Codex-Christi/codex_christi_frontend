@@ -9,10 +9,15 @@ import {
   writeAdminAuditLog,
 } from '@/lib/admin/admin-auth-ledger';
 import { requireMasterAdminAction } from '@/lib/admin/require-admin';
-import { savePayPalLedgerWebhookBinding } from '@/lib/paypal/txLedger/adminPayPalLedgerWebhooks';
+import {
+  registerPayPalLedgerWebhookBinding,
+  savePayPalLedgerWebhookBinding,
+  syncPayPalLedgerWebhookEnvToDbBinding,
+} from '@/lib/paypal/txLedger/adminPayPalLedgerWebhooks';
 
 export type PayPalLedgerWebhookBindingActionState = {
   error: string | null;
+  messageId: string | null;
   success: string | null;
 };
 
@@ -22,7 +27,11 @@ export async function savePayPalLedgerWebhookBindingAction(
 ): Promise<PayPalLedgerWebhookBindingActionState> {
   const intentValue = String(formData.get('intent') ?? '').trim();
   const intent =
-    intentValue === 'activate' || intentValue === 'deactivate' || intentValue === 'save'
+    intentValue === 'register' ||
+    intentValue === 'sync_env_to_db' ||
+    intentValue === 'activate' ||
+    intentValue === 'deactivate' ||
+    intentValue === 'save'
       ? intentValue
       : null;
   const key = String(formData.get('key') ?? '').trim();
@@ -42,14 +51,35 @@ export async function savePayPalLedgerWebhookBindingAction(
       targetId: key,
     });
 
-    await savePayPalLedgerWebhookBinding({
-      actorAdminUserId: actor.adminUserId,
-      actorCodexUserId: actor.userID,
-      intent,
-      key,
-      webhookId,
-      webhookUrl,
-    });
+    const registerResult =
+      intent === 'register'
+        ? await registerPayPalLedgerWebhookBinding({
+            actorAdminUserId: actor.adminUserId,
+            actorCodexUserId: actor.userID,
+            key,
+            webhookUrl,
+          })
+        : null;
+    const envSyncResult =
+      intent === 'sync_env_to_db'
+        ? await syncPayPalLedgerWebhookEnvToDbBinding({
+            actorAdminUserId: actor.adminUserId,
+            actorCodexUserId: actor.userID,
+            key,
+            webhookUrl,
+          })
+        : null;
+
+    if (intent !== 'register' && intent !== 'sync_env_to_db') {
+      await savePayPalLedgerWebhookBinding({
+        actorAdminUserId: actor.adminUserId,
+        actorCodexUserId: actor.userID,
+        intent,
+        key,
+        webhookId,
+        webhookUrl,
+      });
+    }
 
     await writeAdminAuditLog({
       actor,
@@ -61,6 +91,19 @@ export async function savePayPalLedgerWebhookBindingAction(
         intent,
         webhookIdConfigured: Boolean(webhookId),
         webhookUrlConfigured: Boolean(webhookUrl),
+        ...(registerResult
+          ? {
+              envVarName: registerResult.envVarName,
+              paypalAction: registerResult.paypalAction,
+              paypalPaymentMode: registerResult.paypalPaymentMode,
+              previousWebhookIdSource: registerResult.previousWebhookIdSource,
+            }
+          : envSyncResult
+            ? {
+                envVarName: envSyncResult.envVarName,
+                syncedFromEnv: true,
+              }
+            : {}),
       },
     });
 
@@ -68,12 +111,16 @@ export async function savePayPalLedgerWebhookBindingAction(
 
     return {
       error: null,
-      success:
-        intent === 'activate'
-          ? 'DB binding activated.'
-          : intent === 'deactivate'
-            ? 'DB binding deactivated.'
-            : 'DB binding saved.',
+      messageId: crypto.randomUUID(),
+      success: registerResult
+        ? `${registerResult.label} webhook ${registerResult.paypalAction}; DB binding activated.`
+        : envSyncResult
+          ? `${envSyncResult.label} env value synced to DB and activated.`
+          : intent === 'activate'
+            ? 'DB binding activated.'
+            : intent === 'deactivate'
+              ? 'DB binding deactivated.'
+              : 'DB binding saved.',
     };
   } catch (error) {
     if (actor) {
@@ -91,6 +138,7 @@ export async function savePayPalLedgerWebhookBindingAction(
 
     return {
       error: error instanceof Error ? error.message : 'Unable to update webhook binding.',
+      messageId: crypto.randomUUID(),
       success: null,
     };
   }
