@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, Clock3, Radar, Webhook } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getPayPalLedgerWebhookSourceLabel } from '@/lib/paypal/txLedger/paypalLedgerProvenance';
 import type { PaidOrderRecoveryDetail } from './adminShopDashboardTypes';
 
 type PaidOrderRecoveryWebhookScannerSummaryProps = {
@@ -10,7 +11,9 @@ export default function PaidOrderRecoveryWebhookScannerSummary({
   detail,
 }: PaidOrderRecoveryWebhookScannerSummaryProps) {
   const latestWebhook = detail.webhookEvents[0];
-  const latestWebhookSource = latestWebhook ? getWebhookSourceLabel(latestWebhook) : null;
+  const latestWebhookSource = latestWebhook
+    ? getPayPalLedgerWebhookSourceLabel(latestWebhook, 'unrecorded webhook source')
+    : null;
   const scannerIsEligible = detail.scannerState.eligible;
 
   return (
@@ -89,16 +92,6 @@ export default function PaidOrderRecoveryWebhookScannerSummary({
       </div>
     </section>
   );
-}
-
-function getWebhookSourceLabel(webhook: PaidOrderRecoveryDetail['webhookEvents'][number]) {
-  if (webhook.matchedWebhookLabel) return webhook.matchedWebhookLabel;
-  if (webhook.matchedWebhookBindingKey)
-    return webhook.matchedWebhookBindingKey.replaceAll('_', ' ');
-  if (webhook.matchedWebhookSource) return webhook.matchedWebhookSource.replaceAll('_', ' ');
-  if (webhook.webhookVerificationMode === 'disabled') return 'signature verification disabled';
-
-  return 'unrecorded webhook source';
 }
 
 function StatusTile({

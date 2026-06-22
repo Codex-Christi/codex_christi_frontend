@@ -8,6 +8,11 @@ import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { listCustomerNotificationsForOrder } from '@/lib/paypal/txLedger/customerNotificationOutbox';
 import {
+  getPayPalLedgerProcessingSourceDisplay,
+  getPayPalLedgerRunnerSourceLabel,
+  getPayPalLedgerWebhookSourceLabel,
+} from '@/lib/paypal/txLedger/paypalLedgerProvenance';
+import {
   getMerchizeFulfillmentOpsPrisma,
   isMerchizeFulfillmentOpsDatabaseConfigured,
 } from '@/lib/prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOpsPrisma';
@@ -320,7 +325,7 @@ function mapLedgerRowToPaidOrderRecoveryRow(row: {
     row.merchizeFulfillmentResponsePayload,
     row.merchizeFulfillmentOpsSyncStatus,
   );
-  const processingSource = getProcessingSourceDisplay(row);
+  const processingSource = getPayPalLedgerProcessingSourceDisplay(row);
 
   return {
     orderToken: row.orderToken,
@@ -337,39 +342,6 @@ function mapLedgerRowToPaidOrderRecoveryRow(row: {
     updated: formatUpdated(row.updatedAt),
     needsProviderDetailSync: providerDetailSyncNeeded,
   };
-}
-
-function getProcessingSourceDisplay(row: {
-  latestWebhookSourceLabel?: string | null;
-  processingTriggerDetail?: string | null;
-  processingTriggerSource?: string | null;
-}): {
-  label: string;
-  tone: PaidOrderRecoveryRow['processingSourceTone'];
-} {
-  switch (row.processingTriggerSource) {
-    case 'webhook':
-      return {
-        label: row.processingTriggerDetail
-          ? `Webhook · ${row.processingTriggerDetail}`
-          : row.latestWebhookSourceLabel
-            ? `Webhook · ${row.latestWebhookSourceLabel}`
-            : 'Webhook',
-        tone: 'cyan',
-      };
-    case 'recovery_scanner':
-      return { label: 'Recovery scanner', tone: 'amber' };
-    case 'payment_reconciliation':
-      return { label: 'Reconciliation', tone: 'emerald' };
-    case 'manual_admin':
-      return { label: 'Manual admin', tone: 'rose' };
-    case 'capture_route':
-      return { label: 'Capture route', tone: 'slate' };
-    default:
-      return row.latestWebhookSourceLabel
-        ? { label: `Webhook · ${row.latestWebhookSourceLabel}`, tone: 'cyan' }
-        : { label: 'Not recorded', tone: 'slate' };
-  }
 }
 
 function buildTimeline(row: {
@@ -624,24 +596,10 @@ async function getLatestWebhookSourceByOrder(
 
     if (!orderToken || latestByOrderToken.has(orderToken)) continue;
 
-    latestByOrderToken.set(orderToken, getWebhookSourceLabel(row));
+    latestByOrderToken.set(orderToken, getPayPalLedgerWebhookSourceLabel(row));
   }
 
   return latestByOrderToken;
-}
-
-function getWebhookSourceLabel(row: {
-  matchedWebhookBindingKey?: string | null;
-  matchedWebhookLabel?: string | null;
-  matchedWebhookSource?: string | null;
-  webhookVerificationMode?: string | null;
-}) {
-  if (row.matchedWebhookLabel) return row.matchedWebhookLabel;
-  if (row.matchedWebhookBindingKey) return row.matchedWebhookBindingKey.replaceAll('_', ' ');
-  if (row.matchedWebhookSource) return row.matchedWebhookSource.replaceAll('_', ' ');
-  if (row.webhookVerificationMode === 'disabled') return 'Signature verification disabled';
-
-  return 'Webhook source not recorded';
 }
 
 function normalizeAddress(value: unknown): PaidOrderRecoveryAddress | null {
@@ -755,7 +713,7 @@ function buildActivity(row: {
   if (row.processingTriggerSource && row.processingTriggeredAt) {
     activity.push({
       label: 'Processing runner selected',
-      description: `${getRunnerSourceLabel(row.processingTriggerSource)} resumed post-payment processing${
+      description: `${getPayPalLedgerRunnerSourceLabel(row.processingTriggerSource)} resumed post-payment processing${
         row.processingTriggerDetail ? ` (${row.processingTriggerDetail})` : ''
       }.`,
       time: formatLongDate(row.processingTriggeredAt),
@@ -803,23 +761,6 @@ function buildActivity(row: {
   }
 
   return activity;
-}
-
-function getRunnerSourceLabel(source: string) {
-  switch (source) {
-    case 'capture_route':
-      return 'Capture route';
-    case 'manual_admin':
-      return 'Manual admin';
-    case 'payment_reconciliation':
-      return 'Payment reconciliation';
-    case 'recovery_scanner':
-      return 'Recovery scanner';
-    case 'webhook':
-      return 'Webhook';
-    default:
-      return source.replaceAll('_', ' ');
-  }
 }
 
 function mapWebhookEvent(event: {

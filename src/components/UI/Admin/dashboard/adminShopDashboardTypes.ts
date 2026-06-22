@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
+import type { PayPalLedgerSourceTone } from '@/lib/paypal/txLedger/paypalLedgerProvenance';
 
 export type ToolTone = 'cyan' | 'emerald' | 'amber' | 'rose' | 'violet' | 'blue';
 export type ToolState =
@@ -35,7 +36,7 @@ export type PaidOrderRecoveryRow = {
   step: string;
   error: string;
   processingSourceLabel: string;
-  processingSourceTone: 'amber' | 'cyan' | 'emerald' | 'rose' | 'slate';
+  processingSourceTone: PayPalLedgerSourceTone;
   supportRef: string;
   updated: string;
   needsProviderDetailSync?: boolean;

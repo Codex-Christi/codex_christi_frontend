@@ -36,6 +36,31 @@ const initialState: PayPalLedgerWebhookBindingActionState = {
   success: null,
 };
 
+type StatusTone = 'amber' | 'cyan' | 'emerald' | 'rose' | 'slate';
+type MetricTone = Exclude<StatusTone, 'slate'>;
+type StatusPillProps = { label: string; tone: StatusTone; value: string };
+type ValueBlockProps = { label: string; mono?: boolean; value: string };
+type ActionButtonConfig = {
+  icon: 'deactivate' | 'register' | 'sync';
+  intent: 'deactivate' | 'register' | 'sync_env_to_db';
+  label: string;
+};
+
+const STATUS_TONE_CLASS: Record<StatusTone, string> = {
+  amber: 'border-amber-300/20 bg-amber-300/10 text-amber-100',
+  cyan: 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100',
+  emerald: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100',
+  rose: 'border-rose-300/20 bg-rose-300/10 text-rose-100',
+  slate: 'border-white/10 bg-white/[0.04] text-slate-300',
+};
+
+const METRIC_TONE_CLASS: Record<MetricTone, string> = {
+  amber: 'text-amber-100',
+  cyan: 'text-cyan-100',
+  emerald: 'text-emerald-100',
+  rose: 'text-rose-100',
+};
+
 export default function AdminPayPalLedgerWebhooksClient({
   dashboard,
 }: AdminPayPalLedgerWebhooksClientProps) {
@@ -62,6 +87,46 @@ export default function AdminPayPalLedgerWebhooksClient({
       });
     }
   }, [state.error, state.messageId, state.success]);
+
+  const overviewPills: StatusPillProps[] = [
+    {
+      label: 'Ledger DB',
+      value: dashboard.databaseConfigured ? 'configured' : 'missing',
+      tone: dashboard.databaseTarget.tone,
+    },
+    {
+      label: 'Ledger branch',
+      value: dashboard.databaseTarget.selectedBranch ?? 'none',
+      tone: dashboard.databaseTarget.tone,
+    },
+    {
+      label: 'Branch source',
+      value: formatDatabaseSelectionSource(dashboard.databaseTarget.selectionSource),
+      tone: dashboard.databaseTarget.selectionSource === 'fallback' ? 'amber' : 'slate',
+    },
+    {
+      label: 'DB fingerprint',
+      value: dashboard.databaseTarget.selectedUrlFingerprint ?? 'none',
+      tone: dashboard.databaseTarget.selectedUrlFingerprint ? 'cyan' : 'rose',
+    },
+    {
+      label: 'PayPal app',
+      value: formatPayPalAppFingerprint(dashboard),
+      tone: dashboard.paypalApp.currentClientIdConfigured ? 'cyan' : 'rose',
+    },
+    {
+      label: 'DB URL env',
+      value: formatDatabaseUrlPresence(dashboard.databaseTarget),
+      tone: dashboard.databaseTarget.prodDevUrlsMatch ? 'rose' : 'slate',
+    },
+    {
+      label: 'Notifications',
+      value: dashboard.summary.notificationDueCount
+        ? `${dashboard.summary.notificationDueCount} queued`
+        : 'clear',
+      tone: dashboard.summary.notificationDueCount ? 'amber' : 'emerald',
+    },
+  ];
 
   return (
     <div className='px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
@@ -121,45 +186,9 @@ export default function AdminPayPalLedgerWebhooksClient({
             </div>
 
             <div className='grid gap-2 text-xs text-slate-400 sm:grid-cols-2 lg:min-w-[620px] xl:grid-cols-3'>
-              <StatusPill
-                label='Ledger DB'
-                value={dashboard.databaseConfigured ? 'configured' : 'missing'}
-                tone={dashboard.databaseTarget.tone}
-              />
-              <StatusPill
-                label='Ledger branch'
-                value={dashboard.databaseTarget.selectedBranch ?? 'none'}
-                tone={dashboard.databaseTarget.tone}
-              />
-              <StatusPill
-                label='Branch source'
-                value={formatDatabaseSelectionSource(dashboard.databaseTarget.selectionSource)}
-                tone={dashboard.databaseTarget.selectionSource === 'fallback' ? 'amber' : 'slate'}
-              />
-              <StatusPill
-                label='DB fingerprint'
-                value={dashboard.databaseTarget.selectedUrlFingerprint ?? 'none'}
-                tone={dashboard.databaseTarget.selectedUrlFingerprint ? 'cyan' : 'rose'}
-              />
-              <StatusPill
-                label='PayPal app'
-                value={formatPayPalAppFingerprint(dashboard)}
-                tone={dashboard.paypalApp.currentClientIdConfigured ? 'cyan' : 'rose'}
-              />
-              <StatusPill
-                label='DB URL env'
-                value={formatDatabaseUrlPresence(dashboard.databaseTarget)}
-                tone={dashboard.databaseTarget.prodDevUrlsMatch ? 'rose' : 'slate'}
-              />
-              <StatusPill
-                label='Notifications'
-                value={
-                  dashboard.summary.notificationDueCount
-                    ? `${dashboard.summary.notificationDueCount} queued`
-                    : 'clear'
-                }
-                tone={dashboard.summary.notificationDueCount ? 'amber' : 'emerald'}
-              />
+              {overviewPills.map((pill) => (
+                <StatusPill key={pill.label} {...pill} />
+              ))}
             </div>
           </div>
 
@@ -244,6 +273,20 @@ function WebhookBindingCard({
   row: PayPalLedgerWebhookDashboardBinding;
 }) {
   const canSyncEnvToDb = Boolean(row.envWebhookId && !row.dbWebhookId);
+  const valueBlocks: ValueBlockProps[] = [
+    { label: 'Env variable', value: row.envVarName, mono: true },
+    { label: 'Runtime env value', value: row.envWebhookId ?? 'not set', mono: true },
+    { label: 'Latest DB value', value: row.dbWebhookId ?? 'not set', mono: true },
+    { label: 'Webhook URL', value: row.webhookUrl ?? 'not set' },
+    { label: 'Expected URL', value: row.expectedUrl ?? 'ngrok/custom target' },
+  ];
+  const actions: ActionButtonConfig[] = [
+    ...(canSyncEnvToDb
+      ? [{ intent: 'sync_env_to_db', icon: 'sync', label: 'Sync env to DB' } as const]
+      : []),
+    { intent: 'register', icon: 'register', label: 'Register / Patch' },
+    { intent: 'deactivate', icon: 'deactivate', label: 'Disable DB' },
+  ];
 
   return (
     <AdminGlassPanel className='flex min-h-[520px] flex-col p-4 sm:p-5'>
@@ -279,11 +322,9 @@ function WebhookBindingCard({
       </div>
 
       <div className='mt-4 space-y-3'>
-        <ValueBlock label='Env variable' value={row.envVarName} mono />
-        <ValueBlock label='Runtime env value' value={row.envWebhookId ?? 'not set'} mono />
-        <ValueBlock label='Latest DB value' value={row.dbWebhookId ?? 'not set'} mono />
-        <ValueBlock label='Webhook URL' value={row.webhookUrl ?? 'not set'} />
-        <ValueBlock label='Expected URL' value={row.expectedUrl ?? 'ngrok/custom target'} />
+        {valueBlocks.map((block) => (
+          <ValueBlock key={block.label} {...block} />
+        ))}
       </div>
 
       {row.dbWebhookId ? (
@@ -320,43 +361,16 @@ function WebhookBindingCard({
         </label>
 
         <div className='grid gap-2 sm:grid-cols-2'>
-          {canSyncEnvToDb ? (
-            <ActionButton
-              intent='sync_env_to_db'
-              pending={pending}
-              icon='sync'
-              label='Sync env to DB'
-            />
-          ) : null}
-          <ActionButton
-            intent='register'
-            pending={pending}
-            icon='register'
-            label='Register / Patch'
-          />
-          <ActionButton
-            intent='deactivate'
-            pending={pending}
-            icon='deactivate'
-            label='Disable DB'
-          />
+          {actions.map((action) => (
+            <ActionButton key={action.intent} {...action} pending={pending} />
+          ))}
         </div>
       </form>
     </AdminGlassPanel>
   );
 }
 
-function ActionButton({
-  icon,
-  intent,
-  label,
-  pending,
-}: {
-  icon: 'deactivate' | 'register' | 'sync';
-  intent: 'deactivate' | 'register' | 'sync_env_to_db';
-  label: string;
-  pending: boolean;
-}) {
+function ActionButton({ icon, intent, label, pending }: ActionButtonConfig & { pending: boolean }) {
   const Icon = icon === 'register' ? Webhook : icon === 'sync' ? Database : PowerOff;
 
   return (
@@ -380,49 +394,20 @@ function ActionButton({
   );
 }
 
-function MetricCard({
-  label,
-  tone,
-  value,
-}: {
-  label: string;
-  tone: 'amber' | 'cyan' | 'emerald' | 'rose';
-  value: string;
-}) {
-  const toneClass = {
-    amber: 'text-amber-100',
-    cyan: 'text-cyan-100',
-    emerald: 'text-emerald-100',
-    rose: 'text-rose-100',
-  }[tone];
-
+function MetricCard({ label, tone, value }: { label: string; tone: MetricTone; value: string }) {
   return (
     <AdminGlassPanel className='p-4'>
       <p className='text-xs uppercase tracking-[0.12em] text-slate-500'>{label}</p>
-      <p className={cn('mt-2 text-2xl font-semibold tracking-normal', toneClass)}>{value}</p>
+      <p className={cn('mt-2 text-2xl font-semibold tracking-normal', METRIC_TONE_CLASS[tone])}>
+        {value}
+      </p>
     </AdminGlassPanel>
   );
 }
 
-function StatusPill({
-  label,
-  tone,
-  value,
-}: {
-  label: string;
-  tone: 'amber' | 'cyan' | 'emerald' | 'rose' | 'slate';
-  value: string;
-}) {
-  const toneClass = {
-    amber: 'border-amber-300/20 bg-amber-300/10 text-amber-100',
-    cyan: 'border-cyan-300/20 bg-cyan-300/10 text-cyan-100',
-    emerald: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100',
-    rose: 'border-rose-300/20 bg-rose-300/10 text-rose-100',
-    slate: 'border-white/10 bg-white/[0.04] text-slate-300',
-  }[tone];
-
+function StatusPill({ label, tone, value }: StatusPillProps) {
   return (
-    <div className={cn('rounded-lg border px-3 py-2', toneClass)}>
+    <div className={cn('rounded-lg border px-3 py-2', STATUS_TONE_CLASS[tone])}>
       <span className='block text-[11px] uppercase tracking-[0.12em] opacity-70'>{label}</span>
       <span className='mt-1 block text-sm font-semibold'>{value}</span>
     </div>
@@ -430,19 +415,13 @@ function StatusPill({
 }
 
 function StatusIcon({ tone }: { tone: PayPalLedgerWebhookDashboardBinding['syncTone'] }) {
-  const className = {
-    amber: 'border-amber-300/20 bg-amber-300/10 text-amber-100',
-    emerald: 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100',
-    rose: 'border-rose-300/20 bg-rose-300/10 text-rose-100',
-    slate: 'border-white/10 bg-white/[0.04] text-slate-400',
-  }[tone];
   const Icon = tone === 'emerald' ? CheckCircle2 : tone === 'slate' ? Database : AlertTriangle;
 
   return (
     <span
       className={cn(
         'inline-flex h-10 w-10 items-center justify-center rounded-lg border',
-        className,
+        STATUS_TONE_CLASS[tone],
       )}
     >
       <Icon size={18} />
@@ -450,15 +429,7 @@ function StatusIcon({ tone }: { tone: PayPalLedgerWebhookDashboardBinding['syncT
   );
 }
 
-function ValueBlock({
-  label,
-  mono = false,
-  value,
-}: {
-  label: string;
-  mono?: boolean;
-  value: string;
-}) {
+function ValueBlock({ label, mono = false, value }: ValueBlockProps) {
   return (
     <div className='rounded-lg border border-white/10 bg-white/[0.03] p-3'>
       <div className='flex items-center gap-2 text-[11px] uppercase tracking-[0.12em] text-slate-500'>
