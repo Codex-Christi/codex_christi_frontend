@@ -12,6 +12,7 @@ import {
   type AdminScope,
   type AdminStatus,
 } from './admin-config';
+import { toAdminOpsLedgerUnavailableError } from './admin-ops-ledger-errors';
 import { getAdminRequestAuditContext, type AdminRequestAuditContext } from './admin-request-audit';
 
 const UNLOCK_WINDOW_MS = 15 * 60 * 1000;
@@ -104,11 +105,21 @@ const adminAuditLogSummarySelect = {
 } satisfies Prisma.AdminAuditLogSelect;
 
 export async function getActiveAdminUserByCodexUserId(codexUserId: string) {
-  const row = await getAdminOpsLedgerPrisma().adminUser.findUnique({
-    where: { codexUserId },
-  });
+  try {
+    const row = await getAdminOpsLedgerPrisma().adminUser.findUnique({
+      where: { codexUserId },
+    });
 
-  return normalizeAdminUserAuthRecord(row);
+    return normalizeAdminUserAuthRecord(row);
+  } catch (error) {
+    const unavailableError = toAdminOpsLedgerUnavailableError(error);
+
+    if (unavailableError) {
+      throw unavailableError;
+    }
+
+    throw error;
+  }
 }
 
 export async function touchAdminUserUnlockedAt(adminUserId: string) {
