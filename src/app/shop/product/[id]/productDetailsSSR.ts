@@ -32,7 +32,10 @@ export const storefrontSnapshotCacheSeconds = () => {
 // --- Fetch Base Product Info ---
 export const fetchBaseProduct = cache((externalProductID: string) => {
   return (async () => {
-    const snapshot = await getBasicProductSnapshotState(externalProductID);
+    const snapshot = await getBasicProductSnapshotState(externalProductID).catch((err) => {
+      console.warn('[storefrontSnapshot] product snapshot read failed:', err);
+      return null;
+    });
     if (snapshot?.isFresh) {
       return snapshot.product;
     }
@@ -67,7 +70,10 @@ export const fetchBaseProduct = cache((externalProductID: string) => {
 
 export const fetchProductVariants = cache((productIDorSlug: string) => {
   return (async () => {
-    const snapshot = await getProductVariantsSnapshotState(productIDorSlug);
+    const snapshot = await getProductVariantsSnapshotState(productIDorSlug).catch((err) => {
+      console.warn('[storefrontSnapshot] variants snapshot read failed:', err);
+      return null;
+    });
     if (snapshot?.isFresh) {
       return snapshot.variants;
     }

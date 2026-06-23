@@ -8,6 +8,8 @@ import {
   normalizeStorefrontCategorySlug,
 } from '@/lib/merchizeStorefront/snapshot';
 import { STOREFRONT_SNAPSHOT_CATEGORY_SLUGS } from '@/lib/merchizeStorefront/categories';
+import { readCategorySeoManifestEntry } from '@/lib/shop/seoManifest/read';
+import type { CategorySeoManifestEntry } from '@/lib/shop/seoManifest/types';
 
 const ProductList = dynamic(
   () =>
@@ -44,52 +46,123 @@ function isPublishedCategory(categoryName: string) {
   return STOREFRONT_SNAPSHOT_CATEGORY_SLUGS.some((slug) => slug === categorySlug);
 }
 
+function toCategoryMetadata({
+  categoryName,
+  page,
+  name,
+  description,
+  coverUrl,
+  shouldIndex,
+}: {
+  categoryName: string;
+  page: number;
+  name: string;
+  description: string;
+  coverUrl: string | null | undefined;
+  shouldIndex: boolean;
+}): Metadata {
+  const title =
+    page > 1 ? `${name} - Page ${page} | ${SHOP_SITE_NAME}` : `${name} | ${SHOP_SITE_NAME}`;
+  const urlSuffix = page > 1 ? `/page/${page}` : '';
+
+  return {
+    title,
+    description,
+    ...(shouldIndex ? {} : { robots: { index: false, follow: false } }),
+    openGraph: {
+      title,
+      description,
+      ...(coverUrl ? { images: [{ url: coverUrl }] } : {}),
+      type: 'website',
+      url: getShopSiteUrl(`/category/${categoryName}${urlSuffix}`),
+      locale: 'en_US',
+      siteName: SHOP_SITE_NAME,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      ...(coverUrl ? { images: coverUrl } : {}),
+    },
+  };
+}
+
+function toCategoryMetadataFromManifest(
+  entry: CategorySeoManifestEntry,
+  categoryName: string,
+  page: number,
+): Metadata {
+  return toCategoryMetadata({
+    categoryName,
+    page,
+    name: entry.name,
+    description: entry.description,
+    coverUrl: entry.cover,
+    shouldIndex: true,
+  });
+}
+
+async function getDevLiveCategoryMetadata(categoryName: string) {
+  if (process.env.NODE_ENV === 'production') return null;
+
+  try {
+    return await getCategoryMetadataFromMerchize(categoryName);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn('[category.generateMetadata] dev live metadata fetch failed:', message);
+    return null;
+  }
+}
+
 export async function generateCategoryPageMetadata(
   categoryName: string,
   page = 1,
 ): Promise<Metadata> {
-  // Keep route metadata off Merchize; publishable SEO data must be warmed into snapshots.
+  const manifestEntry = await readCategorySeoManifestEntry(categoryName).catch((err) => {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.warn('[category.generateMetadata] manifest metadata lookup failed:', errorMessage);
+    return null;
+  });
+  if (manifestEntry) return toCategoryMetadataFromManifest(manifestEntry, categoryName, page);
+
   const categoryMetaData = await getCategoryMetadataFromSnapshot(categoryName).catch((err) => {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.warn('[category.generateMetadata] snapshot metadata lookup failed:', errorMessage);
     return null;
   });
 
-  const { cover, description, name } = categoryMetaData ?? fallbackCategoryMetadata(categoryName);
-  const shouldIndex = Boolean(categoryMetaData) || isPublishedCategory(categoryName);
-  const title =
-    page > 1 ? `${name} - Page ${page} | ${SHOP_SITE_NAME}` : `${name} | ${SHOP_SITE_NAME}`;
-  const urlSuffix = page > 1 ? `/page/${page}` : '';
-
-  try {
-    return {
-      title,
-      description,
-      ...(shouldIndex ? {} : { robots: { index: false, follow: false } }),
-      openGraph: {
-        title,
-        description,
-        ...(cover ? { images: [{ url: cover.url }] } : {}),
-        type: 'website',
-        url: getShopSiteUrl(`/category/${categoryName}${urlSuffix}`),
-        locale: 'en_US',
-        siteName: SHOP_SITE_NAME,
-      },
-      twitter: {
-        card: 'summary_large_image',
-        title,
-        description,
-        ...(cover ? { images: cover.url } : {}),
-      },
-    };
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    console.warn('[category.generateMetadata] metadata build failed:', errorMessage);
-    return {
-      title,
-      description,
-    };
+  if (categoryMetaData) {
+    return toCategoryMetadata({
+      categoryName,
+      page,
+      name: categoryMetaData.name,
+      description: categoryMetaData.description,
+      coverUrl: categoryMetaData.cover?.url,
+      shouldIndex: true,
+    });
   }
+
+  const devLiveCategoryMetaData = await getDevLiveCategoryMetadata(categoryName);
+  if (devLiveCategoryMetaData) {
+    return toCategoryMetadata({
+      categoryName,
+      page,
+      name: devLiveCategoryMetaData.name,
+      description: devLiveCategoryMetaData.description,
+      coverUrl: devLiveCategoryMetaData.cover?.url,
+      shouldIndex: true,
+    });
+  }
+
+  const fallback = fallbackCategoryMetadata(categoryName);
+  return toCategoryMetadata({
+    categoryName,
+    page,
+    name: fallback.name,
+    description: fallback.description,
+    coverUrl: null,
+    shouldIndex: isPublishedCategory(categoryName),
+  });
 }
 
 async function getCategoryPageData(categoryName: string, page: number, productLimit: number) {

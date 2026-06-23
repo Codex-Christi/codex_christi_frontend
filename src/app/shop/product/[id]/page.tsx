@@ -1,16 +1,20 @@
 import ProductDetailsShell from '@/components/UI/Shop/ProductDetails/ProductDetailsShell';
 import { Metadata } from 'next';
-import { getProductMetaDataOnly } from './productDetailsSSR';
+import { getProductMetaDataOnly, merchizeAPIKey, merchizeBaseURL } from './productDetailsSSR';
 import { notFound } from 'next/navigation';
 import serialize from 'serialize-javascript';
 import { extractProductMetaDescriptionFromHtml } from '@/lib/utils/extract-plain-text-from-html';
 import { getBasicProductFromSnapshot } from '@/lib/merchizeStorefront/snapshot';
+import { fetchMerchizeJson } from '@/lib/merchizeStorefront/providerErrors';
+import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
 import {
   ProductDescriptionSection,
   ProductFeedbackSection,
 } from '@/components/UI/Shop/ProductDetails/ProductStaticSections';
 import { getShopSiteUrl } from '@/lib/siteBaseUrls';
 import { getPublishedShopProductPreview } from '@/lib/utils/shopHomePageProductsData';
+import { readProductSeoManifestEntry } from '@/lib/shop/seoManifest/read';
+import type { ProductSeoManifestEntry } from '@/lib/shop/seoManifest/types';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -81,51 +85,121 @@ function getSnapshotMissProductMetadata(productId: string): Metadata {
   };
 }
 
+function toProductMetadata({
+  productId,
+  title,
+  description,
+  image,
+  price,
+}: {
+  productId: string;
+  title: string;
+  description: string;
+  image: string | null | undefined;
+  price: string | number | null | undefined;
+}): Metadata {
+  const imageUrl = resolveProductImageUrl(image);
+  const priceAmount = price === null || price === undefined ? null : price.toString();
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      ...(imageUrl ? { images: [{ url: imageUrl }] } : {}),
+      url: getShopSiteUrl(`/product/${productId}`),
+      locale: 'en_US',
+      siteName: SHOP_SITE_NAME,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      ...(imageUrl ? { images: imageUrl } : {}),
+    },
+    other: {
+      'og:type': 'product',
+      ...(priceAmount ? { 'og:product:price:amount': priceAmount } : {}),
+      'og:product:price:currency': 'USD',
+    },
+  };
+}
+
+function toProductMetadataFromManifest(entry: ProductSeoManifestEntry): Metadata {
+  return toProductMetadata({
+    productId: entry.id,
+    title: `${entry.title} | ${SHOP_SITE_NAME}`,
+    description: entry.description,
+    image: entry.image,
+    price: entry.price,
+  });
+}
+
+async function getDevLiveProductMetadata(productId: string) {
+  if (process.env.NODE_ENV === 'production') return null;
+
+  try {
+    const json = await fetchMerchizeJson<BasicProductInterface>(
+      `${merchizeBaseURL}/product/products/${productId}`,
+      {
+        headers: {
+          'X-API-KEY': `${merchizeAPIKey}`,
+        },
+      },
+    );
+    return json.data;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn('[product.generateMetadata] dev live metadata fetch failed:', message);
+    return null;
+  }
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
 
-  try {
-    // Keep route metadata off Merchize; publishable SEO data must be warmed into snapshots.
-    const productMetaData = await getBasicProductFromSnapshot(id);
-    if (!productMetaData) return getSnapshotMissProductMetadata(id);
+  const manifestEntry = await readProductSeoManifestEntry(id).catch((err) => {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.warn('[product.generateMetadata] manifest metadata lookup failed:', errorMessage);
+    return null;
+  });
+  if (manifestEntry) return toProductMetadataFromManifest(manifestEntry);
 
-    const firstImageUrl = resolveProductImageUrl(productMetaData.image);
-
-    const title = `${productMetaData.title} | ${SHOP_SITE_NAME}`;
-    const description = extractProductMetaDescriptionFromHtml(
-      productMetaData.description,
-      productMetaData.title,
-    );
-
-    return {
-      title: title,
-      description: description,
-      openGraph: {
-        title: title,
-        description: description,
-        ...(firstImageUrl ? { images: [{ url: firstImageUrl }] } : {}),
-        url: getShopSiteUrl(`/product/${id}`),
-        locale: 'en_US',
-        siteName: SHOP_SITE_NAME,
-      },
-      twitter: {
-        card: 'summary_large_image',
-        title: title,
-        description: description,
-        ...(firstImageUrl ? { images: firstImageUrl } : {}),
-      },
-      other: {
-        'og:type': 'product', // Manually add the custom og:type
-        'og:product:price:amount': productMetaData.retail_price.toString(),
-        'og:product:price:currency': 'USD',
-        // Add other product-specific tags as needed
-      },
-    };
-  } catch (err) {
+  const productMetaData = await getBasicProductFromSnapshot(id).catch((err) => {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.warn('[product.generateMetadata] snapshot metadata lookup failed:', errorMessage);
-    return getSnapshotMissProductMetadata(id);
+    return null;
+  });
+
+  if (productMetaData) {
+    return toProductMetadata({
+      productId: id,
+      title: `${productMetaData.title} | ${SHOP_SITE_NAME}`,
+      description: extractProductMetaDescriptionFromHtml(
+        productMetaData.description,
+        productMetaData.title,
+      ),
+      image: productMetaData.image,
+      price: productMetaData.retail_price,
+    });
   }
+
+  const liveProductMetaData = await getDevLiveProductMetadata(id);
+  if (liveProductMetaData) {
+    return toProductMetadata({
+      productId: id,
+      title: `${liveProductMetaData.title} | ${SHOP_SITE_NAME}`,
+      description: extractProductMetaDescriptionFromHtml(
+        liveProductMetaData.description,
+        liveProductMetaData.title,
+      ),
+      image: liveProductMetaData.image,
+      price: liveProductMetaData.retail_price,
+    });
+  }
+
+  return getSnapshotMissProductMetadata(id);
 }
 
 // ✅ 2. Main component for the product details page

@@ -69,7 +69,10 @@ function normalizeCategoryProductImage(product: CategoryProductDetail): Category
 
 // Get category's ID from Merchize
 const getCategoryIDFromMerchize = cache(async (categoryName: string) => {
-  const snapshotCategoryID = await getCategoryIdFromSnapshot(categoryName);
+  const snapshotCategoryID = await getCategoryIdFromSnapshot(categoryName).catch((err) => {
+    console.warn('[storefrontSnapshot] category id snapshot read failed:', err);
+    return null;
+  });
   if (snapshotCategoryID) return snapshotCategoryID;
 
   try {
@@ -100,7 +103,10 @@ const getCategoryIDFromMerchize = cache(async (categoryName: string) => {
 
 // Get tCategory's Metadata from Merchize
 export const getCategoryMetadataFromMerchize = cache(async (categoryName: string) => {
-  const snapshotState = await getCategoryMetadataSnapshotState(categoryName);
+  const snapshotState = await getCategoryMetadataSnapshotState(categoryName).catch((err) => {
+    console.warn('[storefrontSnapshot] category metadata snapshot read failed:', err);
+    return null;
+  });
   if (snapshotState?.isFresh) return snapshotState.category;
 
   try {
@@ -188,7 +194,12 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
   // const skip = (page - 1) * limit;
 
   if (!forceSnapshotRefresh) {
-    const snapshot = await getCategoryProductsSnapshotState({ category, page, page_size });
+    const snapshot = await getCategoryProductsSnapshotState({ category, page, page_size }).catch(
+      (err) => {
+        console.warn('[storefrontSnapshot] category products snapshot read failed:', err);
+        return null;
+      },
+    );
     if (snapshot?.isFresh) return snapshot.products;
   }
 

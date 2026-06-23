@@ -14,6 +14,8 @@ import {
 import { fetchBaseProduct } from '@/app/shop/product/[id]/productDetailsSSR';
 import { getCategoryPagePath } from '@/lib/utils/shop/categoryPagePath';
 import { PUBLISHED_SHOP_PRODUCT_IDS } from '@/lib/utils/shopHomePageProductsData';
+import { generateShopSeoManifest } from '@/lib/shop/seoManifest/generate';
+import { readShopSeoManifestStats } from '@/lib/shop/seoManifest/read';
 
 // const v = await merchizeCatalogPrisma.variant.findUnique({
 //   where: { sku: 'FBJSVN000000AA02' },
@@ -32,7 +34,7 @@ import { PUBLISHED_SHOP_PRODUCT_IDS } from '@/lib/utils/shopHomePageProductsData
 export async function getStorefrontSnapshotStats() {
   await requireAdminAction('shop.view');
 
-  const [productCount, categoryCount, variantAgg, latestProduct, latestCategory] =
+  const [productCount, categoryCount, variantAgg, latestProduct, latestCategory, seoManifest] =
     await Promise.all([
       merchizeCatalogPrisma.storefrontProductSnapshot.count(),
       merchizeCatalogPrisma.storefrontCategorySnapshot.count(),
@@ -47,6 +49,10 @@ export async function getStorefrontSnapshotStats() {
         orderBy: { lastSuccessfulFetchAt: 'desc' },
         select: { lastSuccessfulFetchAt: true },
       }),
+      readShopSeoManifestStats().catch((err) => {
+        console.warn('[shopSeoManifest] stats read failed:', err);
+        return null;
+      }),
     ]);
 
   return {
@@ -56,6 +62,15 @@ export async function getStorefrontSnapshotStats() {
     lastProductSnapshotAt: latestProduct?.lastSeenAt ?? null,
     lastCategorySnapshotAt: latestCategory?.lastSuccessfulFetchAt ?? null,
     ttlDays: process.env.MERCHIZE_STOREFRONT_SNAPSHOT_TTL_DAYS ?? '1',
+    seoManifest: seoManifest ?? {
+      activeGeneration: null,
+      generatedAt: null,
+      productCount: 0,
+      categoryCount: 0,
+      missingPublishedProductIds: [],
+      missingCategorySlugs: [],
+      manifestPath: '',
+    },
   };
 }
 
@@ -199,13 +214,31 @@ export async function refreshStorefrontSnapshotsAction() {
     }
   }
 
-  const stats = await getStorefrontSnapshotStats();
+  const seoManifest = await generateShopSeoManifest().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[shopSeoManifest.generate.afterSnapshotRefresh.failed]', { message });
+
+    return {
+      ok: false as const,
+      activeGeneration: null,
+      generatedAt: null,
+      productCount: 0,
+      categoryCount: 0,
+      missingPublishedProductIds: [],
+      missingCategorySlugs: [],
+      manifestPath: '',
+      affectedRoutes: [],
+      error: message,
+    };
+  });
   const revalidatedPaths = revalidateStorefrontSnapshotPaths({
     categoryTotalPages,
     productIds,
+    extraPaths: seoManifest.affectedRoutes,
   });
+  const stats = await getStorefrontSnapshotStats();
   const result = {
-    ok: failures.length === 0 && productSnapshotFailures.length === 0,
+    ok: failures.length === 0 && productSnapshotFailures.length === 0 && seoManifest.ok,
     productsSeen,
     pagesFetched,
     publishedProductsAttempted: PUBLISHED_SHOP_PRODUCT_IDS.length,
@@ -213,6 +246,7 @@ export async function refreshStorefrontSnapshotsAction() {
     categoriesAttempted: STOREFRONT_SNAPSHOT_CATEGORY_SLUGS.length,
     failures,
     stats,
+    seoManifest,
     revalidatedPaths,
   };
 
@@ -224,6 +258,13 @@ export async function refreshStorefrontSnapshotsAction() {
     publishedProductsAttempted: result.publishedProductsAttempted,
     failures: result.failures.map((failure) => failure.category),
     productSnapshotFailures: result.productSnapshotFailures.map((failure) => failure.productId),
+    seoManifest: {
+      ok: result.seoManifest.ok,
+      productCount: result.seoManifest.productCount,
+      categoryCount: result.seoManifest.categoryCount,
+      missingPublishedProductIds: result.seoManifest.missingPublishedProductIds,
+      missingCategorySlugs: result.seoManifest.missingCategorySlugs,
+    },
     revalidatedPaths: result.revalidatedPaths.length,
     elapsedMs: Date.now() - refreshStartedAt,
   });
@@ -234,11 +275,13 @@ export async function refreshStorefrontSnapshotsAction() {
 function revalidateStorefrontSnapshotPaths({
   categoryTotalPages,
   productIds,
+  extraPaths = [],
 }: {
   categoryTotalPages: Map<string, number>;
   productIds: Set<string>;
+  extraPaths?: string[];
 }) {
-  const paths = new Set<string>(['/shop']);
+  const paths = new Set<string>(['/shop', ...extraPaths]);
 
   for (const [category, totalPages] of categoryTotalPages) {
     const safeTotalPages = Math.max(1, totalPages);
@@ -256,6 +299,55 @@ function revalidateStorefrontSnapshotPaths({
   }
 
   return [...paths];
+}
+
+export async function generateShopSeoManifestAction() {
+  const admin = await requireAdminAction('shop.catalog.refresh');
+  await writeAdminAuditLog({
+    actor: admin,
+    action: 'shop.catalog.generate_seo_manifest',
+    outcome: 'started',
+  });
+
+  try {
+    const result = await generateShopSeoManifest();
+    const revalidatedPaths = revalidatePaths(result.affectedRoutes);
+    const stats = await getStorefrontSnapshotStats();
+
+    return {
+      ...result,
+      stats,
+      revalidatedPaths,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[shopSeoManifest.generateAction.failed]', { message });
+
+    return {
+      ok: false as const,
+      error: message,
+      activeGeneration: null,
+      generatedAt: null,
+      productCount: 0,
+      categoryCount: 0,
+      missingPublishedProductIds: [],
+      missingCategorySlugs: [],
+      manifestPath: '',
+      affectedRoutes: [],
+      stats: await getStorefrontSnapshotStats(),
+      revalidatedPaths: [],
+    };
+  }
+}
+
+function revalidatePaths(paths: string[]) {
+  const uniquePaths = [...new Set(['/shop', ...paths])];
+
+  for (const path of uniquePaths) {
+    revalidatePath(path);
+  }
+
+  return uniquePaths;
 }
 
 export async function searchPriceShippingCatalogBySku(query: string) {

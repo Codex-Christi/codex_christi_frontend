@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useTransition, type ReactNode } from 'react';
-import { ArrowRight, Database, RefreshCw, Search, Store } from 'lucide-react';
+import { ArrowRight, Database, FileText, RefreshCw, Search, Store } from 'lucide-react';
 import AdminGlassPanel from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import type {
   SyncState,
@@ -10,6 +10,7 @@ import type {
   ShippingBand,
 } from '@/lib/prisma/shop/merchize/generated/merchizeCatalog/client';
 import {
+  generateShopSeoManifestAction,
   refreshPriceShippingCatalogAction,
   refreshStorefrontSnapshotsAction,
   searchPriceShippingCatalogBySku,
@@ -48,6 +49,15 @@ type StorefrontSnapshotStats = {
   lastProductSnapshotAt: Date | null;
   lastCategorySnapshotAt: Date | null;
   ttlDays: string;
+  seoManifest: {
+    activeGeneration: string | null;
+    generatedAt: string | null;
+    productCount: number;
+    categoryCount: number;
+    missingPublishedProductIds: string[];
+    missingCategorySlugs: string[];
+    manifestPath: string;
+  };
 };
 
 type StatusState =
@@ -144,7 +154,10 @@ export default function MerchizeCatalogSnapshotsAdminClient({
         const revalidationText = res.revalidatedPaths.length
           ? ` Revalidated public paths: ${res.revalidatedPaths.length}.`
           : '';
-        const msg = `Storefront snapshots refreshed. Pages: ${res.pagesFetched}, products seen: ${res.productsSeen}, published products attempted: ${res.publishedProductsAttempted}.${revalidationText}${failureText}${productFailureText}`;
+        const seoManifestText = res.seoManifest.ok
+          ? ` SEO manifest: ${res.seoManifest.productCount} products, ${res.seoManifest.categoryCount} categories.`
+          : ` SEO manifest needs attention: ${res.seoManifest.productCount} products, ${res.seoManifest.categoryCount} categories.`;
+        const msg = `Storefront snapshots refreshed. Pages: ${res.pagesFetched}, products seen: ${res.productsSeen}, published products attempted: ${res.publishedProductsAttempted}.${seoManifestText}${revalidationText}${failureText}${productFailureText}`;
 
         setStatus({
           type: res.ok ? 'success' : 'error',
@@ -162,6 +175,50 @@ export default function MerchizeCatalogSnapshotsAdminClient({
         const message = e instanceof Error ? e.message : 'Storefront snapshot refresh failed.';
         setStatus({ type: 'error', message });
         showErrorToast({ header: 'Storefront snapshot refresh error', message });
+      }
+    });
+  };
+
+  const handleSeoManifestGenerateConfirmed = () => {
+    startTransition(async () => {
+      setRefreshProgress(10);
+      setStatus({ type: 'loading', message: 'Generating SEO manifest…' });
+      const loadID = showLoadingToast({ message: 'Generating SEO manifest…' });
+
+      try {
+        const res = await generateShopSeoManifestAction();
+        toast.dismiss(loadID);
+        setStorefrontSnapshotStats(res.stats);
+        setRefreshProgress(100);
+
+        const missingProductsText = res.missingPublishedProductIds.length
+          ? ` Missing products: ${res.missingPublishedProductIds.join(', ')}.`
+          : '';
+        const missingCategoriesText = res.missingCategorySlugs.length
+          ? ` Missing categories: ${res.missingCategorySlugs.join(', ')}.`
+          : '';
+        const errorText = 'error' in res && res.error ? ` ${res.error}` : '';
+        const revalidationText = res.revalidatedPaths.length
+          ? ` Revalidated public paths: ${res.revalidatedPaths.length}.`
+          : '';
+        const msg = `SEO manifest generated. Products: ${res.productCount}, categories: ${res.categoryCount}.${revalidationText}${missingProductsText}${missingCategoriesText}${errorText}`;
+
+        setStatus({
+          type: res.ok ? 'success' : 'error',
+          message: msg,
+        });
+
+        if (res.ok) {
+          showSuccessToast({ header: 'SEO manifest generated', message: msg });
+        } else {
+          showErrorToast({ header: 'SEO manifest needs attention', message: msg });
+        }
+      } catch (e: unknown) {
+        toast.dismiss(loadID);
+        setRefreshProgress(0);
+        const message = e instanceof Error ? e.message : 'SEO manifest generation failed.';
+        setStatus({ type: 'error', message });
+        showErrorToast({ header: 'SEO manifest generation error', message });
       }
     });
   };
@@ -212,6 +269,9 @@ export default function MerchizeCatalogSnapshotsAdminClient({
   }`;
   const lastProductSnapshot = formatAdminDate(storefrontSnapshotStats.lastProductSnapshotAt);
   const lastCategorySnapshot = formatAdminDate(storefrontSnapshotStats.lastCategorySnapshotAt);
+  const lastSeoManifest = storefrontSnapshotStats.seoManifest.generatedAt
+    ? formatAdminDate(new Date(storefrontSnapshotStats.seoManifest.generatedAt))
+    : 'Never';
 
   const handleClearSearch = () => {
     setSearchTerm('');
@@ -234,13 +294,17 @@ export default function MerchizeCatalogSnapshotsAdminClient({
             unavailable.
           </p>
 
-          <div className='mt-5 grid gap-3 text-xs sm:grid-cols-3'>
+          <div className='mt-5 grid gap-3 text-xs sm:grid-cols-4'>
             <MiniStatus
               label='Catalog sync'
               value={lastSuccess === 'Never' ? 'Pending' : 'Ready'}
             />
             <MiniStatus label='Storefront TTL' value={snapshotTtlLabel} />
             <MiniStatus label='SQLite source' value='merchize_catalog' />
+            <MiniStatus
+              label='SEO manifest'
+              value={storefrontSnapshotStats.seoManifest.generatedAt ? 'Ready' : 'Missing'}
+            />
           </div>
         </AdminGlassPanel>
 
@@ -264,6 +328,16 @@ export default function MerchizeCatalogSnapshotsAdminClient({
             description='This refreshes the category and product data used by public storefront pages when Merchize is unavailable, then revalidates the affected shop, category, and product pages.'
             confirmText='Refresh snapshots'
             onConfirm={handleStorefrontSnapshotsRefreshConfirmed}
+          />
+          <RefreshConfirmationDialog
+            disabled={working}
+            icon={<FileText size={16} />}
+            buttonText='Generate SEO manifest'
+            helperText='Merchize product/category metadata shards'
+            title='Generate SEO manifest?'
+            description='This derives small local SEO metadata shards from storefront snapshots, then revalidates affected public shop routes.'
+            confirmText='Generate manifest'
+            onConfirm={handleSeoManifestGenerateConfirmed}
           />
         </div>
       </section>
@@ -310,6 +384,23 @@ export default function MerchizeCatalogSnapshotsAdminClient({
         <StatTile label='Product snapshot' value={lastProductSnapshot} />
         <StatTile label='Category snapshot' value={lastCategorySnapshot} />
         <StatTile label='Snapshot TTL' value={snapshotTtlLabel} />
+        <StatTile label='SEO manifest' value={lastSeoManifest} />
+        <StatTile
+          label='SEO product shards'
+          value={storefrontSnapshotStats.seoManifest.productCount}
+        />
+        <StatTile
+          label='SEO category shards'
+          value={storefrontSnapshotStats.seoManifest.categoryCount}
+        />
+        <StatTile
+          label='SEO missing products'
+          value={storefrontSnapshotStats.seoManifest.missingPublishedProductIds.length}
+        />
+        <StatTile
+          label='SEO missing categories'
+          value={storefrontSnapshotStats.seoManifest.missingCategorySlugs.length}
+        />
       </section>
 
       <AdminGlassPanel className='overflow-hidden'>
