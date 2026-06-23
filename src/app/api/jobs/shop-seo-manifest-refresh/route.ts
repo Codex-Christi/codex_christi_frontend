@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { generateShopSeoManifest } from '@/lib/shop/seoManifest/generate';
+import {
+  ShopSeoManifestGenerationLockError,
+  generateShopSeoManifest,
+} from '@/lib/shop/seoManifest/generate';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,6 +26,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result, { status: result.ok ? 200 : 207 });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof ShopSeoManifestGenerationLockError) {
+      return NextResponse.json({ ok: false, error: message }, { status: 409 });
+    }
+
     console.error('[shopSeoManifest.cron.failed]', { error: message });
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }

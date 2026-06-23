@@ -70,6 +70,9 @@ export async function getStorefrontSnapshotStats() {
       missingPublishedProductIds: [],
       missingCategorySlugs: [],
       manifestPath: '',
+      retainedGenerationCount: 0,
+      lastPrunedGenerationCount: 0,
+      warnings: [],
     },
   };
 }
@@ -227,6 +230,10 @@ export async function refreshStorefrontSnapshotsAction() {
       missingPublishedProductIds: [],
       missingCategorySlugs: [],
       manifestPath: '',
+      retainedGenerationCount: 0,
+      lastPrunedGenerationCount: 0,
+      warnings: [],
+      prunedGenerations: [],
       affectedRoutes: [],
       error: message,
     };
@@ -264,6 +271,11 @@ export async function refreshStorefrontSnapshotsAction() {
       categoryCount: result.seoManifest.categoryCount,
       missingPublishedProductIds: result.seoManifest.missingPublishedProductIds,
       missingCategorySlugs: result.seoManifest.missingCategorySlugs,
+      prunedGenerations:
+        'prunedGenerations' in result.seoManifest
+          ? result.seoManifest.prunedGenerations.length
+          : 0,
+      warnings: result.seoManifest.warnings.length,
     },
     revalidatedPaths: result.revalidatedPaths.length,
     elapsedMs: Date.now() - refreshStartedAt,
@@ -333,6 +345,10 @@ export async function generateShopSeoManifestAction() {
       missingPublishedProductIds: [],
       missingCategorySlugs: [],
       manifestPath: '',
+      retainedGenerationCount: 0,
+      lastPrunedGenerationCount: 0,
+      warnings: [],
+      prunedGenerations: [],
       affectedRoutes: [],
       stats: await getStorefrontSnapshotStats(),
       revalidatedPaths: [],

@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import {
   getCategorySeoManifestPath,
   getProductSeoManifestPath,
+  getShopSeoManifestGenerationsRoot,
   getShopSeoManifestIndexPath,
   getShopSeoManifestRoot,
 } from './paths';
@@ -38,6 +39,7 @@ export async function readCategorySeoManifestEntry(categorySlug: string) {
 
 export async function readShopSeoManifestStats(): Promise<ShopSeoManifestStats> {
   const index = await readShopSeoManifestIndex();
+  const retainedGenerationCount = await countRetainedGenerations().catch(() => 0);
 
   return {
     activeGeneration: index?.activeGeneration ?? null,
@@ -47,6 +49,10 @@ export async function readShopSeoManifestStats(): Promise<ShopSeoManifestStats> 
     missingPublishedProductIds: index?.missingPublishedProductIds ?? [],
     missingCategorySlugs: index?.missingCategorySlugs ?? [],
     manifestPath: getShopSeoManifestRoot(),
+    retainedGenerationCount:
+      index?.retainedGenerationCount ?? retainedGenerationCount,
+    lastPrunedGenerationCount: index?.lastPrunedGenerationCount ?? 0,
+    warnings: Array.isArray(index?.warnings) ? index.warnings : [],
   };
 }
 
@@ -62,6 +68,14 @@ async function readJsonFile<T>(filePath: string): Promise<T | null> {
     if (isFileNotFound(error)) return null;
     throw error;
   }
+}
+
+async function countRetainedGenerations() {
+  const entries = await fs.readdir(getShopSeoManifestGenerationsRoot(), {
+    withFileTypes: true,
+  });
+
+  return entries.filter((entry) => entry.isDirectory()).length;
 }
 
 function isFileNotFound(error: unknown) {

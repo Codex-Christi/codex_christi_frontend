@@ -3,6 +3,15 @@ export const SHOP_SEO_MANIFEST_PROVIDER_MERCHIZE = 'merchize';
 
 export type ShopSeoManifestSource = 'snapshot' | 'published_fallback' | 'category_fallback';
 export type ShopSeoManifestProvider = typeof SHOP_SEO_MANIFEST_PROVIDER_MERCHIZE;
+export type ShopSeoManifestWarningCode =
+  | 'stale_lock_reclaimed'
+  | 'generation_prune_failed'
+  | 'temp_generation_prune_failed';
+
+export type ShopSeoManifestWarning = {
+  code: ShopSeoManifestWarningCode;
+  message: string;
+};
 
 export type ProductSeoManifestEntry = {
   schemaVersion: typeof SHOP_SEO_MANIFEST_SCHEMA_VERSION;
@@ -41,6 +50,9 @@ export type ShopSeoManifestIndex = {
   categoryCount: number;
   missingPublishedProductIds: string[];
   missingCategorySlugs: string[];
+  retainedGenerationCount: number;
+  lastPrunedGenerationCount: number;
+  warnings: ShopSeoManifestWarning[];
 };
 
 export type ShopSeoManifestStats = {
@@ -51,9 +63,13 @@ export type ShopSeoManifestStats = {
   missingPublishedProductIds: string[];
   missingCategorySlugs: string[];
   manifestPath: string;
+  retainedGenerationCount: number;
+  lastPrunedGenerationCount: number;
+  warnings: ShopSeoManifestWarning[];
 };
 
 export type ShopSeoManifestGenerationResult = ShopSeoManifestStats & {
   ok: boolean;
   affectedRoutes: string[];
+  prunedGenerations: string[];
 };

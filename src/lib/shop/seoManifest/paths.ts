@@ -17,8 +17,20 @@ export function getShopSeoManifestIndexPath() {
   return path.join(SHOP_SEO_MANIFEST_ROOT, 'manifest-index.json');
 }
 
+export function getShopSeoManifestGenerationsRoot() {
+  return path.join(SHOP_SEO_MANIFEST_ROOT, 'generations');
+}
+
 export function getShopSeoManifestGenerationPath(generation: string) {
-  return path.join(SHOP_SEO_MANIFEST_ROOT, 'generations', generation);
+  return path.join(getShopSeoManifestGenerationsRoot(), generation);
+}
+
+export function getShopSeoManifestLocksRoot() {
+  return path.join(SHOP_SEO_MANIFEST_ROOT, 'locks');
+}
+
+export function getShopSeoManifestGenerationLockPath() {
+  return path.join(getShopSeoManifestLocksRoot(), 'merchize-seo-manifest-generation.lock');
 }
 
 export function getProductSeoManifestPath(generation: string, productId: string) {

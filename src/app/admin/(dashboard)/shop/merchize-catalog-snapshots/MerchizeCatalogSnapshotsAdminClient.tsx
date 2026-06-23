@@ -57,6 +57,9 @@ type StorefrontSnapshotStats = {
     missingPublishedProductIds: string[];
     missingCategorySlugs: string[];
     manifestPath: string;
+    retainedGenerationCount: number;
+    lastPrunedGenerationCount: number;
+    warnings: Array<{ code: string; message: string }>;
   };
 };
 
@@ -157,7 +160,16 @@ export default function MerchizeCatalogSnapshotsAdminClient({
         const seoManifestText = res.seoManifest.ok
           ? ` SEO manifest: ${res.seoManifest.productCount} products, ${res.seoManifest.categoryCount} categories.`
           : ` SEO manifest needs attention: ${res.seoManifest.productCount} products, ${res.seoManifest.categoryCount} categories.`;
-        const msg = `Storefront snapshots refreshed. Pages: ${res.pagesFetched}, products seen: ${res.productsSeen}, published products attempted: ${res.publishedProductsAttempted}.${seoManifestText}${revalidationText}${failureText}${productFailureText}`;
+        const seoManifestWarningText = res.seoManifest.warnings.length
+          ? ` SEO manifest warnings: ${res.seoManifest.warnings
+              .map((warning) => warning.message)
+              .join(' ')}`
+          : '';
+        const seoManifestPrunedText =
+          'prunedGenerations' in res.seoManifest && res.seoManifest.prunedGenerations.length
+            ? ` Pruned SEO generations: ${res.seoManifest.prunedGenerations.length}.`
+            : '';
+        const msg = `Storefront snapshots refreshed. Pages: ${res.pagesFetched}, products seen: ${res.productsSeen}, published products attempted: ${res.publishedProductsAttempted}.${seoManifestText}${seoManifestPrunedText}${seoManifestWarningText}${revalidationText}${failureText}${productFailureText}`;
 
         setStatus({
           type: res.ok ? 'success' : 'error',
@@ -198,10 +210,17 @@ export default function MerchizeCatalogSnapshotsAdminClient({
           ? ` Missing categories: ${res.missingCategorySlugs.join(', ')}.`
           : '';
         const errorText = 'error' in res && res.error ? ` ${res.error}` : '';
+        const warningText = res.warnings.length
+          ? ` Warnings: ${res.warnings.map((warning) => warning.message).join(' ')}`
+          : '';
+        const prunedText =
+          'prunedGenerations' in res && res.prunedGenerations.length
+            ? ` Pruned old generations: ${res.prunedGenerations.length}.`
+            : '';
         const revalidationText = res.revalidatedPaths.length
           ? ` Revalidated public paths: ${res.revalidatedPaths.length}.`
           : '';
-        const msg = `SEO manifest generated. Products: ${res.productCount}, categories: ${res.categoryCount}.${revalidationText}${missingProductsText}${missingCategoriesText}${errorText}`;
+        const msg = `SEO manifest generated. Products: ${res.productCount}, categories: ${res.categoryCount}.${prunedText}${warningText}${revalidationText}${missingProductsText}${missingCategoriesText}${errorText}`;
 
         setStatus({
           type: res.ok ? 'success' : 'error',
@@ -400,6 +419,14 @@ export default function MerchizeCatalogSnapshotsAdminClient({
         <StatTile
           label='SEO missing categories'
           value={storefrontSnapshotStats.seoManifest.missingCategorySlugs.length}
+        />
+        <StatTile
+          label='SEO retained generations'
+          value={storefrontSnapshotStats.seoManifest.retainedGenerationCount}
+        />
+        <StatTile
+          label='SEO last pruned'
+          value={storefrontSnapshotStats.seoManifest.lastPrunedGenerationCount}
         />
       </section>
 

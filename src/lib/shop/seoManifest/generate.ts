@@ -12,7 +12,9 @@ import {
   getPublishedShopProductPreview,
 } from '@/lib/utils/shopHomePageProductsData';
 import {
+  getShopSeoManifestGenerationLockPath,
   getShopSeoManifestGenerationPath,
+  getShopSeoManifestGenerationsRoot,
   getShopSeoManifestIndexPath,
   getShopSeoManifestRoot,
   toManifestFileName,
@@ -24,7 +26,16 @@ import {
   type ProductSeoManifestEntry,
   type ShopSeoManifestGenerationResult,
   type ShopSeoManifestIndex,
+  type ShopSeoManifestWarning,
 } from './types';
+
+const DEFAULT_RETAINED_SEO_MANIFEST_GENERATIONS = 5;
+const DEFAULT_GENERATION_LOCK_STALE_MS = 15 * 60 * 1000;
+
+type GenerateShopSeoManifestOptions = {
+  retainGenerations?: number;
+  lockStaleMs?: number;
+};
 
 type ProductSnapshotRow = Awaited<
   ReturnType<typeof getProductSnapshotRows>
@@ -34,7 +45,27 @@ type CategorySnapshotRow = Awaited<
   ReturnType<typeof getCategorySnapshotRows>
 >[number];
 
-export async function generateShopSeoManifest(): Promise<ShopSeoManifestGenerationResult> {
+export class ShopSeoManifestGenerationLockError extends Error {
+  readonly code = 'SHOP_SEO_MANIFEST_GENERATION_LOCKED';
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'ShopSeoManifestGenerationLockError';
+  }
+}
+
+export async function generateShopSeoManifest(
+  options: GenerateShopSeoManifestOptions = {},
+): Promise<ShopSeoManifestGenerationResult> {
+  return withSeoManifestGenerationLock(options, (lockWarnings) =>
+    generateShopSeoManifestUnlocked(options, lockWarnings),
+  );
+}
+
+async function generateShopSeoManifestUnlocked(
+  options: GenerateShopSeoManifestOptions,
+  lockWarnings: ShopSeoManifestWarning[],
+): Promise<ShopSeoManifestGenerationResult> {
   const generatedAt = new Date().toISOString();
   const generation = `${generatedAt.replace(/[:.]/g, '-')}-${crypto.randomUUID().slice(0, 8)}`;
   const tempGenerationPath = path.join(getShopSeoManifestRoot(), `.tmp-${generation}`);
@@ -101,7 +132,7 @@ export async function generateShopSeoManifest(): Promise<ShopSeoManifestGenerati
   await fs.mkdir(path.dirname(activeGenerationPath), { recursive: true });
   await fs.rename(tempGenerationPath, activeGenerationPath);
 
-  const index: ShopSeoManifestIndex = {
+  const provisionalIndex: ShopSeoManifestIndex = {
     schemaVersion: SHOP_SEO_MANIFEST_SCHEMA_VERSION,
     activeGeneration: generation,
     generatedAt,
@@ -109,6 +140,24 @@ export async function generateShopSeoManifest(): Promise<ShopSeoManifestGenerati
     categoryCount: categoryList.length,
     missingPublishedProductIds,
     missingCategorySlugs,
+    retainedGenerationCount: 0,
+    lastPrunedGenerationCount: 0,
+    warnings: lockWarnings,
+  };
+
+  await writeJsonAtomic(getShopSeoManifestIndexPath(), provisionalIndex);
+
+  const pruneResult = await pruneSeoManifestGenerations({
+    activeGeneration: generation,
+    retainGenerations: resolveRetainedGenerationCount(options.retainGenerations),
+    tempStaleMs: resolveGenerationLockStaleMs(options.lockStaleMs),
+  });
+  const warnings = [...lockWarnings, ...pruneResult.warnings];
+  const index: ShopSeoManifestIndex = {
+    ...provisionalIndex,
+    retainedGenerationCount: pruneResult.retainedGenerationCount,
+    lastPrunedGenerationCount: pruneResult.prunedGenerations.length,
+    warnings,
   };
 
   await writeJsonAtomic(getShopSeoManifestIndexPath(), index);
@@ -127,8 +176,208 @@ export async function generateShopSeoManifest(): Promise<ShopSeoManifestGenerati
     missingPublishedProductIds,
     missingCategorySlugs,
     manifestPath: getShopSeoManifestRoot(),
+    retainedGenerationCount: index.retainedGenerationCount,
+    lastPrunedGenerationCount: index.lastPrunedGenerationCount,
+    warnings,
+    prunedGenerations: pruneResult.prunedGenerations,
     affectedRoutes: [...new Set(['/shop', ...affectedRoutes])],
   };
+}
+
+async function withSeoManifestGenerationLock<T>(
+  options: GenerateShopSeoManifestOptions,
+  run: (lockWarnings: ShopSeoManifestWarning[]) => Promise<T>,
+) {
+  const lockPath = getShopSeoManifestGenerationLockPath();
+  const lockWarnings: ShopSeoManifestWarning[] = [];
+  const staleMs = resolveGenerationLockStaleMs(options.lockStaleMs);
+  const lockId = crypto.randomUUID();
+
+  await fs.mkdir(path.dirname(lockPath), { recursive: true });
+
+  let acquired = false;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await fs.mkdir(lockPath);
+      acquired = true;
+      break;
+    } catch (error) {
+      if (!isNodeErrorCode(error, 'EEXIST')) throw error;
+
+      const existingLockAgeMs = await getExistingLockAgeMs(lockPath);
+      if (existingLockAgeMs < staleMs) {
+        throw new ShopSeoManifestGenerationLockError(
+          `SEO manifest generation is already running. Lock age: ${Math.ceil(
+            existingLockAgeMs / 1000,
+          )}s.`,
+        );
+      }
+
+      await fs.rm(lockPath, { recursive: true, force: true });
+      lockWarnings.push({
+        code: 'stale_lock_reclaimed',
+        message: `Reclaimed stale SEO manifest generation lock after ${Math.ceil(
+          existingLockAgeMs / 1000,
+        )}s.`,
+      });
+    }
+  }
+
+  if (!acquired) {
+    throw new ShopSeoManifestGenerationLockError(
+      'SEO manifest generation lock could not be acquired.',
+    );
+  }
+
+  try {
+    try {
+      await writeJsonFile(path.join(lockPath, 'lock.json'), {
+        lockId,
+        createdAt: new Date().toISOString(),
+        pid: process.pid,
+      });
+    } catch (error) {
+      await fs.rm(lockPath, { recursive: true, force: true });
+      throw error;
+    }
+
+    return await run(lockWarnings);
+  } finally {
+    await fs.rm(lockPath, { recursive: true, force: true }).catch((error) => {
+      console.error('[shopSeoManifest.lock.releaseFailed]', {
+        error: formatErrorMessage(error),
+      });
+    });
+  }
+}
+
+async function getExistingLockAgeMs(lockPath: string) {
+  const now = Date.now();
+
+  try {
+    const raw = await fs.readFile(path.join(lockPath, 'lock.json'), 'utf8');
+    const parsed = JSON.parse(raw) as { createdAt?: unknown };
+    if (typeof parsed.createdAt === 'string') {
+      const createdAtMs = Date.parse(parsed.createdAt);
+      if (Number.isFinite(createdAtMs)) return Math.max(0, now - createdAtMs);
+    }
+  } catch {
+    // Fall back to directory mtime if metadata is missing or malformed.
+  }
+
+  const stat = await fs.stat(lockPath);
+  return Math.max(0, now - stat.mtimeMs);
+}
+
+async function pruneSeoManifestGenerations({
+  activeGeneration,
+  retainGenerations,
+  tempStaleMs,
+}: {
+  activeGeneration: string;
+  retainGenerations: number;
+  tempStaleMs: number;
+}) {
+  const warnings: ShopSeoManifestWarning[] = [];
+  const prunedGenerations: string[] = [];
+
+  try {
+    await pruneStaleTempGenerations(tempStaleMs, warnings);
+
+    const generationNames = await readGenerationNames();
+    const retained = new Set(generationNames.slice(0, retainGenerations));
+    retained.add(activeGeneration);
+
+    for (const generation of generationNames) {
+      if (retained.has(generation)) continue;
+
+      try {
+        await fs.rm(getShopSeoManifestGenerationPath(generation), {
+          recursive: true,
+          force: true,
+        });
+        prunedGenerations.push(generation);
+      } catch (error) {
+        warnings.push({
+          code: 'generation_prune_failed',
+          message: `Failed to prune SEO manifest generation ${generation}: ${formatErrorMessage(
+            error,
+          )}`,
+        });
+      }
+    }
+
+    return {
+      retainedGenerationCount: retained.size,
+      prunedGenerations,
+      warnings,
+    };
+  } catch (error) {
+    return {
+      retainedGenerationCount: 0,
+      prunedGenerations,
+      warnings: [
+        ...warnings,
+        {
+          code: 'generation_prune_failed' as const,
+          message: `Failed to inspect SEO manifest generations: ${formatErrorMessage(error)}`,
+        },
+      ],
+    };
+  }
+}
+
+async function pruneStaleTempGenerations(
+  tempStaleMs: number,
+  warnings: ShopSeoManifestWarning[],
+) {
+  const entries = await fs
+    .readdir(getShopSeoManifestRoot(), { withFileTypes: true })
+    .catch((error) => {
+      if (isNodeErrorCode(error, 'ENOENT')) return [];
+      throw error;
+    });
+  const now = Date.now();
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith('.tmp-')) continue;
+
+    const tempPath = path.join(getShopSeoManifestRoot(), entry.name);
+    const stat = await fs.stat(tempPath).catch((error) => {
+      warnings.push({
+        code: 'temp_generation_prune_failed',
+        message: `Failed to inspect stale SEO manifest temp directory ${entry.name}: ${formatErrorMessage(
+          error,
+        )}`,
+      });
+      return null;
+    });
+    if (!stat || now - stat.mtimeMs < tempStaleMs) continue;
+
+    await fs.rm(tempPath, { recursive: true, force: true }).catch((error) => {
+      warnings.push({
+        code: 'temp_generation_prune_failed',
+        message: `Failed to prune stale SEO manifest temp directory ${entry.name}: ${formatErrorMessage(
+          error,
+        )}`,
+      });
+    });
+  }
+}
+
+async function readGenerationNames() {
+  const entries = await fs.readdir(getShopSeoManifestGenerationsRoot(), {
+    withFileTypes: true,
+  }).catch((error) => {
+    if (isNodeErrorCode(error, 'ENOENT')) return [];
+    throw error;
+  });
+
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort()
+    .reverse();
 }
 
 async function getProductSnapshotRows() {
@@ -214,7 +463,13 @@ async function writeManifestFiles(
 ) {
   await Promise.all([
     fs.mkdir(
-      path.join(generationPath, 'providers', SHOP_SEO_MANIFEST_PROVIDER_MERCHIZE, 'products', 'by-id'),
+      path.join(
+        generationPath,
+        'providers',
+        SHOP_SEO_MANIFEST_PROVIDER_MERCHIZE,
+        'products',
+        'by-id',
+      ),
       { recursive: true },
     ),
     fs.mkdir(
@@ -300,7 +555,10 @@ function resolveImageUrl(image: string | null | undefined) {
   if (!image) return null;
   if (image.startsWith('/')) return getShopSiteUrl(image);
   if (image.startsWith('http')) return image.replace(/\/thumb\.jpg(?:[?#].*)?$/i, '');
-  return `https://d2dytk4tvgwhb4.cloudfront.net/${image}`.replace(/\/thumb\.jpg(?:[?#].*)?$/i, '');
+  return `https://d2dytk4tvgwhb4.cloudfront.net/${image}`.replace(
+    /\/thumb\.jpg(?:[?#].*)?$/i,
+    '',
+  );
 }
 
 function formatPrice(price: number | null | undefined) {
@@ -313,4 +571,32 @@ function displayCategoryName(categorySlug: string) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
+}
+
+function resolveRetainedGenerationCount(value: number | undefined) {
+  const raw = value ?? Number(process.env.SHOP_SEO_MANIFEST_RETAIN_GENERATIONS ?? '');
+  if (Number.isFinite(raw) && raw >= 1) return Math.floor(raw);
+  return DEFAULT_RETAINED_SEO_MANIFEST_GENERATIONS;
+}
+
+function resolveGenerationLockStaleMs(value: number | undefined) {
+  const rawSeconds =
+    value === undefined
+      ? Number(process.env.SHOP_SEO_MANIFEST_LOCK_STALE_SECONDS ?? '')
+      : value / 1000;
+  if (Number.isFinite(rawSeconds) && rawSeconds >= 30) return Math.floor(rawSeconds * 1000);
+  return DEFAULT_GENERATION_LOCK_STALE_MS;
+}
+
+function isNodeErrorCode(error: unknown, code: string) {
+  return (
+    Boolean(error) &&
+    typeof error === 'object' &&
+    'code' in error &&
+    (error as { code?: unknown }).code === code
+  );
+}
+
+function formatErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
