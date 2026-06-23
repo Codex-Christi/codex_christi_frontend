@@ -24,6 +24,10 @@ import {
 import { isMerchizeFulfillmentPushEnabled } from '@/lib/merchizeFulfillmentOps/pushPolicy';
 import { CODEX_CHRISTI_FULFILLMENT_IDENTIFIER } from '@/lib/merchizeFulfillmentOps/fulfillmentIdentifier';
 import { syncMerchizeFulfillmentOrder } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOrder';
+import {
+  isMerchizeLookupPendingProviderProcessingError,
+  MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_ERROR_CODE,
+} from '@/lib/merchizeFulfillmentOps/lookupPending';
 import { syncMerchizeFulfillmentOperationalSnapshots } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOperationalSnapshots';
 import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/lib/merchizeFulfillmentOps/merchizeMapper';
 import {
@@ -219,6 +223,37 @@ async function markFulfillmentAttentionRequiredAndNotify(args: {
       });
     },
   );
+}
+
+async function markFulfillmentLookupPendingForAutomaticRetry(args: {
+  orderToken: string;
+  lockId: string;
+  requestPayload?: unknown;
+  responsePayload?: unknown;
+  merchizeFulfillmentProcessingId?: string | null;
+  merchizeProviderOrderId?: string | null;
+  merchizeProviderOrderCode?: string | null;
+}) {
+  await updateLockedRow(args.orderToken, args.lockId, {
+    status: PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
+    lastErrorCode: MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_ERROR_CODE,
+    lastErrorMessage: null,
+    merchizeFulfillmentRequestPayload:
+      args.requestPayload === undefined ? undefined : toLedgerJson(args.requestPayload),
+    merchizeFulfillmentResponsePayload:
+      args.responsePayload === undefined ? undefined : toLedgerJson(args.responsePayload),
+    merchizeFulfillmentProcessingId: args.merchizeFulfillmentProcessingId ?? undefined,
+    merchizeProviderOrderId: args.merchizeProviderOrderId ?? undefined,
+    merchizeProviderOrderCode: args.merchizeProviderOrderCode ?? undefined,
+    postProcessingLockId: null,
+    postProcessingLockedAt: null,
+    postProcessingLockExpiresAt: null,
+  } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
+
+  console.info('[merchize.fulfillment_ops.lookup_pending_for_retry]', {
+    orderToken: args.orderToken,
+    errorCode: MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_ERROR_CODE,
+  });
 }
 
 async function notifyFulfillmentPushAccepted(args: {
@@ -501,6 +536,19 @@ export async function runPaidFulfillmentProcessing(
 
       const sync = await syncMerchizeFulfillmentOrder(orderToken);
       if (!sync.ok) {
+        if (isMerchizeLookupPendingProviderProcessingError(sync.errorCode)) {
+          await markFulfillmentLookupPendingForAutomaticRetry({
+            orderToken,
+            lockId,
+            requestPayload: fulfillmentRequestPayload,
+            responsePayload: fulfillmentResponsePayload,
+            merchizeFulfillmentProcessingId,
+            merchizeProviderOrderId,
+            merchizeProviderOrderCode,
+          });
+          return;
+        }
+
         await markFulfillmentFailedAndNotify({
           orderToken,
           lockId,

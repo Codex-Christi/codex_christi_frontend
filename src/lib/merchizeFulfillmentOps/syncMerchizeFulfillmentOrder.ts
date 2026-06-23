@@ -17,6 +17,11 @@ import {
   summarizeProviderResponse,
   toOptionalPrismaJson,
 } from './merchizeMapper';
+import {
+  isMerchizeProviderProcessingLookupPayload,
+  MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_ERROR_CODE,
+  MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_MESSAGE,
+} from './lookupPending';
 import { safeLogErrorMessage } from './redaction';
 import {
   MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS,
@@ -25,6 +30,13 @@ import {
 import type { MerchizeFulfillmentSyncResult } from './merchizeTypes';
 
 type SyncAction = 'external_lookup' | 'detail_lookup';
+type SyncMerchizeFulfillmentOrderOptions = {
+  lookupRetryDelaysMs?: readonly number[];
+};
+
+const DEFAULT_LOOKUP_RETRY_DELAYS_MS = [1_500, 3_000] as const;
+const LOOKUP_PROVIDER_PROCESSING_ESCALATION_ATTEMPTS = 4;
+const LOOKUP_PROVIDER_PROCESSING_ESCALATION_GRACE_MS = 10 * 60_000;
 
 async function startSyncAttempt(args: {
   merchizeFulfillmentOrderId: string;
@@ -87,8 +99,74 @@ function getSyncError(error: unknown) {
   };
 }
 
+function wait(ms: number) {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function lookupExternalOrderWithProviderProcessingBackoff(args: {
+  merchizeExternalOrderNumber: string;
+  merchizeIdentifier: string | null;
+  retryDelaysMs: readonly number[];
+}) {
+  let lookup = await getMerchizeOrderByExternalNumber(
+    args.merchizeExternalOrderNumber,
+    args.merchizeIdentifier,
+  );
+  let retryCount = 0;
+
+  for (const delayMs of args.retryDelaysMs) {
+    if (!isMerchizeProviderProcessingLookupPayload(lookup)) break;
+
+    retryCount += 1;
+    await wait(delayMs);
+    lookup = await getMerchizeOrderByExternalNumber(
+      args.merchizeExternalOrderNumber,
+      args.merchizeIdentifier,
+    );
+  }
+
+  return {
+    lookup,
+    retryCount,
+    providerProcessingPending: isMerchizeProviderProcessingLookupPayload(lookup),
+  };
+}
+
+async function getProviderProcessingEscalationState(args: {
+  merchizeFulfillmentOrderId: string;
+  now: Date;
+}) {
+  const prisma = getMerchizeFulfillmentOpsPrisma();
+  const where = {
+    merchizeFulfillmentOrderId: args.merchizeFulfillmentOrderId,
+    action: 'external_lookup',
+    errorCode: MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_ERROR_CODE,
+  } as const;
+  const [priorAttemptCount, oldestPendingAttempt] = await Promise.all([
+    prisma.merchizeFulfillmentSyncAttempt.count({ where }),
+    prisma.merchizeFulfillmentSyncAttempt.findFirst({
+      where,
+      orderBy: { startedAt: 'asc' },
+      select: { startedAt: true },
+    }),
+  ]);
+  const totalPendingAttemptCount = priorAttemptCount + 1;
+  const firstPendingAt = oldestPendingAttempt?.startedAt ?? args.now;
+  const pendingAgeMs = args.now.getTime() - firstPendingAt.getTime();
+
+  return {
+    totalPendingAttemptCount,
+    pendingAgeMs,
+    shouldEscalate:
+      totalPendingAttemptCount >= LOOKUP_PROVIDER_PROCESSING_ESCALATION_ATTEMPTS ||
+      pendingAgeMs >= LOOKUP_PROVIDER_PROCESSING_ESCALATION_GRACE_MS,
+  };
+}
+
 export async function syncMerchizeFulfillmentOrder(
   orderToken: string,
+  options: SyncMerchizeFulfillmentOrderOptions = {},
 ): Promise<MerchizeFulfillmentSyncResult> {
   if (!isMerchizeFulfillmentOpsDatabaseConfigured()) {
     return {
@@ -135,17 +213,87 @@ export async function syncMerchizeFulfillmentOrder(
       requestSummary: {
         merchizeExternalOrderNumber: order.merchizeExternalOrderNumber,
         fulfillmentIdentifier: order.merchizeIdentifier,
+        providerProcessingRetryDelaysMs:
+          options.lookupRetryDelaysMs ?? DEFAULT_LOOKUP_RETRY_DELAYS_MS,
       },
     });
     activeAttemptId = lookupAttempt.id;
 
-    const lookup = await getMerchizeOrderByExternalNumber(
-      order.merchizeExternalOrderNumber,
-      order.merchizeIdentifier,
-    );
+    const { lookup, retryCount, providerProcessingPending } =
+      await lookupExternalOrderWithProviderProcessingBackoff({
+        merchizeExternalOrderNumber: order.merchizeExternalOrderNumber,
+        merchizeIdentifier: order.merchizeIdentifier,
+        retryDelaysMs: options.lookupRetryDelaysMs ?? DEFAULT_LOOKUP_RETRY_DELAYS_MS,
+      });
     merchizeOrderId = extractMerchizeOrderIdFromExternalLookup(lookup);
 
     if (!merchizeOrderId) {
+      if (providerProcessingPending) {
+        const providerProcessingEscalation = await getProviderProcessingEscalationState({
+          merchizeFulfillmentOrderId: order.id,
+          now: new Date(),
+        });
+
+        if (providerProcessingEscalation.shouldEscalate) {
+          const message =
+            'Merchize external-number lookup kept reporting provider processing and did not return data._id within the retry grace window.';
+
+          await prisma.merchizeFulfillmentOrder.update({
+            where: { id: order.id },
+            data: {
+              merchizeExternalLookupPayload: toOptionalPrismaJson(lookup),
+              syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.LOOKUP_NOT_FOUND,
+              lastSyncErrorCode: 'MERCHIZE_LOOKUP_NOT_FOUND',
+              lastSyncErrorMessage: message,
+              lastLookupAt: new Date(),
+            },
+          });
+
+          await finishSyncAttempt({
+            attemptId: activeAttemptId,
+            status: MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.FAILED,
+            errorCode: 'MERCHIZE_LOOKUP_NOT_FOUND',
+            errorMessage: message,
+            responseSummary: lookup,
+          });
+
+          return {
+            ok: false,
+            orderToken,
+            errorCode: 'MERCHIZE_LOOKUP_NOT_FOUND',
+            errorMessage: message,
+          };
+        }
+
+        await prisma.merchizeFulfillmentOrder.update({
+          where: { id: order.id },
+          data: {
+            merchizeExternalLookupPayload: toOptionalPrismaJson(lookup),
+            syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.LOOKUP_PENDING,
+            lastSyncErrorCode: MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_ERROR_CODE,
+            lastSyncErrorMessage: MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_MESSAGE,
+            lastLookupAt: new Date(),
+          },
+        });
+
+        await finishSyncAttempt({
+          attemptId: activeAttemptId,
+          status: MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.SKIPPED,
+          errorCode: MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_ERROR_CODE,
+          errorMessage: MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_MESSAGE,
+          responseSummary: lookup,
+        });
+
+        return {
+          ok: false,
+          orderToken,
+          errorCode: MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_ERROR_CODE,
+          errorMessage: MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_MESSAGE,
+          pending: true,
+          retryable: true,
+        };
+      }
+
       const message =
         'Merchize external-number lookup did not return data._id for the expected external number.';
 
@@ -191,6 +339,13 @@ export async function syncMerchizeFulfillmentOrder(
       status: MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.SUCCEEDED,
       responseSummary: lookup,
     });
+
+    if (retryCount > 0) {
+      console.info('[merchize.fulfillment_ops.lookup_recovered_after_provider_processing]', {
+        orderToken: order.orderToken,
+        retryCount,
+      });
+    }
 
     activeAction = 'detail_lookup';
     const detailAttempt = await startSyncAttempt({

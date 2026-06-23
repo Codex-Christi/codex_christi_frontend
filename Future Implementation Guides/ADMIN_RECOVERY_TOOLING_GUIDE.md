@@ -169,8 +169,9 @@ Use the full current runbook in `MERCHIZE_FULFILLMENT_OPS_GUIDE.md` for checkout
 3. Open `/admin/shop/paid-order-recovery/[orderToken]`.
 4. Confirm the detail page shows the PayPal ledger stage, receipt state, Django payment-save custom ID, Merchize external order number when known, Merchize Ops sync status, production gate status, and notification history.
 5. For successful push acceptance, confirm the detail page shows `push_accepted`/`push_to_fulfillment_accepted`, admin notification history, and customer notification history.
-6. For failure or blocked states, confirm a notification outbox row exists and that resend/suppress actions work without changing the PayPal ledger stage.
-7. For `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false`, confirm the row shows `fulfillment_attention_required`, the manual release form appears, the master-admin password/reason are required, and release resumes through `runPaidFulfillmentProcessing(orderToken, { overrideMerchizeFulfillmentPushDisabled: true })` without replaying PayPal capture, receipt upload, Django payment save, or an already accepted Django process response.
+6. For `MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING`, confirm the row stays customer-safe and scanner-resumable, the admin list/detail page shows provider sync pending, and no critical recovery email is sent for the initial provider-indexing lag. After repeated pending attempts or the grace window, confirm the row escalates to `MERCHIZE_LOOKUP_NOT_FOUND` and creates the normal recovery alert.
+7. For failure or blocked states, confirm a notification outbox row exists and that resend/suppress actions work without changing the PayPal ledger stage.
+8. For `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false`, confirm the row shows `fulfillment_attention_required`, the manual release form appears, the master-admin password/reason are required, and release resumes through `runPaidFulfillmentProcessing(orderToken, { overrideMerchizeFulfillmentPushDisabled: true })` without replaying PayPal capture, receipt upload, Django payment save, or an already accepted Django process response.
 
 Current expected notification behavior:
 

@@ -20,6 +20,7 @@ import {
   MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_STATUS,
 } from '@/lib/merchizeFulfillmentOps/status';
+import { isMerchizeLookupPendingProviderProcessingError } from '@/lib/merchizeFulfillmentOps/lookupPending';
 import { safeLogErrorMessage } from '@/lib/merchizeFulfillmentOps/redaction';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import type { Prisma } from '@/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger/client';
@@ -220,8 +221,9 @@ function getRawStatusFilter(status: PaidOrderRecoveryStatusFilter) {
     case 'attention':
       return [PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED];
     case 'completed':
-    case 'sync':
       return [PAYPAL_LEDGER_STATUS.COMPLETED];
+    case 'sync':
+      return [...ADMIN_RECOVERY_STATUSES];
     case 'pending':
       return [PAYPAL_LEDGER_STATUS.PAYMENT_SAVED];
     case 'all':
@@ -295,9 +297,25 @@ function getErrorLabel(errorCode: string | null, errorMessage: string | null) {
   if (!errorCode && !errorMessage) return '—';
   if (errorCode === 'FULFILLMENT_PAYLOAD_INVALID') return 'Payload Validation Failed';
   if (errorCode === 'FULFILLMENT_PROVIDER_REJECTED') return 'Provider Rejected Fulfillment';
+  if (isMerchizeLookupPendingProviderProcessingError(errorCode)) return 'Provider Lookup Pending';
   if (errorCode === 'MERCHIZE_PUSH_DISABLED_BY_CONFIG') return 'Push Disabled by Config';
   if (errorCode === 'POST_PROCESSING_FAILED') return 'Post-processing Failed';
   return errorMessage ?? errorCode ?? 'Unknown error';
+}
+
+function getProviderDetailSyncMessage(args: {
+  syncStatus?: string | null;
+  lastSyncErrorCode?: string | null;
+}) {
+  if (isMerchizeLookupPendingProviderProcessingError(args.lastSyncErrorCode)) {
+    return 'Merchize is still indexing the accepted order; scanner/admin retry will resume sync.';
+  }
+
+  if (args.syncStatus === MERCHIZE_FULFILLMENT_SYNC_STATUS.LOOKUP_PENDING) {
+    return 'Fulfillment accepted; provider lookup is pending.';
+  }
+
+  return 'Fulfillment accepted; sync provider details';
 }
 
 function formatUpdated(date: Date) {
@@ -313,6 +331,7 @@ function mapLedgerRowToPaidOrderRecoveryRow(row: {
   initialCurrency: string | null;
   merchizeFulfillmentResponsePayload: unknown;
   merchizeFulfillmentOpsSyncStatus?: string | null;
+  merchizeFulfillmentOpsLastSyncErrorCode?: string | null;
   latestWebhookSourceLabel?: string | null;
   lastErrorCode: string | null;
   lastErrorMessage: string | null;
@@ -334,7 +353,10 @@ function mapLedgerRowToPaidOrderRecoveryRow(row: {
     amount: getCaptureAmount(row.capturePayload, row.initialCurrency),
     step: providerDetailSyncNeeded ? 'Provider Detail Sync' : getStepLabel(row.status),
     error: providerDetailSyncNeeded
-      ? 'Fulfillment accepted; sync provider details'
+      ? getProviderDetailSyncMessage({
+          syncStatus: row.merchizeFulfillmentOpsSyncStatus,
+          lastSyncErrorCode: row.merchizeFulfillmentOpsLastSyncErrorCode,
+        })
       : getErrorLabel(row.lastErrorCode, row.lastErrorMessage),
     processingSourceLabel: processingSource.label,
     processingSourceTone: processingSource.tone,
@@ -487,6 +509,7 @@ function mapMerchizeFulfillmentOpsSummary(row: {
   lastDetailSyncAt: Date | null;
   lastProgressSyncAt: Date | null;
   lastTrackingSyncAt: Date | null;
+  lastSyncErrorCode: string | null;
   lastSyncErrorMessage: string | null;
 }): MerchizeFulfillmentOpsAdminSummary {
   return {
@@ -506,6 +529,7 @@ function mapMerchizeFulfillmentOpsSummary(row: {
     lastDetailSyncAt: row.lastDetailSyncAt ? formatLongDate(row.lastDetailSyncAt) : null,
     lastProgressSyncAt: row.lastProgressSyncAt ? formatLongDate(row.lastProgressSyncAt) : null,
     lastTrackingSyncAt: row.lastTrackingSyncAt ? formatLongDate(row.lastTrackingSyncAt) : null,
+    lastSyncErrorCode: row.lastSyncErrorCode,
     lastSyncErrorMessage: row.lastSyncErrorMessage,
   };
 }
@@ -537,6 +561,7 @@ async function getMerchizeFulfillmentOpsSummaries(orderTokens: string[]) {
         lastDetailSyncAt: true,
         lastProgressSyncAt: true,
         lastTrackingSyncAt: true,
+        lastSyncErrorCode: true,
         lastSyncErrorMessage: true,
       },
     });
@@ -1022,6 +1047,8 @@ export async function listAdminPaidOrderRecoveryRows({
         ...row,
         latestWebhookSourceLabel: latestWebhookSourceByOrderToken.get(row.orderToken),
         merchizeFulfillmentOpsSyncStatus: merchizeOpsSummaries.get(row.orderToken)?.syncStatus,
+        merchizeFulfillmentOpsLastSyncErrorCode:
+          merchizeOpsSummaries.get(row.orderToken)?.lastSyncErrorCode,
       }),
     )
     .filter((row) => filters.status === 'all' || row.status === filters.status);

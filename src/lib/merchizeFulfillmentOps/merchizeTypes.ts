@@ -42,4 +42,6 @@ export type MerchizeFulfillmentSyncResult =
       orderToken: string;
       errorCode: string;
       errorMessage: string;
+      pending?: boolean;
+      retryable?: boolean;
     };

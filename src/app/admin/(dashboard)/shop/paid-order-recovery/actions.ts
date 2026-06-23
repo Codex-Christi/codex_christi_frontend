@@ -28,13 +28,16 @@ import { registerAcceptedMerchizeFulfillmentProcess } from '@/lib/merchizeFulfil
 import { syncMerchizeFulfillmentOrder } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOrder';
 import { syncMerchizeFulfillmentOperationalSnapshots } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOperationalSnapshots';
 import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/lib/merchizeFulfillmentOps/merchizeMapper';
+import { isMerchizeLookupPendingProviderProcessingError } from '@/lib/merchizeFulfillmentOps/lookupPending';
 import { CODEX_CHRISTI_FULFILLMENT_IDENTIFIER } from '@/lib/merchizeFulfillmentOps/fulfillmentIdentifier';
 import {
   getMerchizeFulfillmentOpsPrisma,
   isMerchizeFulfillmentOpsDatabaseConfigured,
 } from '@/lib/prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOpsPrisma';
 
-type AdminNotificationActionResult = { ok: true; message: string } | { ok: false; error: string };
+type AdminNotificationActionResult =
+  | { ok: true; message: string; tone?: 'success' | 'warning' }
+  | { ok: false; error: string };
 
 const SCANNER_AUDIT_ACTIONS = [
   'shop.paid_order_recovery.scan_candidates',
@@ -874,6 +877,14 @@ export async function syncAdminMerchizeProviderDetailsAction({
     revalidatePath('/admin/shop/paid-order-recovery');
 
     if (!sync.ok) {
+      if (isMerchizeLookupPendingProviderProcessingError(sync.errorCode)) {
+        return {
+          ok: true,
+          tone: 'warning',
+          message: sync.errorMessage,
+        };
+      }
+
       return {
         ok: false,
         error: sync.errorMessage,

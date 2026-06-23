@@ -132,6 +132,7 @@ export type MerchizeFulfillmentOpsAdminSummary = {
   lastDetailSyncAt: string | null;
   lastProgressSyncAt: string | null;
   lastTrackingSyncAt: string | null;
+  lastSyncErrorCode: string | null;
   lastSyncErrorMessage: string | null;
 };
 

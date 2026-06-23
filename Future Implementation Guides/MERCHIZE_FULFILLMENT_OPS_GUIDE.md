@@ -341,6 +341,7 @@ Current runtime status:
 
 - `MERCHIZE_FULFILLMENT_PUSH_ENABLED` is the server-only push gate. Empty or missing means enabled. Valid explicit values are `true` and `false`.
 - When `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false`, the runner completes the payment-owned stages, calls Django payment save, calls Django fulfillment process/import, registers the accepted Merchize process, runs external-number lookup/detail sync when safe, and stops before `POST /order/external/orders/push`.
+- If the external-number lookup temporarily returns `success: false` with message `Order is being processed`, treat it as provider indexing lag, not a failed order. Retry briefly, then persist Merchize Ops `syncStatus = lookup_pending` with `lastSyncErrorCode = MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING`, leave the PayPal ledger scanner-resumable, and do not send a critical recovery email for that first pending state. Escalate to `MERCHIZE_LOOKUP_NOT_FOUND` only after the bounded retry/grace policy is exhausted.
 - The stopped state is explicit: PayPal ledger `status = fulfillment_attention_required`, `lastErrorCode = MERCHIZE_PUSH_DISABLED_BY_CONFIG`, Merchize Ops `syncStatus = push_to_fulfillment_disabled`, and `productionGateStatus = push_disabled`.
 - The stopped state creates a durable admin notification outbox row and attempts to send the configured internal email, because this is an operator action item.
 - The customer confirmation page does not expose provider internals. It shows the customer-safe manual-review/preparation state and the `orderToken` support reference.
@@ -358,7 +359,8 @@ Implemented admin override behavior:
 Implemented customer/admin notification behavior:
 
 - Customer email after automatic or manual push acceptance is tracked in `CustomerNotificationOutbox`.
-- Admin emails are sent for push-disabled, push-failed, lookup-failed, provider-rejected, payload-invalid, and future attention-required states.
+- Admin emails are sent for push-disabled, push-failed, true lookup-failed/not-found, provider-rejected, payload-invalid, and future attention-required states.
+- Do not send a critical admin email for `MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING`; show it as a provider-sync pending state and let scanner/admin retry. Escalate to `MERCHIZE_LOOKUP_NOT_FOUND` only after the provider no longer reports processing or after the bounded grace/retry policy is exhausted.
 - Admin success emails for pushed orders route through `paid_order_fulfillment_success` so they can be separated from the higher-signal `paid_order_fulfillment_issues` stream.
 
 ## Current UI-led end-to-end verification runbook
@@ -1342,6 +1344,14 @@ Django accepted `/orders/process/{custom_id}`.
 
 Merchize external-number lookup is queued or running.
 
+If Merchize responds with `Order is being processed`, keep this status and persist `MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING`. This is a retryable provider-indexing state, not `lookup_not_found`, until the implementation's bounded retry/grace policy is exhausted.
+
+Current runtime policy:
+
+- Retry the lookup inside the same processing run after short delays of 1.5 seconds and 3 seconds.
+- If Merchize still reports provider processing, keep the PayPal ledger scanner-resumable and do not send a critical recovery email.
+- Escalate to `MERCHIZE_LOOKUP_NOT_FOUND` after 4 pending provider-processing lookup attempts or after 10 minutes from the first pending provider-processing lookup attempt, whichever comes first.
+
 `lookup_failed`
 
 The Merchize lookup request failed due to transport, auth, rate limit, or Merchize error.
@@ -1869,6 +1879,11 @@ export async function syncMerchizeFulfillmentOrder(orderToken: string) {
   const merchizeOrderId = extractMerchizeOrderId(lookup);
 
   if (!merchizeOrderId) {
+    if (lookup.message === 'Order is being processed') {
+      await markLookupPendingForRetry(...);
+      return;
+    }
+
     await markLookupNotFoundOrManualReview(...);
     return;
   }
@@ -1888,6 +1903,7 @@ Retry rules:
 - Retrying sync must not recreate the Merchize order.
 - Retrying sync may call Merchize lookup/detail endpoints.
 - Retrying sync may update Merchize status and item snapshots.
+- A pending provider-indexing retry must not send a critical admin email or surface a customer-facing failure.
 
 ## Production readiness worker extension
 

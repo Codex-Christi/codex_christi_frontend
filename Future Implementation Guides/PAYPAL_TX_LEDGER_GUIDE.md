@@ -2259,6 +2259,7 @@ Fulfillment validation and provider response handling:
 - After push-to-fulfillment acceptance, the paid order fulfillment domain can continue with independent operational stages:
   - Query Merchize by external number.
   - Read the provider `_id` from the external-number lookup result at `resp.data._id`.
+  - If the external-number lookup reports `Order is being processed`, keep the paid order in a scanner-resumable post-payment state, persist Merchize Ops `lookup_pending`, and avoid customer-facing or critical-admin failure messaging.
   - Query in-depth order details by provider `_id`.
   - Treat that external-lookup `_id` as the canonical Merchize platform order ID for later POD actions.
   - Persist the provider order and item snapshots in dedicated tables.
@@ -2432,6 +2433,7 @@ Confirmed provider lookup contract:
 - Use the semantic local variable `merchizeExternalOrderNumber` at every Merchize lookup boundary.
 - Do not use Django's wrapped process `response_data.data._id` as the in-depth detail path ID. The in-depth `{id}` must be taken from the external-number lookup response.
 - The external-number lookup response `_id` is the canonical Merchize platform order ID for in-depth details and later actions such as view, edit, pause, change product, change processing, and tracking/status operations.
+- The Merchize response message `Order is being processed` means the accepted external order is not indexed yet. Treat it as `MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING`, not `MERCHIZE_LOOKUP_NOT_FOUND`, and resume through the scanner/admin sync path without replaying PayPal capture, receipt upload, Django payment save, or accepted Django process/import. Escalate only after the bounded retry/grace policy is exhausted.
 - Never store only the extracted provider IDs; persist the lookup/detail JSON snapshots because provider support and admin reconciliation will need the original provider payload.
 
 ---

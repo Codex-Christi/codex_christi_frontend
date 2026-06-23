@@ -60,10 +60,16 @@ export default function AdminPaidOrderRecoveryActionsPanel({
           return;
         }
 
-        successToast({
-          header: 'Provider details synced',
-          message: result.message,
-        });
+        if (result.tone === 'warning') {
+          toast.warning('Provider sync pending', {
+            description: result.message,
+          });
+        } else {
+          successToast({
+            header: 'Provider details synced',
+            message: result.message,
+          });
+        }
         router.refresh();
       } catch (error) {
         toast.dismiss(toastId);
