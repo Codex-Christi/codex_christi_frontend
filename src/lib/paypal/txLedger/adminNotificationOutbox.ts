@@ -181,91 +181,134 @@ function escapeHtml(value: string) {
     .replaceAll("'", '&#039;');
 }
 
-function buildAdminRecoveryAlertEmailHtml(payload: AdminRecoveryNotificationPayload) {
+type AdminEmailTone = 'amber' | 'cyan' | 'emerald' | 'rose';
+
+type AdminEmailDetailItem = {
+  label: string;
+  valueHtml: string;
+  valueColor?: string;
+  monospace?: boolean;
+};
+
+type AdminEmailShellProps = {
+  tone: AdminEmailTone;
+  alertLabel: string;
+  eyebrow: string;
+  heading: string;
+  intro: string;
+  bodyHtml: string;
+  buttonHref: string;
+  buttonLabel: string;
+  footnote?: string | null;
+};
+
+function getAdminEmailTone(tone: AdminEmailTone) {
+  const tones = {
+    amber: {
+      accent: '#fbbf24',
+      accentSoft: '#fde68a',
+      accentMuted: '#fcd34d',
+      border: 'rgba(251,191,36,0.28)',
+      glow: 'rgba(251,191,36,0.12)',
+      buttonBg: '#fbbf24',
+      buttonText: '#111827',
+    },
+    cyan: {
+      accent: '#67e8f9',
+      accentSoft: '#bae6fd',
+      accentMuted: '#7dd3fc',
+      border: 'rgba(103,232,249,0.24)',
+      glow: 'rgba(14,165,233,0.14)',
+      buttonBg: '#dbeafe',
+      buttonText: '#082f49',
+    },
+    emerald: {
+      accent: '#34d399',
+      accentSoft: '#d1fae5',
+      accentMuted: '#6ee7b7',
+      border: 'rgba(52,211,153,0.24)',
+      glow: 'rgba(16,185,129,0.13)',
+      buttonBg: '#d1fae5',
+      buttonText: '#064e3b',
+    },
+    rose: {
+      accent: '#fb7185',
+      accentSoft: '#fecdd3',
+      accentMuted: '#fda4af',
+      border: 'rgba(251,113,133,0.26)',
+      glow: 'rgba(244,63,94,0.13)',
+      buttonBg: '#fecdd3',
+      buttonText: '#881337',
+    },
+  } satisfies Record<AdminEmailTone, Record<string, string>>;
+
+  return tones[tone];
+}
+
+function buildAdminEmailShell({
+  tone,
+  alertLabel,
+  eyebrow,
+  heading,
+  intro,
+  bodyHtml,
+  buttonHref,
+  buttonLabel,
+  footnote,
+}: AdminEmailShellProps) {
   const logoUrl = getMainSiteUrl('/media/img/general/logo-glow-tiny.jpg');
-  const issueRows = payload.issueSummary
-    .map(
-      (issue) => `
-        <tr>
-          <td style="padding:10px 0;border-top:1px solid rgba(148,163,184,0.16);color:#dbeafe;font-size:13px;line-height:1.5;">
-            ${escapeHtml(issue)}
-          </td>
-        </tr>`,
-    )
-    .join('');
+  const ambientUrl = getMainSiteUrl('/media/img/admin/ambient/ambient-03-desktop.avif');
+  const cometsUrl = getMainSiteUrl('/media/img/home/comets_%20desktop.svg');
+  const colors = getAdminEmailTone(tone);
+  const safeFootnote =
+    footnote ??
+    'This is an internal operations alert. Review the durable ledger and provider state before taking action.';
 
   return `<!doctype html>
 <html>
-  <body style="margin:0;padding:0;background:#05070d;color:#f8fafc;font-family:Arial,Helvetica,sans-serif;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#05070d;padding:28px 14px;">
+  <body style="margin:0;padding:0;background:#030712;color:#f8fafc;font-family:Arial,Helvetica,sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#030712;background-image:linear-gradient(180deg,rgba(3,7,18,0.82),rgba(3,7,18,0.95)),url('${escapeHtml(ambientUrl)}');background-position:center;background-size:cover;padding:30px 14px;">
       <tr>
         <td align="center">
-          <table width="100%" cellpadding="0" cellspacing="0" style="max-width:680px;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:720px;border-collapse:separate;">
             <tr>
               <td style="padding:0 0 18px;">
-                <table width="100%" cellpadding="0" cellspacing="0">
+                <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
                   <tr>
-                    <td>
-                      <img src="${escapeHtml(logoUrl)}" width="48" height="48" alt="Codex Christi" style="border-radius:14px;border:1px solid rgba(255,255,255,0.14);vertical-align:middle;" />
-                      <span style="display:inline-block;margin-left:12px;font-size:12px;letter-spacing:0.22em;text-transform:uppercase;color:#94a3b8;vertical-align:middle;">Codex Christi Ops</span>
+                    <td style="vertical-align:middle;">
+                      <img src="${escapeHtml(logoUrl)}" width="52" height="52" alt="Codex Christi" style="border-radius:16px;border:1px solid rgba(255,255,255,0.18);vertical-align:middle;box-shadow:0 0 34px rgba(125,211,252,0.16);" />
+                      <span style="display:inline-block;margin-left:13px;font-size:12px;letter-spacing:0.25em;text-transform:uppercase;color:#dbeafe;vertical-align:middle;">Codex Christi Ops</span>
                     </td>
-                    <td align="right" style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#fbbf24;">
-                      ${escapeHtml(payload.alertLabel ?? 'Recovery Alert')}
+                    <td align="right" style="font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:${colors.accent};font-weight:700;vertical-align:middle;">
+                      ${escapeHtml(alertLabel)}
                     </td>
                   </tr>
                 </table>
               </td>
             </tr>
             <tr>
-              <td style="border:1px solid rgba(96,165,250,0.22);border-radius:22px;background:#0b1020;padding:28px;">
-                <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#60a5fa;font-weight:700;">${escapeHtml(payload.eyebrow ?? 'Paid Order Requires Attention')}</div>
-                <h1 style="margin:12px 0 8px;font-size:24px;line-height:1.25;color:#ffffff;">${escapeHtml(payload.heading ?? 'A paid checkout stopped during fulfillment')}</h1>
-                <p style="margin:0 0 22px;font-size:14px;line-height:1.65;color:#cbd5e1;">
-                  ${escapeHtml(
-                    payload.intro ??
-                      'This order is already paid, but the fulfillment stage did not complete cleanly. Review the transaction before the customer needs to contact support.',
-                  )}
-                </p>
+              <td style="border:1px solid ${colors.border};border-radius:24px;background:#07111f;background-image:linear-gradient(145deg,rgba(76,61,61,0.24),rgba(15,23,42,0.52) 56%,rgba(8,15,30,0.68)),url('${escapeHtml(cometsUrl)}');background-repeat:repeat;background-size:auto,560px auto;padding:1px;box-shadow:0 26px 72px rgba(0,0,0,0.42),0 0 44px ${colors.glow};">
+                <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:separate;border-radius:23px;background:#07111f;background-image:linear-gradient(180deg,rgba(7,17,31,0.92),rgba(7,17,31,0.84));overflow:hidden;">
+                  <tr>
+                    <td style="padding:30px 28px 28px;">
+                      <div style="font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:${colors.accentSoft};font-weight:800;">${escapeHtml(eyebrow)}</div>
+                      <h1 style="margin:13px 0 10px;font-size:26px;line-height:1.22;color:#ffffff;">${escapeHtml(heading)}</h1>
+                      <p style="margin:0 0 24px;font-size:14px;line-height:1.72;color:#cbd5e1;">
+                        ${escapeHtml(intro)}
+                      </p>
 
-                <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;border:1px solid rgba(148,163,184,0.16);border-radius:16px;background:#0f172a;">
-                  <tr>
-                    <td style="padding:16px 18px 6px;color:#94a3b8;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;">Customer</td>
-                    <td style="padding:16px 18px 6px;color:#94a3b8;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;">Ledger Status</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:0 18px 16px;color:#f8fafc;font-size:14px;line-height:1.5;">
-                      ${escapeHtml(payload.customerName)}<br />
-                      <span style="color:#94a3b8;">${escapeHtml(payload.customerEmail)}</span>
-                    </td>
-                    <td style="padding:0 18px 16px;color:#fbbf24;font-size:13px;line-height:1.5;">
-                      ${escapeHtml(payload.ledgerStatus.replaceAll('_', ' '))}
+                      ${bodyHtml}
+
+                      <div style="margin-top:24px;">
+                        <a href="${escapeHtml(buttonHref)}" style="display:inline-block;border-radius:14px;background:${colors.buttonBg};color:${colors.buttonText};text-decoration:none;font-size:13px;font-weight:800;padding:13px 19px;box-shadow:0 16px 34px rgba(0,0,0,0.24);">${escapeHtml(buttonLabel)}</a>
+                      </div>
+
+                      <p style="margin:22px 0 0;font-size:12px;line-height:1.7;color:#94a3b8;">
+                        ${escapeHtml(safeFootnote)}
+                      </p>
                     </td>
                   </tr>
-                  <tr>
-                    <td style="padding:14px 18px 6px;border-top:1px solid rgba(148,163,184,0.16);color:#94a3b8;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;">Support Ref</td>
-                    <td style="padding:14px 18px 6px;border-top:1px solid rgba(148,163,184,0.16);color:#94a3b8;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;">Error Code</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:0 18px 16px;color:#e2e8f0;font-size:13px;line-height:1.5;">${escapeHtml(payload.supportReference)}</td>
-                    <td style="padding:0 18px 16px;color:#fca5a5;font-size:13px;line-height:1.5;">${escapeHtml(payload.errorCode)}</td>
-                  </tr>
                 </table>
-
-                <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
-                  <tr>
-                    <td style="padding:0 0 8px;color:#94a3b8;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;">What failed</td>
-                  </tr>
-                  ${issueRows}
-                </table>
-
-                <a href="${escapeHtml(payload.adminDetailUrl)}" style="display:inline-block;border-radius:12px;background:#dbeafe;color:#0f172a;text-decoration:none;font-size:13px;font-weight:700;padding:12px 18px;">${escapeHtml(payload.buttonLabel ?? 'Open Recovery Detail')}</a>
-
-                <p style="margin:20px 0 0;font-size:12px;line-height:1.6;color:#64748b;">
-                  ${escapeHtml(
-                    payload.footnote ??
-                      'This is an internal operations alert. The customer has already paid; treat this as a recovery task, not a failed checkout attempt.',
-                  )}
-                </p>
               </td>
             </tr>
           </table>
@@ -276,53 +319,139 @@ function buildAdminRecoveryAlertEmailHtml(payload: AdminRecoveryNotificationPayl
 </html>`;
 }
 
+function buildAdminEmailDetailGrid(items: AdminEmailDetailItem[]) {
+  const rows: string[] = [];
+
+  for (let index = 0; index < items.length; index += 2) {
+    const left = items[index];
+    const right = items[index + 1];
+    const cells = [left, right].map((item) =>
+      item
+        ? `
+          <td width="50%" style="padding:16px 18px;vertical-align:top;border-top:${index === 0 ? '0' : '1px solid rgba(148,163,184,0.14)'};">
+            <div style="font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:#94a3b8;">${escapeHtml(item.label)}</div>
+            <div style="margin-top:9px;color:${item.valueColor ?? '#e2e8f0'};font-size:14px;line-height:1.52;word-break:break-word;${item.monospace ? 'font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;' : ''}">
+              ${item.valueHtml}
+            </div>
+          </td>`
+        : '<td width="50%" style="padding:16px 18px;border-top:1px solid rgba(148,163,184,0.14);">&nbsp;</td>',
+    );
+
+    rows.push(`<tr>${cells.join('')}</tr>`);
+  }
+
+  return `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px;border:1px solid rgba(255,255,255,0.10);border-radius:18px;background:#0a1424;background-image:linear-gradient(145deg,rgba(255,255,255,0.06),rgba(15,23,42,0.20));overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,0.06);">
+      ${rows.join('')}
+    </table>`;
+}
+
+function buildAdminEmailIssueList(label: string, issues: string[], tone: AdminEmailTone) {
+  const colors = getAdminEmailTone(tone);
+  const issueRows = issues
+    .map(
+      (issue) => `
+        <tr>
+          <td style="padding:12px 0;border-top:1px solid rgba(148,163,184,0.16);color:#bfdbfe;font-size:13px;line-height:1.55;">
+            ${escapeHtml(issue)}
+          </td>
+        </tr>`,
+    )
+    .join('');
+
+  return `
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 22px;">
+      <tr>
+        <td style="padding:0 0 8px;color:${colors.accentMuted};font-size:10px;letter-spacing:0.18em;text-transform:uppercase;font-weight:700;">${escapeHtml(label)}</td>
+      </tr>
+      ${issueRows}
+    </table>`;
+}
+
+function buildAdminRecoveryAlertEmailHtml(payload: AdminRecoveryNotificationPayload) {
+  const tone: AdminEmailTone = payload.alertLabel === 'Payment Alert' ? 'amber' : 'cyan';
+  const bodyHtml = `
+    ${buildAdminEmailDetailGrid([
+      {
+        label: 'Customer',
+        valueHtml: `${escapeHtml(payload.customerName)}<br /><span style="color:#93c5fd;">${escapeHtml(payload.customerEmail)}</span>`,
+      },
+      {
+        label: 'Ledger Status',
+        valueHtml: escapeHtml(payload.ledgerStatus.replaceAll('_', ' ')),
+        valueColor: '#fbbf24',
+      },
+      {
+        label: 'Support Ref',
+        valueHtml: escapeHtml(payload.supportReference),
+        monospace: true,
+      },
+      {
+        label: 'Error Code',
+        valueHtml: escapeHtml(payload.errorCode),
+        valueColor: '#fca5a5',
+        monospace: true,
+      },
+    ])}
+    ${buildAdminEmailIssueList('What failed', payload.issueSummary, tone)}`;
+
+  return buildAdminEmailShell({
+    tone,
+    alertLabel: payload.alertLabel ?? 'Recovery Alert',
+    eyebrow: payload.eyebrow ?? 'Paid Order Requires Attention',
+    heading: payload.heading ?? 'A paid checkout stopped during fulfillment',
+    intro:
+      payload.intro ??
+      'This order is already paid, but the fulfillment stage did not complete cleanly. Review the transaction before the customer needs to contact support.',
+    bodyHtml,
+    buttonHref: payload.adminDetailUrl,
+    buttonLabel: payload.buttonLabel ?? 'Open Recovery Detail',
+    footnote:
+      payload.footnote ??
+      'This is an internal operations alert. The customer has already paid; treat this as a recovery task, not a failed checkout attempt.',
+  });
+}
+
 function buildAdminFulfillmentPushAcceptedEmailHtml(
   payload: AdminFulfillmentPushAcceptedNotificationPayload,
 ) {
-  return `<!doctype html>
-<html>
-  <body style="margin:0;padding:0;background:#05070d;color:#f8fafc;font-family:Arial,Helvetica,sans-serif;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#05070d;padding:28px 14px;">
-      <tr>
-        <td align="center">
-          <table width="100%" cellpadding="0" cellspacing="0" style="max-width:680px;">
-            <tr>
-              <td style="border:1px solid rgba(52,211,153,0.2);border-radius:22px;background:#0b1020;padding:28px;">
-                <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#34d399;font-weight:700;">Fulfillment Push Accepted</div>
-                <h1 style="margin:12px 0 8px;font-size:24px;line-height:1.25;color:#ffffff;">A paid order moved to fulfillment</h1>
-                <p style="margin:0 0 22px;font-size:14px;line-height:1.65;color:#cbd5e1;">
-                  Payment, receipt, Django payment save, Django fulfillment processing, provider detail sync, and Merchize push-to-fulfillment completed.
-                </p>
-                <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;border:1px solid rgba(148,163,184,0.16);border-radius:16px;background:#0f172a;">
-                  <tr>
-                    <td style="padding:16px 18px 6px;color:#94a3b8;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;">Customer</td>
-                    <td style="padding:16px 18px 6px;color:#94a3b8;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;">Support Ref</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:0 18px 16px;color:#f8fafc;font-size:14px;line-height:1.5;">
-                      ${escapeHtml(payload.customerName)}<br />
-                      <span style="color:#94a3b8;">${escapeHtml(payload.customerEmail)}</span>
-                    </td>
-                    <td style="padding:0 18px 16px;color:#e2e8f0;font-size:13px;line-height:1.5;">${escapeHtml(payload.supportReference)}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:14px 18px 6px;border-top:1px solid rgba(148,163,184,0.16);color:#94a3b8;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;">Merchize External Number</td>
-                    <td style="padding:14px 18px 6px;border-top:1px solid rgba(148,163,184,0.16);color:#94a3b8;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;">Merchize Order ID</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:0 18px 16px;color:#d1fae5;font-size:13px;line-height:1.5;">${escapeHtml(payload.merchizeExternalOrderNumber ?? 'Unavailable')}</td>
-                    <td style="padding:0 18px 16px;color:#d1fae5;font-size:13px;line-height:1.5;">${escapeHtml(payload.merchizeOrderId ?? payload.merchizeOrderCode ?? 'Unavailable')}</td>
-                  </tr>
-                </table>
-                <a href="${escapeHtml(payload.adminDetailUrl)}" style="display:inline-block;border-radius:12px;background:#d1fae5;color:#064e3b;text-decoration:none;font-size:13px;font-weight:700;padding:12px 18px;">Open Order Detail</a>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+  const bodyHtml = buildAdminEmailDetailGrid([
+    {
+      label: 'Customer',
+      valueHtml: `${escapeHtml(payload.customerName)}<br /><span style="color:#93c5fd;">${escapeHtml(payload.customerEmail)}</span>`,
+    },
+    {
+      label: 'Support Ref',
+      valueHtml: escapeHtml(payload.supportReference),
+      monospace: true,
+    },
+    {
+      label: 'Merchize External Number',
+      valueHtml: escapeHtml(payload.merchizeExternalOrderNumber ?? 'Unavailable'),
+      valueColor: '#d1fae5',
+      monospace: true,
+    },
+    {
+      label: 'Merchize Order ID',
+      valueHtml: escapeHtml(payload.merchizeOrderId ?? payload.merchizeOrderCode ?? 'Unavailable'),
+      valueColor: '#d1fae5',
+      monospace: true,
+    },
+  ]);
+
+  return buildAdminEmailShell({
+    tone: 'emerald',
+    alertLabel: 'Fulfillment Ready',
+    eyebrow: 'Fulfillment Push Accepted',
+    heading: 'A paid order moved to fulfillment',
+    intro:
+      'Payment, receipt, Django payment save, Django fulfillment processing, provider detail sync, and Merchize push-to-fulfillment completed.',
+    bodyHtml,
+    buttonHref: payload.adminDetailUrl,
+    buttonLabel: 'Open Order Detail',
+    footnote:
+      'This is an internal success notice. Customer notification delivery is tracked separately in the customer notification outbox.',
+  });
 }
 
 function buildAdminPayPalLedgerWebhookDriftEmailHtml(
@@ -330,56 +459,51 @@ function buildAdminPayPalLedgerWebhookDriftEmailHtml(
 ) {
   const dbValue = payload.dbWebhookId?.trim() || 'not set';
   const envValue = payload.envWebhookId?.trim() || 'not set';
+  const bodyHtml = buildAdminEmailDetailGrid([
+    {
+      label: 'Binding',
+      valueHtml: escapeHtml(payload.label),
+    },
+    {
+      label: 'Activation Source',
+      valueHtml: escapeHtml(payload.activationSource),
+      valueColor: '#fbbf24',
+    },
+    {
+      label: 'Env Variable',
+      valueHtml: escapeHtml(payload.envVarName),
+      valueColor: '#bae6fd',
+      monospace: true,
+    },
+    {
+      label: 'Sync Status',
+      valueHtml: escapeHtml(payload.syncStatus),
+      monospace: true,
+    },
+    {
+      label: 'DB Webhook ID',
+      valueHtml: escapeHtml(dbValue),
+      monospace: true,
+    },
+    {
+      label: 'Runtime Env ID',
+      valueHtml: escapeHtml(envValue),
+      monospace: true,
+    },
+  ]);
 
-  return `
-    <div style="margin:0;padding:0;background:#020617;color:#e2e8f0;font-family:Inter,Arial,sans-serif;">
-      <table role="presentation" style="width:100%;border-collapse:collapse;background:#020617;">
-        <tr>
-          <td style="padding:32px 18px;">
-            <table role="presentation" style="width:100%;max-width:680px;margin:0 auto;border-collapse:collapse;border:1px solid rgba(148,163,184,0.22);border-radius:20px;overflow:hidden;background:#0f172a;">
-              <tr>
-                <td style="padding:26px 28px 22px;background:#111827;">
-                  <p style="margin:0 0 10px;font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:#fbbf24;font-weight:700;">PayPal Ledger Webhook Operations</p>
-                  <h1 style="margin:0;font-size:24px;line-height:1.25;color:#ffffff;">Webhook env drift needs review</h1>
-                  <p style="margin:12px 0 0;font-size:14px;line-height:1.7;color:#cbd5e1;">${escapeHtml(payload.message)}</p>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding:22px 28px;">
-                  <table role="presentation" style="width:100%;border-collapse:collapse;">
-                    <tr>
-                      <td style="padding:10px 0;color:#94a3b8;font-size:13px;">Binding</td>
-                      <td style="padding:10px 0;color:#f8fafc;font-size:13px;font-weight:700;text-align:right;">${escapeHtml(payload.label)}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:10px 0;color:#94a3b8;font-size:13px;">Env variable</td>
-                      <td style="padding:10px 0;color:#bae6fd;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right;">${escapeHtml(payload.envVarName)}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:10px 0;color:#94a3b8;font-size:13px;">DB webhook ID</td>
-                      <td style="padding:10px 0;color:#f8fafc;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right;">${escapeHtml(dbValue)}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:10px 0;color:#94a3b8;font-size:13px;">Runtime env ID</td>
-                      <td style="padding:10px 0;color:#f8fafc;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right;">${escapeHtml(envValue)}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:10px 0;color:#94a3b8;font-size:13px;">Activation source</td>
-                      <td style="padding:10px 0;color:#f8fafc;font-size:13px;text-align:right;">${escapeHtml(payload.activationSource)}</td>
-                    </tr>
-                  </table>
-                  <div style="margin-top:22px;">
-                    <a href="${escapeHtml(payload.dashboardUrl)}" style="display:inline-block;border-radius:12px;background:#fbbf24;color:#111827;text-decoration:none;font-size:13px;font-weight:800;padding:12px 18px;">Open Webhook Dashboard</a>
-                  </div>
-                  <p style="margin:18px 0 0;font-size:12px;line-height:1.6;color:#94a3b8;">Update the deployment environment when the DB value is the intended trusted webhook ID. Hybrid mode keeps env fallback available for break-glass verification.</p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-    </div>
-  `;
+  return buildAdminEmailShell({
+    tone: 'amber',
+    alertLabel: 'Webhook Alert',
+    eyebrow: 'PayPal Ledger Webhook Operations',
+    heading: 'Webhook env drift needs review',
+    intro: payload.message,
+    bodyHtml,
+    buttonHref: payload.dashboardUrl,
+    buttonLabel: 'Open Webhook Dashboard',
+    footnote:
+      'Update the deployment environment when the DB value is the intended trusted webhook ID. Hybrid mode keeps env fallback available for break-glass verification.',
+  });
 }
 
 export async function enqueueAdminRecoveryNotification({
