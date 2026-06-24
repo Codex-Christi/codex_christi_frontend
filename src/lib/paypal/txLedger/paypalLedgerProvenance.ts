@@ -23,6 +23,12 @@ export type PayPalLedgerProcessingSourceFields = {
   processingTriggerSource?: string | null;
 };
 
+export type PayPalLedgerInferredSourceFields = {
+  checkoutSurfaceLabel?: string | null;
+  hasCapturePayload?: boolean;
+  ledgerStatus?: string | null;
+};
+
 function humanizeSourceKey(value: string) {
   return value.replaceAll('_', ' ');
 }
@@ -53,6 +59,10 @@ export function getPayPalLedgerRunnerSourceLabel(source: string | null | undefin
 
 export function getPayPalLedgerProcessingSourceDisplay(
   source: PayPalLedgerProcessingSourceFields,
+  fallback: { label: string; tone: PayPalLedgerSourceTone } = {
+    label: 'Not recorded',
+    tone: 'slate',
+  },
 ): { label: string; tone: PayPalLedgerSourceTone } {
   if (source.processingTriggerSource === 'webhook') {
     const detail = source.processingTriggerDetail ?? source.latestWebhookSourceLabel;
@@ -69,5 +79,40 @@ export function getPayPalLedgerProcessingSourceDisplay(
 
   return source.latestWebhookSourceLabel
     ? { label: `Webhook · ${source.latestWebhookSourceLabel}`, tone: 'cyan' }
-    : { label: 'Not recorded', tone: 'slate' };
+    : fallback;
+}
+
+function getCheckoutSurfaceLabel() {
+  if (process.env.NODE_ENV !== 'production') return 'Local checkout';
+
+  const shopUrl = process.env.NEXT_PUBLIC_SHOP_SITE_URL?.trim();
+  if (!shopUrl) return 'Shop checkout';
+
+  try {
+    return `${new URL(shopUrl).hostname} checkout`;
+  } catch {
+    return 'Shop checkout';
+  }
+}
+
+export function getPayPalLedgerInferredProcessingSourceDisplay({
+  checkoutSurfaceLabel,
+  hasCapturePayload,
+  ledgerStatus,
+}: PayPalLedgerInferredSourceFields): { label: string; tone: PayPalLedgerSourceTone } | null {
+  if (checkoutSurfaceLabel) return { label: checkoutSurfaceLabel, tone: 'slate' };
+  if (!hasCapturePayload) return null;
+
+  if (
+    ledgerStatus === 'captured' ||
+    ledgerStatus === 'receipt_uploaded' ||
+    ledgerStatus === 'payment_saved'
+  ) {
+    return {
+      label: `${getCheckoutSurfaceLabel()} capture route`,
+      tone: 'slate',
+    };
+  }
+
+  return null;
 }

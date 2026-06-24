@@ -2,7 +2,10 @@ import 'server-only';
 
 import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
-import { getPayPalLedgerProcessingSourceDisplay } from '@/lib/paypal/txLedger/paypalLedgerProvenance';
+import {
+  getPayPalLedgerInferredProcessingSourceDisplay,
+  getPayPalLedgerProcessingSourceDisplay,
+} from '@/lib/paypal/txLedger/paypalLedgerProvenance';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import {
   getMerchizeFulfillmentOpsPrisma,
@@ -59,9 +62,7 @@ type AdminRecoveryStatus = 'failed' | 'recovery' | 'pending' | 'completed' | 'sy
 
 type JsonRecord = Record<string, unknown>;
 
-type ProjectionLedgerRow = NonNullable<
-  Awaited<ReturnType<typeof getProjectionLedgerRow>>
->;
+type ProjectionLedgerRow = NonNullable<Awaited<ReturnType<typeof getProjectionLedgerRow>>>;
 
 type ProjectionMerchizeOpsRow = {
   syncStatus: string;
@@ -167,7 +168,8 @@ function getCaptureAmountLabel(capturePayload: unknown, fallbackCurrency?: strin
 function getWebhookSourceLabel(webhook: ProjectionWebhookRow | null) {
   if (!webhook) return null;
   if (webhook.matchedWebhookLabel) return webhook.matchedWebhookLabel;
-  if (webhook.matchedWebhookBindingKey) return webhook.matchedWebhookBindingKey.replaceAll('_', ' ');
+  if (webhook.matchedWebhookBindingKey)
+    return webhook.matchedWebhookBindingKey.replaceAll('_', ' ');
   if (webhook.matchedWebhookSource) return webhook.matchedWebhookSource.replaceAll('_', ' ');
   if (webhook.webhookVerificationMode === 'disabled') return 'Signature verification disabled';
 
@@ -301,6 +303,8 @@ function getProjectionLedgerRow(orderToken: string) {
       processingTriggerDetail: true,
       processingTriggeredAt: true,
       processingTriggerSource: true,
+      checkoutSurfaceHost: true,
+      checkoutSurfaceLabel: true,
       processingCompletedAt: true,
       updatedAt: true,
     },
@@ -397,11 +401,18 @@ function buildProjectionData({
       ledgerRow.status as (typeof CUSTOMER_PROTECTION_LEDGER_STATUSES)[number],
     );
   const latestWebhookSourceLabel = getWebhookSourceLabel(webhookRow);
-  const processingSource = getPayPalLedgerProcessingSourceDisplay({
-    latestWebhookSourceLabel,
-    processingTriggerDetail: ledgerRow.processingTriggerDetail,
-    processingTriggerSource: ledgerRow.processingTriggerSource,
-  });
+  const processingSource = getPayPalLedgerProcessingSourceDisplay(
+    {
+      latestWebhookSourceLabel,
+      processingTriggerDetail: ledgerRow.processingTriggerDetail,
+      processingTriggerSource: ledgerRow.processingTriggerSource,
+    },
+    getPayPalLedgerInferredProcessingSourceDisplay({
+      checkoutSurfaceLabel: ledgerRow.checkoutSurfaceLabel,
+      hasCapturePayload: Boolean(ledgerRow.capturePayload),
+      ledgerStatus: ledgerRow.status,
+    }) ?? undefined,
+  );
   const merchizeExternalOrderNumber =
     merchizeOpsRow?.merchizeExternalOrderNumber ??
     ledgerRow.merchizeProviderOrderCode ??
@@ -455,6 +466,8 @@ function buildProjectionData({
     paidAmountLabel: getCaptureAmountLabel(ledgerRow.capturePayload, ledgerRow.initialCurrency),
     processingSourceLabel: processingSource.label,
     processingSourceTone: processingSource.tone,
+    checkoutSurfaceHost: ledgerRow.checkoutSurfaceHost,
+    checkoutSurfaceLabel: ledgerRow.checkoutSurfaceLabel,
     latestWebhookSourceLabel,
     latestWebhookEventType: webhookRow?.eventType ?? null,
     latestWebhookProcessingStatus: webhookRow?.processingStatus ?? null,

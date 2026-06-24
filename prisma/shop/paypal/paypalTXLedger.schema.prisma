@@ -49,6 +49,9 @@ model PaypalIntent {
   processingTriggerSource            String?
   processingTriggerDetail            String?
   processingTriggeredAt              DateTime?
+  checkoutSurfaceHost                String?
+  checkoutSurfaceOrigin              String?
+  checkoutSurfaceLabel               String?
   postProcessingLockId               String?
   postProcessingLockedAt             DateTime?
   postProcessingLockExpiresAt        DateTime?
@@ -170,6 +173,8 @@ model PaidOrderRecoveryProjection {
   paidAmountLabel               String?
   processingSourceLabel         String?
   processingSourceTone          String?
+  checkoutSurfaceHost           String?
+  checkoutSurfaceLabel          String?
   latestWebhookSourceLabel      String?
   latestWebhookEventType        String?
   latestWebhookProcessingStatus String?

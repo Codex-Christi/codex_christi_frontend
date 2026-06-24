@@ -189,6 +189,7 @@ function RecoveryActionsPanel({
           isCompleted={recovery.status === 'completed'}
           needsProviderDetailSync={detail.needsProviderDetailSync}
           requiresPushOverride={detail.requiresPushOverride}
+          recoveryStatus={recovery.status}
         />
         <button
           type='button'

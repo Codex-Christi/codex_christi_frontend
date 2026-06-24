@@ -27,6 +27,7 @@ type AdminRecoveryActionsPanelProps = {
   isCompleted: boolean;
   needsProviderDetailSync: boolean;
   requiresPushOverride: boolean;
+  recoveryStatus: 'failed' | 'recovery' | 'pending' | 'completed' | 'sync' | 'attention';
 };
 
 export default function AdminPaidOrderRecoveryActionsPanel({
@@ -34,11 +35,13 @@ export default function AdminPaidOrderRecoveryActionsPanel({
   isCompleted,
   needsProviderDetailSync,
   requiresPushOverride,
+  recoveryStatus,
 }: AdminRecoveryActionsPanelProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [overridePassword, setOverridePassword] = useState('');
   const [overrideReason, setOverrideReason] = useState('');
+  const resumesFullPostPaymentFlow = recoveryStatus === 'recovery';
 
   const handleProviderDetailSync = () => {
     startTransition(async () => {
@@ -84,8 +87,12 @@ export default function AdminPaidOrderRecoveryActionsPanel({
   const handleRetry = () => {
     startTransition(async () => {
       const toastId = loadingToast({
-        header: 'Retrying order recovery',
-        message: 'Running the server recovery pipeline again.',
+        header: resumesFullPostPaymentFlow
+          ? 'Resuming post-payment processing'
+          : 'Retrying fulfillment recovery',
+        message: resumesFullPostPaymentFlow
+          ? 'Continuing receipt, Django payment save, and fulfillment handoff from the paid ledger row.'
+          : 'Running the server recovery pipeline again.',
       });
 
       try {
@@ -240,7 +247,15 @@ export default function AdminPaidOrderRecoveryActionsPanel({
           disabled={isPending || isCompleted}
           onClick={handleRetry}
         >
-          {isCompleted ? 'Already Completed' : isPending ? 'Retrying...' : 'Retry Fulfillment'}
+          {isCompleted
+            ? 'Already Completed'
+            : isPending
+              ? resumesFullPostPaymentFlow
+                ? 'Resuming...'
+                : 'Retrying...'
+              : resumesFullPostPaymentFlow
+                ? 'Resume Post-Payment Processing'
+                : 'Retry Fulfillment'}
         </ActionButton>
       )}
 

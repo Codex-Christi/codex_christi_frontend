@@ -8,6 +8,7 @@ import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { listCustomerNotificationsForOrder } from '@/lib/paypal/txLedger/customerNotificationOutbox';
 import {
+  getPayPalLedgerInferredProcessingSourceDisplay,
   getPayPalLedgerProcessingSourceDisplay,
   getPayPalLedgerRunnerSourceLabel,
 } from '@/lib/paypal/txLedger/paypalLedgerProvenance';
@@ -303,13 +304,21 @@ function mapLedgerRowToPaidOrderRecoveryRow(row: {
   processingTriggerDetail?: string | null;
   processingTriggeredAt?: Date | null;
   processingTriggerSource?: string | null;
+  checkoutSurfaceLabel?: string | null;
   updatedAt: Date;
 }): PaidOrderRecoveryRow {
   const providerDetailSyncNeeded = needsProviderDetailSync(
     row.merchizeFulfillmentResponsePayload,
     row.merchizeFulfillmentOpsSyncStatus,
   );
-  const processingSource = getPayPalLedgerProcessingSourceDisplay(row);
+  const processingSource = getPayPalLedgerProcessingSourceDisplay(
+    row,
+    getPayPalLedgerInferredProcessingSourceDisplay({
+      checkoutSurfaceLabel: row.checkoutSurfaceLabel,
+      hasCapturePayload: Boolean(row.capturePayload),
+      ledgerStatus: row.status,
+    }) ?? undefined,
+  );
 
   return {
     orderToken: row.orderToken,
@@ -843,6 +852,9 @@ function buildDetail(row: {
   processingTriggeredAt: Date | null;
   processingTriggerDetail: string | null;
   processingTriggerSource: string | null;
+  checkoutSurfaceHost: string | null;
+  checkoutSurfaceOrigin: string | null;
+  checkoutSurfaceLabel: string | null;
   postProcessingLockExpiresAt: Date | null;
   status: string;
   lastErrorMessage: string | null;
@@ -868,6 +880,11 @@ function buildDetail(row: {
       row.merchizeFulfillmentOps?.productionGateStatus ===
         MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_DISABLED);
   const captureCompletion = getPayPalCaptureCompletion(row.capturePayload);
+  const inferredProcessingSource = getPayPalLedgerInferredProcessingSourceDisplay({
+    checkoutSurfaceLabel: row.checkoutSurfaceLabel,
+    hasCapturePayload: Boolean(row.capturePayload),
+    ledgerStatus: row.status,
+  });
 
   return {
     customerName: row.customerName,
@@ -889,8 +906,13 @@ function buildDetail(row: {
       { label: 'Authenticated user ID', value: row.userId },
       { label: 'PayPal order ID', value: row.paypalOrderId },
       { label: 'PayPal capture proof', value: captureCompletion.reason },
-      { label: 'Processing source', value: row.processingTriggerSource },
+      {
+        label: 'Processing source',
+        value: row.processingTriggerSource ?? inferredProcessingSource?.label ?? null,
+      },
       { label: 'Processing source detail', value: row.processingTriggerDetail },
+      { label: 'Checkout surface host', value: row.checkoutSurfaceHost },
+      { label: 'Checkout surface origin', value: row.checkoutSurfaceOrigin },
       { label: 'Django order intent UUID', value: row.djangoOrderIntentUuid },
       { label: 'Django order intent order ID', value: row.djangoOrderIntentOrderId },
       { label: 'Django payment save custom ID', value: row.djangoPaymentSaveCustomId },
@@ -956,6 +978,9 @@ function buildDetail(row: {
       processingTriggerSource: row.processingTriggerSource,
       processingTriggerDetail: row.processingTriggerDetail,
       processingTriggeredAt: row.processingTriggeredAt,
+      checkoutSurfaceHost: row.checkoutSurfaceHost,
+      checkoutSurfaceOrigin: row.checkoutSurfaceOrigin,
+      checkoutSurfaceLabel: row.checkoutSurfaceLabel,
     },
   };
 }

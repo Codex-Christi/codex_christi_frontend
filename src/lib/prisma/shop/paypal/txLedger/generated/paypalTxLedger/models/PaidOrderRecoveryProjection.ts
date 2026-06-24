@@ -58,6 +58,8 @@ export type PaidOrderRecoveryProjectionMinAggregateOutputType = {
   paidAmountLabel: string | null
   processingSourceLabel: string | null
   processingSourceTone: string | null
+  checkoutSurfaceHost: string | null
+  checkoutSurfaceLabel: string | null
   latestWebhookSourceLabel: string | null
   latestWebhookEventType: string | null
   latestWebhookProcessingStatus: string | null
@@ -107,6 +109,8 @@ export type PaidOrderRecoveryProjectionMaxAggregateOutputType = {
   paidAmountLabel: string | null
   processingSourceLabel: string | null
   processingSourceTone: string | null
+  checkoutSurfaceHost: string | null
+  checkoutSurfaceLabel: string | null
   latestWebhookSourceLabel: string | null
   latestWebhookEventType: string | null
   latestWebhookProcessingStatus: string | null
@@ -156,6 +160,8 @@ export type PaidOrderRecoveryProjectionCountAggregateOutputType = {
   paidAmountLabel: number
   processingSourceLabel: number
   processingSourceTone: number
+  checkoutSurfaceHost: number
+  checkoutSurfaceLabel: number
   latestWebhookSourceLabel: number
   latestWebhookEventType: number
   latestWebhookProcessingStatus: number
@@ -207,6 +213,8 @@ export type PaidOrderRecoveryProjectionMinAggregateInputType = {
   paidAmountLabel?: true
   processingSourceLabel?: true
   processingSourceTone?: true
+  checkoutSurfaceHost?: true
+  checkoutSurfaceLabel?: true
   latestWebhookSourceLabel?: true
   latestWebhookEventType?: true
   latestWebhookProcessingStatus?: true
@@ -256,6 +264,8 @@ export type PaidOrderRecoveryProjectionMaxAggregateInputType = {
   paidAmountLabel?: true
   processingSourceLabel?: true
   processingSourceTone?: true
+  checkoutSurfaceHost?: true
+  checkoutSurfaceLabel?: true
   latestWebhookSourceLabel?: true
   latestWebhookEventType?: true
   latestWebhookProcessingStatus?: true
@@ -305,6 +315,8 @@ export type PaidOrderRecoveryProjectionCountAggregateInputType = {
   paidAmountLabel?: true
   processingSourceLabel?: true
   processingSourceTone?: true
+  checkoutSurfaceHost?: true
+  checkoutSurfaceLabel?: true
   latestWebhookSourceLabel?: true
   latestWebhookEventType?: true
   latestWebhookProcessingStatus?: true
@@ -427,6 +439,8 @@ export type PaidOrderRecoveryProjectionGroupByOutputType = {
   paidAmountLabel: string | null
   processingSourceLabel: string | null
   processingSourceTone: string | null
+  checkoutSurfaceHost: string | null
+  checkoutSurfaceLabel: string | null
   latestWebhookSourceLabel: string | null
   latestWebhookEventType: string | null
   latestWebhookProcessingStatus: string | null
@@ -497,6 +511,8 @@ export type PaidOrderRecoveryProjectionWhereInput = {
   paidAmountLabel?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
   processingSourceLabel?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
   processingSourceTone?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
+  checkoutSurfaceHost?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
+  checkoutSurfaceLabel?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
   latestWebhookSourceLabel?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
   latestWebhookEventType?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
   latestWebhookProcessingStatus?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
@@ -546,6 +562,8 @@ export type PaidOrderRecoveryProjectionOrderByWithRelationInput = {
   paidAmountLabel?: Prisma.SortOrderInput | Prisma.SortOrder
   processingSourceLabel?: Prisma.SortOrderInput | Prisma.SortOrder
   processingSourceTone?: Prisma.SortOrderInput | Prisma.SortOrder
+  checkoutSurfaceHost?: Prisma.SortOrderInput | Prisma.SortOrder
+  checkoutSurfaceLabel?: Prisma.SortOrderInput | Prisma.SortOrder
   latestWebhookSourceLabel?: Prisma.SortOrderInput | Prisma.SortOrder
   latestWebhookEventType?: Prisma.SortOrderInput | Prisma.SortOrder
   latestWebhookProcessingStatus?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -598,6 +616,8 @@ export type PaidOrderRecoveryProjectionWhereUniqueInput = Prisma.AtLeast<{
   paidAmountLabel?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
   processingSourceLabel?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
   processingSourceTone?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
+  checkoutSurfaceHost?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
+  checkoutSurfaceLabel?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
   latestWebhookSourceLabel?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
   latestWebhookEventType?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
   latestWebhookProcessingStatus?: Prisma.StringNullableFilter<"PaidOrderRecoveryProjection"> | string | null
@@ -647,6 +667,8 @@ export type PaidOrderRecoveryProjectionOrderByWithAggregationInput = {
   paidAmountLabel?: Prisma.SortOrderInput | Prisma.SortOrder
   processingSourceLabel?: Prisma.SortOrderInput | Prisma.SortOrder
   processingSourceTone?: Prisma.SortOrderInput | Prisma.SortOrder
+  checkoutSurfaceHost?: Prisma.SortOrderInput | Prisma.SortOrder
+  checkoutSurfaceLabel?: Prisma.SortOrderInput | Prisma.SortOrder
   latestWebhookSourceLabel?: Prisma.SortOrderInput | Prisma.SortOrder
   latestWebhookEventType?: Prisma.SortOrderInput | Prisma.SortOrder
   latestWebhookProcessingStatus?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -702,6 +724,8 @@ export type PaidOrderRecoveryProjectionScalarWhereWithAggregatesInput = {
   paidAmountLabel?: Prisma.StringNullableWithAggregatesFilter<"PaidOrderRecoveryProjection"> | string | null
   processingSourceLabel?: Prisma.StringNullableWithAggregatesFilter<"PaidOrderRecoveryProjection"> | string | null
   processingSourceTone?: Prisma.StringNullableWithAggregatesFilter<"PaidOrderRecoveryProjection"> | string | null
+  checkoutSurfaceHost?: Prisma.StringNullableWithAggregatesFilter<"PaidOrderRecoveryProjection"> | string | null
+  checkoutSurfaceLabel?: Prisma.StringNullableWithAggregatesFilter<"PaidOrderRecoveryProjection"> | string | null
   latestWebhookSourceLabel?: Prisma.StringNullableWithAggregatesFilter<"PaidOrderRecoveryProjection"> | string | null
   latestWebhookEventType?: Prisma.StringNullableWithAggregatesFilter<"PaidOrderRecoveryProjection"> | string | null
   latestWebhookProcessingStatus?: Prisma.StringNullableWithAggregatesFilter<"PaidOrderRecoveryProjection"> | string | null
@@ -751,6 +775,8 @@ export type PaidOrderRecoveryProjectionCreateInput = {
   paidAmountLabel?: string | null
   processingSourceLabel?: string | null
   processingSourceTone?: string | null
+  checkoutSurfaceHost?: string | null
+  checkoutSurfaceLabel?: string | null
   latestWebhookSourceLabel?: string | null
   latestWebhookEventType?: string | null
   latestWebhookProcessingStatus?: string | null
@@ -800,6 +826,8 @@ export type PaidOrderRecoveryProjectionUncheckedCreateInput = {
   paidAmountLabel?: string | null
   processingSourceLabel?: string | null
   processingSourceTone?: string | null
+  checkoutSurfaceHost?: string | null
+  checkoutSurfaceLabel?: string | null
   latestWebhookSourceLabel?: string | null
   latestWebhookEventType?: string | null
   latestWebhookProcessingStatus?: string | null
@@ -849,6 +877,8 @@ export type PaidOrderRecoveryProjectionUpdateInput = {
   paidAmountLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingSourceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingSourceTone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceHost?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestWebhookSourceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestWebhookEventType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestWebhookProcessingStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -898,6 +928,8 @@ export type PaidOrderRecoveryProjectionUncheckedUpdateInput = {
   paidAmountLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingSourceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingSourceTone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceHost?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestWebhookSourceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestWebhookEventType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestWebhookProcessingStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -947,6 +979,8 @@ export type PaidOrderRecoveryProjectionCreateManyInput = {
   paidAmountLabel?: string | null
   processingSourceLabel?: string | null
   processingSourceTone?: string | null
+  checkoutSurfaceHost?: string | null
+  checkoutSurfaceLabel?: string | null
   latestWebhookSourceLabel?: string | null
   latestWebhookEventType?: string | null
   latestWebhookProcessingStatus?: string | null
@@ -996,6 +1030,8 @@ export type PaidOrderRecoveryProjectionUpdateManyMutationInput = {
   paidAmountLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingSourceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingSourceTone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceHost?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestWebhookSourceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestWebhookEventType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestWebhookProcessingStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1045,6 +1081,8 @@ export type PaidOrderRecoveryProjectionUncheckedUpdateManyInput = {
   paidAmountLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingSourceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingSourceTone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceHost?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestWebhookSourceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestWebhookEventType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   latestWebhookProcessingStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1094,6 +1132,8 @@ export type PaidOrderRecoveryProjectionCountOrderByAggregateInput = {
   paidAmountLabel?: Prisma.SortOrder
   processingSourceLabel?: Prisma.SortOrder
   processingSourceTone?: Prisma.SortOrder
+  checkoutSurfaceHost?: Prisma.SortOrder
+  checkoutSurfaceLabel?: Prisma.SortOrder
   latestWebhookSourceLabel?: Prisma.SortOrder
   latestWebhookEventType?: Prisma.SortOrder
   latestWebhookProcessingStatus?: Prisma.SortOrder
@@ -1143,6 +1183,8 @@ export type PaidOrderRecoveryProjectionMaxOrderByAggregateInput = {
   paidAmountLabel?: Prisma.SortOrder
   processingSourceLabel?: Prisma.SortOrder
   processingSourceTone?: Prisma.SortOrder
+  checkoutSurfaceHost?: Prisma.SortOrder
+  checkoutSurfaceLabel?: Prisma.SortOrder
   latestWebhookSourceLabel?: Prisma.SortOrder
   latestWebhookEventType?: Prisma.SortOrder
   latestWebhookProcessingStatus?: Prisma.SortOrder
@@ -1192,6 +1234,8 @@ export type PaidOrderRecoveryProjectionMinOrderByAggregateInput = {
   paidAmountLabel?: Prisma.SortOrder
   processingSourceLabel?: Prisma.SortOrder
   processingSourceTone?: Prisma.SortOrder
+  checkoutSurfaceHost?: Prisma.SortOrder
+  checkoutSurfaceLabel?: Prisma.SortOrder
   latestWebhookSourceLabel?: Prisma.SortOrder
   latestWebhookEventType?: Prisma.SortOrder
   latestWebhookProcessingStatus?: Prisma.SortOrder
@@ -1243,6 +1287,8 @@ export type PaidOrderRecoveryProjectionSelect<ExtArgs extends runtime.Types.Exte
   paidAmountLabel?: boolean
   processingSourceLabel?: boolean
   processingSourceTone?: boolean
+  checkoutSurfaceHost?: boolean
+  checkoutSurfaceLabel?: boolean
   latestWebhookSourceLabel?: boolean
   latestWebhookEventType?: boolean
   latestWebhookProcessingStatus?: boolean
@@ -1292,6 +1338,8 @@ export type PaidOrderRecoveryProjectionSelectCreateManyAndReturn<ExtArgs extends
   paidAmountLabel?: boolean
   processingSourceLabel?: boolean
   processingSourceTone?: boolean
+  checkoutSurfaceHost?: boolean
+  checkoutSurfaceLabel?: boolean
   latestWebhookSourceLabel?: boolean
   latestWebhookEventType?: boolean
   latestWebhookProcessingStatus?: boolean
@@ -1341,6 +1389,8 @@ export type PaidOrderRecoveryProjectionSelectUpdateManyAndReturn<ExtArgs extends
   paidAmountLabel?: boolean
   processingSourceLabel?: boolean
   processingSourceTone?: boolean
+  checkoutSurfaceHost?: boolean
+  checkoutSurfaceLabel?: boolean
   latestWebhookSourceLabel?: boolean
   latestWebhookEventType?: boolean
   latestWebhookProcessingStatus?: boolean
@@ -1390,6 +1440,8 @@ export type PaidOrderRecoveryProjectionSelectScalar = {
   paidAmountLabel?: boolean
   processingSourceLabel?: boolean
   processingSourceTone?: boolean
+  checkoutSurfaceHost?: boolean
+  checkoutSurfaceLabel?: boolean
   latestWebhookSourceLabel?: boolean
   latestWebhookEventType?: boolean
   latestWebhookProcessingStatus?: boolean
@@ -1405,7 +1457,7 @@ export type PaidOrderRecoveryProjectionSelectScalar = {
   updatedAt?: boolean
 }
 
-export type PaidOrderRecoveryProjectionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderToken" | "paypalOrderId" | "djangoOrderIntentUuid" | "djangoOrderIntentOrderId" | "djangoPaymentSaveCustomId" | "userId" | "customerEmail" | "customerName" | "paypalLedgerStatus" | "adminRecoveryStatus" | "customerRecoveryStatus" | "isPaid" | "isQueueVisible" | "isCustomerProtectionVisible" | "isResolved" | "needsProviderDetailSync" | "needsAdminAttention" | "canRetryFullPostProcessing" | "canRetryFulfillment" | "canSyncProviderDetails" | "merchizeExternalOrderNumber" | "merchizeOrderId" | "merchizeOrderCode" | "merchizeOpsSyncStatus" | "merchizeProductionGateStatus" | "merchizeProgressStatus" | "merchizeDeliveryStatus" | "receiptLink" | "receiptFile" | "paidAmountLabel" | "processingSourceLabel" | "processingSourceTone" | "latestWebhookSourceLabel" | "latestWebhookEventType" | "latestWebhookProcessingStatus" | "lastErrorCode" | "lastErrorMessage" | "recoveryReason" | "recoveryStage" | "recoverySeverity" | "paypalIntentUpdatedAt" | "merchizeOpsUpdatedAt" | "projectedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["paidOrderRecoveryProjection"]>
+export type PaidOrderRecoveryProjectionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderToken" | "paypalOrderId" | "djangoOrderIntentUuid" | "djangoOrderIntentOrderId" | "djangoPaymentSaveCustomId" | "userId" | "customerEmail" | "customerName" | "paypalLedgerStatus" | "adminRecoveryStatus" | "customerRecoveryStatus" | "isPaid" | "isQueueVisible" | "isCustomerProtectionVisible" | "isResolved" | "needsProviderDetailSync" | "needsAdminAttention" | "canRetryFullPostProcessing" | "canRetryFulfillment" | "canSyncProviderDetails" | "merchizeExternalOrderNumber" | "merchizeOrderId" | "merchizeOrderCode" | "merchizeOpsSyncStatus" | "merchizeProductionGateStatus" | "merchizeProgressStatus" | "merchizeDeliveryStatus" | "receiptLink" | "receiptFile" | "paidAmountLabel" | "processingSourceLabel" | "processingSourceTone" | "checkoutSurfaceHost" | "checkoutSurfaceLabel" | "latestWebhookSourceLabel" | "latestWebhookEventType" | "latestWebhookProcessingStatus" | "lastErrorCode" | "lastErrorMessage" | "recoveryReason" | "recoveryStage" | "recoverySeverity" | "paypalIntentUpdatedAt" | "merchizeOpsUpdatedAt" | "projectedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["paidOrderRecoveryProjection"]>
 
 export type $PaidOrderRecoveryProjectionPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "PaidOrderRecoveryProjection"
@@ -1444,6 +1496,8 @@ export type $PaidOrderRecoveryProjectionPayload<ExtArgs extends runtime.Types.Ex
     paidAmountLabel: string | null
     processingSourceLabel: string | null
     processingSourceTone: string | null
+    checkoutSurfaceHost: string | null
+    checkoutSurfaceLabel: string | null
     latestWebhookSourceLabel: string | null
     latestWebhookEventType: string | null
     latestWebhookProcessingStatus: string | null
@@ -1913,6 +1967,8 @@ export interface PaidOrderRecoveryProjectionFieldRefs {
   readonly paidAmountLabel: Prisma.FieldRef<"PaidOrderRecoveryProjection", 'String'>
   readonly processingSourceLabel: Prisma.FieldRef<"PaidOrderRecoveryProjection", 'String'>
   readonly processingSourceTone: Prisma.FieldRef<"PaidOrderRecoveryProjection", 'String'>
+  readonly checkoutSurfaceHost: Prisma.FieldRef<"PaidOrderRecoveryProjection", 'String'>
+  readonly checkoutSurfaceLabel: Prisma.FieldRef<"PaidOrderRecoveryProjection", 'String'>
   readonly latestWebhookSourceLabel: Prisma.FieldRef<"PaidOrderRecoveryProjection", 'String'>
   readonly latestWebhookEventType: Prisma.FieldRef<"PaidOrderRecoveryProjection", 'String'>
   readonly latestWebhookProcessingStatus: Prisma.FieldRef<"PaidOrderRecoveryProjection", 'String'>

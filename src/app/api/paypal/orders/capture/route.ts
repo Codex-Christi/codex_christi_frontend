@@ -12,6 +12,7 @@ import {
   type PayPalCaptureCompletion,
 } from '@/lib/paypal/txLedger/captureCompletion';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
+import { getCheckoutSurfaceProvenance } from '@/lib/paypal/txLedger/checkoutSurfaceProvenance';
 
 const POST_CAPTURE_RESUMABLE_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.CAPTURED,
@@ -31,6 +32,7 @@ function getLedgerStatusForIncompleteCapture(completion: PayPalCaptureCompletion
 
 export async function POST(req: Request) {
   const requestId = randomUUID();
+  const checkoutSurface = getCheckoutSurfaceProvenance(req);
 
   let orderToken: string | undefined;
 
@@ -102,6 +104,7 @@ export async function POST(req: Request) {
         capturePayload: JSON.parse(JSON.stringify(payload)),
         lastErrorCode: 'CAPTURE_NOT_COMPLETED',
         lastErrorMessage: completion.reason,
+        ...checkoutSurface,
       },
     });
     if (orderToken) await refreshPaidOrderRecoveryProjectionSafely(orderToken);
@@ -122,6 +125,7 @@ export async function POST(req: Request) {
         capturePayload: JSON.parse(JSON.stringify(payload)),
         lastErrorCode: null,
         lastErrorMessage: null,
+        ...checkoutSurface,
       },
     });
     if (orderToken) await refreshPaidOrderRecoveryProjectionSafely(orderToken);

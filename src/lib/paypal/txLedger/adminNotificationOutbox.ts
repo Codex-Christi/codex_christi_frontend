@@ -11,6 +11,7 @@ const DEFAULT_PENDING_SEND_LIMIT = 25;
 
 export const ADMIN_NOTIFICATION_TYPE = {
   PAID_ORDER_RECOVERY_REQUIRED: 'paid_order_recovery_required',
+  PAID_ORDER_RECOVERY_SCANNER_CANDIDATE: 'paid_order_recovery_scanner_candidate',
   PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED: 'paid_order_fulfillment_push_accepted',
   PAYPAL_LEDGER_WEBHOOK_DRIFT: 'paypal_ledger_webhook_drift',
   PAYMENT_RECONCILIATION_REQUIRED: 'payment_reconciliation_required',

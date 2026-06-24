@@ -101,6 +101,10 @@ function parseStoredScannerRun(value: unknown): PayPalRecoveryScannerRunResult |
           orderToken: typeof candidate.orderToken === 'string' ? candidate.orderToken : '',
           status: typeof candidate.status === 'string' ? candidate.status : '',
           customerEmail: typeof candidate.customerEmail === 'string' ? candidate.customerEmail : '',
+          customerName: typeof candidate.customerName === 'string' ? candidate.customerName : '',
+          paypalOrderId:
+            typeof candidate.paypalOrderId === 'string' ? candidate.paypalOrderId : null,
+          receiptLink: typeof candidate.receiptLink === 'string' ? candidate.receiptLink : null,
           createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : '',
           updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : '',
           reason: typeof candidate.reason === 'string' ? candidate.reason : '',

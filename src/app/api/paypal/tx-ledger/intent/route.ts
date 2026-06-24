@@ -9,6 +9,7 @@ import {
 import { paypalRouteError, paypalRouteSuccess } from '@/lib/paypal/txLedger/routeResponses';
 import { getServerSessionState } from '@/lib/session/server-session';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
+import { getCheckoutSurfaceProvenance } from '@/lib/paypal/txLedger/checkoutSurfaceProvenance';
 
 export async function POST(req: Request) {
   const requestId = randomUUID();
@@ -73,6 +74,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
+    const checkoutSurface = getCheckoutSurfaceProvenance(req);
     const {
       cart,
       customer,
@@ -116,6 +118,7 @@ export async function POST(req: Request) {
         initialCurrency: initialCurrency ?? null,
         cartSnapshot: cart,
         shippingSnapshot: delivery_address,
+        ...checkoutSurface,
       },
     });
     await refreshPaidOrderRecoveryProjectionSafely(orderToken);

@@ -64,6 +64,9 @@ export type PaypalIntentMinAggregateOutputType = {
   processingTriggerSource: string | null
   processingTriggerDetail: string | null
   processingTriggeredAt: Date | null
+  checkoutSurfaceHost: string | null
+  checkoutSurfaceOrigin: string | null
+  checkoutSurfaceLabel: string | null
   postProcessingLockId: string | null
   postProcessingLockedAt: Date | null
   postProcessingLockExpiresAt: Date | null
@@ -102,6 +105,9 @@ export type PaypalIntentMaxAggregateOutputType = {
   processingTriggerSource: string | null
   processingTriggerDetail: string | null
   processingTriggeredAt: Date | null
+  checkoutSurfaceHost: string | null
+  checkoutSurfaceOrigin: string | null
+  checkoutSurfaceLabel: string | null
   postProcessingLockId: string | null
   postProcessingLockedAt: Date | null
   postProcessingLockExpiresAt: Date | null
@@ -150,6 +156,9 @@ export type PaypalIntentCountAggregateOutputType = {
   processingTriggerSource: number
   processingTriggerDetail: number
   processingTriggeredAt: number
+  checkoutSurfaceHost: number
+  checkoutSurfaceOrigin: number
+  checkoutSurfaceLabel: number
   postProcessingLockId: number
   postProcessingLockedAt: number
   postProcessingLockExpiresAt: number
@@ -198,6 +207,9 @@ export type PaypalIntentMinAggregateInputType = {
   processingTriggerSource?: true
   processingTriggerDetail?: true
   processingTriggeredAt?: true
+  checkoutSurfaceHost?: true
+  checkoutSurfaceOrigin?: true
+  checkoutSurfaceLabel?: true
   postProcessingLockId?: true
   postProcessingLockedAt?: true
   postProcessingLockExpiresAt?: true
@@ -236,6 +248,9 @@ export type PaypalIntentMaxAggregateInputType = {
   processingTriggerSource?: true
   processingTriggerDetail?: true
   processingTriggeredAt?: true
+  checkoutSurfaceHost?: true
+  checkoutSurfaceOrigin?: true
+  checkoutSurfaceLabel?: true
   postProcessingLockId?: true
   postProcessingLockedAt?: true
   postProcessingLockExpiresAt?: true
@@ -284,6 +299,9 @@ export type PaypalIntentCountAggregateInputType = {
   processingTriggerSource?: true
   processingTriggerDetail?: true
   processingTriggeredAt?: true
+  checkoutSurfaceHost?: true
+  checkoutSurfaceOrigin?: true
+  checkoutSurfaceLabel?: true
   postProcessingLockId?: true
   postProcessingLockedAt?: true
   postProcessingLockExpiresAt?: true
@@ -419,6 +437,9 @@ export type PaypalIntentGroupByOutputType = {
   processingTriggerSource: string | null
   processingTriggerDetail: string | null
   processingTriggeredAt: Date | null
+  checkoutSurfaceHost: string | null
+  checkoutSurfaceOrigin: string | null
+  checkoutSurfaceLabel: string | null
   postProcessingLockId: string | null
   postProcessingLockedAt: Date | null
   postProcessingLockExpiresAt: Date | null
@@ -490,6 +511,9 @@ export type PaypalIntentWhereInput = {
   processingTriggerSource?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   processingTriggerDetail?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   processingTriggeredAt?: Prisma.DateTimeNullableFilter<"PaypalIntent"> | Date | string | null
+  checkoutSurfaceHost?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  checkoutSurfaceOrigin?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  checkoutSurfaceLabel?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   postProcessingLockId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   postProcessingLockedAt?: Prisma.DateTimeNullableFilter<"PaypalIntent"> | Date | string | null
   postProcessingLockExpiresAt?: Prisma.DateTimeNullableFilter<"PaypalIntent"> | Date | string | null
@@ -538,6 +562,9 @@ export type PaypalIntentOrderByWithRelationInput = {
   processingTriggerSource?: Prisma.SortOrderInput | Prisma.SortOrder
   processingTriggerDetail?: Prisma.SortOrderInput | Prisma.SortOrder
   processingTriggeredAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  checkoutSurfaceHost?: Prisma.SortOrderInput | Prisma.SortOrder
+  checkoutSurfaceOrigin?: Prisma.SortOrderInput | Prisma.SortOrder
+  checkoutSurfaceLabel?: Prisma.SortOrderInput | Prisma.SortOrder
   postProcessingLockId?: Prisma.SortOrderInput | Prisma.SortOrder
   postProcessingLockedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   postProcessingLockExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -589,6 +616,9 @@ export type PaypalIntentWhereUniqueInput = Prisma.AtLeast<{
   processingTriggerSource?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   processingTriggerDetail?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   processingTriggeredAt?: Prisma.DateTimeNullableFilter<"PaypalIntent"> | Date | string | null
+  checkoutSurfaceHost?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  checkoutSurfaceOrigin?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
+  checkoutSurfaceLabel?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   postProcessingLockId?: Prisma.StringNullableFilter<"PaypalIntent"> | string | null
   postProcessingLockedAt?: Prisma.DateTimeNullableFilter<"PaypalIntent"> | Date | string | null
   postProcessingLockExpiresAt?: Prisma.DateTimeNullableFilter<"PaypalIntent"> | Date | string | null
@@ -637,6 +667,9 @@ export type PaypalIntentOrderByWithAggregationInput = {
   processingTriggerSource?: Prisma.SortOrderInput | Prisma.SortOrder
   processingTriggerDetail?: Prisma.SortOrderInput | Prisma.SortOrder
   processingTriggeredAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  checkoutSurfaceHost?: Prisma.SortOrderInput | Prisma.SortOrder
+  checkoutSurfaceOrigin?: Prisma.SortOrderInput | Prisma.SortOrder
+  checkoutSurfaceLabel?: Prisma.SortOrderInput | Prisma.SortOrder
   postProcessingLockId?: Prisma.SortOrderInput | Prisma.SortOrder
   postProcessingLockedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   postProcessingLockExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -693,6 +726,9 @@ export type PaypalIntentScalarWhereWithAggregatesInput = {
   processingTriggerSource?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
   processingTriggerDetail?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
   processingTriggeredAt?: Prisma.DateTimeNullableWithAggregatesFilter<"PaypalIntent"> | Date | string | null
+  checkoutSurfaceHost?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
+  checkoutSurfaceOrigin?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
+  checkoutSurfaceLabel?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
   postProcessingLockId?: Prisma.StringNullableWithAggregatesFilter<"PaypalIntent"> | string | null
   postProcessingLockedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"PaypalIntent"> | Date | string | null
   postProcessingLockExpiresAt?: Prisma.DateTimeNullableWithAggregatesFilter<"PaypalIntent"> | Date | string | null
@@ -741,6 +777,9 @@ export type PaypalIntentCreateInput = {
   processingTriggerSource?: string | null
   processingTriggerDetail?: string | null
   processingTriggeredAt?: Date | string | null
+  checkoutSurfaceHost?: string | null
+  checkoutSurfaceOrigin?: string | null
+  checkoutSurfaceLabel?: string | null
   postProcessingLockId?: string | null
   postProcessingLockedAt?: Date | string | null
   postProcessingLockExpiresAt?: Date | string | null
@@ -789,6 +828,9 @@ export type PaypalIntentUncheckedCreateInput = {
   processingTriggerSource?: string | null
   processingTriggerDetail?: string | null
   processingTriggeredAt?: Date | string | null
+  checkoutSurfaceHost?: string | null
+  checkoutSurfaceOrigin?: string | null
+  checkoutSurfaceLabel?: string | null
   postProcessingLockId?: string | null
   postProcessingLockedAt?: Date | string | null
   postProcessingLockExpiresAt?: Date | string | null
@@ -837,6 +879,9 @@ export type PaypalIntentUpdateInput = {
   processingTriggerSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingTriggerDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingTriggeredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  checkoutSurfaceHost?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceOrigin?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   postProcessingLockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   postProcessingLockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   postProcessingLockExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -885,6 +930,9 @@ export type PaypalIntentUncheckedUpdateInput = {
   processingTriggerSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingTriggerDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingTriggeredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  checkoutSurfaceHost?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceOrigin?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   postProcessingLockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   postProcessingLockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   postProcessingLockExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -933,6 +981,9 @@ export type PaypalIntentCreateManyInput = {
   processingTriggerSource?: string | null
   processingTriggerDetail?: string | null
   processingTriggeredAt?: Date | string | null
+  checkoutSurfaceHost?: string | null
+  checkoutSurfaceOrigin?: string | null
+  checkoutSurfaceLabel?: string | null
   postProcessingLockId?: string | null
   postProcessingLockedAt?: Date | string | null
   postProcessingLockExpiresAt?: Date | string | null
@@ -981,6 +1032,9 @@ export type PaypalIntentUpdateManyMutationInput = {
   processingTriggerSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingTriggerDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingTriggeredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  checkoutSurfaceHost?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceOrigin?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   postProcessingLockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   postProcessingLockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   postProcessingLockExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1029,6 +1083,9 @@ export type PaypalIntentUncheckedUpdateManyInput = {
   processingTriggerSource?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingTriggerDetail?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   processingTriggeredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  checkoutSurfaceHost?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceOrigin?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  checkoutSurfaceLabel?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   postProcessingLockId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   postProcessingLockedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   postProcessingLockExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1077,6 +1134,9 @@ export type PaypalIntentCountOrderByAggregateInput = {
   processingTriggerSource?: Prisma.SortOrder
   processingTriggerDetail?: Prisma.SortOrder
   processingTriggeredAt?: Prisma.SortOrder
+  checkoutSurfaceHost?: Prisma.SortOrder
+  checkoutSurfaceOrigin?: Prisma.SortOrder
+  checkoutSurfaceLabel?: Prisma.SortOrder
   postProcessingLockId?: Prisma.SortOrder
   postProcessingLockedAt?: Prisma.SortOrder
   postProcessingLockExpiresAt?: Prisma.SortOrder
@@ -1119,6 +1179,9 @@ export type PaypalIntentMaxOrderByAggregateInput = {
   processingTriggerSource?: Prisma.SortOrder
   processingTriggerDetail?: Prisma.SortOrder
   processingTriggeredAt?: Prisma.SortOrder
+  checkoutSurfaceHost?: Prisma.SortOrder
+  checkoutSurfaceOrigin?: Prisma.SortOrder
+  checkoutSurfaceLabel?: Prisma.SortOrder
   postProcessingLockId?: Prisma.SortOrder
   postProcessingLockedAt?: Prisma.SortOrder
   postProcessingLockExpiresAt?: Prisma.SortOrder
@@ -1157,6 +1220,9 @@ export type PaypalIntentMinOrderByAggregateInput = {
   processingTriggerSource?: Prisma.SortOrder
   processingTriggerDetail?: Prisma.SortOrder
   processingTriggeredAt?: Prisma.SortOrder
+  checkoutSurfaceHost?: Prisma.SortOrder
+  checkoutSurfaceOrigin?: Prisma.SortOrder
+  checkoutSurfaceLabel?: Prisma.SortOrder
   postProcessingLockId?: Prisma.SortOrder
   postProcessingLockedAt?: Prisma.SortOrder
   postProcessingLockExpiresAt?: Prisma.SortOrder
@@ -1235,6 +1301,9 @@ export type PaypalIntentSelect<ExtArgs extends runtime.Types.Extensions.Internal
   processingTriggerSource?: boolean
   processingTriggerDetail?: boolean
   processingTriggeredAt?: boolean
+  checkoutSurfaceHost?: boolean
+  checkoutSurfaceOrigin?: boolean
+  checkoutSurfaceLabel?: boolean
   postProcessingLockId?: boolean
   postProcessingLockedAt?: boolean
   postProcessingLockExpiresAt?: boolean
@@ -1283,6 +1352,9 @@ export type PaypalIntentSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   processingTriggerSource?: boolean
   processingTriggerDetail?: boolean
   processingTriggeredAt?: boolean
+  checkoutSurfaceHost?: boolean
+  checkoutSurfaceOrigin?: boolean
+  checkoutSurfaceLabel?: boolean
   postProcessingLockId?: boolean
   postProcessingLockedAt?: boolean
   postProcessingLockExpiresAt?: boolean
@@ -1331,6 +1403,9 @@ export type PaypalIntentSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   processingTriggerSource?: boolean
   processingTriggerDetail?: boolean
   processingTriggeredAt?: boolean
+  checkoutSurfaceHost?: boolean
+  checkoutSurfaceOrigin?: boolean
+  checkoutSurfaceLabel?: boolean
   postProcessingLockId?: boolean
   postProcessingLockedAt?: boolean
   postProcessingLockExpiresAt?: boolean
@@ -1379,6 +1454,9 @@ export type PaypalIntentSelectScalar = {
   processingTriggerSource?: boolean
   processingTriggerDetail?: boolean
   processingTriggeredAt?: boolean
+  checkoutSurfaceHost?: boolean
+  checkoutSurfaceOrigin?: boolean
+  checkoutSurfaceLabel?: boolean
   postProcessingLockId?: boolean
   postProcessingLockedAt?: boolean
   postProcessingLockExpiresAt?: boolean
@@ -1387,7 +1465,7 @@ export type PaypalIntentSelectScalar = {
   updatedAt?: boolean
 }
 
-export type PaypalIntentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderToken" | "paypalOrderId" | "paypalAuthorizationId" | "djangoOrderIntentUuid" | "djangoOrderIntentOrderId" | "customerName" | "customerEmail" | "userId" | "countryIso2" | "countryIso3" | "initialCurrency" | "cartSnapshot" | "shippingSnapshot" | "authorizePayload" | "capturePayload" | "djangoOrderIntentPayload" | "djangoOrderIntentVerifyPayload" | "djangoPaymentSaveResponsePayload" | "merchizeFulfillmentRequestPayload" | "merchizeFulfillmentResponsePayload" | "merchizeFulfillmentProcessingId" | "merchizeProviderOrderId" | "merchizeProviderOrderCode" | "fulfillmentAddressOverride" | "fulfillmentAddressOverrideReason" | "fulfillmentAddressOverriddenBy" | "fulfillmentAddressOverriddenAt" | "djangoPaymentSaveCustomId" | "receiptLink" | "receiptFile" | "status" | "lastEventType" | "lastErrorCode" | "lastErrorMessage" | "retryCount" | "processingTriggerSource" | "processingTriggerDetail" | "processingTriggeredAt" | "postProcessingLockId" | "postProcessingLockedAt" | "postProcessingLockExpiresAt" | "processingCompletedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["paypalIntent"]>
+export type PaypalIntentOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderToken" | "paypalOrderId" | "paypalAuthorizationId" | "djangoOrderIntentUuid" | "djangoOrderIntentOrderId" | "customerName" | "customerEmail" | "userId" | "countryIso2" | "countryIso3" | "initialCurrency" | "cartSnapshot" | "shippingSnapshot" | "authorizePayload" | "capturePayload" | "djangoOrderIntentPayload" | "djangoOrderIntentVerifyPayload" | "djangoPaymentSaveResponsePayload" | "merchizeFulfillmentRequestPayload" | "merchizeFulfillmentResponsePayload" | "merchizeFulfillmentProcessingId" | "merchizeProviderOrderId" | "merchizeProviderOrderCode" | "fulfillmentAddressOverride" | "fulfillmentAddressOverrideReason" | "fulfillmentAddressOverriddenBy" | "fulfillmentAddressOverriddenAt" | "djangoPaymentSaveCustomId" | "receiptLink" | "receiptFile" | "status" | "lastEventType" | "lastErrorCode" | "lastErrorMessage" | "retryCount" | "processingTriggerSource" | "processingTriggerDetail" | "processingTriggeredAt" | "checkoutSurfaceHost" | "checkoutSurfaceOrigin" | "checkoutSurfaceLabel" | "postProcessingLockId" | "postProcessingLockedAt" | "postProcessingLockExpiresAt" | "processingCompletedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["paypalIntent"]>
 
 export type $PaypalIntentPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "PaypalIntent"
@@ -1432,6 +1510,9 @@ export type $PaypalIntentPayload<ExtArgs extends runtime.Types.Extensions.Intern
     processingTriggerSource: string | null
     processingTriggerDetail: string | null
     processingTriggeredAt: Date | null
+    checkoutSurfaceHost: string | null
+    checkoutSurfaceOrigin: string | null
+    checkoutSurfaceLabel: string | null
     postProcessingLockId: string | null
     postProcessingLockedAt: Date | null
     postProcessingLockExpiresAt: Date | null
@@ -1900,6 +1981,9 @@ export interface PaypalIntentFieldRefs {
   readonly processingTriggerSource: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly processingTriggerDetail: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly processingTriggeredAt: Prisma.FieldRef<"PaypalIntent", 'DateTime'>
+  readonly checkoutSurfaceHost: Prisma.FieldRef<"PaypalIntent", 'String'>
+  readonly checkoutSurfaceOrigin: Prisma.FieldRef<"PaypalIntent", 'String'>
+  readonly checkoutSurfaceLabel: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly postProcessingLockId: Prisma.FieldRef<"PaypalIntent", 'String'>
   readonly postProcessingLockedAt: Prisma.FieldRef<"PaypalIntent", 'DateTime'>
   readonly postProcessingLockExpiresAt: Prisma.FieldRef<"PaypalIntent", 'DateTime'>

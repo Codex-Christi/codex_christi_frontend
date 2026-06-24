@@ -9,6 +9,13 @@ import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfi
 import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+import {
+  ADMIN_NOTIFICATION_SEVERITY,
+  ADMIN_NOTIFICATION_STAGE,
+  ADMIN_NOTIFICATION_TYPE,
+  enqueueAdminRecoveryNotification,
+  sendPendingAdminRecoveryNotificationsForOrder,
+} from '@/lib/paypal/txLedger/adminNotificationOutbox';
 
 const AUTOMATIC_RECOVERY_STATUSES = [
   PAYPAL_LEDGER_STATUS.CAPTURED,
@@ -22,6 +29,9 @@ export type PayPalRecoveryScanCandidate = {
   orderToken: string;
   status: string;
   customerEmail: string;
+  customerName: string;
+  paypalOrderId: string | null;
+  receiptLink: string | null;
   createdAt: string;
   updatedAt: string;
   reason: string;
@@ -61,6 +71,9 @@ function toCandidate(row: {
   orderToken: string;
   status: string;
   customerEmail: string;
+  customerName: string;
+  paypalOrderId: string | null;
+  receiptLink: string | null;
   capturePayload: unknown;
   createdAt: Date;
   updatedAt: Date;
@@ -73,6 +86,9 @@ function toCandidate(row: {
     orderToken: row.orderToken,
     status: row.status,
     customerEmail: row.customerEmail,
+    customerName: row.customerName,
+    paypalOrderId: row.paypalOrderId,
+    receiptLink: row.receiptLink,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     reason: `${captureCompletion.reason} Post-capture ledger row is still ${row.status}.`,
@@ -107,6 +123,9 @@ export async function findPayPalRecoveryCandidates(args?: {
       orderToken: true,
       status: true,
       customerEmail: true,
+      customerName: true,
+      paypalOrderId: true,
+      receiptLink: true,
       capturePayload: true,
       createdAt: true,
       updatedAt: true,
@@ -119,6 +138,42 @@ export async function findPayPalRecoveryCandidates(args?: {
     .filter((row) => getPayPalCaptureCompletion(row.capturePayload).ok)
     .slice(0, batchSize)
     .map((row) => toCandidate(row));
+}
+
+async function notifyScheduledRecoveryCandidates({
+  candidates,
+  minAgeMinutes,
+}: {
+  candidates: PayPalRecoveryScanCandidate[];
+  minAgeMinutes: number;
+}) {
+  for (const candidate of candidates) {
+    await enqueueAdminRecoveryNotification({
+      orderToken: candidate.orderToken,
+      paypalOrderId: candidate.paypalOrderId,
+      customerName: candidate.customerName,
+      customerEmail: candidate.customerEmail,
+      ledgerStatus: candidate.status,
+      errorCode: 'PAID_ORDER_RECOVERY_SCANNER_CANDIDATE',
+      errorMessage: `A paid checkout is still at ${candidate.status} after at least ${minAgeMinutes} minutes and is queued for automatic post-payment recovery.`,
+      issueSummary: [
+        `Recovery scanner found this paid row at status ${candidate.status}.`,
+        'Receipt generation, Django payment save, or fulfillment handoff has not completed yet.',
+        'The scanner will attempt to resume from the durable PayPal TX ledger row without recapturing payment.',
+      ],
+      receiptLink: candidate.receiptLink,
+      type: ADMIN_NOTIFICATION_TYPE.PAID_ORDER_RECOVERY_SCANNER_CANDIDATE,
+      stage: ADMIN_NOTIFICATION_STAGE.PAYMENT,
+      severity: ADMIN_NOTIFICATION_SEVERITY.WARNING,
+    });
+
+    await sendPendingAdminRecoveryNotificationsForOrder(candidate.orderToken).catch((error) => {
+      console.error('[AdminNotificationOutbox] failed to send recovery scanner alert', {
+        orderToken: candidate.orderToken,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
 }
 
 export async function runPayPalRecoveryScanner(args?: {
@@ -147,6 +202,8 @@ export async function runPayPalRecoveryScanner(args?: {
   };
 
   if (!enabled || result.dryRun) return result;
+
+  await notifyScheduledRecoveryCandidates({ candidates, minAgeMinutes });
 
   for (const candidate of candidates) {
     try {
