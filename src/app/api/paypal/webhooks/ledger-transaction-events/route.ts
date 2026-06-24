@@ -1,5 +1,6 @@
 import { after } from 'next/server';
 
+import { getPayPalWebhookProcessingOwner } from '@/lib/paypal/ledgerWebhookConfig';
 import { resolvePayPalLedgerTrustedWebhookIds } from '@/lib/paypal/ledgerWebhookTrust';
 import type { PayPalLedgerTrustedWebhookCandidate } from '@/lib/paypal/ledgerWebhookTrust';
 import { getServerPayPalConfig } from '@/lib/paypal/serverPayPalConfig';
@@ -18,6 +19,7 @@ import {
   verifyWebhookSignature,
 } from '@/lib/paypal/txLedger/webhookHelpers';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -43,6 +45,10 @@ type PayPalWebhookVerificationHeaders = {
   paypalTransmissionSig: string;
   paypalTransmissionTime: string;
 };
+
+type WebhookProcessingOwnershipDecision =
+  | { shouldProcess: true; reason: null }
+  | { shouldProcess: false; reason: string };
 
 function shouldVerifyWebhookSignature() {
   const configured = (process.env.PAYPAL_WEBHOOK_SIGNATURE_VERIFICATION ?? '').toLowerCase();
@@ -82,6 +88,47 @@ async function verifyWebhookSignatureWithAnyConfiguredWebhookId({
   }
 
   return null;
+}
+
+function getWebhookProcessingOwnershipDecision({
+  matchedWebhook,
+  owner,
+  ownerError,
+  shouldVerify,
+}: {
+  matchedWebhook: PayPalLedgerTrustedWebhookCandidate | null;
+  owner: string;
+  ownerError: string | null;
+  shouldVerify: boolean;
+}): WebhookProcessingOwnershipDecision {
+  if (ownerError) {
+    return {
+      shouldProcess: false,
+      reason: ownerError,
+    };
+  }
+
+  if (owner === 'none') {
+    return {
+      shouldProcess: false,
+      reason: 'PayPal webhook processing owner is set to none.',
+    };
+  }
+
+  if (!shouldVerify) {
+    return { shouldProcess: true, reason: null };
+  }
+
+  if (matchedWebhook?.bindingKey === owner) {
+    return { shouldProcess: true, reason: null };
+  }
+
+  return {
+    shouldProcess: false,
+    reason: matchedWebhook?.bindingKey
+      ? `Webhook matched ${matchedWebhook.bindingKey}, but ${owner} owns processing for this runtime.`
+      : `Webhook matched an additional/unnamed webhook ID, but ${owner} owns processing for this runtime.`,
+  };
 }
 
 async function updateLedgerFromWebhook(args: {
@@ -199,6 +246,7 @@ export async function POST(req: Request) {
   try {
     const config = getServerPayPalConfig();
     const trustResolution = await resolvePayPalLedgerTrustedWebhookIds(config.paymentMode);
+    const processingOwnership = getPayPalWebhookProcessingOwner(config.paymentMode);
     const shouldVerify = shouldVerifyWebhookSignature();
     let matchedWebhook: PayPalLedgerTrustedWebhookCandidate | null = null;
 
@@ -232,6 +280,30 @@ export async function POST(req: Request) {
 
     if (!event.id || !event.event_type) {
       return new Response('Missing event metadata', { status: 400 });
+    }
+
+    const ownershipDecision = getWebhookProcessingOwnershipDecision({
+      matchedWebhook,
+      owner: processingOwnership.owner,
+      ownerError: processingOwnership.error,
+      shouldVerify,
+    });
+
+    if (!ownershipDecision.shouldProcess) {
+      console.info('[PayPal Webhook] acknowledged by non-owner runtime', {
+        eventId: event.id,
+        eventType: event.event_type,
+        matchedWebhookBindingKey: matchedWebhook?.bindingKey ?? null,
+        matchedWebhookLabel: matchedWebhook?.label ?? null,
+        matchedWebhookSource:
+          matchedWebhook?.source ?? (shouldVerify ? trustResolution.source : null),
+        owner: processingOwnership.owner,
+        ownerSource: processingOwnership.source,
+        ownerEnvVarName: processingOwnership.envVarName,
+        reason: ownershipDecision.reason,
+      });
+
+      return new Response('OK', { status: 200 });
     }
 
     const correlation = getWebhookLedgerCorrelation(event);
@@ -288,6 +360,7 @@ export async function POST(req: Request) {
       currentCapturePayload: row.capturePayload,
       webhookResource: event.resource,
     });
+    await refreshPaidOrderRecoveryProjectionSafely(row.orderToken);
 
     if (event.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
       if (FULFILLMENT_RECOVERY_STATUSES.has(row.status)) {

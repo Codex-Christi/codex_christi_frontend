@@ -11,6 +11,7 @@ import {
   getPayPalCaptureCompletion,
   type PayPalCaptureCompletion,
 } from '@/lib/paypal/txLedger/captureCompletion';
+import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 
 const POST_CAPTURE_RESUMABLE_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.CAPTURED,
@@ -80,6 +81,7 @@ export async function POST(req: Request) {
           },
         })
         .catch(() => undefined);
+      await refreshPaidOrderRecoveryProjectionSafely(orderToken);
     }
     return routeError({
       status,
@@ -102,6 +104,7 @@ export async function POST(req: Request) {
         lastErrorMessage: completion.reason,
       },
     });
+    if (orderToken) await refreshPaidOrderRecoveryProjectionSafely(orderToken);
   };
 
   const persistCapturedResult = async (payload: CapturedPayment) => {
@@ -121,6 +124,7 @@ export async function POST(req: Request) {
         lastErrorMessage: null,
       },
     });
+    if (orderToken) await refreshPaidOrderRecoveryProjectionSafely(orderToken);
 
     return completion;
   };

@@ -6,8 +6,10 @@ import {
   getPayPalLedgerWebhookActivationSource,
   getPayPalLedgerWebhookEnvValue,
   getPayPalLedgerWebhookExpectedUrl,
+  getPayPalWebhookProcessingOwner,
   PAYPAL_LEDGER_WEBHOOK_BINDING_DEFINITIONS,
   PAYPAL_LEDGER_WEBHOOK_REQUIRED_EVENTS,
+  type PayPalWebhookProcessingOwnership,
   type PayPalLedgerWebhookActivationSource,
   type PayPalLedgerWebhookBindingKey,
 } from '@/lib/paypal/ledgerWebhookConfig';
@@ -40,6 +42,7 @@ export type PayPalLedgerWebhookDashboardBinding = {
   envWebhookId: string | null;
   expectedUrl: string | null;
   isActive: boolean;
+  isProcessingOwner: boolean;
   key: PayPalLedgerWebhookBindingKey;
   label: string;
   lastCheckedAt: string | null;
@@ -62,6 +65,7 @@ export type PayPalLedgerWebhookDashboard = {
   generatedAt: string;
   paypalApp: PayPalLedgerWebhookPayPalAppStatus;
   paymentModeError: string | null;
+  processingOwnership: PayPalLedgerWebhookProcessingOwnerStatus | null;
   requiredEvents: string[];
   rows: PayPalLedgerWebhookDashboardBinding[];
   safetyWarnings: PayPalLedgerWebhookSafetyWarning[];
@@ -73,6 +77,11 @@ export type PayPalLedgerWebhookDashboard = {
     notificationDueCount: number;
     safetyWarningCount: number;
   };
+};
+
+export type PayPalLedgerWebhookProcessingOwnerStatus = PayPalWebhookProcessingOwnership & {
+  ownerLabel: string;
+  ownerTrustedByRuntime: boolean;
 };
 
 export type PayPalLedgerWebhookPayPalAppStatus = {
@@ -147,11 +156,26 @@ export async function getPayPalLedgerWebhookDashboard({
   const paymentModeState = getOptionalConfiguredPayPalPaymentMode();
   const databaseTarget = getPayPalLedgerWebhookDatabaseTargetStatus();
   const databaseConfigured = databaseTarget.configured;
-  const rows = await getPayPalLedgerWebhookDashboardRows({ databaseConfigured });
+  const rawProcessingOwnership = paymentModeState.paymentMode
+    ? getPayPalWebhookProcessingOwner(paymentModeState.paymentMode)
+    : null;
+  const rows = await getPayPalLedgerWebhookDashboardRows({
+    databaseConfigured,
+    processingOwner: rawProcessingOwnership?.owner ?? null,
+  });
+  const processingOwnership = rawProcessingOwnership
+    ? getPayPalLedgerWebhookProcessingOwnerStatus({
+        activationSource,
+        ownership: rawProcessingOwnership,
+        rows,
+      })
+    : null;
   const paypalApp = getPayPalLedgerWebhookPayPalAppStatus(paymentModeState.paymentMode);
   const safetyWarnings = getPayPalLedgerWebhookSafetyWarnings({
+    activationSource,
     currentPaymentMode: paymentModeState.paymentMode,
     databaseTarget,
+    processingOwnership,
     rows,
   });
 
@@ -177,6 +201,7 @@ export async function getPayPalLedgerWebhookDashboard({
     generatedAt: new Date().toISOString(),
     paypalApp,
     paymentModeError: paymentModeState.error,
+    processingOwnership,
     requiredEvents: [...PAYPAL_LEDGER_WEBHOOK_REQUIRED_EVENTS],
     rows,
     safetyWarnings,
@@ -215,31 +240,96 @@ function getPayPalLedgerWebhookPayPalAppStatus(
   };
 }
 
-function getPayPalLedgerWebhookSafetyWarnings({
-  currentPaymentMode,
-  databaseTarget,
+function getPayPalLedgerWebhookBindingLabel(key: string | null) {
+  if (!key || key === 'none') return 'None';
+
+  return (
+    PAYPAL_LEDGER_WEBHOOK_BINDING_DEFINITIONS.find((definition) => definition.key === key)?.label ??
+    key.replaceAll('_', ' ')
+  );
+}
+
+function isPayPalLedgerWebhookBindingTrustedByRuntime({
+  activationSource,
+  row,
+}: {
+  activationSource: PayPalLedgerWebhookActivationSource;
+  row: PayPalLedgerWebhookDashboardBinding | undefined;
+}) {
+  return (
+    Boolean(row?.envWebhookId) ||
+    (activationSource === 'db_hybrid' && Boolean(row?.isActive && row.dbWebhookId))
+  );
+}
+
+function getPayPalLedgerWebhookProcessingOwnerStatus({
+  activationSource,
+  ownership,
   rows,
 }: {
+  activationSource: PayPalLedgerWebhookActivationSource;
+  ownership: PayPalWebhookProcessingOwnership;
+  rows: PayPalLedgerWebhookDashboardBinding[];
+}): PayPalLedgerWebhookProcessingOwnerStatus {
+  const ownerRow = rows.find((row) => row.key === ownership.owner);
+
+  return {
+    ...ownership,
+    ownerLabel: getPayPalLedgerWebhookBindingLabel(ownership.owner),
+    ownerTrustedByRuntime: isPayPalLedgerWebhookBindingTrustedByRuntime({
+      activationSource,
+      row: ownerRow,
+    }),
+  };
+}
+
+function getPayPalLedgerWebhookSafetyWarnings({
+  activationSource,
+  currentPaymentMode,
+  databaseTarget,
+  processingOwnership,
+  rows,
+}: {
+  activationSource: PayPalLedgerWebhookActivationSource;
   currentPaymentMode: 'sandbox' | 'live' | null;
   databaseTarget: PayPalLedgerWebhookDatabaseTargetStatus;
+  processingOwnership: PayPalLedgerWebhookProcessingOwnerStatus | null;
   rows: PayPalLedgerWebhookDashboardBinding[];
 }): PayPalLedgerWebhookSafetyWarning[] {
   const warnings: PayPalLedgerWebhookSafetyWarning[] = [...databaseTarget.warnings];
 
-  if (currentPaymentMode === 'sandbox') {
-    const sandboxNgrokTrusted = rows.some(
-      (row) => row.key === 'sandbox_ngrok' && Boolean(row.dbWebhookId || row.envWebhookId),
-    );
-    const sandboxProductionTrusted = rows.some(
-      (row) => row.key === 'sandbox_production' && Boolean(row.dbWebhookId || row.envWebhookId),
-    );
+  if (!currentPaymentMode || !processingOwnership) return warnings;
 
-    if (sandboxNgrokTrusted && sandboxProductionTrusted) {
+  if (processingOwnership.error) {
+    warnings.push({
+      code: 'paypal_webhook_processing_owner_invalid',
+      message: processingOwnership.error,
+      severity: 'critical',
+    });
+  }
+
+  if (processingOwnership.owner === 'none') {
+    warnings.push({
+      code: 'paypal_webhook_processing_owner_none',
+      message:
+        'PayPal webhook processing owner is set to none. This runtime will acknowledge matching webhooks without mutating the ledger.',
+      severity: currentPaymentMode === 'live' ? 'critical' : 'warning',
+    });
+  }
+
+  if (processingOwnership.owner !== 'none') {
+    const ownerRow = rows.find((row) => row.key === processingOwnership.owner);
+
+    if (
+      !isPayPalLedgerWebhookBindingTrustedByRuntime({
+        activationSource,
+        row: ownerRow,
+      })
+    ) {
       warnings.push({
-        code: 'sandbox_dual_listener_delivery',
-        message:
-          'Sandbox ngrok and production listeners are both trusted. If both are registered under the same PayPal sandbox app, PayPal can deliver the same event to both; compare PayPal app fingerprints across local and VPS for isolation.',
-        severity: 'warning',
+        code: 'paypal_webhook_processing_owner_untrusted',
+        message: `${processingOwnership.ownerLabel} owns processing for this runtime, but no trusted webhook ID for that binding is currently available through env or active DB binding.`,
+        severity: 'critical',
       });
     }
   }
@@ -511,8 +601,10 @@ export async function syncPayPalLedgerWebhookEnvToDbBinding({
 
 async function getPayPalLedgerWebhookDashboardRows({
   databaseConfigured,
+  processingOwner,
 }: {
   databaseConfigured: boolean;
+  processingOwner: string | null;
 }) {
   let dbRows: Awaited<
     ReturnType<typeof paypalTxLedger.paypalLedgerTransactionWebhookBinding.findMany>
@@ -561,6 +653,7 @@ async function getPayPalLedgerWebhookDashboardRows({
       envWebhookId,
       expectedUrl,
       isActive: Boolean(dbRow?.isActive),
+      isProcessingOwner: definition.key === processingOwner,
       key: definition.key,
       label: definition.label,
       lastCheckedAt: dbRow?.lastCheckedAt?.toISOString() ?? null,

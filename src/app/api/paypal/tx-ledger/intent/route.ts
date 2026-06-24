@@ -8,6 +8,7 @@ import {
 } from '@/lib/paypal/createPayPalOrder';
 import { paypalRouteError, paypalRouteSuccess } from '@/lib/paypal/txLedger/routeResponses';
 import { getServerSessionState } from '@/lib/session/server-session';
+import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 
 export async function POST(req: Request) {
   const requestId = randomUUID();
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
           lastErrorMessage: err instanceof Error ? err.message : String(err),
         },
       });
+      await refreshPaidOrderRecoveryProjectionSafely(orderToken);
     }
 
     return paypalRouteError({
@@ -116,6 +118,7 @@ export async function POST(req: Request) {
         shippingSnapshot: delivery_address,
       },
     });
+    await refreshPaidOrderRecoveryProjectionSafely(orderToken);
 
     let paypalOrder: Order;
     try {
@@ -164,6 +167,7 @@ export async function POST(req: Request) {
           status: PAYPAL_LEDGER_STATUS.INTENT_CREATED,
         },
       });
+      await refreshPaidOrderRecoveryProjectionSafely(orderToken);
     } catch (persistErr) {
       return fail({
         code: 'LEDGER_UPDATE_FAILED',

@@ -54,6 +54,7 @@ export const ModelName = {
   PaypalIntent: 'PaypalIntent',
   PaypalWebhookEvent: 'PaypalWebhookEvent',
   PaypalLedgerTransactionWebhookBinding: 'PaypalLedgerTransactionWebhookBinding',
+  PaidOrderRecoveryProjection: 'PaidOrderRecoveryProjection',
   CheckoutRecoveryOtpChallenge: 'CheckoutRecoveryOtpChallenge',
   AdminNotificationOutbox: 'AdminNotificationOutbox',
   CustomerNotificationOutbox: 'CustomerNotificationOutbox'
@@ -180,6 +181,58 @@ export const PaypalLedgerTransactionWebhookBindingScalarFieldEnum = {
 } as const
 
 export type PaypalLedgerTransactionWebhookBindingScalarFieldEnum = (typeof PaypalLedgerTransactionWebhookBindingScalarFieldEnum)[keyof typeof PaypalLedgerTransactionWebhookBindingScalarFieldEnum]
+
+
+export const PaidOrderRecoveryProjectionScalarFieldEnum = {
+  id: 'id',
+  orderToken: 'orderToken',
+  paypalOrderId: 'paypalOrderId',
+  djangoOrderIntentUuid: 'djangoOrderIntentUuid',
+  djangoOrderIntentOrderId: 'djangoOrderIntentOrderId',
+  djangoPaymentSaveCustomId: 'djangoPaymentSaveCustomId',
+  userId: 'userId',
+  customerEmail: 'customerEmail',
+  customerName: 'customerName',
+  paypalLedgerStatus: 'paypalLedgerStatus',
+  adminRecoveryStatus: 'adminRecoveryStatus',
+  customerRecoveryStatus: 'customerRecoveryStatus',
+  isPaid: 'isPaid',
+  isQueueVisible: 'isQueueVisible',
+  isCustomerProtectionVisible: 'isCustomerProtectionVisible',
+  isResolved: 'isResolved',
+  needsProviderDetailSync: 'needsProviderDetailSync',
+  needsAdminAttention: 'needsAdminAttention',
+  canRetryFullPostProcessing: 'canRetryFullPostProcessing',
+  canRetryFulfillment: 'canRetryFulfillment',
+  canSyncProviderDetails: 'canSyncProviderDetails',
+  merchizeExternalOrderNumber: 'merchizeExternalOrderNumber',
+  merchizeOrderId: 'merchizeOrderId',
+  merchizeOrderCode: 'merchizeOrderCode',
+  merchizeOpsSyncStatus: 'merchizeOpsSyncStatus',
+  merchizeProductionGateStatus: 'merchizeProductionGateStatus',
+  merchizeProgressStatus: 'merchizeProgressStatus',
+  merchizeDeliveryStatus: 'merchizeDeliveryStatus',
+  receiptLink: 'receiptLink',
+  receiptFile: 'receiptFile',
+  paidAmountLabel: 'paidAmountLabel',
+  processingSourceLabel: 'processingSourceLabel',
+  processingSourceTone: 'processingSourceTone',
+  latestWebhookSourceLabel: 'latestWebhookSourceLabel',
+  latestWebhookEventType: 'latestWebhookEventType',
+  latestWebhookProcessingStatus: 'latestWebhookProcessingStatus',
+  lastErrorCode: 'lastErrorCode',
+  lastErrorMessage: 'lastErrorMessage',
+  recoveryReason: 'recoveryReason',
+  recoveryStage: 'recoveryStage',
+  recoverySeverity: 'recoverySeverity',
+  paypalIntentUpdatedAt: 'paypalIntentUpdatedAt',
+  merchizeOpsUpdatedAt: 'merchizeOpsUpdatedAt',
+  projectedAt: 'projectedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PaidOrderRecoveryProjectionScalarFieldEnum = (typeof PaidOrderRecoveryProjectionScalarFieldEnum)[keyof typeof PaidOrderRecoveryProjectionScalarFieldEnum]
 
 
 export const CheckoutRecoveryOtpChallengeScalarFieldEnum = {

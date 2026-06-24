@@ -20,6 +20,7 @@ import {
 } from './merchizeMapper';
 import { safeLogErrorMessage } from './redaction';
 import { MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS } from './status';
+import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 
 type SnapshotAction =
   | 'external_order_progress'
@@ -273,6 +274,8 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
       });
     },
   );
+
+  await refreshPaidOrderRecoveryProjectionSafely(orderToken);
 
   return {
     ok: failed.length === 0,

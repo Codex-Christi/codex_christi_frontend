@@ -43,6 +43,7 @@ import {
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
+import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
 import type { CartVariant } from '@/stores/shop_stores/cartStore';
@@ -73,7 +74,7 @@ function toLedgerJson(value: unknown) {
 }
 
 async function clearLock(orderToken: string, lockId: string) {
-  await paypalTxLedger.paypalIntent.updateMany({
+  const result = await paypalTxLedger.paypalIntent.updateMany({
     where: { orderToken, postProcessingLockId: lockId },
     data: {
       postProcessingLockId: null,
@@ -81,6 +82,8 @@ async function clearLock(orderToken: string, lockId: string) {
       postProcessingLockExpiresAt: null,
     },
   });
+
+  if (result.count > 0) await refreshPaidOrderRecoveryProjectionSafely(orderToken);
 }
 
 async function updateLockedRow(
@@ -88,10 +91,12 @@ async function updateLockedRow(
   lockId: string,
   data: Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
 ) {
-  await paypalTxLedger.paypalIntent.updateMany({
+  const result = await paypalTxLedger.paypalIntent.updateMany({
     where: { orderToken, postProcessingLockId: lockId },
     data,
   });
+
+  if (result.count > 0) await refreshPaidOrderRecoveryProjectionSafely(orderToken);
 }
 
 async function markFulfillmentFailedAndNotify(args: {
@@ -145,6 +150,7 @@ async function markFulfillmentFailedAndNotify(args: {
       receiptLink: args.row.receiptLink,
     });
   });
+  await refreshPaidOrderRecoveryProjectionSafely(args.orderToken);
 
   await sendPendingAdminRecoveryNotificationsForOrder(args.orderToken).catch(
     (notificationError) => {
@@ -211,6 +217,7 @@ async function markFulfillmentAttentionRequiredAndNotify(args: {
       severity: ADMIN_NOTIFICATION_SEVERITY.WARNING,
     });
   });
+  await refreshPaidOrderRecoveryProjectionSafely(args.orderToken);
 
   await sendPendingAdminRecoveryNotificationsForOrder(args.orderToken).catch(
     (notificationError) => {
@@ -701,6 +708,7 @@ export async function runPaidFulfillmentProcessing(
           receiptLink: row.receiptLink,
         });
       });
+      await refreshPaidOrderRecoveryProjectionSafely(orderToken);
 
       await sendPendingAdminRecoveryNotificationsForOrder(orderToken).catch((notificationError) => {
         console.error('[AdminNotificationOutbox] failed to send fulfillment blocked alert', {
@@ -747,6 +755,7 @@ export async function runPaidFulfillmentProcessing(
           receiptLink: row.receiptLink,
         });
       });
+      await refreshPaidOrderRecoveryProjectionSafely(orderToken);
 
       await sendPendingAdminRecoveryNotificationsForOrder(orderToken).catch((notificationError) => {
         console.error('[AdminNotificationOutbox] failed to send fulfillment failed alert', {

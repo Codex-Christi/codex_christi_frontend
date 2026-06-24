@@ -14,6 +14,7 @@ import {
   MERCHIZE_FULFILLMENT_SYNC_STATUS,
 } from '@/lib/merchizeFulfillmentOps/status';
 import { syncMerchizeFulfillmentOrder } from './syncMerchizeFulfillmentOrder';
+import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 import type { MerchizeFulfillmentRegistrationInput } from './merchizeTypes';
 
 type RegistrationResult =
@@ -133,6 +134,8 @@ export async function registerAcceptedMerchizeFulfillmentProcess(
       });
     }
   }
+
+  await refreshPaidOrderRecoveryProjectionSafely(input.orderToken);
 
   return {
     ok: true,

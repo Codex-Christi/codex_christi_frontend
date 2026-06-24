@@ -27,6 +27,7 @@ import {
   MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_STATUS,
 } from './status';
+import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 import type { MerchizeFulfillmentSyncResult } from './merchizeTypes';
 
 type SyncAction = 'external_lookup' | 'detail_lookup';
@@ -164,6 +165,11 @@ async function getProviderProcessingEscalationState(args: {
   };
 }
 
+async function refreshProjectionAndReturn<T extends MerchizeFulfillmentSyncResult>(result: T) {
+  await refreshPaidOrderRecoveryProjectionSafely(result.orderToken);
+  return result;
+}
+
 export async function syncMerchizeFulfillmentOrder(
   orderToken: string,
   options: SyncMerchizeFulfillmentOrderOptions = {},
@@ -257,12 +263,12 @@ export async function syncMerchizeFulfillmentOrder(
             responseSummary: lookup,
           });
 
-          return {
+          return refreshProjectionAndReturn({
             ok: false,
             orderToken,
             errorCode: 'MERCHIZE_LOOKUP_NOT_FOUND',
             errorMessage: message,
-          };
+          });
         }
 
         await prisma.merchizeFulfillmentOrder.update({
@@ -284,14 +290,14 @@ export async function syncMerchizeFulfillmentOrder(
           responseSummary: lookup,
         });
 
-        return {
+        return refreshProjectionAndReturn({
           ok: false,
           orderToken,
           errorCode: MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_ERROR_CODE,
           errorMessage: MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_MESSAGE,
           pending: true,
           retryable: true,
-        };
+        });
       }
 
       const message =
@@ -316,12 +322,12 @@ export async function syncMerchizeFulfillmentOrder(
         responseSummary: lookup,
       });
 
-      return {
+      return refreshProjectionAndReturn({
         ok: false,
         orderToken,
         errorCode: 'MERCHIZE_LOOKUP_NOT_FOUND',
         errorMessage: message,
-      };
+      });
     }
 
     await prisma.merchizeFulfillmentOrder.update({
@@ -426,13 +432,13 @@ export async function syncMerchizeFulfillmentOrder(
       responseSummary: detail,
     });
 
-    return {
+    return refreshProjectionAndReturn({
       ok: true,
       orderToken,
       merchizeExternalOrderNumber: order.merchizeExternalOrderNumber,
       merchizeOrderId,
       itemCount: items.length,
-    };
+    });
   } catch (error) {
     const syncError = getSyncError(error);
     const syncStatus =
@@ -471,11 +477,11 @@ export async function syncMerchizeFulfillmentOrder(
       error: syncError.message,
     });
 
-    return {
+    return refreshProjectionAndReturn({
       ok: false,
       orderToken,
       errorCode: syncError.code,
       errorMessage: syncError.message,
-    };
+    });
   }
 }

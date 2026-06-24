@@ -131,6 +131,71 @@ model PaypalLedgerTransactionWebhookBinding {
   @@index([updatedAt])
 }
 
+model PaidOrderRecoveryProjection {
+  id         String @id @default(cuid())
+  orderToken String @unique
+
+  paypalOrderId             String?
+  djangoOrderIntentUuid     String?
+  djangoOrderIntentOrderId  String?
+  djangoPaymentSaveCustomId String?
+  userId                    String?
+  customerEmail             String
+  customerName              String
+
+  paypalLedgerStatus          String
+  adminRecoveryStatus         String
+  customerRecoveryStatus      String
+  isPaid                      Boolean @default(false)
+  isQueueVisible              Boolean @default(false)
+  isCustomerProtectionVisible Boolean @default(false)
+  isResolved                  Boolean @default(false)
+
+  needsProviderDetailSync    Boolean @default(false)
+  needsAdminAttention        Boolean @default(false)
+  canRetryFullPostProcessing Boolean @default(false)
+  canRetryFulfillment        Boolean @default(false)
+  canSyncProviderDetails     Boolean @default(false)
+
+  merchizeExternalOrderNumber  String?
+  merchizeOrderId              String?
+  merchizeOrderCode            String?
+  merchizeOpsSyncStatus        String?
+  merchizeProductionGateStatus String?
+  merchizeProgressStatus       String?
+  merchizeDeliveryStatus       String?
+
+  receiptLink                   String?
+  receiptFile                   String?
+  paidAmountLabel               String?
+  processingSourceLabel         String?
+  processingSourceTone          String?
+  latestWebhookSourceLabel      String?
+  latestWebhookEventType        String?
+  latestWebhookProcessingStatus String?
+  lastErrorCode                 String?
+  lastErrorMessage              String?
+  recoveryReason                String?
+  recoveryStage                 String?
+  recoverySeverity              String?
+
+  paypalIntentUpdatedAt DateTime?
+  merchizeOpsUpdatedAt  DateTime?
+  projectedAt           DateTime  @default(now())
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([adminRecoveryStatus, updatedAt])
+  @@index([customerRecoveryStatus, updatedAt])
+  @@index([isQueueVisible, updatedAt])
+  @@index([isCustomerProtectionVisible, updatedAt])
+  @@index([customerEmail, updatedAt])
+  @@index([paypalLedgerStatus])
+  @@index([djangoPaymentSaveCustomId])
+  @@index([needsProviderDetailSync])
+  @@index([needsAdminAttention])
+}
+
 model CheckoutRecoveryOtpChallenge {
   id           String    @id @default(cuid())
   email        String

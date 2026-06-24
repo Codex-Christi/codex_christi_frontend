@@ -16,9 +16,7 @@ const UNRESOLVED_PAID_STATUSES = [
   PAYPAL_LEDGER_STATUS.ERROR,
 ] as const;
 
-export async function findUnresolvedPaidCheckoutsByEmail(email: string) {
-  const normalizedEmail = normalizeRecoveryEmail(email);
-
+async function findUnresolvedPaidCheckoutsByEmailFromLegacyLedger(normalizedEmail: string) {
   const rows = await paypalTxLedger.paypalIntent.findMany({
     where: {
       customerEmail: normalizedEmail,
@@ -43,4 +41,54 @@ export async function findUnresolvedPaidCheckoutsByEmail(email: string) {
   });
 
   return rows.filter((row) => isCompletedPayPalCapture(row.capturePayload)).slice(0, 3);
+}
+
+export async function findUnresolvedPaidCheckoutsByEmail(email: string) {
+  const normalizedEmail = normalizeRecoveryEmail(email);
+
+  try {
+    const projections = await paypalTxLedger.paidOrderRecoveryProjection.findMany({
+      where: {
+        customerEmail: normalizedEmail,
+        isCustomerProtectionVisible: true,
+      },
+      orderBy: [{ paypalIntentUpdatedAt: 'desc' }, { updatedAt: 'desc' }],
+      take: 3,
+      select: {
+        orderToken: true,
+      },
+    });
+
+    if (projections.length) {
+      const orderTokens = projections.map((projection) => projection.orderToken);
+      const rows = await paypalTxLedger.paypalIntent.findMany({
+        where: {
+          orderToken: {
+            in: orderTokens,
+          },
+        },
+      });
+      const rowByOrderToken = new Map(rows.map((row) => [row.orderToken, row]));
+
+      return orderTokens
+        .map((orderToken) => rowByOrderToken.get(orderToken))
+        .filter((row): row is (typeof rows)[number] => Boolean(row));
+    }
+
+    const projectionCountForEmail = await paypalTxLedger.paidOrderRecoveryProjection.count({
+      where: {
+        customerEmail: normalizedEmail,
+      },
+    });
+
+    return projectionCountForEmail > 0
+      ? []
+      : findUnresolvedPaidCheckoutsByEmailFromLegacyLedger(normalizedEmail);
+  } catch (error) {
+    console.error('[checkout-recovery.projection_lookup_failed]', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return findUnresolvedPaidCheckoutsByEmailFromLegacyLedger(normalizedEmail);
+  }
 }

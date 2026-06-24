@@ -10,7 +10,6 @@ import { listCustomerNotificationsForOrder } from '@/lib/paypal/txLedger/custome
 import {
   getPayPalLedgerProcessingSourceDisplay,
   getPayPalLedgerRunnerSourceLabel,
-  getPayPalLedgerWebhookSourceLabel,
 } from '@/lib/paypal/txLedger/paypalLedgerProvenance';
 import {
   getMerchizeFulfillmentOpsPrisma,
@@ -39,17 +38,6 @@ import type {
   TimelineItem,
 } from '@/components/UI/Admin/dashboard/adminShopDashboardTypes';
 
-const ADMIN_RECOVERY_STATUSES = [
-  PAYPAL_LEDGER_STATUS.CAPTURED,
-  PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED,
-  PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
-  PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED,
-  PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
-  PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED,
-  PAYPAL_LEDGER_STATUS.ERROR,
-  PAYPAL_LEDGER_STATUS.COMPLETED,
-] as const;
-
 type JsonRecord = Record<string, unknown>;
 const SCANNER_RECOVERABLE_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.CAPTURED,
@@ -58,7 +46,6 @@ const SCANNER_RECOVERABLE_STATUSES = new Set<string>([
 ]);
 const DEFAULT_ADMIN_RECOVERY_PAGE_SIZE = 25;
 const ADMIN_RECOVERY_PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
-const MAX_ADMIN_RECOVERY_SCAN_ROWS = 1000;
 const ADMIN_RECOVERY_STATUS_FILTERS = new Set<PaidOrderRecoveryStatusFilter>([
   'all',
   'failed',
@@ -208,36 +195,12 @@ export function getPaidOrderRecoveryPage(value: unknown) {
   return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
-function getRawStatusFilter(status: PaidOrderRecoveryStatusFilter) {
-  switch (status) {
-    case 'failed':
-      return [
-        PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED,
-        PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
-        PAYPAL_LEDGER_STATUS.ERROR,
-      ];
-    case 'recovery':
-      return [PAYPAL_LEDGER_STATUS.CAPTURED, PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED];
-    case 'attention':
-      return [PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED];
-    case 'completed':
-      return [PAYPAL_LEDGER_STATUS.COMPLETED];
-    case 'sync':
-      return [...ADMIN_RECOVERY_STATUSES];
-    case 'pending':
-      return [PAYPAL_LEDGER_STATUS.PAYMENT_SAVED];
-    case 'all':
-    default:
-      return [...ADMIN_RECOVERY_STATUSES];
-  }
-}
-
 function buildPaidOrderRecoveryWhere(filters: PaidOrderRecoveryFilters) {
-  const where: Prisma.PaypalIntentWhereInput = {
-    status: {
-      in: getRawStatusFilter(filters.status),
-    },
+  const where: Prisma.PaidOrderRecoveryProjectionWhereInput = {
+    isQueueVisible: true,
   };
+
+  if (filters.status !== 'all') where.adminRecoveryStatus = filters.status;
 
   if (filters.search) {
     const search = filters.search;
@@ -248,10 +211,12 @@ function buildPaidOrderRecoveryWhere(filters: PaidOrderRecoveryFilters) {
       { paypalOrderId: { contains: search } },
       { djangoOrderIntentOrderId: { contains: search } },
       { djangoPaymentSaveCustomId: { contains: search } },
-      { merchizeProviderOrderId: { contains: search } },
-      { merchizeProviderOrderCode: { contains: search } },
+      { merchizeExternalOrderNumber: { contains: search } },
+      { merchizeOrderId: { contains: search } },
+      { merchizeOrderCode: { contains: search } },
       { lastErrorCode: { contains: search } },
       { lastErrorMessage: { contains: search } },
+      { recoveryReason: { contains: search } },
     ];
   }
 
@@ -363,6 +328,44 @@ function mapLedgerRowToPaidOrderRecoveryRow(row: {
     supportRef: row.orderToken.slice(0, 8).toUpperCase(),
     updated: formatUpdated(row.updatedAt),
     needsProviderDetailSync: providerDetailSyncNeeded,
+  };
+}
+
+function mapProjectionRowToPaidOrderRecoveryRow(row: {
+  orderToken: string;
+  adminRecoveryStatus: string;
+  customerEmail: string;
+  customerName: string;
+  paidAmountLabel: string | null;
+  recoveryStage: string | null;
+  recoveryReason: string | null;
+  processingSourceLabel: string | null;
+  processingSourceTone: string | null;
+  paypalIntentUpdatedAt: Date | null;
+  updatedAt: Date;
+  needsProviderDetailSync: boolean;
+}): PaidOrderRecoveryRow {
+  const status = normalizeRecoveryStatusFilter(row.adminRecoveryStatus);
+
+  return {
+    orderToken: row.orderToken,
+    status: status === 'all' ? 'pending' : status,
+    customer: row.customerEmail || row.customerName,
+    amount: row.paidAmountLabel ?? '—',
+    step: row.recoveryStage ?? 'In Progress',
+    error: row.recoveryReason ?? '—',
+    processingSourceLabel: row.processingSourceLabel ?? 'Not recorded',
+    processingSourceTone:
+      row.processingSourceTone === 'cyan' ||
+      row.processingSourceTone === 'emerald' ||
+      row.processingSourceTone === 'amber' ||
+      row.processingSourceTone === 'rose' ||
+      row.processingSourceTone === 'slate'
+        ? row.processingSourceTone
+        : 'slate',
+    supportRef: row.orderToken.slice(0, 8).toUpperCase(),
+    updated: formatUpdated(row.paypalIntentUpdatedAt ?? row.updatedAt),
+    needsProviderDetailSync: row.needsProviderDetailSync,
   };
 }
 
@@ -578,53 +581,6 @@ async function getMerchizeFulfillmentOpsSummaries(orderTokens: string[]) {
   }
 
   return summaries;
-}
-
-async function getLatestWebhookSourceByOrder(
-  ledgerRows: Array<{ orderToken: string; paypalOrderId: string | null }>,
-) {
-  const latestByOrderToken = new Map<string, string>();
-  const uniqueOrderTokens = [...new Set(ledgerRows.map((row) => row.orderToken))];
-  const uniquePayPalOrderIds = [
-    ...new Set(
-      ledgerRows.map((row) => row.paypalOrderId).filter((value): value is string => Boolean(value)),
-    ),
-  ];
-  const orderTokenByPayPalOrderId = new Map(
-    ledgerRows.flatMap((row) => (row.paypalOrderId ? [[row.paypalOrderId, row.orderToken]] : [])),
-  );
-
-  if (!uniqueOrderTokens.length && !uniquePayPalOrderIds.length) return latestByOrderToken;
-
-  const rows = await paypalTxLedger.paypalWebhookEvent.findMany({
-    where: {
-      OR: [
-        { orderToken: { in: uniqueOrderTokens } },
-        ...(uniquePayPalOrderIds.length ? [{ paypalOrderId: { in: uniquePayPalOrderIds } }] : []),
-      ],
-    },
-    orderBy: { createdAt: 'desc' },
-    select: {
-      matchedWebhookBindingKey: true,
-      matchedWebhookLabel: true,
-      matchedWebhookSource: true,
-      orderToken: true,
-      paypalOrderId: true,
-      webhookVerificationMode: true,
-    },
-  });
-
-  for (const row of rows) {
-    const orderToken =
-      row.orderToken ??
-      (row.paypalOrderId ? orderTokenByPayPalOrderId.get(row.paypalOrderId) : null);
-
-    if (!orderToken || latestByOrderToken.has(orderToken)) continue;
-
-    latestByOrderToken.set(orderToken, getPayPalLedgerWebhookSourceLabel(row));
-  }
-
-  return latestByOrderToken;
 }
 
 function normalizeAddress(value: unknown): PaidOrderRecoveryAddress | null {
@@ -1013,60 +969,41 @@ export async function listAdminPaidOrderRecoveryRows({
   const normalizedPageSize = getPaidOrderRecoveryPageSize(pageSize);
   const requestedPage = getPaidOrderRecoveryPage(page);
   const where = buildPaidOrderRecoveryWhere(filters);
-  const rows = await paypalTxLedger.paypalIntent.findMany({
-    where,
-    orderBy: {
-      updatedAt: 'desc',
-    },
-    take: MAX_ADMIN_RECOVERY_SCAN_ROWS,
-    select: {
-      orderToken: true,
-      customerEmail: true,
-      customerName: true,
-      status: true,
-      capturePayload: true,
-      initialCurrency: true,
-      merchizeFulfillmentResponsePayload: true,
-      merchizeProviderOrderId: true,
-      paypalOrderId: true,
-      lastErrorCode: true,
-      lastErrorMessage: true,
-      processingTriggerDetail: true,
-      processingTriggeredAt: true,
-      processingTriggerSource: true,
-      updatedAt: true,
-    },
-  });
-  const [merchizeOpsSummaries, latestWebhookSourceByOrderToken] = await Promise.all([
-    getMerchizeFulfillmentOpsSummaries(rows.map((row) => row.orderToken)),
-    getLatestWebhookSourceByOrder(rows),
-  ]);
-  const mappedRows = rows
-    .map((row) =>
-      mapLedgerRowToPaidOrderRecoveryRow({
-        ...row,
-        latestWebhookSourceLabel: latestWebhookSourceByOrderToken.get(row.orderToken),
-        merchizeFulfillmentOpsSyncStatus: merchizeOpsSummaries.get(row.orderToken)?.syncStatus,
-        merchizeFulfillmentOpsLastSyncErrorCode:
-          merchizeOpsSummaries.get(row.orderToken)?.lastSyncErrorCode,
-      }),
-    )
-    .filter((row) => filters.status === 'all' || row.status === filters.status);
+  const totalRows = await paypalTxLedger.paidOrderRecoveryProjection.count({ where });
   const initialPagination = buildPaidOrderRecoveryPagination({
     currentPage: requestedPage,
     pageSize: normalizedPageSize,
-    totalRows: mappedRows.length,
+    totalRows,
   });
   const start = (initialPagination.currentPage - 1) * normalizedPageSize;
-  const pageRows = mappedRows.slice(start, start + normalizedPageSize);
+  const rows = await paypalTxLedger.paidOrderRecoveryProjection.findMany({
+    where,
+    orderBy: [{ paypalIntentUpdatedAt: 'desc' }, { updatedAt: 'desc' }],
+    skip: start,
+    take: normalizedPageSize,
+    select: {
+      orderToken: true,
+      adminRecoveryStatus: true,
+      customerEmail: true,
+      customerName: true,
+      paidAmountLabel: true,
+      recoveryStage: true,
+      recoveryReason: true,
+      processingSourceLabel: true,
+      processingSourceTone: true,
+      paypalIntentUpdatedAt: true,
+      updatedAt: true,
+      needsProviderDetailSync: true,
+    },
+  });
   const pagination = buildPaidOrderRecoveryPagination({
     currentPage: initialPagination.currentPage,
     pageSize: normalizedPageSize,
-    totalRows: mappedRows.length,
+    totalRows,
   });
 
   return {
-    rows: pageRows,
+    rows: rows.map(mapProjectionRowToPaidOrderRecoveryRow),
     filters,
     pagination,
   };

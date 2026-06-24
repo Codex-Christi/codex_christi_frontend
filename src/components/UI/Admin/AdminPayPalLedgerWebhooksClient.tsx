@@ -115,6 +115,27 @@ export default function AdminPayPalLedgerWebhooksClient({
       tone: dashboard.paypalApp.currentClientIdConfigured ? 'cyan' : 'rose',
     },
     {
+      label: 'Processing owner',
+      value: dashboard.processingOwnership?.ownerLabel ?? 'unresolved',
+      tone: dashboard.processingOwnership?.error
+        ? 'rose'
+        : dashboard.processingOwnership?.owner === 'none'
+          ? 'amber'
+          : 'emerald',
+    },
+    {
+      label: 'Owner source',
+      value: dashboard.processingOwnership
+        ? `${dashboard.processingOwnership.source.replaceAll('_', ' ')} · ${dashboard.processingOwnership.envVarName}`
+        : 'unresolved',
+      tone:
+        dashboard.processingOwnership?.source === 'invalid_env'
+          ? 'rose'
+          : dashboard.processingOwnership?.source === 'default'
+            ? 'amber'
+            : 'cyan',
+    },
+    {
       label: 'DB URL env',
       value: formatDatabaseUrlPresence(dashboard.databaseTarget),
       tone: dashboard.databaseTarget.prodDevUrlsMatch ? 'rose' : 'slate',
@@ -180,8 +201,9 @@ export default function AdminPayPalLedgerWebhooksClient({
                 Ledger transaction webhook trust
               </h2>
               <p className='mt-1 max-w-3xl text-sm leading-6 text-slate-400'>
-                Runtime verification uses env values in env mode. In hybrid mode, active DB bindings
-                are tried first and env values remain fallback.
+                Runtime verification can trust registered env or DB webhook IDs, but only the
+                configured processing owner mutates the ledger. Non-owner deliveries are
+                acknowledged and ignored.
               </p>
             </div>
 
@@ -304,6 +326,15 @@ function WebhookBindingCard({
             >
               {row.isActive ? 'active' : 'inactive'}
             </span>
+            {row.isProcessingOwner ? (
+              <span className='rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-cyan-100'>
+                owner
+              </span>
+            ) : row.activationRelevant ? (
+              <span className='rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400'>
+                ack-only
+              </span>
+            ) : null}
           </div>
           <p className='mt-1 text-xs text-slate-500'>
             {row.paypalPaymentMode} · {row.deploymentTarget.replaceAll('_', ' ')}
@@ -318,6 +349,11 @@ function WebhookBindingCard({
           label='Current mode'
           value={row.activationRelevant ? 'relevant' : 'not selected'}
           tone={row.activationRelevant ? 'cyan' : 'slate'}
+        />
+        <StatusPill
+          label='Processing'
+          value={row.isProcessingOwner ? 'owner' : row.activationRelevant ? 'ack-only' : 'ignored'}
+          tone={row.isProcessingOwner ? 'emerald' : row.activationRelevant ? 'cyan' : 'slate'}
         />
       </div>
 

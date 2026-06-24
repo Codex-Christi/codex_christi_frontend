@@ -17,6 +17,7 @@ import {
   MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_STATUS,
 } from './status';
+import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 
 const PUSH_ACTION = 'push_to_fulfillment';
 
@@ -188,6 +189,7 @@ export async function recordMerchizeFulfillmentPushDisabledByConfig(input: PushI
       },
     });
   });
+  await refreshPaidOrderRecoveryProjectionSafely(input.orderToken);
 
   return { ok: true as const };
 }
@@ -270,6 +272,7 @@ export async function pushMerchizeFulfillmentOrderToProduction(
           });
         }
       });
+      await refreshPaidOrderRecoveryProjectionSafely(input.orderToken);
     }
 
     return {
@@ -306,6 +309,7 @@ export async function pushMerchizeFulfillmentOrderToProduction(
           });
         }
       });
+      await refreshPaidOrderRecoveryProjectionSafely(input.orderToken);
     }
 
     throw new MerchizeFulfillmentPushError(pushError.message, {

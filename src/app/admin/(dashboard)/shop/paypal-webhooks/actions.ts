@@ -8,7 +8,7 @@ import {
   recordAdminUnlockAttempt,
   writeAdminAuditLog,
 } from '@/lib/admin/admin-auth-ledger';
-import { requireMasterAdminAction } from '@/lib/admin/require-admin';
+import { getAdminActionErrorMessage, requireMasterAdminAction } from '@/lib/admin/require-admin';
 import {
   registerPayPalLedgerWebhookBinding,
   savePayPalLedgerWebhookBinding,
@@ -137,7 +137,7 @@ export async function savePayPalLedgerWebhookBindingAction(
     }
 
     return {
-      error: error instanceof Error ? error.message : 'Unable to update webhook binding.',
+      error: getAdminActionErrorMessage(error, 'Unable to update webhook binding.'),
       messageId: crypto.randomUUID(),
       success: null,
     };

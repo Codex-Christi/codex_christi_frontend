@@ -248,6 +248,8 @@ PAYPAL_LIVE_CLIENT_SECRET="..."
 PAYPAL_SANDBOX_NGROK_WEBHOOK_ID="..."
 PAYPAL_SANDBOX_PRODUCTION_WEBHOOK_ID="..."
 PAYPAL_LIVE_PRODUCTION_WEBHOOK_ID="..."
+PAYPAL_SANDBOX_WEBHOOK_PROCESSING_OWNER="sandbox_ngrok" # sandbox_ngrok | sandbox_production | none
+PAYPAL_LIVE_WEBHOOK_PROCESSING_OWNER="none" # live_production | none
 
 # PayPal TX ledger processing policy
 PAYPAL_TX_LEDGER_ENABLE_CAPTURE_ROUTE_RUNNER="false"
@@ -291,6 +293,8 @@ Notes:
 - `NEXT_PUBLIC_PAYPAL_*_CLIENT_ID` values are public by design. They are not secrets.
 - `PAYPAL_*_CLIENT_SECRET` and `PAYPAL_*_WEBHOOK_ID` values stay server-only.
 - Use `PAYPAL_SANDBOX_NGROK_WEBHOOK_ID` for the ngrok sandbox listener and `PAYPAL_SANDBOX_PRODUCTION_WEBHOOK_ID` for the `codexchristi.org` sandbox listener.
+- Keep all registered webhook IDs configured if needed. Use `PAYPAL_SANDBOX_WEBHOOK_PROCESSING_OWNER` and `PAYPAL_LIVE_WEBHOOK_PROCESSING_OWNER` to choose which listener may mutate the ledger.
+- Non-owner PayPal webhook deliveries are acknowledged with `200 OK` and intentionally do not update the ledger, run fulfillment, or send notifications.
 - For clean deployments, keep `PAYPAL_PAYMENT_MODE` and `NEXT_PUBLIC_PAYPAL_PAYMENT_MODE` aligned.
 - Use `PAYPAL_PAYMENT_MODE="sandbox"` on production deployments while you are still testing sandbox payments.
 - Switch to `PAYPAL_PAYMENT_MODE="live"` only when real payments and the live webhook registration are ready.

@@ -198,6 +198,7 @@ PAYPAL_SANDBOX_CLIENT_ID=...
 PAYPAL_SANDBOX_CLIENT_SECRET=...
 PAYPAL_SANDBOX_NGROK_WEBHOOK_ID=...
 PAYPAL_SANDBOX_PRODUCTION_WEBHOOK_ID=...
+PAYPAL_SANDBOX_WEBHOOK_PROCESSING_OWNER=sandbox_ngrok # sandbox_ngrok | sandbox_production | none
 
 # Live payment mode: real payments
 PAYPAL_PAYMENT_MODE=live
@@ -206,6 +207,7 @@ NEXT_PUBLIC_PAYPAL_LIVE_CLIENT_ID=...
 PAYPAL_LIVE_CLIENT_ID=...
 PAYPAL_LIVE_CLIENT_SECRET=...
 PAYPAL_LIVE_PRODUCTION_WEBHOOK_ID=...
+PAYPAL_LIVE_WEBHOOK_PROCESSING_OWNER=live_production # live_production | none
 ```
 
 The repository currently resolves these values in:
@@ -218,10 +220,32 @@ Resolution rules:
 
 - `PAYPAL_PAYMENT_MODE=live` uses live credentials and live webhook ID.
 - `PAYPAL_PAYMENT_MODE=sandbox` uses sandbox credentials and sandbox webhook IDs.
-- In production deployments, `PAYPAL_SANDBOX_PRODUCTION_WEBHOOK_ID` is preferred when set. If it is missing, verification falls back to the ngrok sandbox webhook ID.
-- In local/non-production runs, `PAYPAL_SANDBOX_NGROK_WEBHOOK_ID` is preferred when set.
-- `PAYPAL_SANDBOX_ADDITIONAL_WEBHOOK_IDS` can hold a comma-separated list for temporary migration windows.
+- Webhook ID env vars identify registered PayPal webhooks that can verify signatures.
+- `PAYPAL_SANDBOX_WEBHOOK_PROCESSING_OWNER` decides which sandbox listener can mutate the ledger.
+- `PAYPAL_LIVE_WEBHOOK_PROCESSING_OWNER` decides whether the live production listener can mutate the ledger.
+- Non-owner webhook deliveries should return `200 OK` and do no ledger, fulfillment, or notification work.
+- `PAYPAL_SANDBOX_ADDITIONAL_WEBHOOK_IDS` can hold a comma-separated list for temporary signature verification windows, but additional unnamed IDs should not own processing.
 - `NEXT_PUBLIC_PAYPAL_PAYMENT_MODE` should match `PAYPAL_PAYMENT_MODE`.
+
+Recommended ownership split:
+
+```txt
+# Local sandbox testing
+PAYPAL_PAYMENT_MODE=sandbox
+PAYPAL_SANDBOX_WEBHOOK_PROCESSING_OWNER=sandbox_ngrok
+
+# Production-deployed sandbox testing
+PAYPAL_PAYMENT_MODE=sandbox
+PAYPAL_SANDBOX_WEBHOOK_PROCESSING_OWNER=sandbox_production
+
+# Production live payments
+PAYPAL_PAYMENT_MODE=live
+PAYPAL_LIVE_WEBHOOK_PROCESSING_OWNER=live_production
+
+# Passive runtime that should ACK but never process
+PAYPAL_SANDBOX_WEBHOOK_PROCESSING_OWNER=none
+PAYPAL_LIVE_WEBHOOK_PROCESSING_OWNER=none
+```
 
 ## Domain Strategy
 

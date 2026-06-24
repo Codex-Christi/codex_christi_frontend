@@ -3,11 +3,7 @@ import 'server-only';
 import { notFound, redirect } from 'next/navigation';
 import { getServerSessionState } from '@/lib/session/server-session';
 import { getActiveAdminUserByCodexUserId } from './admin-auth-ledger';
-import {
-  buildAdminLogoutPath,
-  buildAdminUnlockPath,
-  sanitizeAdminReturnPath,
-} from './admin-paths';
+import { buildAdminLogoutPath, buildAdminUnlockPath, sanitizeAdminReturnPath } from './admin-paths';
 import {
   isAdminScopeAllowed,
   isMasterAdminRole,
@@ -25,6 +21,32 @@ export type AdminAuthContext = {
   scopes: AdminScope[];
   sessionVersion: number;
 };
+
+export type AdminActionAuthErrorCode =
+  | 'admin_session_expired'
+  | 'admin_permission_denied'
+  | 'primary_session_expired';
+
+export class AdminActionAuthError extends Error {
+  code: AdminActionAuthErrorCode;
+
+  constructor(code: AdminActionAuthErrorCode, message: string) {
+    super(message);
+    this.name = 'AdminActionAuthError';
+    this.code = code;
+  }
+}
+
+export function isAdminActionAuthError(error: unknown): error is AdminActionAuthError {
+  return error instanceof AdminActionAuthError;
+}
+
+export function getAdminActionErrorMessage(error: unknown, fallback: string) {
+  if (isAdminActionAuthError(error)) return error.message;
+  if (error instanceof Error) return error.message;
+
+  return fallback;
+}
 
 export async function requirePrimaryAdminCandidate({
   returnPath = '/admin',
@@ -133,20 +155,63 @@ export async function requireAdminPage({
 }
 
 export async function requireAdminAction(scope?: AdminScope) {
-  const context = await getAdminAuthContext();
+  const primarySession = await getServerSessionState();
 
-  if (!context || !isAdminScopeAllowed(context.scopes, scope, context.role)) {
-    throw new Error('Admin authorization required.');
+  if (!primarySession.isAuthenticated || !primarySession.userID) {
+    throw new AdminActionAuthError(
+      'primary_session_expired',
+      'Your sign-in session expired. Sign in again before running this admin action.',
+    );
   }
 
-  return context;
+  const adminUser = await getActiveAdminUserByCodexUserId(primarySession.userID);
+
+  if (!adminUser) {
+    throw new AdminActionAuthError(
+      'admin_permission_denied',
+      'This account no longer has admin access.',
+    );
+  }
+
+  const adminSession = await getServerAdminSessionState();
+
+  if (
+    !adminSession.isAuthenticated ||
+    adminSession.userID !== primarySession.userID ||
+    adminSession.sessionVersion !== adminUser.sessionVersion
+  ) {
+    throw new AdminActionAuthError(
+      'admin_session_expired',
+      'Your admin session expired. Unlock the admin dashboard and try again.',
+    );
+  }
+
+  if (!isAdminScopeAllowed(adminUser.scopes, scope, adminUser.role)) {
+    throw new AdminActionAuthError(
+      'admin_permission_denied',
+      'Your admin role does not allow this action.',
+    );
+  }
+
+  return {
+    adminUserId: adminUser.id,
+    userID: primarySession.userID,
+    email: adminUser.email,
+    displayName: adminUser.displayName,
+    role: adminUser.role,
+    scopes: adminUser.scopes,
+    sessionVersion: adminUser.sessionVersion,
+  };
 }
 
 export async function requireMasterAdminAction() {
-  const context = await getAdminAuthContext();
+  const context = await requireAdminAction();
 
   if (!context || !isMasterAdminRole(context.role)) {
-    throw new Error('Master admin authorization required.');
+    throw new AdminActionAuthError(
+      'admin_permission_denied',
+      'Master admin authorization is required for this action.',
+    );
   }
 
   return context;

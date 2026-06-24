@@ -17,6 +17,7 @@ import {
 import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 
 const DEFAULT_MIN_AGE_MINUTES = 15;
 const DEFAULT_BATCH_SIZE = 5;
@@ -459,6 +460,7 @@ async function handleCapturedPayment({
         lastErrorMessage: completion.reason,
       },
     });
+    await refreshPaidOrderRecoveryProjectionSafely(row.orderToken);
 
     const notification = await enqueuePaymentAttention({
       row,
@@ -493,6 +495,7 @@ async function handleCapturedPayment({
       lastErrorMessage: null,
     },
   });
+  await refreshPaidOrderRecoveryProjectionSafely(row.orderToken);
 
   const notification = await enqueuePaymentAttention({
     row,
@@ -569,6 +572,7 @@ async function handleAuthorization({
         lastErrorMessage: message,
       },
     });
+    await refreshPaidOrderRecoveryProjectionSafely(row.orderToken);
 
     const notification = await enqueuePaymentAttention({
       row,
@@ -625,6 +629,7 @@ async function handleAuthorization({
       lastErrorMessage: message,
     },
   });
+  await refreshPaidOrderRecoveryProjectionSafely(row.orderToken);
 
   const notification = await enqueuePaymentAttention({
     row,
@@ -686,6 +691,7 @@ async function reconcilePaymentRow(
           status: PAYPAL_LEDGER_STATUS.AUTHORIZED,
         },
       });
+      await refreshPaidOrderRecoveryProjectionSafely(row.orderToken);
 
       const { result: authorization } = await payments.getAuthorizedPayment({ authorizationId });
       return handleAuthorization({
@@ -723,6 +729,7 @@ async function reconcilePaymentRow(
       lastErrorMessage: message,
     },
   });
+  await refreshPaidOrderRecoveryProjectionSafely(row.orderToken);
 
   return {
     orderToken: row.orderToken,

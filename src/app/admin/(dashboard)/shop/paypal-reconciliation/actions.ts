@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { writeAdminAuditLog } from '@/lib/admin/admin-auth-ledger';
-import { requireAdminAction } from '@/lib/admin/require-admin';
+import { getAdminActionErrorMessage, requireAdminAction } from '@/lib/admin/require-admin';
 import {
   runPayPalPaymentReconciliationScanner,
   type PayPalPaymentReconciliationRunResult,
@@ -75,7 +75,7 @@ export async function runPayPalPaymentReconciliationAction(
     }
 
     return {
-      error: error instanceof Error ? error.message : 'Unable to run payment reconciliation.',
+      error: getAdminActionErrorMessage(error, 'Unable to run payment reconciliation.'),
       success: null,
       result: null,
     };

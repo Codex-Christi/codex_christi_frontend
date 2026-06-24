@@ -8,7 +8,11 @@ import {
   recordAdminUnlockAttempt,
   writeAdminAuditLog,
 } from '@/lib/admin/admin-auth-ledger';
-import { requireAdminAction, requireMasterAdminAction } from '@/lib/admin/require-admin';
+import {
+  getAdminActionErrorMessage,
+  requireAdminAction,
+  requireMasterAdminAction,
+} from '@/lib/admin/require-admin';
 import {
   resendAdminRecoveryNotification,
   suppressAdminRecoveryNotification,
@@ -23,6 +27,7 @@ import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureComplet
 import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 import { getAdminOpsLedgerPrisma } from '@/lib/prisma/adminOpsLedger/adminOpsLedgerPrisma';
 import { registerAcceptedMerchizeFulfillmentProcess } from '@/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentProcess';
 import { syncMerchizeFulfillmentOrder } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOrder';
@@ -300,7 +305,7 @@ export async function scanAdminPaidOrderRecoveryCandidatesAction(): Promise<Admi
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'Recovery scan failed.',
+      error: getAdminActionErrorMessage(error, 'Recovery scan failed.'),
     };
   }
 }
@@ -369,7 +374,7 @@ export async function runSelectedAdminPaidOrderRecoveryAction({
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'Selected recovery failed.',
+      error: getAdminActionErrorMessage(error, 'Selected recovery failed.'),
     };
   }
 }
@@ -410,7 +415,7 @@ export async function resendAdminRecoveryNotificationAction({
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'Notification resend failed.',
+      error: getAdminActionErrorMessage(error, 'Notification resend failed.'),
     };
   }
 }
@@ -444,7 +449,7 @@ export async function suppressAdminRecoveryNotificationAction({
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'Notification suppress failed.',
+      error: getAdminActionErrorMessage(error, 'Notification suppress failed.'),
     };
   }
 }
@@ -503,7 +508,7 @@ export async function resendCustomerNotificationAction({
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'Customer notification resend failed.',
+      error: getAdminActionErrorMessage(error, 'Customer notification resend failed.'),
     };
   }
 }
@@ -601,7 +606,7 @@ export async function retryAdminPaidOrderRecoveryAction({
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'Retry failed.',
+      error: getAdminActionErrorMessage(error, 'Retry failed.'),
     };
   }
 }
@@ -774,7 +779,7 @@ export async function overrideMerchizePushDisabledAndReleaseAction({
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'Push override failed.',
+      error: getAdminActionErrorMessage(error, 'Push override failed.'),
     };
   }
 }
@@ -901,7 +906,7 @@ export async function syncAdminMerchizeProviderDetailsAction({
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'Merchize provider detail sync failed.',
+      error: getAdminActionErrorMessage(error, 'Merchize provider detail sync failed.'),
     };
   }
 }
@@ -969,6 +974,7 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
         fulfillmentAddressOverriddenAt: new Date(),
       },
     });
+    await refreshPaidOrderRecoveryProjectionSafely(orderToken);
 
     revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
 
@@ -979,7 +985,7 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : 'Address override could not be saved.',
+      error: getAdminActionErrorMessage(error, 'Address override could not be saved.'),
     };
   }
 }

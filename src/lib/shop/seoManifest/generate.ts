@@ -37,13 +37,9 @@ type GenerateShopSeoManifestOptions = {
   lockStaleMs?: number;
 };
 
-type ProductSnapshotRow = Awaited<
-  ReturnType<typeof getProductSnapshotRows>
->[number];
+type ProductSnapshotRow = Awaited<ReturnType<typeof getProductSnapshotRows>>[number];
 
-type CategorySnapshotRow = Awaited<
-  ReturnType<typeof getCategorySnapshotRows>
->[number];
+type CategorySnapshotRow = Awaited<ReturnType<typeof getCategorySnapshotRows>>[number];
 
 export class ShopSeoManifestGenerationLockError extends Error {
   readonly code = 'SHOP_SEO_MANIFEST_GENERATION_LOCKED';
@@ -327,10 +323,7 @@ async function pruneSeoManifestGenerations({
   }
 }
 
-async function pruneStaleTempGenerations(
-  tempStaleMs: number,
-  warnings: ShopSeoManifestWarning[],
-) {
+async function pruneStaleTempGenerations(tempStaleMs: number, warnings: ShopSeoManifestWarning[]) {
   const entries = await fs
     .readdir(getShopSeoManifestRoot(), { withFileTypes: true })
     .catch((error) => {
@@ -366,12 +359,14 @@ async function pruneStaleTempGenerations(
 }
 
 async function readGenerationNames() {
-  const entries = await fs.readdir(getShopSeoManifestGenerationsRoot(), {
-    withFileTypes: true,
-  }).catch((error) => {
-    if (isNodeErrorCode(error, 'ENOENT')) return [];
-    throw error;
-  });
+  const entries = await fs
+    .readdir(getShopSeoManifestGenerationsRoot(), {
+      withFileTypes: true,
+    })
+    .catch((error) => {
+      if (isNodeErrorCode(error, 'ENOENT')) return [];
+      throw error;
+    });
 
   return entries
     .filter((entry) => entry.isDirectory())
@@ -555,10 +550,7 @@ function resolveImageUrl(image: string | null | undefined) {
   if (!image) return null;
   if (image.startsWith('/')) return getShopSiteUrl(image);
   if (image.startsWith('http')) return image.replace(/\/thumb\.jpg(?:[?#].*)?$/i, '');
-  return `https://d2dytk4tvgwhb4.cloudfront.net/${image}`.replace(
-    /\/thumb\.jpg(?:[?#].*)?$/i,
-    '',
-  );
+  return `https://d2dytk4tvgwhb4.cloudfront.net/${image}`.replace(/\/thumb\.jpg(?:[?#].*)?$/i, '');
 }
 
 function formatPrice(price: number | null | undefined) {
@@ -590,8 +582,8 @@ function resolveGenerationLockStaleMs(value: number | undefined) {
 
 function isNodeErrorCode(error: unknown, code: string) {
   return (
-    Boolean(error) &&
     typeof error === 'object' &&
+    error !== null &&
     'code' in error &&
     (error as { code?: unknown }).code === code
   );

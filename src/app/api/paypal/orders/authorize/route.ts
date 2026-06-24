@@ -9,6 +9,7 @@ import { getPayPalClient } from '@/lib/paymentClients/paypalClient';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { createPayPalRouteResponders } from '@/lib/paypal/txLedger/routeResponses';
+import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 
 const NON_AUTHORIZABLE_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.CAPTURED,
@@ -42,6 +43,7 @@ async function persistAuthorizedResult(
       authorizePayload: JSON.parse(JSON.stringify(payload)),
     },
   });
+  await refreshPaidOrderRecoveryProjectionSafely(orderToken);
 }
 
 async function syncExistingAuthorization(orderID: string, orderToken: string) {
@@ -101,6 +103,7 @@ export async function POST(req: Request) {
           lastErrorMessage: err instanceof Error ? err.message : String(err),
         },
       });
+      await refreshPaidOrderRecoveryProjectionSafely(orderToken);
     }
 
     return routeError({

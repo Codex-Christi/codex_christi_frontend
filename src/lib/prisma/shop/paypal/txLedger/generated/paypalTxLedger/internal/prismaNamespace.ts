@@ -387,6 +387,7 @@ export const ModelName = {
   PaypalIntent: 'PaypalIntent',
   PaypalWebhookEvent: 'PaypalWebhookEvent',
   PaypalLedgerTransactionWebhookBinding: 'PaypalLedgerTransactionWebhookBinding',
+  PaidOrderRecoveryProjection: 'PaidOrderRecoveryProjection',
   CheckoutRecoveryOtpChallenge: 'CheckoutRecoveryOtpChallenge',
   AdminNotificationOutbox: 'AdminNotificationOutbox',
   CustomerNotificationOutbox: 'CustomerNotificationOutbox'
@@ -405,7 +406,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "paypalIntent" | "paypalWebhookEvent" | "paypalLedgerTransactionWebhookBinding" | "checkoutRecoveryOtpChallenge" | "adminNotificationOutbox" | "customerNotificationOutbox"
+    modelProps: "paypalIntent" | "paypalWebhookEvent" | "paypalLedgerTransactionWebhookBinding" | "paidOrderRecoveryProjection" | "checkoutRecoveryOtpChallenge" | "adminNotificationOutbox" | "customerNotificationOutbox"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -628,6 +629,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.PaypalLedgerTransactionWebhookBindingCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.PaypalLedgerTransactionWebhookBindingCountAggregateOutputType> | number
+        }
+      }
+    }
+    PaidOrderRecoveryProjection: {
+      payload: Prisma.$PaidOrderRecoveryProjectionPayload<ExtArgs>
+      fields: Prisma.PaidOrderRecoveryProjectionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PaidOrderRecoveryProjectionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaidOrderRecoveryProjectionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PaidOrderRecoveryProjectionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaidOrderRecoveryProjectionPayload>
+        }
+        findFirst: {
+          args: Prisma.PaidOrderRecoveryProjectionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaidOrderRecoveryProjectionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PaidOrderRecoveryProjectionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaidOrderRecoveryProjectionPayload>
+        }
+        findMany: {
+          args: Prisma.PaidOrderRecoveryProjectionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaidOrderRecoveryProjectionPayload>[]
+        }
+        create: {
+          args: Prisma.PaidOrderRecoveryProjectionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaidOrderRecoveryProjectionPayload>
+        }
+        createMany: {
+          args: Prisma.PaidOrderRecoveryProjectionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PaidOrderRecoveryProjectionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaidOrderRecoveryProjectionPayload>[]
+        }
+        delete: {
+          args: Prisma.PaidOrderRecoveryProjectionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaidOrderRecoveryProjectionPayload>
+        }
+        update: {
+          args: Prisma.PaidOrderRecoveryProjectionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaidOrderRecoveryProjectionPayload>
+        }
+        deleteMany: {
+          args: Prisma.PaidOrderRecoveryProjectionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PaidOrderRecoveryProjectionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PaidOrderRecoveryProjectionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaidOrderRecoveryProjectionPayload>[]
+        }
+        upsert: {
+          args: Prisma.PaidOrderRecoveryProjectionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaidOrderRecoveryProjectionPayload>
+        }
+        aggregate: {
+          args: Prisma.PaidOrderRecoveryProjectionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePaidOrderRecoveryProjection>
+        }
+        groupBy: {
+          args: Prisma.PaidOrderRecoveryProjectionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PaidOrderRecoveryProjectionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PaidOrderRecoveryProjectionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PaidOrderRecoveryProjectionCountAggregateOutputType> | number
         }
       }
     }
@@ -999,6 +1074,58 @@ export const PaypalLedgerTransactionWebhookBindingScalarFieldEnum = {
 export type PaypalLedgerTransactionWebhookBindingScalarFieldEnum = (typeof PaypalLedgerTransactionWebhookBindingScalarFieldEnum)[keyof typeof PaypalLedgerTransactionWebhookBindingScalarFieldEnum]
 
 
+export const PaidOrderRecoveryProjectionScalarFieldEnum = {
+  id: 'id',
+  orderToken: 'orderToken',
+  paypalOrderId: 'paypalOrderId',
+  djangoOrderIntentUuid: 'djangoOrderIntentUuid',
+  djangoOrderIntentOrderId: 'djangoOrderIntentOrderId',
+  djangoPaymentSaveCustomId: 'djangoPaymentSaveCustomId',
+  userId: 'userId',
+  customerEmail: 'customerEmail',
+  customerName: 'customerName',
+  paypalLedgerStatus: 'paypalLedgerStatus',
+  adminRecoveryStatus: 'adminRecoveryStatus',
+  customerRecoveryStatus: 'customerRecoveryStatus',
+  isPaid: 'isPaid',
+  isQueueVisible: 'isQueueVisible',
+  isCustomerProtectionVisible: 'isCustomerProtectionVisible',
+  isResolved: 'isResolved',
+  needsProviderDetailSync: 'needsProviderDetailSync',
+  needsAdminAttention: 'needsAdminAttention',
+  canRetryFullPostProcessing: 'canRetryFullPostProcessing',
+  canRetryFulfillment: 'canRetryFulfillment',
+  canSyncProviderDetails: 'canSyncProviderDetails',
+  merchizeExternalOrderNumber: 'merchizeExternalOrderNumber',
+  merchizeOrderId: 'merchizeOrderId',
+  merchizeOrderCode: 'merchizeOrderCode',
+  merchizeOpsSyncStatus: 'merchizeOpsSyncStatus',
+  merchizeProductionGateStatus: 'merchizeProductionGateStatus',
+  merchizeProgressStatus: 'merchizeProgressStatus',
+  merchizeDeliveryStatus: 'merchizeDeliveryStatus',
+  receiptLink: 'receiptLink',
+  receiptFile: 'receiptFile',
+  paidAmountLabel: 'paidAmountLabel',
+  processingSourceLabel: 'processingSourceLabel',
+  processingSourceTone: 'processingSourceTone',
+  latestWebhookSourceLabel: 'latestWebhookSourceLabel',
+  latestWebhookEventType: 'latestWebhookEventType',
+  latestWebhookProcessingStatus: 'latestWebhookProcessingStatus',
+  lastErrorCode: 'lastErrorCode',
+  lastErrorMessage: 'lastErrorMessage',
+  recoveryReason: 'recoveryReason',
+  recoveryStage: 'recoveryStage',
+  recoverySeverity: 'recoverySeverity',
+  paypalIntentUpdatedAt: 'paypalIntentUpdatedAt',
+  merchizeOpsUpdatedAt: 'merchizeOpsUpdatedAt',
+  projectedAt: 'projectedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PaidOrderRecoveryProjectionScalarFieldEnum = (typeof PaidOrderRecoveryProjectionScalarFieldEnum)[keyof typeof PaidOrderRecoveryProjectionScalarFieldEnum]
+
+
 export const CheckoutRecoveryOtpChallengeScalarFieldEnum = {
   id: 'id',
   email: 'email',
@@ -1298,6 +1425,7 @@ export type GlobalOmitConfig = {
   paypalIntent?: Prisma.PaypalIntentOmit
   paypalWebhookEvent?: Prisma.PaypalWebhookEventOmit
   paypalLedgerTransactionWebhookBinding?: Prisma.PaypalLedgerTransactionWebhookBindingOmit
+  paidOrderRecoveryProjection?: Prisma.PaidOrderRecoveryProjectionOmit
   checkoutRecoveryOtpChallenge?: Prisma.CheckoutRecoveryOtpChallengeOmit
   adminNotificationOutbox?: Prisma.AdminNotificationOutboxOmit
   customerNotificationOutbox?: Prisma.CustomerNotificationOutboxOmit

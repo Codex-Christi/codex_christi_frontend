@@ -9,6 +9,8 @@ export type PayPalLedgerWebhookBindingKey =
   | 'sandbox_production'
   | 'live_production';
 export type PayPalLedgerWebhookDeploymentTarget = 'ngrok_tunnel' | 'production_domain';
+export type PayPalWebhookProcessingOwner = PayPalLedgerWebhookBindingKey | 'none';
+export type PayPalWebhookProcessingOwnerSource = 'default' | 'env' | 'invalid_env';
 
 export const PAYPAL_LEDGER_WEBHOOK_PATH = '/next-api/paypal/webhooks/ledger-transaction-events';
 
@@ -23,6 +25,9 @@ export const PAYPAL_LEDGER_WEBHOOK_REQUIRED_EVENTS = [
 
 export const PAYPAL_LEDGER_WEBHOOK_ACTIVATION_SOURCE_ENV =
   'PAYPAL_LEDGER_WEBHOOK_ACTIVATION_SOURCE';
+export const PAYPAL_SANDBOX_WEBHOOK_PROCESSING_OWNER_ENV =
+  'PAYPAL_SANDBOX_WEBHOOK_PROCESSING_OWNER';
+export const PAYPAL_LIVE_WEBHOOK_PROCESSING_OWNER_ENV = 'PAYPAL_LIVE_WEBHOOK_PROCESSING_OWNER';
 
 export const PAYPAL_LEDGER_WEBHOOK_BINDING_DEFINITIONS = [
   {
@@ -51,6 +56,16 @@ export const PAYPAL_LEDGER_WEBHOOK_BINDING_DEFINITIONS = [
 export type PayPalLedgerWebhookBindingDefinition =
   (typeof PAYPAL_LEDGER_WEBHOOK_BINDING_DEFINITIONS)[number];
 
+export type PayPalWebhookProcessingOwnership = {
+  allowedOwners: PayPalWebhookProcessingOwner[];
+  envVarName:
+    | typeof PAYPAL_SANDBOX_WEBHOOK_PROCESSING_OWNER_ENV
+    | typeof PAYPAL_LIVE_WEBHOOK_PROCESSING_OWNER_ENV;
+  error: string | null;
+  owner: PayPalWebhookProcessingOwner;
+  source: PayPalWebhookProcessingOwnerSource;
+};
+
 export function getPayPalLedgerWebhookActivationSource(): PayPalLedgerWebhookActivationSource {
   const configured = (
     process.env[PAYPAL_LEDGER_WEBHOOK_ACTIVATION_SOURCE_ENV] ?? 'env'
@@ -73,6 +88,63 @@ export function getConfiguredPayPalPaymentMode(): PayPalPaymentMode {
   }
 
   throw new Error('Missing PAYPAL_PAYMENT_MODE. Expected "sandbox" or "live".');
+}
+
+export function getDefaultPayPalWebhookProcessingOwner(
+  paymentMode: PayPalPaymentMode,
+): PayPalWebhookProcessingOwner {
+  if (paymentMode === 'live') {
+    return process.env.NODE_ENV === 'production' ? 'live_production' : 'none';
+  }
+
+  return process.env.NODE_ENV === 'production' ? 'sandbox_production' : 'sandbox_ngrok';
+}
+
+export function getAllowedPayPalWebhookProcessingOwners(
+  paymentMode: PayPalPaymentMode,
+): PayPalWebhookProcessingOwner[] {
+  return paymentMode === 'live'
+    ? ['live_production', 'none']
+    : ['sandbox_ngrok', 'sandbox_production', 'none'];
+}
+
+export function getPayPalWebhookProcessingOwner(
+  paymentMode: PayPalPaymentMode,
+): PayPalWebhookProcessingOwnership {
+  const envVarName =
+    paymentMode === 'live'
+      ? PAYPAL_LIVE_WEBHOOK_PROCESSING_OWNER_ENV
+      : PAYPAL_SANDBOX_WEBHOOK_PROCESSING_OWNER_ENV;
+  const allowedOwners = getAllowedPayPalWebhookProcessingOwners(paymentMode);
+  const configured = process.env[envVarName]?.trim().toLowerCase();
+
+  if (!configured) {
+    return {
+      allowedOwners,
+      envVarName,
+      error: null,
+      owner: getDefaultPayPalWebhookProcessingOwner(paymentMode),
+      source: 'default',
+    };
+  }
+
+  if (allowedOwners.includes(configured as PayPalWebhookProcessingOwner)) {
+    return {
+      allowedOwners,
+      envVarName,
+      error: null,
+      owner: configured as PayPalWebhookProcessingOwner,
+      source: 'env',
+    };
+  }
+
+  return {
+    allowedOwners,
+    envVarName,
+    error: `Invalid ${envVarName}. Expected one of: ${allowedOwners.join(', ')}.`,
+    owner: 'none',
+    source: 'invalid_env',
+  };
 }
 
 export function getOptionalConfiguredPayPalPaymentMode() {
