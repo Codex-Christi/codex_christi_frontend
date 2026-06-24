@@ -1,7 +1,16 @@
 'use client';
 
 import { useEffect, useState, useTransition, type ReactNode } from 'react';
-import { ArrowRight, Database, FileText, RefreshCw, Search, Store } from 'lucide-react';
+import {
+  ArrowRight,
+  ClipboardCheck,
+  Database,
+  FileText,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Store,
+} from 'lucide-react';
 import AdminGlassPanel from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import type {
   SyncState,
@@ -13,7 +22,9 @@ import {
   generateShopSeoManifestAction,
   refreshPriceShippingCatalogAction,
   refreshStorefrontSnapshotsAction,
+  runStorefrontMetadataDiagnosticsAction,
   searchPriceShippingCatalogBySku,
+  verifyPublishedProductsAction,
 } from './actions';
 import {
   AlertDialog,
@@ -48,7 +59,10 @@ type StorefrontSnapshotStats = {
   variantSnapshotCount: number;
   lastProductSnapshotAt: Date | null;
   lastCategorySnapshotAt: Date | null;
+  latestSnapshotAt: Date | null;
+  snapshotTtlExpired: boolean;
   ttlDays: string;
+  healthWarnings: Array<{ code: string; severity: string; message: string }>;
   seoManifest: {
     activeGeneration: string | null;
     generatedAt: string | null;
@@ -60,8 +74,15 @@ type StorefrontSnapshotStats = {
     retainedGenerationCount: number;
     lastPrunedGenerationCount: number;
     warnings: Array<{ code: string; message: string }>;
+    isStale: boolean;
   };
 };
+
+type MetadataDiagnosticsResult = Awaited<
+  ReturnType<typeof runStorefrontMetadataDiagnosticsAction>
+>;
+
+type PublishedProductVerificationResult = Awaited<ReturnType<typeof verifyPublishedProductsAction>>;
 
 type StatusState =
   | { type: 'idle' }
@@ -80,6 +101,10 @@ export default function StorefrontDataHealthAdminClient({
   );
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<VariantWithRelations[] | null>(null);
+  const [metadataDiagnostics, setMetadataDiagnostics] =
+    useState<MetadataDiagnosticsResult | null>(null);
+  const [publishedProductVerification, setPublishedProductVerification] =
+    useState<PublishedProductVerificationResult | null>(null);
   const [status, setStatus] = useState<StatusState>({ type: 'idle' });
   const [isPending, startTransition] = useTransition();
   const [refreshProgress, setRefreshProgress] = useState(0);
@@ -242,6 +267,67 @@ export default function StorefrontDataHealthAdminClient({
     });
   };
 
+  const handleMetadataDiagnosticsConfirmed = () => {
+    startTransition(async () => {
+      setRefreshProgress(10);
+      setStatus({ type: 'loading', message: 'Running metadata diagnostics…' });
+      const loadID = showLoadingToast({ message: 'Running metadata diagnostics…' });
+
+      try {
+        const res = await runStorefrontMetadataDiagnosticsAction();
+        toast.dismiss(loadID);
+        setMetadataDiagnostics(res);
+        setRefreshProgress(100);
+
+        const failedChecks = res.checks.filter((check) => !check.ok).length;
+        const msg = `Metadata diagnostics complete. Checks: ${res.checks.length - failedChecks}/${res.checks.length} passed. Manifest hits: ${res.sourceCounts.manifest}, snapshot hits: ${res.sourceCounts.snapshot}, noindex: ${res.sourceCounts.unknown_noindex}.`;
+        setStatus({ type: res.ok ? 'success' : 'error', message: msg });
+
+        if (res.ok) {
+          showSuccessToast({ header: 'Metadata diagnostics passed', message: msg });
+        } else {
+          showErrorToast({ header: 'Metadata diagnostics need review', message: msg });
+        }
+      } catch (e: unknown) {
+        toast.dismiss(loadID);
+        setRefreshProgress(0);
+        const message = e instanceof Error ? e.message : 'Metadata diagnostics failed.';
+        setStatus({ type: 'error', message });
+        showErrorToast({ header: 'Metadata diagnostics error', message });
+      }
+    });
+  };
+
+  const handlePublishedProductVerificationConfirmed = () => {
+    startTransition(async () => {
+      setRefreshProgress(10);
+      setStatus({ type: 'loading', message: 'Verifying published products…' });
+      const loadID = showLoadingToast({ message: 'Verifying published products…' });
+
+      try {
+        const res = await verifyPublishedProductsAction();
+        toast.dismiss(loadID);
+        setPublishedProductVerification(res);
+        setRefreshProgress(100);
+
+        const msg = `Published product verification complete. Available: ${res.counts.available}, missing remote: ${res.counts.missing_remote}, provider errors: ${res.counts.provider_error}.`;
+        setStatus({ type: res.ok ? 'success' : 'error', message: msg });
+
+        if (res.ok) {
+          showSuccessToast({ header: 'Published products verified', message: msg });
+        } else {
+          showErrorToast({ header: 'Published products need review', message: msg });
+        }
+      } catch (e: unknown) {
+        toast.dismiss(loadID);
+        setRefreshProgress(0);
+        const message = e instanceof Error ? e.message : 'Published product verification failed.';
+        setStatus({ type: 'error', message });
+        showErrorToast({ header: 'Product verification error', message });
+      }
+    });
+  };
+
   const handleSearch = () => {
     startTransition(async () => {
       setRefreshProgress(10);
@@ -295,11 +381,21 @@ export default function StorefrontDataHealthAdminClient({
     storefrontSnapshotStats.seoManifest.missingPublishedProductIds.length +
     storefrontSnapshotStats.seoManifest.missingCategorySlugs.length;
   const seoManifestWarningCount = storefrontSnapshotStats.seoManifest.warnings.length;
+  const criticalHealthWarnings = storefrontSnapshotStats.healthWarnings.filter(
+    (warning) => warning.severity === 'critical',
+  ).length;
+  const warningHealthWarnings = storefrontSnapshotStats.healthWarnings.filter(
+    (warning) => warning.severity === 'warning',
+  ).length;
   const metadataCoverageStatus = !storefrontSnapshotStats.seoManifest.generatedAt
     ? 'Manifest missing'
-    : seoManifestMissingCount || seoManifestWarningCount
+    : storefrontSnapshotStats.seoManifest.isStale
+      ? 'Manifest stale'
+      : seoManifestMissingCount || seoManifestWarningCount || warningHealthWarnings
       ? 'Needs review'
       : 'Covered';
+  const manifestFreshnessLabel = storefrontSnapshotStats.seoManifest.isStale ? 'Stale' : 'Current';
+  const snapshotTtlStatus = storefrontSnapshotStats.snapshotTtlExpired ? 'Expired' : 'Current';
 
   const handleClearSearch = () => {
     setSearchTerm('');
@@ -366,6 +462,26 @@ export default function StorefrontDataHealthAdminClient({
             confirmText='Generate manifest'
             onConfirm={handleSeoManifestGenerateConfirmed}
           />
+          <RefreshConfirmationDialog
+            disabled={working}
+            icon={<ClipboardCheck size={16} />}
+            buttonText='Run metadata diagnostics'
+            helperText='Source order, noindex, and coverage checks'
+            title='Run metadata diagnostics?'
+            description='This checks the local metadata read path for published products, configured categories, and unknown routes without calling live Merchize metadata APIs.'
+            confirmText='Run diagnostics'
+            onConfirm={handleMetadataDiagnosticsConfirmed}
+          />
+          <RefreshConfirmationDialog
+            disabled={working}
+            icon={<ShieldCheck size={16} />}
+            buttonText='Verify published products'
+            helperText='Manual remote existence check'
+            title='Verify published products against Merchize?'
+            description='This checks only the curated product IDs currently published by the storefront. It does not mutate snapshots or rebuild the SEO manifest.'
+            confirmText='Verify products'
+            onConfirm={handlePublishedProductVerificationConfirmed}
+          />
         </div>
       </section>
 
@@ -418,10 +534,139 @@ export default function StorefrontDataHealthAdminClient({
         <div className='mt-4 grid gap-3 text-xs sm:grid-cols-4'>
           <MiniStatus label='Primary metadata' value='SEO manifest' />
           <MiniStatus label='Manifest age' value={lastSeoManifest} />
-          <MiniStatus label='Missing coverage' value={seoManifestMissingCount} />
-          <MiniStatus label='Warnings' value={seoManifestWarningCount} />
+          <MiniStatus label='Manifest freshness' value={manifestFreshnessLabel} />
+          <MiniStatus label='Snapshot TTL' value={snapshotTtlStatus} />
+          <MiniStatus label='Missing coverage' value={String(seoManifestMissingCount)} />
+          <MiniStatus label='Manifest warnings' value={String(seoManifestWarningCount)} />
+          <MiniStatus label='Health warnings' value={String(warningHealthWarnings)} />
+          <MiniStatus label='Critical warnings' value={String(criticalHealthWarnings)} />
         </div>
+
+        {storefrontSnapshotStats.healthWarnings.length ? (
+          <div className='mt-4 space-y-2'>
+            {storefrontSnapshotStats.healthWarnings.map((warning) => (
+              <div
+                key={`${warning.code}-${warning.message}`}
+                className='rounded-lg border border-amber-300/20 bg-amber-300/8 px-3 py-2 text-xs text-amber-100'
+              >
+                <span className='font-semibold uppercase tracking-[0.12em]'>
+                  {warning.severity}
+                </span>{' '}
+                {warning.message}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </AdminGlassPanel>
+
+      {metadataDiagnostics ? (
+        <AdminGlassPanel className='p-4 sm:p-5'>
+          <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+            <div>
+              <h2 className='text-base font-semibold text-white'>Metadata diagnostics</h2>
+              <p className='mt-1 text-xs text-slate-500'>
+                Last run: {formatAdminDate(metadataDiagnostics.generatedAt)}
+              </p>
+            </div>
+            <span
+              className={`inline-flex w-fit rounded-md border px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] ${
+                metadataDiagnostics.ok
+                  ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
+                  : 'border-amber-300/20 bg-amber-300/10 text-amber-100'
+              }`}
+            >
+              {metadataDiagnostics.ok ? 'Passed' : 'Review'}
+            </span>
+          </div>
+
+          <div className='mt-4 grid gap-3 text-xs sm:grid-cols-6'>
+            <MiniStatus label='Manifest' value={String(metadataDiagnostics.sourceCounts.manifest)} />
+            <MiniStatus label='Snapshot' value={String(metadataDiagnostics.sourceCounts.snapshot)} />
+            <MiniStatus
+              label='Published fallback'
+              value={String(metadataDiagnostics.sourceCounts.published_fallback)}
+            />
+            <MiniStatus
+              label='Category fallback'
+              value={String(metadataDiagnostics.sourceCounts.category_fallback)}
+            />
+            <MiniStatus
+              label='Noindex'
+              value={String(metadataDiagnostics.sourceCounts.unknown_noindex)}
+            />
+            <MiniStatus label='Live calls' value={String(metadataDiagnostics.sourceCounts.dev_live)} />
+          </div>
+
+          <div className='mt-4 space-y-2'>
+            {metadataDiagnostics.checks.map((check) => (
+              <div
+                key={check.label}
+                className={`rounded-lg border px-3 py-2 text-xs ${
+                  check.ok
+                    ? 'border-emerald-300/20 bg-emerald-300/8 text-emerald-100'
+                    : 'border-amber-300/20 bg-amber-300/8 text-amber-100'
+                }`}
+              >
+                <span className='font-semibold'>{check.ok ? 'Pass' : 'Review'}:</span>{' '}
+                {check.label}. {check.detail}
+              </div>
+            ))}
+          </div>
+        </AdminGlassPanel>
+      ) : null}
+
+      {publishedProductVerification ? (
+        <AdminGlassPanel className='p-4 sm:p-5'>
+          <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+            <div>
+              <h2 className='text-base font-semibold text-white'>Published product verification</h2>
+              <p className='mt-1 text-xs text-slate-500'>
+                Last run: {formatAdminDate(publishedProductVerification.checkedAt)}
+              </p>
+            </div>
+            <span
+              className={`inline-flex w-fit rounded-md border px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] ${
+                publishedProductVerification.ok
+                  ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-100'
+                  : 'border-rose-300/20 bg-rose-300/10 text-rose-100'
+              }`}
+            >
+              {publishedProductVerification.ok ? 'Verified' : 'Review'}
+            </span>
+          </div>
+
+          <div className='mt-4 grid gap-3 text-xs sm:grid-cols-3'>
+            <MiniStatus
+              label='Available'
+              value={String(publishedProductVerification.counts.available)}
+            />
+            <MiniStatus
+              label='Missing remote'
+              value={String(publishedProductVerification.counts.missing_remote)}
+            />
+            <MiniStatus
+              label='Provider errors'
+              value={String(publishedProductVerification.counts.provider_error)}
+            />
+          </div>
+
+          {publishedProductVerification.products.some((product) => product.status !== 'available') ? (
+            <div className='mt-4 space-y-2'>
+              {publishedProductVerification.products
+                .filter((product) => product.status !== 'available')
+                .map((product) => (
+                  <div
+                    key={product.productId}
+                    className='rounded-lg border border-rose-300/20 bg-rose-300/8 px-3 py-2 text-xs text-rose-100'
+                  >
+                    <span className='font-mono text-[11px]'>{product.productId}</span>{' '}
+                    {product.expectedTitle}: {product.message}
+                  </div>
+                ))}
+            </div>
+          ) : null}
+        </AdminGlassPanel>
+      ) : null}
 
       <section className='grid gap-3 sm:grid-cols-2 xl:grid-cols-3'>
         <StatTile label='Last catalog run' value={lastRun} />
