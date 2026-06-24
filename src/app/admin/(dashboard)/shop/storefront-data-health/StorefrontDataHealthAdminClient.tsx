@@ -78,9 +78,7 @@ type StorefrontSnapshotStats = {
   };
 };
 
-type MetadataDiagnosticsResult = Awaited<
-  ReturnType<typeof runStorefrontMetadataDiagnosticsAction>
->;
+type MetadataDiagnosticsResult = Awaited<ReturnType<typeof runStorefrontMetadataDiagnosticsAction>>;
 
 type PublishedProductVerificationResult = Awaited<ReturnType<typeof verifyPublishedProductsAction>>;
 
@@ -101,8 +99,9 @@ export default function StorefrontDataHealthAdminClient({
   );
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<VariantWithRelations[] | null>(null);
-  const [metadataDiagnostics, setMetadataDiagnostics] =
-    useState<MetadataDiagnosticsResult | null>(null);
+  const [metadataDiagnostics, setMetadataDiagnostics] = useState<MetadataDiagnosticsResult | null>(
+    null,
+  );
   const [publishedProductVerification, setPublishedProductVerification] =
     useState<PublishedProductVerificationResult | null>(null);
   const [status, setStatus] = useState<StatusState>({ type: 'idle' });
@@ -183,16 +182,16 @@ export default function StorefrontDataHealthAdminClient({
           ? ` Revalidated public paths: ${res.revalidatedPaths.length}.`
           : '';
         const seoManifestText = res.seoManifest.ok
-          ? ` SEO manifest: ${res.seoManifest.productCount} products, ${res.seoManifest.categoryCount} categories.`
-          : ` SEO manifest needs attention: ${res.seoManifest.productCount} products, ${res.seoManifest.categoryCount} categories.`;
+          ? ` Search metadata manifest: ${res.seoManifest.productCount} products, ${res.seoManifest.categoryCount} categories.`
+          : ` Search metadata manifest needs attention: ${res.seoManifest.productCount} products, ${res.seoManifest.categoryCount} categories.`;
         const seoManifestWarningText = res.seoManifest.warnings.length
-          ? ` SEO manifest warnings: ${res.seoManifest.warnings
+          ? ` Search metadata warnings: ${res.seoManifest.warnings
               .map((warning) => warning.message)
               .join(' ')}`
           : '';
         const seoManifestPrunedText =
           'prunedGenerations' in res.seoManifest && res.seoManifest.prunedGenerations.length
-            ? ` Pruned SEO generations: ${res.seoManifest.prunedGenerations.length}.`
+            ? ` Pruned manifest generations: ${res.seoManifest.prunedGenerations.length}.`
             : '';
         const msg = `Storefront snapshots refreshed. Pages: ${res.pagesFetched}, products seen: ${res.productsSeen}, published products attempted: ${res.publishedProductsAttempted}.${seoManifestText}${seoManifestPrunedText}${seoManifestWarningText}${revalidationText}${failureText}${productFailureText}`;
 
@@ -219,8 +218,8 @@ export default function StorefrontDataHealthAdminClient({
   const handleSeoManifestGenerateConfirmed = () => {
     startTransition(async () => {
       setRefreshProgress(10);
-      setStatus({ type: 'loading', message: 'Generating SEO manifest…' });
-      const loadID = showLoadingToast({ message: 'Generating SEO manifest…' });
+      setStatus({ type: 'loading', message: 'Generating search metadata manifest…' });
+      const loadID = showLoadingToast({ message: 'Generating search metadata manifest…' });
 
       try {
         const res = await generateShopSeoManifestAction();
@@ -245,7 +244,7 @@ export default function StorefrontDataHealthAdminClient({
         const revalidationText = res.revalidatedPaths.length
           ? ` Revalidated public paths: ${res.revalidatedPaths.length}.`
           : '';
-        const msg = `SEO manifest generated. Products: ${res.productCount}, categories: ${res.categoryCount}.${prunedText}${warningText}${revalidationText}${missingProductsText}${missingCategoriesText}${errorText}`;
+        const msg = `Search metadata manifest generated. Products: ${res.productCount}, categories: ${res.categoryCount}.${prunedText}${warningText}${revalidationText}${missingProductsText}${missingCategoriesText}${errorText}`;
 
         setStatus({
           type: res.ok ? 'success' : 'error',
@@ -253,16 +252,17 @@ export default function StorefrontDataHealthAdminClient({
         });
 
         if (res.ok) {
-          showSuccessToast({ header: 'SEO manifest generated', message: msg });
+          showSuccessToast({ header: 'Search metadata manifest generated', message: msg });
         } else {
-          showErrorToast({ header: 'SEO manifest needs attention', message: msg });
+          showErrorToast({ header: 'Search metadata manifest needs attention', message: msg });
         }
       } catch (e: unknown) {
         toast.dismiss(loadID);
         setRefreshProgress(0);
-        const message = e instanceof Error ? e.message : 'SEO manifest generation failed.';
+        const message =
+          e instanceof Error ? e.message : 'Search metadata manifest generation failed.';
         setStatus({ type: 'error', message });
-        showErrorToast({ header: 'SEO manifest generation error', message });
+        showErrorToast({ header: 'Search metadata manifest generation error', message });
       }
     });
   };
@@ -392,8 +392,8 @@ export default function StorefrontDataHealthAdminClient({
     : storefrontSnapshotStats.seoManifest.isStale
       ? 'Manifest stale'
       : seoManifestMissingCount || seoManifestWarningCount || warningHealthWarnings
-      ? 'Needs review'
-      : 'Covered';
+        ? 'Needs review'
+        : 'Covered';
   const manifestFreshnessLabel = storefrontSnapshotStats.seoManifest.isStale ? 'Stale' : 'Current';
   const snapshotTtlStatus = storefrontSnapshotStats.snapshotTtlExpired ? 'Expired' : 'Current';
 
@@ -413,8 +413,8 @@ export default function StorefrontDataHealthAdminClient({
           </p>
           <h2 className='mt-4 text-xl font-semibold text-white'>Storefront data health</h2>
           <p className='mt-2 max-w-3xl text-sm leading-6 text-slate-400'>
-            Refresh the local price/shipping catalog, storefront snapshots, and SEO metadata shards
-            that keep public shop pages independent from live Merchize metadata calls.
+            Refresh the local price/shipping catalog, storefront snapshots, and search metadata
+            shards that keep public shop pages independent from live Merchize metadata calls.
           </p>
 
           <div className='mt-5 grid gap-3 text-xs sm:grid-cols-4'>
@@ -425,7 +425,7 @@ export default function StorefrontDataHealthAdminClient({
             <MiniStatus label='Storefront TTL' value={snapshotTtlLabel} />
             <MiniStatus label='SQLite source' value='merchize_catalog' />
             <MiniStatus
-              label='SEO manifest'
+              label='Search manifest'
               value={storefrontSnapshotStats.seoManifest.generatedAt ? 'Ready' : 'Missing'}
             />
           </div>
@@ -455,10 +455,10 @@ export default function StorefrontDataHealthAdminClient({
           <RefreshConfirmationDialog
             disabled={working}
             icon={<FileText size={16} />}
-            buttonText='Generate SEO manifest'
-            helperText='Merchize product/category metadata shards'
-            title='Generate SEO manifest?'
-            description='This derives small local SEO metadata shards from storefront snapshots, then revalidates affected public shop routes.'
+            buttonText='Generate search metadata'
+            helperText='Product/category metadata shards'
+            title='Generate search metadata manifest?'
+            description='This derives small local search metadata shards from storefront snapshots, then revalidates affected public shop routes.'
             confirmText='Generate manifest'
             onConfirm={handleSeoManifestGenerateConfirmed}
           />
@@ -478,7 +478,7 @@ export default function StorefrontDataHealthAdminClient({
             buttonText='Verify published products'
             helperText='Manual remote existence check'
             title='Verify published products against Merchize?'
-            description='This checks only the curated product IDs currently published by the storefront. It does not mutate snapshots or rebuild the SEO manifest.'
+            description='This checks only the curated product IDs currently published by the storefront. It does not mutate snapshots or rebuild the search metadata manifest.'
             confirmText='Verify products'
             onConfirm={handlePublishedProductVerificationConfirmed}
           />
@@ -522,8 +522,8 @@ export default function StorefrontDataHealthAdminClient({
           <div>
             <h2 className='text-base font-semibold text-white'>Metadata coverage</h2>
             <p className='mt-1 text-xs leading-5 text-slate-500'>
-              The SEO metadata read path uses the manifest first, then the SQLite snapshot, then
-              local published fallbacks or noindex for unknown routes.
+              The public metadata read path uses the search manifest first, then the SQLite
+              snapshot, then local published fallbacks or noindex for unknown routes.
             </p>
           </div>
           <span className='inline-flex w-fit rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-cyan-100'>
@@ -532,7 +532,7 @@ export default function StorefrontDataHealthAdminClient({
         </div>
 
         <div className='mt-4 grid gap-3 text-xs sm:grid-cols-4'>
-          <MiniStatus label='Primary metadata' value='SEO manifest' />
+          <MiniStatus label='Primary metadata' value='Search manifest' />
           <MiniStatus label='Manifest age' value={lastSeoManifest} />
           <MiniStatus label='Manifest freshness' value={manifestFreshnessLabel} />
           <MiniStatus label='Snapshot TTL' value={snapshotTtlStatus} />
@@ -580,8 +580,14 @@ export default function StorefrontDataHealthAdminClient({
           </div>
 
           <div className='mt-4 grid gap-3 text-xs sm:grid-cols-6'>
-            <MiniStatus label='Manifest' value={String(metadataDiagnostics.sourceCounts.manifest)} />
-            <MiniStatus label='Snapshot' value={String(metadataDiagnostics.sourceCounts.snapshot)} />
+            <MiniStatus
+              label='Manifest'
+              value={String(metadataDiagnostics.sourceCounts.manifest)}
+            />
+            <MiniStatus
+              label='Snapshot'
+              value={String(metadataDiagnostics.sourceCounts.snapshot)}
+            />
             <MiniStatus
               label='Published fallback'
               value={String(metadataDiagnostics.sourceCounts.published_fallback)}
@@ -594,7 +600,10 @@ export default function StorefrontDataHealthAdminClient({
               label='Noindex'
               value={String(metadataDiagnostics.sourceCounts.unknown_noindex)}
             />
-            <MiniStatus label='Live calls' value={String(metadataDiagnostics.sourceCounts.dev_live)} />
+            <MiniStatus
+              label='Live calls'
+              value={String(metadataDiagnostics.sourceCounts.dev_live)}
+            />
           </div>
 
           <div className='mt-4 space-y-2'>
@@ -607,8 +616,8 @@ export default function StorefrontDataHealthAdminClient({
                     : 'border-amber-300/20 bg-amber-300/8 text-amber-100'
                 }`}
               >
-                <span className='font-semibold'>{check.ok ? 'Pass' : 'Review'}:</span>{' '}
-                {check.label}. {check.detail}
+                <span className='font-semibold'>{check.ok ? 'Pass' : 'Review'}:</span> {check.label}
+                . {check.detail}
               </div>
             ))}
           </div>
@@ -650,7 +659,9 @@ export default function StorefrontDataHealthAdminClient({
             />
           </div>
 
-          {publishedProductVerification.products.some((product) => product.status !== 'available') ? (
+          {publishedProductVerification.products.some(
+            (product) => product.status !== 'available',
+          ) ? (
             <div className='mt-4 space-y-2'>
               {publishedProductVerification.products
                 .filter((product) => product.status !== 'available')
@@ -678,29 +689,29 @@ export default function StorefrontDataHealthAdminClient({
         <StatTile label='Product snapshot' value={lastProductSnapshot} />
         <StatTile label='Category snapshot' value={lastCategorySnapshot} />
         <StatTile label='Snapshot TTL' value={snapshotTtlLabel} />
-        <StatTile label='SEO manifest' value={lastSeoManifest} />
+        <StatTile label='Search metadata manifest' value={lastSeoManifest} />
         <StatTile
-          label='SEO product shards'
+          label='Product metadata shards'
           value={storefrontSnapshotStats.seoManifest.productCount}
         />
         <StatTile
-          label='SEO category shards'
+          label='Category metadata shards'
           value={storefrontSnapshotStats.seoManifest.categoryCount}
         />
         <StatTile
-          label='SEO missing products'
+          label='Products missing metadata'
           value={storefrontSnapshotStats.seoManifest.missingPublishedProductIds.length}
         />
         <StatTile
-          label='SEO missing categories'
+          label='Categories missing metadata'
           value={storefrontSnapshotStats.seoManifest.missingCategorySlugs.length}
         />
         <StatTile
-          label='SEO retained generations'
+          label='Retained manifest generations'
           value={storefrontSnapshotStats.seoManifest.retainedGenerationCount}
         />
         <StatTile
-          label='SEO last pruned'
+          label='Generations pruned last run'
           value={storefrontSnapshotStats.seoManifest.lastPrunedGenerationCount}
         />
       </section>

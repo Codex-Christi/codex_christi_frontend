@@ -14,6 +14,11 @@ import { getCategoryPagePath } from '@/lib/utils/shop/categoryPagePath';
 
 type BasicProductData = BasicProductInterface['data'];
 type ProductVariantsData = ProductVariantsInterface['data'];
+type BasicProductPayload = Record<string, unknown> & {
+  _id: string;
+  title: string;
+  retail_price: string | number;
+};
 
 type CategoryMetaSnapshotInput = {
   categorySlug: string;
@@ -32,7 +37,7 @@ type CategoryPageSnapshotInput = {
   pageSize: number;
   total: number;
   totalPages: number;
-  products: BasicProductData[];
+  products: unknown[];
   force?: boolean;
 };
 
@@ -54,6 +59,72 @@ export type SnapshotCategoryMetadataResponse = {
 
 export function normalizeStorefrontCategorySlug(input: string) {
   return input.trim().toLowerCase();
+}
+
+export class InvalidStorefrontProductPayloadError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidStorefrontProductPayloadError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+export function isInvalidStorefrontProductPayloadError(
+  error: unknown,
+): error is InvalidStorefrontProductPayloadError {
+  return (
+    error instanceof InvalidStorefrontProductPayloadError ||
+    (!!error &&
+      typeof error === 'object' &&
+      (error as { name?: unknown }).name === 'InvalidStorefrontProductPayloadError')
+  );
+}
+
+function isNonEmptyString(value: unknown) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function getInvalidBasicProductPayloadFields(value: unknown) {
+  if (!value || typeof value !== 'object') return ['data'];
+
+  const candidate = value as Record<string, unknown>;
+  const invalidFields: string[] = [];
+
+  if (!isNonEmptyString(candidate._id)) invalidFields.push('data._id');
+  if (!isNonEmptyString(candidate.title)) invalidFields.push('data.title');
+  if (typeof candidate.retail_price !== 'string' && typeof candidate.retail_price !== 'number') {
+    invalidFields.push('data.retail_price');
+  }
+
+  return invalidFields;
+}
+
+export function isBasicStorefrontProductData(value: unknown): value is BasicProductPayload {
+  return getInvalidBasicProductPayloadFields(value).length === 0;
+}
+
+export function assertBasicStorefrontProductData(
+  value: unknown,
+  context = 'Storefront product',
+): BasicProductData {
+  const invalidFields = getInvalidBasicProductPayloadFields(value);
+  if (invalidFields.length) {
+    throw new InvalidStorefrontProductPayloadError(
+      `${context} payload is missing required fields: ${invalidFields.join(', ')}.`,
+    );
+  }
+
+  const product = value as BasicProductPayload;
+
+  return {
+    ...product,
+    _id: product._id,
+    title: product.title,
+    description: typeof product.description === 'string' ? product.description : '',
+    image: typeof product.image === 'string' ? product.image : '',
+    retail_price: String(product.retail_price),
+    slug: typeof product.slug === 'string' && product.slug ? product.slug : product._id,
+  } satisfies BasicProductData;
 }
 
 function storefrontSnapshotTtlMs() {
@@ -138,38 +209,42 @@ function productSnapshotWhere(productIDorSlug: string) {
 }
 
 export async function upsertStorefrontProductSnapshot(
-  product: BasicProductData,
+  product: unknown,
   opts: { force?: boolean } = {},
 ) {
+  const validProduct = assertBasicStorefrontProductData(
+    product,
+    'Storefront product snapshot upsert',
+  );
   const now = new Date();
-  const retailPrice = parseRetailPrice(product.retail_price);
+  const retailPrice = parseRetailPrice(validProduct.retail_price);
   const existing = await merchizeCatalogPrisma.storefrontProductSnapshot.findUnique({
-    where: { merchizeProductId: product._id },
+    where: { merchizeProductId: validProduct._id },
     select: { lastProductFetchAt: true },
   });
 
   if (!opts.force && isFresh(existing?.lastProductFetchAt, now)) return;
 
   await merchizeCatalogPrisma.storefrontProductSnapshot.upsert({
-    where: { merchizeProductId: product._id },
+    where: { merchizeProductId: validProduct._id },
     create: {
-      merchizeProductId: product._id,
-      slug: product.slug ?? null,
-      title: product.title ?? null,
-      description: product.description ?? null,
-      image: getProductImageFromRawProduct(product) || null,
+      merchizeProductId: validProduct._id,
+      slug: validProduct.slug ?? null,
+      title: validProduct.title ?? null,
+      description: validProduct.description ?? null,
+      image: getProductImageFromRawProduct(validProduct) || null,
       retailPrice,
-      rawProductJson: toJsonValue(product),
+      rawProductJson: toJsonValue(validProduct),
       lastSeenAt: now,
       lastProductFetchAt: now,
     },
     update: {
-      slug: product.slug ?? null,
-      title: product.title ?? null,
-      description: product.description ?? null,
-      image: getProductImageFromRawProduct(product) || null,
+      slug: validProduct.slug ?? null,
+      title: validProduct.title ?? null,
+      description: validProduct.description ?? null,
+      image: getProductImageFromRawProduct(validProduct) || null,
       retailPrice,
-      rawProductJson: toJsonValue(product),
+      rawProductJson: toJsonValue(validProduct),
       lastSeenAt: now,
       lastProductFetchAt: now,
     },
@@ -289,7 +364,18 @@ export async function upsertStorefrontCategoryPageSnapshot(input: CategoryPageSn
     },
   });
 
-  for (const [index, product] of input.products.entries()) {
+  for (const [index, rawProduct] of input.products.entries()) {
+    let product: BasicProductData;
+    try {
+      product = assertBasicStorefrontProductData(
+        rawProduct,
+        `Storefront category product ${categorySlug} page ${input.page} index ${index}`,
+      );
+    } catch (err) {
+      console.warn('[storefrontSnapshot] category product snapshot skipped:', err);
+      continue;
+    }
+
     await upsertStorefrontProductSnapshot(product, { force: input.force });
 
     const productRecord = await merchizeCatalogPrisma.storefrontProductSnapshot.findUnique({

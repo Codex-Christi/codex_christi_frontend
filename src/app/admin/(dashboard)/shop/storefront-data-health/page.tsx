@@ -7,7 +7,7 @@ import { requireAdminPage } from '@/lib/admin/require-admin';
 export const metadata: Metadata = {
   title: 'Storefront Data Health | Codex Christi Admin',
   description:
-    'Shop admin tooling for Merchize catalog sync, storefront snapshots, and SEO metadata health.',
+    'Shop admin tooling for Merchize catalog sync, storefront snapshots, and search metadata health.',
 };
 
 export const dynamic = 'force-dynamic';

@@ -5,9 +5,11 @@ import {
   shouldUseStorefrontSnapshot,
 } from '@/lib/merchizeStorefront/providerErrors';
 import {
+  assertBasicStorefrontProductData,
   getBasicProductSnapshotState,
   getProductDetailsFromSnapshot,
   getProductVariantsSnapshotState,
+  isInvalidStorefrontProductPayloadError,
   upsertStorefrontProductSnapshot,
   upsertStorefrontProductVariantsSnapshot,
 } from '@/lib/merchizeStorefront/snapshot';
@@ -52,13 +54,20 @@ export const fetchBaseProduct = cache((externalProductID: string) => {
         },
       );
 
-      await upsertStorefrontProductSnapshot(json.data).catch((err) => {
+      const product = assertBasicStorefrontProductData(
+        json.data,
+        `Merchize product ${externalProductID}`,
+      );
+
+      await upsertStorefrontProductSnapshot(product).catch((err) => {
         console.warn('[storefrontSnapshot] product snapshot upsert failed:', err);
       });
 
-      return { ...json.data };
+      return { ...product };
     } catch (err) {
-      if (!shouldUseStorefrontSnapshot(err)) throw err;
+      if (!shouldUseStorefrontSnapshot(err) && !isInvalidStorefrontProductPayloadError(err)) {
+        throw err;
+      }
 
       if (!snapshot) throw err;
       return snapshot.product;

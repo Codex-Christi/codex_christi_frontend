@@ -4,7 +4,10 @@ import { getProductMetaDataOnly, merchizeAPIKey, merchizeBaseURL } from './produ
 import { notFound } from 'next/navigation';
 import serialize from 'serialize-javascript';
 import { extractProductMetaDescriptionFromHtml } from '@/lib/utils/extract-plain-text-from-html';
-import { getBasicProductFromSnapshot } from '@/lib/merchizeStorefront/snapshot';
+import {
+  assertBasicStorefrontProductData,
+  getBasicProductFromSnapshot,
+} from '@/lib/merchizeStorefront/snapshot';
 import { fetchMerchizeJson } from '@/lib/merchizeStorefront/providerErrors';
 import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
 import {
@@ -32,7 +35,9 @@ export async function generateStaticParams() {
 function resolveProductImageUrl(image: string | undefined | null) {
   if (!image) return undefined;
   if (image.startsWith('/')) return getShopSiteUrl(image);
-  const imageUrl = image.startsWith('http') ? image : `https://d2dytk4tvgwhb4.cloudfront.net/${image}`;
+  const imageUrl = image.startsWith('http')
+    ? image
+    : `https://d2dytk4tvgwhb4.cloudfront.net/${image}`;
   return imageUrl.replace(/\/thumb\.jpg(?:[?#].*)?$/i, '');
 }
 
@@ -149,7 +154,7 @@ async function getDevLiveProductMetadata(productId: string) {
         },
       },
     );
-    return json.data;
+    return assertBasicStorefrontProductData(json.data, `Merchize product ${productId}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn('[product.generateMetadata] dev live metadata fetch failed:', message);

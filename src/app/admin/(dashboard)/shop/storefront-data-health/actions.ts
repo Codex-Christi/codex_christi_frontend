@@ -28,9 +28,13 @@ import {
   readShopSeoManifestStats,
 } from '@/lib/shop/seoManifest/read';
 import type { ShopMetadataSource } from '@/lib/shop/seoManifest/metadataObservability';
-import { fetchMerchizeJson, coerceMerchizeProviderError } from '@/lib/merchizeStorefront/providerErrors';
+import {
+  fetchMerchizeJson,
+  coerceMerchizeProviderError,
+} from '@/lib/merchizeStorefront/providerErrors';
 import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
 import {
+  assertBasicStorefrontProductData,
   getBasicProductFromSnapshot,
   getCategoryMetadataFromSnapshot,
   normalizeStorefrontCategorySlug,
@@ -240,13 +244,13 @@ function buildStorefrontDataHealthWarnings({
     warnings.push({
       code: 'seo_manifest_missing',
       severity: 'critical',
-      message: 'The SEO metadata manifest is missing.',
+      message: 'The search metadata manifest is missing.',
     });
   } else if (manifestIsStale) {
     warnings.push({
       code: 'seo_manifest_stale',
       severity: 'warning',
-      message: 'The SEO metadata manifest is older than the latest storefront snapshot.',
+      message: 'The search metadata manifest is older than the latest storefront snapshot.',
     });
   }
 
@@ -254,7 +258,7 @@ function buildStorefrontDataHealthWarnings({
     warnings.push({
       code: 'seo_manifest_missing_coverage',
       severity: 'warning',
-      message: 'The SEO metadata manifest is missing published product or category coverage.',
+      message: 'The search metadata manifest is missing published product or category coverage.',
     });
   }
 
@@ -262,7 +266,7 @@ function buildStorefrontDataHealthWarnings({
     warnings.push({
       code: 'seo_manifest_warnings',
       severity: 'info',
-      message: 'The latest SEO manifest generation reported warnings.',
+      message: 'The latest search metadata generation reported warnings.',
     });
   }
 
@@ -376,7 +380,7 @@ async function resolveProductMetadataDiagnostic(
       source: 'manifest',
       shouldIndex: true,
       ok: true,
-      message: 'Resolved from SEO manifest.',
+      message: 'Resolved from the search metadata manifest.',
     };
   }
 
@@ -426,7 +430,7 @@ async function resolveCategoryMetadataDiagnostic(
       source: 'manifest',
       shouldIndex: true,
       ok: true,
-      message: 'Resolved from SEO manifest.',
+      message: 'Resolved from the search metadata manifest.',
     };
   }
 
@@ -519,7 +523,9 @@ export async function verifyPublishedProductsAction() {
   };
 }
 
-async function verifyPublishedProduct(productId: string): Promise<PublishedProductVerificationItem> {
+async function verifyPublishedProduct(
+  productId: string,
+): Promise<PublishedProductVerificationItem> {
   const expected = getPublishedShopProductPreview(productId);
   const expectedTitle = expected?.title ?? productId;
   const url = `${merchizeBaseURL}/product/products/${encodeURIComponent(productId)}`;
@@ -532,11 +538,16 @@ async function verifyPublishedProduct(productId: string): Promise<PublishedProdu
       cache: 'no-store',
     });
 
+    const product = assertBasicStorefrontProductData(
+      response.data,
+      `Merchize product ${productId}`,
+    );
+
     return {
       productId,
       expectedTitle,
       status: 'available',
-      remoteTitle: response.data.title ?? null,
+      remoteTitle: product.title ?? null,
       message: 'Remote product is available.',
       statusCode: 200,
     };
