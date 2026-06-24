@@ -10,6 +10,7 @@ import {
 import { STOREFRONT_SNAPSHOT_CATEGORY_SLUGS } from '@/lib/merchizeStorefront/categories';
 import { readCategorySeoManifestEntry } from '@/lib/shop/seoManifest/read';
 import type { CategorySeoManifestEntry } from '@/lib/shop/seoManifest/types';
+import { recordShopMetadataSource } from '@/lib/shop/seoManifest/metadataObservability';
 
 const ProductList = dynamic(
   () =>
@@ -118,12 +119,25 @@ export async function generateCategoryPageMetadata(
   categoryName: string,
   page = 1,
 ): Promise<Metadata> {
+  const startedAt = Date.now();
+  const categorySlug = normalizeStorefrontCategorySlug(categoryName);
+
   const manifestEntry = await readCategorySeoManifestEntry(categoryName).catch((err) => {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.warn('[category.generateMetadata] manifest metadata lookup failed:', errorMessage);
     return null;
   });
-  if (manifestEntry) return toCategoryMetadataFromManifest(manifestEntry, categoryName, page);
+  if (manifestEntry) {
+    recordShopMetadataSource({
+      targetKind: 'category',
+      targetId: categorySlug,
+      source: 'manifest',
+      startedAt,
+      shouldIndex: true,
+      page,
+    });
+    return toCategoryMetadataFromManifest(manifestEntry, categoryName, page);
+  }
 
   const categoryMetaData = await getCategoryMetadataFromSnapshot(categoryName).catch((err) => {
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -132,6 +146,14 @@ export async function generateCategoryPageMetadata(
   });
 
   if (categoryMetaData) {
+    recordShopMetadataSource({
+      targetKind: 'category',
+      targetId: categorySlug,
+      source: 'snapshot',
+      startedAt,
+      shouldIndex: true,
+      page,
+    });
     return toCategoryMetadata({
       categoryName,
       page,
@@ -144,6 +166,14 @@ export async function generateCategoryPageMetadata(
 
   const devLiveCategoryMetaData = await getDevLiveCategoryMetadata(categoryName);
   if (devLiveCategoryMetaData) {
+    recordShopMetadataSource({
+      targetKind: 'category',
+      targetId: categorySlug,
+      source: 'dev_live',
+      startedAt,
+      shouldIndex: true,
+      page,
+    });
     return toCategoryMetadata({
       categoryName,
       page,
@@ -155,13 +185,22 @@ export async function generateCategoryPageMetadata(
   }
 
   const fallback = fallbackCategoryMetadata(categoryName);
+  const shouldIndex = isPublishedCategory(categoryName);
+  recordShopMetadataSource({
+    targetKind: 'category',
+    targetId: categorySlug,
+    source: shouldIndex ? 'category_fallback' : 'unknown_noindex',
+    startedAt,
+    shouldIndex,
+    page,
+  });
   return toCategoryMetadata({
     categoryName,
     page,
     name: fallback.name,
     description: fallback.description,
     coverUrl: null,
-    shouldIndex: isPublishedCategory(categoryName),
+    shouldIndex,
   });
 }
 

@@ -228,11 +228,11 @@ export default async function AdminPage() {
             }
           />
           <ProductCard
-            title='Catalog & Snapshots'
-            description='Inspect Merchize catalog sync state, sample variants, shipping bands, and storefront fallback snapshots.'
-            href={canAccessShopTools ? '/admin/shop/merchize-catalog-snapshots' : undefined}
+            title='Storefront Data Health'
+            description='Inspect Merchize catalog sync, storefront snapshots, fallback coverage, and SEO metadata manifest health.'
+            href={canAccessShopTools ? '/admin/shop/storefront-data-health' : undefined}
             icon={Store}
-            status={canAccessShopTools ? 'Catalog tool' : 'Restricted'}
+            status={canAccessShopTools ? 'Data health' : 'Restricted'}
             attention={canAccessShopTools ? 'Open implemented tool' : 'No access'}
             metrics={
               canAccessShopTools

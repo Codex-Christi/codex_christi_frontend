@@ -1,4 +1,4 @@
-// src/app/admin/shop/merchize-catalog-snapshots/actions.ts
+// src/app/admin/shop/storefront-data-health/actions.ts
 'use server';
 
 import { revalidatePath } from 'next/cache';

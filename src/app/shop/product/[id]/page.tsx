@@ -15,6 +15,7 @@ import { getShopSiteUrl } from '@/lib/siteBaseUrls';
 import { getPublishedShopProductPreview } from '@/lib/utils/shopHomePageProductsData';
 import { readProductSeoManifestEntry } from '@/lib/shop/seoManifest/read';
 import type { ProductSeoManifestEntry } from '@/lib/shop/seoManifest/types';
+import { recordShopMetadataSource } from '@/lib/shop/seoManifest/metadataObservability';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -157,6 +158,7 @@ async function getDevLiveProductMetadata(productId: string) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const startedAt = Date.now();
   const { id } = await params;
 
   const manifestEntry = await readProductSeoManifestEntry(id).catch((err) => {
@@ -164,7 +166,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     console.warn('[product.generateMetadata] manifest metadata lookup failed:', errorMessage);
     return null;
   });
-  if (manifestEntry) return toProductMetadataFromManifest(manifestEntry);
+  if (manifestEntry) {
+    recordShopMetadataSource({
+      targetKind: 'product',
+      targetId: id,
+      source: 'manifest',
+      startedAt,
+      shouldIndex: true,
+    });
+    return toProductMetadataFromManifest(manifestEntry);
+  }
 
   const productMetaData = await getBasicProductFromSnapshot(id).catch((err) => {
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -173,6 +184,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   });
 
   if (productMetaData) {
+    recordShopMetadataSource({
+      targetKind: 'product',
+      targetId: id,
+      source: 'snapshot',
+      startedAt,
+      shouldIndex: true,
+    });
     return toProductMetadata({
       productId: id,
       title: `${productMetaData.title} | ${SHOP_SITE_NAME}`,
@@ -187,6 +205,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const liveProductMetaData = await getDevLiveProductMetadata(id);
   if (liveProductMetaData) {
+    recordShopMetadataSource({
+      targetKind: 'product',
+      targetId: id,
+      source: 'dev_live',
+      startedAt,
+      shouldIndex: true,
+    });
     return toProductMetadata({
       productId: id,
       title: `${liveProductMetaData.title} | ${SHOP_SITE_NAME}`,
@@ -199,6 +224,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     });
   }
 
+  const publishedProductFallback = getPublishedShopProductPreview(id);
+  recordShopMetadataSource({
+    targetKind: 'product',
+    targetId: id,
+    source: publishedProductFallback ? 'published_fallback' : 'unknown_noindex',
+    startedAt,
+    shouldIndex: Boolean(publishedProductFallback),
+  });
   return getSnapshotMissProductMetadata(id);
 }
 

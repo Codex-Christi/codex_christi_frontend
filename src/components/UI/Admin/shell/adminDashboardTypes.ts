@@ -7,7 +7,7 @@ export type AdminDashboardSection =
   | 'admin-ops'
   | 'admin-security-records'
   | 'shop'
-  | 'shop-catalog-snapshots'
+  | 'shop-storefront-data-health'
   | 'shop-paid-order-recovery'
   | 'shop-paypal-webhooks'
   | 'shop-payment-reconciliation';

@@ -221,7 +221,7 @@ Preferred admin routes:
 /admin/shop
 /admin/shop/paid-order-recovery
 /admin/shop/paid-order-recovery/[orderToken]
-/admin/shop/merchize-catalog-snapshots
+/admin/shop/storefront-data-health
 ```
 
 Preferred API/action boundaries:
@@ -419,7 +419,7 @@ The broader admin dashboard should be a hub, not only a ledger page.
 
 Initial shop-focused cards:
 
-- Merchize Catalog & Snapshots.
+- Storefront Data Health.
 - Paid Order Recovery.
 - Clear expired checkout recovery OTP challenges.
 
@@ -466,7 +466,7 @@ Initial admin card groups:
 - Reconciliation: compare PayPal, Django, Merchize, and local ledger state.
 - Expired OTP Cleanup: clear expired checkout recovery OTP challenges.
 - Support Cases: future customer support queue and customer updates.
-- Catalog & Snapshots: refresh Merchize price/shipping data and storefront fallback snapshots.
+- Storefront Data Health: refresh Merchize price/shipping data, storefront snapshots, and SEO metadata coverage.
 
 Card content rules:
 
@@ -866,7 +866,7 @@ Minimum behavior:
 Decision:
 
 - Do not keep separate page-local password gates for individual admin tools.
-- The Merchize Catalog & Snapshots route should rely on the future central admin auth boundary.
+- The Storefront Data Health route should rely on the future central admin auth boundary.
 - Do not block the ledger UI on a full identity provider during beta.
 - Treat any temporary shared-secret or shared-cookie pattern as a beta bridge only.
 - Plan to consolidate admin auth around cryptographic identity.
@@ -927,7 +927,7 @@ src/app/admin/shop/page.tsx
 
 Hub cards:
 
-- Merchize Catalog & Snapshots
+- Storefront Data Health
 - Paid Order Recovery
 - Checkout Recovery OTP Maintenance
 
@@ -1818,7 +1818,7 @@ yarn lint
 
 Admin hub:
 
-- Links to Merchize Catalog & Snapshots admin.
+- Links to Storefront Data Health admin.
 - Links to Paid Order Recovery.
 - Includes expired checkout recovery OTP cleanup entry.
 

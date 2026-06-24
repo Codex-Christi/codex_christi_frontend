@@ -69,7 +69,7 @@ type StatusState =
   | { type: 'success'; message: string }
   | { type: 'error'; message: string };
 
-export default function MerchizeCatalogSnapshotsAdminClient({
+export default function StorefrontDataHealthAdminClient({
   initialSyncState,
   initialSamples,
   initialStorefrontSnapshotStats,
@@ -291,6 +291,15 @@ export default function MerchizeCatalogSnapshotsAdminClient({
   const lastSeoManifest = storefrontSnapshotStats.seoManifest.generatedAt
     ? formatAdminDate(new Date(storefrontSnapshotStats.seoManifest.generatedAt))
     : 'Never';
+  const seoManifestMissingCount =
+    storefrontSnapshotStats.seoManifest.missingPublishedProductIds.length +
+    storefrontSnapshotStats.seoManifest.missingCategorySlugs.length;
+  const seoManifestWarningCount = storefrontSnapshotStats.seoManifest.warnings.length;
+  const metadataCoverageStatus = !storefrontSnapshotStats.seoManifest.generatedAt
+    ? 'Manifest missing'
+    : seoManifestMissingCount || seoManifestWarningCount
+      ? 'Needs review'
+      : 'Covered';
 
   const handleClearSearch = () => {
     setSearchTerm('');
@@ -306,11 +315,10 @@ export default function MerchizeCatalogSnapshotsAdminClient({
           <p className='inline-flex rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-cyan-100'>
             Merchize data plane
           </p>
-          <h2 className='mt-4 text-xl font-semibold text-white'>Catalog and fallback health</h2>
+          <h2 className='mt-4 text-xl font-semibold text-white'>Storefront data health</h2>
           <p className='mt-2 max-w-3xl text-sm leading-6 text-slate-400'>
-            Refresh the local price/shipping catalog used for SKU lookups, and refresh the
-            storefront snapshots used when Merchize product, category, or variant requests are
-            unavailable.
+            Refresh the local price/shipping catalog, storefront snapshots, and SEO metadata shards
+            that keep public shop pages independent from live Merchize metadata calls.
           </p>
 
           <div className='mt-5 grid gap-3 text-xs sm:grid-cols-4'>
@@ -392,6 +400,28 @@ export default function MerchizeCatalogSnapshotsAdminClient({
           {status.message}
         </div>
       )}
+
+      <AdminGlassPanel className='p-4 sm:p-5'>
+        <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+          <div>
+            <h2 className='text-base font-semibold text-white'>Metadata coverage</h2>
+            <p className='mt-1 text-xs leading-5 text-slate-500'>
+              The SEO metadata read path uses the manifest first, then the SQLite snapshot, then
+              local published fallbacks or noindex for unknown routes.
+            </p>
+          </div>
+          <span className='inline-flex w-fit rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[11px] uppercase tracking-[0.16em] text-cyan-100'>
+            {metadataCoverageStatus}
+          </span>
+        </div>
+
+        <div className='mt-4 grid gap-3 text-xs sm:grid-cols-4'>
+          <MiniStatus label='Primary metadata' value='SEO manifest' />
+          <MiniStatus label='Manifest age' value={lastSeoManifest} />
+          <MiniStatus label='Missing coverage' value={seoManifestMissingCount} />
+          <MiniStatus label='Warnings' value={seoManifestWarningCount} />
+        </div>
+      </AdminGlassPanel>
 
       <section className='grid gap-3 sm:grid-cols-2 xl:grid-cols-3'>
         <StatTile label='Last catalog run' value={lastRun} />

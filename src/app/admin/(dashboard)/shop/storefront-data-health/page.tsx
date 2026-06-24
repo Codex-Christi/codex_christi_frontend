@@ -1,17 +1,18 @@
 import type { Metadata } from 'next';
-import MerchizeCatalogSnapshotsAdminClient from './MerchizeCatalogSnapshotsAdminClient';
+import StorefrontDataHealthAdminClient from './StorefrontDataHealthAdminClient';
 import { getStorefrontSnapshotStats } from './actions';
 import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
 import { requireAdminPage } from '@/lib/admin/require-admin';
 
 export const metadata: Metadata = {
-  title: 'Merchize Catalog & Snapshots | Codex Christi Admin',
-  description: 'Shop admin tooling for Merchize price, shipping, and storefront snapshot data.',
+  title: 'Storefront Data Health | Codex Christi Admin',
+  description:
+    'Shop admin tooling for Merchize catalog sync, storefront snapshots, and SEO metadata health.',
 };
 
 export const dynamic = 'force-dynamic';
 
-async function getCatalogPageData() {
+async function getStorefrontDataHealthPageData() {
   try {
     const [syncState, sampleVariants, storefrontSnapshotStats] = await Promise.all([
       merchizeCatalogPrisma.syncState.findUnique({
@@ -27,23 +28,23 @@ async function getCatalogPageData() {
 
     return { syncState, sampleVariants, storefrontSnapshotStats };
   } catch (error) {
-    console.error('Failed to fetch catalog data:', error);
+    console.error('Failed to fetch storefront data health:', error);
     return null;
   }
 }
 
-export default async function MerchizeCatalogSnapshotsAdminPage() {
+export default async function StorefrontDataHealthAdminPage() {
   await requireAdminPage({
     scope: 'shop.view',
-    returnPath: '/admin/shop/merchize-catalog-snapshots',
+    returnPath: '/admin/shop/storefront-data-health',
   });
 
-  const pageData = await getCatalogPageData();
+  const pageData = await getStorefrontDataHealthPageData();
 
   return (
     <>
       {pageData ? (
-        <MerchizeCatalogSnapshotsAdminClient
+        <StorefrontDataHealthAdminClient
           initialSyncState={pageData.syncState}
           initialSamples={pageData.sampleVariants}
           initialStorefrontSnapshotStats={pageData.storefrontSnapshotStats}
@@ -51,7 +52,7 @@ export default async function MerchizeCatalogSnapshotsAdminPage() {
       ) : (
         <div className='grid min-h-[60dvh] place-items-center px-4 text-white'>
           <div className='rounded-lg border border-rose-300/20 bg-rose-400/10 p-5 text-sm text-rose-100 supports-[backdrop-filter]:backdrop-blur-xl'>
-            Error loading Merchize catalog and snapshot data.
+            Error loading storefront data health.
           </div>
         </div>
       )}
