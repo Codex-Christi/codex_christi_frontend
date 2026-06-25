@@ -26,6 +26,10 @@ export const redirectLoggedInUserToProfileMiddleware = async (request: NextReque
   return await redirectLoggedInUserToProfile(request);
 };
 
+function hasRefreshGuard(req: NextRequest) {
+  return req.nextUrl.searchParams.has(SESSION_REFRESH_GUARD_PARAM);
+}
+
 function getPathWithSearchWithoutSessionRefreshGuard(req: NextRequest) {
   const cleanUrl = req.nextUrl.clone();
   cleanUrl.searchParams.delete(SESSION_REFRESH_GUARD_PARAM);
@@ -34,9 +38,7 @@ function getPathWithSearchWithoutSessionRefreshGuard(req: NextRequest) {
 }
 
 function redirectWithoutSessionRefreshGuard(req: NextRequest) {
-  if (!req.nextUrl.searchParams.has(SESSION_REFRESH_GUARD_PARAM)) {
-    return null;
-  }
+  if (!hasRefreshGuard(req)) return null;
 
   const cleanUrl = req.nextUrl.clone();
   cleanUrl.searchParams.delete(SESSION_REFRESH_GUARD_PARAM);
@@ -45,9 +47,7 @@ function redirectWithoutSessionRefreshGuard(req: NextRequest) {
 }
 
 async function refreshRequestSession(req: NextRequest) {
-  if (req.nextUrl.searchParams.has(SESSION_REFRESH_GUARD_PARAM)) {
-    return null;
-  }
+  if (hasRefreshGuard(req)) return null;
 
   const currentRefreshToken = await getRequestRefreshToken(req);
 
@@ -83,6 +83,20 @@ async function refreshRequestSession(req: NextRequest) {
   }
 }
 
+function clearFailedSessionCookiesIfNeeded({
+  req,
+  response,
+  shouldClearCookies,
+}: {
+  req: NextRequest;
+  response: NextResponse;
+  shouldClearCookies: boolean;
+}) {
+  return shouldClearCookies || hasRefreshGuard(req)
+    ? clearAuthCookies(response, req.headers)
+    : response;
+}
+
 export const redirectExpSessionToLoginPage = async (req: NextRequest) => {
   const hostname = getHostnameFromHostHeader(req.headers.get('host'));
   const sessionState = await getRequestSessionState(req);
@@ -104,14 +118,11 @@ export const redirectExpSessionToLoginPage = async (req: NextRequest) => {
     ),
   );
 
-  if (
-    sessionState.shouldClearCookies ||
-    req.nextUrl.searchParams.has(SESSION_REFRESH_GUARD_PARAM)
-  ) {
-    return clearAuthCookies(response, req.headers);
-  }
-
-  return response;
+  return clearFailedSessionCookiesIfNeeded({
+    req,
+    response,
+    shouldClearCookies: sessionState.shouldClearCookies,
+  });
 };
 
 export const protectAdminRouteMiddleware = async (req: NextRequest) => {
@@ -127,14 +138,11 @@ export const protectAdminRouteMiddleware = async (req: NextRequest) => {
       new URL(`/auth/sign-in?next=${encodeURIComponent(safeReturnPath)}`, req.url),
     );
 
-    if (
-      sessionState.shouldClearCookies ||
-      req.nextUrl.searchParams.has(SESSION_REFRESH_GUARD_PARAM)
-    ) {
-      return clearAuthCookies(response, req.headers);
-    }
-
-    return response;
+    return clearFailedSessionCookiesIfNeeded({
+      req,
+      response,
+      shouldClearCookies: sessionState.shouldClearCookies,
+    });
   }
 
   const cleanRefreshGuardResponse = redirectWithoutSessionRefreshGuard(req);

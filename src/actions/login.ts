@@ -14,7 +14,7 @@ export interface AuthSessionState {
   user_id: string | null;
 }
 
-export type CreateLoginSessionResult =
+export type LoginResult =
 	| {
 			success: true;
 			sessionState: AuthSessionState;
@@ -29,10 +29,10 @@ type LoginCredentials = {
 	password: string;
 };
 
-export async function createLoginSession(
+async function createLoginSession(
 	accessToken: string,
 	refreshToken: string,
-): Promise<CreateLoginSessionResult> {
+): Promise<LoginResult> {
 	try {
 		const session = await createSession(accessToken, refreshToken);
 
@@ -54,7 +54,7 @@ export async function createLoginSession(
 export async function loginUser({
 	email,
 	password,
-}: LoginCredentials): Promise<CreateLoginSessionResult> {
+}: LoginCredentials): Promise<LoginResult> {
 	try {
 		const response = await fetch(`${getServerDjangoApiBaseUrl()}/auth/user-login`, {
 			method: "POST",

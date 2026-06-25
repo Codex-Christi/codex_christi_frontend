@@ -42,6 +42,21 @@ function getSameHostRefererPath() {
   }
 }
 
+function getLoginRedirectPath({
+  isShopSite,
+  loginReturnPath,
+  referer,
+}: {
+  isShopSite: boolean;
+  loginReturnPath: string | null;
+  referer: string | null;
+}) {
+  if (loginReturnPath) return loginReturnPath;
+  if (isShopSite) return referer ?? '/';
+
+  return '/profile';
+}
+
 export const useLogin = () => {
   const router = useRouter();
   const setSessionState = useAuthStore((state) => state.setSessionState);
@@ -72,58 +87,44 @@ export const useLogin = () => {
       try {
         const sessionStatus = await loginUser(userDetails);
 
-        if (sessionStatus.success) {
-          setLoginProcessState({
-            isLoading: false,
-            isError: false,
-            errorMsg: '',
-          });
+        if (!sessionStatus.success) {
+          throw new Error(sessionStatus.error);
+        }
 
-          // Sync the auth store from the server session we just created.
-          const sessionState = sessionStatus.sessionState;
-          setSessionState(sessionState);
+        const sessionState = sessionStatus.sessionState;
 
-          if (sessionState.isAuthenticated) {
-            // Fetch profile into Zustand BEFORE redirecting (non-shop flows)
-            const { setProfileFromServer } = useUserMainProfileStore.getState();
-
-            if (!isCodexChristiShop) {
-              try {
-                await setProfileFromServer(); // fills userMainProfile
-              } catch (e) {
-                console.error('Failed to fetch user profile after login:', e);
-                // Optional: you could still proceed; profile page will show "Loading..."
-              }
-            }
-
-            toast.dismiss(loadingToastID);
-
-            successToast({
-              message: `Redirecting you ${isCodexChristiShop ? '' : 'to your dashboard'}...`,
-              header: 'Login Successful.',
-            });
-
-            // Redirect logic
-            if (loginReturnPath) {
-              router.push(loginReturnPath);
-            } else if (isCodexChristiShop) {
-              if (referer && typeof referer === 'string') {
-                router.push(referer);
-              } else {
-                router.push('/');
-              }
-            } else {
-              router.push('/profile');
-            }
-
-            return;
-          }
-
-          // If session not active after all this:
+        if (!sessionState.isAuthenticated) {
           throw new Error('Session verification failed');
         }
 
-        throw new Error(sessionStatus.error);
+        setLoginProcessState({
+          isLoading: false,
+          isError: false,
+          errorMsg: '',
+        });
+        setSessionState(sessionState);
+
+        if (!isCodexChristiShop) {
+          try {
+            await useUserMainProfileStore.getState().setProfileFromServer();
+          } catch (e) {
+            console.error('Failed to fetch user profile after login:', e);
+          }
+        }
+
+        toast.dismiss(loadingToastID);
+        successToast({
+          message: `Redirecting you ${isCodexChristiShop ? '' : 'to your dashboard'}...`,
+          header: 'Login Successful.',
+        });
+
+        router.push(
+          getLoginRedirectPath({
+            isShopSite: isCodexChristiShop,
+            loginReturnPath,
+            referer,
+          }),
+        );
       } catch (err: unknown) {
         toast.dismiss(loadingToastID);
 

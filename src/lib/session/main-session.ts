@@ -4,8 +4,6 @@ import { cookies, headers } from 'next/headers';
 import {
   buildAuthSessionCookies,
   buildExpiredAuthCookies,
-  getAuthCookieOptions,
-  getExpiredAuthCookieOptions,
   getMainRefreshTokenFromCookieValue,
   REFRESH_TOKEN_COOKIE_NAME,
   type AuthCookieDefinition,
@@ -34,23 +32,6 @@ async function writeAuthCookies(authCookies: AuthCookieDefinition[]) {
   }
 }
 
-// Cookie Setter from next/headers
-export async function setCookie(cookie: string, name: string, expiresAt: Date) {
-  const requestHeaders = await headers();
-  const cookieStore = await cookies();
-
-  cookieStore.set(name, cookie, getAuthCookieOptions(expiresAt, requestHeaders));
-}
-
-// Delete Cookie
-export async function deleteCookie(name: string) {
-  const requestHeaders = await headers();
-  const cookieStore = await cookies();
-
-  cookieStore.set(name, '', getExpiredAuthCookieOptions(requestHeaders));
-}
-
-// Create the session
 export async function createSession(
   accessToken: string,
   refreshToken: string,
@@ -69,18 +50,12 @@ export async function createSession(
   };
 }
 
-// Update Session
 export async function refreshSession(): Promise<RefreshSessionResult> {
   const refreshTokenCookie = await getCookie(REFRESH_TOKEN_COOKIE_NAME);
   const currentRefreshToken = await getMainRefreshTokenFromCookieValue(refreshTokenCookie?.value);
 
   if (!currentRefreshToken) {
-    await deleteSession();
-
-    return {
-      success: false,
-      error: 'No refresh token found.',
-    };
+    return clearSessionAfterRefreshFailure('No refresh token found.');
   }
 
   try {
@@ -95,23 +70,27 @@ export async function refreshSession(): Promise<RefreshSessionResult> {
       session,
     };
   } catch (error) {
-    await deleteSession();
-
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    };
+    return clearSessionAfterRefreshFailure(
+      error instanceof Error ? error.message : String(error),
+    );
   }
 }
 
-// Delete Session
+async function clearSessionAfterRefreshFailure(error: string): Promise<RefreshSessionResult> {
+  await deleteSession();
+
+  return {
+    success: false,
+    error,
+  };
+}
+
 export async function deleteSession() {
   const requestHeaders = await headers();
 
   await writeAuthCookies(buildExpiredAuthCookies(requestHeaders));
 }
 
-// Get cookie from server
 export const getCookie = async (name: string) => {
   const cookieStore = await cookies();
 
