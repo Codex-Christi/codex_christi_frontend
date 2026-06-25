@@ -14,6 +14,33 @@ import {
   useVerifyDjangoOrderIntentOTPMutation,
 } from './djangoOrderIntentMutationHooks';
 
+function getDjangoOrderIntentErrorMessage(error: unknown, fallback: string) {
+  const info =
+    error && typeof error === 'object' && 'info' in error
+      ? (error.info as Record<string, unknown> | null)
+      : null;
+  const errors = Array.isArray(info?.errors) ? info.errors : [];
+  const messages = errors
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') return null;
+
+      const record = entry as Record<string, unknown>;
+      const fieldName = typeof record.field_name === 'string' ? record.field_name : null;
+      const message = typeof record.message === 'string' ? record.message : null;
+
+      if (fieldName && message) return `${fieldName}: ${message}`;
+      return message;
+    })
+    .filter((message): message is string => Boolean(message));
+
+  if (messages.length) return messages.join(' ');
+  if (typeof info?.message === 'string' && info.message) return info.message;
+  if (typeof info?.detail === 'string' && info.detail) return info.detail;
+  if (error instanceof Error && error.message) return error.message;
+
+  return fallback;
+}
+
 export const useDjangoOrderIntentEmailVerification = (
   email: string | undefined,
   openOTPModal: () => void,
@@ -30,6 +57,7 @@ export const useDjangoOrderIntentEmailVerification = (
     data: verifyData,
     error: verifyError,
     isMutating: isVerifying,
+    reset: resetVerifyDjangoOrderIntentMutation,
   } = useVerifyDjangoOrderIntentOTPMutation();
   const {
     trigger: resendTrigger,
@@ -67,6 +95,9 @@ export const useDjangoOrderIntentEmailVerification = (
           djangoOrderIntentUuid: data?.id,
           djangoOrderIntentOrderId: data?.order_id,
           djangoOrderIntentPayload: resp,
+          djangoOrderIntentVerifyPayload: otpStatus === 'verified' ? resp : undefined,
+          djangoOrderIntentVerifiedAt:
+            otpStatus === 'verified' ? new Date().toISOString() : undefined,
         });
 
         if (otpStatus === 'pending') {
@@ -85,6 +116,13 @@ export const useDjangoOrderIntentEmailVerification = (
             message: 'Email already verified. Proceeding to payment...',
           });
           return resp;
+        } else if (otpStatus === 'expired') {
+          openOTPModal();
+          errorToast({
+            header: 'Verification code expired',
+            message: 'Use Resend to request a fresh checkout verification code.',
+          });
+          return resp;
         } else {
           openOTPModal();
           successToast({
@@ -94,10 +132,11 @@ export const useDjangoOrderIntentEmailVerification = (
           return resp;
         }
       } catch (err: unknown) {
-        const message =
-          (err as Error)?.message ??
+        const message = getDjangoOrderIntentErrorMessage(
+          err,
           mutationError?.message ??
-          'An error occurred while creating the order verification intent';
+            'An error occurred while creating the order verification intent',
+        );
         errorToast({ header: 'Order verification failed', message });
       }
     },
@@ -127,21 +166,9 @@ export const useDjangoOrderIntentEmailVerification = (
         return;
       }
 
-      if (verifyError) {
-        const errorsArr = Array.isArray(verifyError.info?.errors)
-          ? (verifyError.info.errors as { code: string; message: string }[])
-          : [];
-        if (errorsArr[0]) {
-          const error = errorsArr[0];
-          errorToast({ header: 'OTP Verification failed', message: error.message });
-          return;
-        }
-
-        errorToast({ message: verifyError.message ?? 'An error occurred during verification' });
-        return;
-      }
-
       try {
+        resetVerifyDjangoOrderIntentMutation();
+
         const resp = await verifyTrigger({ email, otp, order_id });
         const data = resp?.data;
         const otpStatus = data?.otp_status;
@@ -150,6 +177,8 @@ export const useDjangoOrderIntentEmailVerification = (
           djangoOrderIntentUuid: data?.id,
           djangoOrderIntentOrderId: data?.order_id,
           djangoOrderIntentVerifyPayload: resp,
+          djangoOrderIntentVerifiedAt:
+            otpStatus === 'verified' ? new Date().toISOString() : undefined,
         });
 
         if (otpStatus === 'verified') {
@@ -167,10 +196,10 @@ export const useDjangoOrderIntentEmailVerification = (
           });
         }
       } catch (err: unknown) {
-        const message =
-          (err as Error)?.message ??
-          mutationError?.message ??
-          'An error occurred while verifying the OTP';
+        const message = getDjangoOrderIntentErrorMessage(
+          err,
+          verifyError?.message ?? 'An error occurred while verifying the OTP',
+        );
         errorToast({ header: 'Email verification failed', message });
       }
     },
@@ -178,8 +207,8 @@ export const useDjangoOrderIntentEmailVerification = (
       isVerifying,
       verifyTrigger,
       verifyError,
+      resetVerifyDjangoOrderIntentMutation,
       addEmailToVerifiedList,
-      mutationError?.message,
       setDjangoOrderIntent,
     ],
   );
@@ -205,10 +234,10 @@ export const useDjangoOrderIntentEmailVerification = (
         });
         return resp;
       } catch (err: unknown) {
-        const message =
-          (err as Error)?.message ??
-          resendError?.message ??
-          'An error occurred while resending OTP';
+        const message = getDjangoOrderIntentErrorMessage(
+          err,
+          resendError?.message ?? 'An error occurred while resending OTP',
+        );
         errorToast({ header: 'OTP resend failed', message });
       }
     },

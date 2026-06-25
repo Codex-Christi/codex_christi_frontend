@@ -15,6 +15,7 @@ import { CheckoutAccordionContext } from '../ProductCheckout';
 import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
 import { DeliveryAddressInputFields } from './DeliveryAddressInputFields';
 import errorToast from '@/lib/error-toast';
+import successToast from '@/lib/success-toast';
 import { useDjangoOrderIntentEmailVerification } from '@/lib/hooks/shopHooks/checkout/useDjangoOrderIntentEmailVerification';
 import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
@@ -25,6 +26,7 @@ import {
   getCheckoutValuesFromStore,
   getPaidCheckoutRecoveryExpiryMinutes,
   getRecipientName,
+  getRecentVerifiedDjangoOrderIntentForEmail,
   saveBasicCheckoutInfoToStore,
   startPaidCheckoutRecovery,
   toDjangoOrderIntentPayload,
@@ -174,6 +176,19 @@ export const BasicCheckoutInfo = () => {
 
   const createDjangoOrderIntentFromCheckoutInfo = useCallback(
     async (data: BasicCheckoutInfoFormSchema) => {
+      const recentVerifiedDjangoOrderIntent = getRecentVerifiedDjangoOrderIntentForEmail(
+        data.email,
+      );
+
+      if (recentVerifiedDjangoOrderIntent) {
+        successToast({
+          header: 'Email already verified',
+          message: 'Continuing with your recent verified checkout session.',
+        });
+        handleOpenItem('payment-section');
+        return;
+      }
+
       // This creates/reuses the Django backend order intent, not the PayPal ledger intent.
       const djangoOrderIntent = await createDjangoOrderIntent(
         toDjangoOrderIntentPayload(data),

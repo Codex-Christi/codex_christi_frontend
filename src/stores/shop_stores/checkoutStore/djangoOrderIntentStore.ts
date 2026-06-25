@@ -10,11 +10,13 @@ interface DjangoOrderIntentState {
   djangoOrderIntentOrderId: string;
   djangoOrderIntentPayload: unknown | null;
   djangoOrderIntentVerifyPayload: unknown | null;
+  djangoOrderIntentVerifiedAt: string | null;
   setDjangoOrderIntent: (intent: {
     djangoOrderIntentUuid?: string | null;
     djangoOrderIntentOrderId?: string | null;
     djangoOrderIntentPayload?: unknown | null;
     djangoOrderIntentVerifyPayload?: unknown | null;
+    djangoOrderIntentVerifiedAt?: string | null;
   }) => void;
   clearDjangoOrderIntent: () => void;
 }
@@ -24,6 +26,7 @@ const initialState = {
   djangoOrderIntentOrderId: '',
   djangoOrderIntentPayload: null,
   djangoOrderIntentVerifyPayload: null,
+  djangoOrderIntentVerifiedAt: null,
 };
 
 export const useDjangoOrderIntentStore = create<DjangoOrderIntentState>()(
@@ -44,6 +47,10 @@ export const useDjangoOrderIntentStore = create<DjangoOrderIntentState>()(
             intent.djangoOrderIntentVerifyPayload === undefined
               ? state.djangoOrderIntentVerifyPayload
               : intent.djangoOrderIntentVerifyPayload,
+          djangoOrderIntentVerifiedAt:
+            intent.djangoOrderIntentVerifiedAt === undefined
+              ? state.djangoOrderIntentVerifiedAt
+              : intent.djangoOrderIntentVerifiedAt,
         })),
       clearDjangoOrderIntent: () => set({ ...initialState }),
     }),

@@ -66,20 +66,21 @@ export const DjangoOrderIntentOtpController = forwardRef<
 
           if (email && order_id) {
             const resp = await triggerVerifyDjangoOrderIntentOTP({ email, order_id, otp });
-            setTimeout(() => {
-              rest.onOpenChange?.(false);
-              if (resp && resp?.data.otp_status === 'verified') {
-                if (!resp.data.order_id) {
-                  return;
-                }
-                setDjangoOrderIntent({
-                  djangoOrderIntentUuid: resp.data.id ?? djangoOrderIntentUuid,
-                  djangoOrderIntentOrderId: resp.data.order_id,
-                  djangoOrderIntentVerifyPayload: resp,
-                });
-                proceedToPaymentTrigger('payment-section');
+
+            if (resp && resp?.data.otp_status === 'verified') {
+              if (!resp.data.order_id) {
+                return;
               }
-            }, 500);
+
+              setDjangoOrderIntent({
+                djangoOrderIntentUuid: resp.data.id ?? djangoOrderIntentUuid,
+                djangoOrderIntentOrderId: resp.data.order_id,
+                djangoOrderIntentVerifyPayload: resp,
+                djangoOrderIntentVerifiedAt: new Date().toISOString(),
+              });
+              rest.onOpenChange?.(false);
+              proceedToPaymentTrigger('payment-section');
+            }
           }
         },
         [

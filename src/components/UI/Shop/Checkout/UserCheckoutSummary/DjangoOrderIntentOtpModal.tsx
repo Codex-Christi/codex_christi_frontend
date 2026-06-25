@@ -51,23 +51,42 @@ export const DjangoOrderIntentOtpModal = React.forwardRef<
     const [value, setValue] = React.useState<string>(defaultValue ?? '');
     const [isComplete, setIsComplete] = React.useState(false);
 
+    const clearValue = React.useCallback(() => {
+      setValue('');
+      setIsComplete(false);
+    }, []);
+
+    const submitOtp = React.useCallback(
+      (otp: string) => {
+        if (otp.length !== length || !onComplete) return;
+
+        setIsComplete(true);
+        onComplete(otp);
+        clearValue();
+      },
+      [clearValue, length, onComplete],
+    );
+
     // Fire onComplete only when fully entered
     React.useEffect(() => {
       if (value.length === length && onComplete && !isComplete) {
-        setIsComplete(true);
-        onComplete(value);
+        submitOtp(value);
       } else if (value.length !== length && isComplete) {
         setIsComplete(false);
       }
-    }, [value, length, onComplete, isComplete]);
+    }, [value, length, onComplete, isComplete, submitOtp]);
+
+    React.useEffect(() => {
+      if (!isOpen) clearValue();
+    }, [clearValue, isOpen]);
 
     // Clear OTP before closing
     const handleOpenChange = React.useCallback(
       (open: boolean) => {
-        if (!open) setValue('');
+        if (!open) clearValue();
         onOpenChange?.(open);
       },
-      [onOpenChange],
+      [clearValue, onOpenChange],
     );
 
     // Imperative control forwards to parent-controlled handler
@@ -172,7 +191,7 @@ export const DjangoOrderIntentOtpModal = React.forwardRef<
               <button
                 name='Proceed to Payment Button'
                 type='button'
-                onClick={() => onComplete?.(value)}
+                onClick={() => submitOtp(value)}
                 disabled={value.length !== length}
                 className='col-span-2 rounded-2xl bg-white px-3 py-2 font-semibold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-1'
               >

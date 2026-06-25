@@ -1,8 +1,10 @@
-# Codex Chat Handoff: PayPal Ledger, Django Intent, Checkout Recovery OTP
+# Shop Checkout Recovery Implementation Guide
 
-Date: 2026-05-31
+Last updated: 2026-06-25
 
-This file summarizes the working context from the Codex chat so the thread can be resumed on another machine without relying on the original conversation.
+This guide summarizes the customer-side checkout recovery architecture around Django order-intent OTP, Next.js-owned paid checkout recovery OTP, and the PayPal transaction ledger.
+
+It replaces the older chat-handoff naming and should be treated as the portable implementation reference for continuing this work in another thread or by another engineer.
 
 ## Current Problem Area
 
@@ -171,6 +173,57 @@ status in ['captured', 'receipt_uploaded', 'payment_saved', 'error']
 processingCompletedAt: null
 capturePayload exists
 ```
+
+## Current Django OTP Frontend Guard
+
+The Django order-intent OTP flow is still owned by the Django backend. The frontend cannot force Django to accept a code once Django has marked the matching order intent or OTP state invalid, expired, consumed, or otherwise inconsistent.
+
+Current frontend safeguards:
+
+- `BasicCheckoutInfo` runs the paid checkout recovery scan before creating a Django order intent.
+- If unresolved paid ledger rows exist, Django intent creation is paused and the Next.js-owned checkout recovery OTP flow is shown.
+- If no paid recovery case exists, the frontend checks for a recent locally persisted verified Django order intent for the same email before calling `/orders/intent` again.
+- The local verified Django intent reuse window is intentionally short: 15 minutes.
+- The local reuse guard is browser-scoped and encrypted in the existing checkout intent store. It is a UX guard, not a replacement for backend idempotency.
+- Stale SWR mutation errors from a previous failed OTP verification no longer block the next verification attempt.
+- The Django OTP modal clears the entered digits after submit, close, and failed verification paths so a previous OTP is not preserved visually.
+- If Django create returns `otp_status: "expired"`, the UI opens the OTP modal with explicit guidance to use Resend instead of showing a generic success message.
+
+Relevant files:
+
+```txt
+src/components/UI/Shop/Checkout/UserCheckoutSummary/BasicCheckoutInfo.tsx
+src/components/UI/Shop/Checkout/UserCheckoutSummary/basicCheckoutInfoHelpers.ts
+src/components/UI/Shop/Checkout/UserCheckoutSummary/DjangoOrderIntentOtpController.tsx
+src/components/UI/Shop/Checkout/UserCheckoutSummary/DjangoOrderIntentOtpModal.tsx
+src/lib/hooks/shopHooks/checkout/useDjangoOrderIntentEmailVerification.ts
+src/stores/shop_stores/checkoutStore/djangoOrderIntentStore.ts
+```
+
+### Known Django Backend Contract Gap
+
+Observed behavior:
+
+- A Django order intent can remain persistent after OTP verification.
+- Later attempts for the same email/order-intent family can return invalid or expired OTP even when the newly delivered OTP appears to still be within its validity window.
+- Waiting for the apparent OTP window may not reliably create a clean customer-facing retry path.
+
+Frontend workaround:
+
+- Reuse a recent locally verified Django order intent for the same email when available.
+- Keep the user in the OTP modal on failed verification and clear the digits.
+- Guide the user toward Resend when Django reports an expired state.
+
+Backend behavior that should eventually be implemented by Django:
+
+- Provide a deterministic current-intent lookup for an email/order-intent checkout session.
+- Return a machine-readable reason when a code is rejected, for example `otp_expired`, `otp_consumed`, `intent_completed`, `intent_locked`, or `intent_not_found`.
+- Make resend attach to the exact active intent returned to the frontend, not only to the email.
+- If a completed intent can be reused for payment, expose that explicitly with a stable `otp_status: "verified"` response and the correct `order_id`.
+- If a completed intent cannot be reused, provide a backend-supported reset/supersede endpoint instead of leaving the frontend to wait for an implicit timeout.
+- Include the OTP validity and resend cooldown in every create/resend/verify response so the UI can show accurate state.
+
+Until that backend contract exists, the frontend must treat Django OTP as a fragile pre-payment dependency and keep the paid checkout recovery OTP separate.
 
 ## Zepto Mail Helper
 
