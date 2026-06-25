@@ -75,11 +75,15 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
   const receiptLink = processingState?.receiptLink;
   const receiptFileName = processingState?.receiptFileName;
   const orderCustomId = processingState?.orderCustomId;
+  const paidAmountLabel = processingState?.paidAmountLabel;
   const routeErrorMessage = processingState?.errorMessage;
   const supportReference = processingState?.supportReference ?? routeOrderToken;
   const needsManualReview = processingState?.needsManualReview ?? false;
   const currentStatusCopy = statusCopy[flowStatus] ?? statusCopy.idle;
   const canDownloadReceipt = Boolean(receiptLink && receiptFileName);
+  const unavailableReceiptLabel = needsManualReview
+    ? 'Receipt pending review'
+    : 'Receipt is generating';
   const timelineProgress = useMemo(() => {
     const total = steps.length || 1;
     const completed = steps.filter((step) => step.status === 'success').length;
@@ -352,6 +356,11 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
               </span>
               <span className='hidden sm:inline'>{currentStatusCopy.description}</span>
             </p>
+            {paidAmountLabel ? (
+              <p className='mt-2 text-[0.74rem] font-medium uppercase tracking-[0.16em] text-emerald-100/70'>
+                Paid {paidAmountLabel}
+              </p>
+            ) : null}
             {routeErrorMessage && !needsManualReview ? (
               <p className='text-rose-200 text-sm mt-3'>{routeErrorMessage}</p>
             ) : null}
@@ -495,7 +504,7 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
               disabled
               className='h-auto w-full rounded-2xl border border-white/[0.12] bg-white/[0.025] py-2.5 text-sm font-medium text-white/48 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] sm:text-base'
             >
-              Receipt is generating
+              {unavailableReceiptLabel}
             </Button>
           </div>
         ) : null}

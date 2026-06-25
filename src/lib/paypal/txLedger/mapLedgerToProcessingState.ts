@@ -6,6 +6,10 @@ export type PayPalTxPaymentStatusResponse = {
   receiptFile?: string | null;
   djangoPaymentSaveCustomId?: string | null;
   processingCompletedAt?: string | null;
+  paidAmountLabel?: string | null;
+  customerRecoveryStatus?: 'paid_unresolved' | null;
+  recoveryReason?: string | null;
+  updatedAt?: string | null;
   error?: { code?: string | null; message?: string | null } | null;
 };
 
@@ -25,6 +29,7 @@ export type MappedProcessingState = {
   receiptLink?: string;
   receiptFileName?: string;
   orderCustomId?: string;
+  paidAmountLabel?: string;
   errorMessage?: string;
   supportReference: string;
   shortSupportReference: string;
@@ -63,13 +68,35 @@ function withStepStatus(
 
 function buildErrorSteps(data: PayPalTxPaymentStatusResponse) {
   let steps = createSteps();
+  const isPaidUnresolved = data.customerRecoveryStatus === 'paid_unresolved';
   const isFulfillmentReview =
     data.status === 'fulfillment_blocked' ||
     data.status === 'fulfillment_failed' ||
     data.status === 'fulfillment_attention_required';
-  const message = isFulfillmentReview
+  const message = isPaidUnresolved
+    ? (data.recoveryReason ?? 'Post-payment processing needs review before fulfillment.')
+    : isFulfillmentReview
     ? 'Our team is reviewing the fulfillment handoff before your order moves forward.'
     : (data.error?.message ?? 'Payment processing failed');
+
+  if (isPaidUnresolved) {
+    steps = withStepStatus(steps, 'receiptUpload', 'success');
+
+    if (data.djangoPaymentSaveCustomId) {
+      steps = withStepStatus(steps, 'paymentSave', 'success');
+      steps = withStepStatus(steps, 'orderPush', 'error', message);
+      return steps;
+    }
+
+    if (data.receiptLink && data.receiptFile) {
+      steps = withStepStatus(steps, 'paymentSave', 'success');
+      steps = withStepStatus(steps, 'orderPush', 'error', message);
+      return steps;
+    }
+
+    steps = withStepStatus(steps, 'paymentSave', 'error', message);
+    return steps;
+  }
 
   if (data.djangoPaymentSaveCustomId) {
     steps = withStepStatus(steps, 'receiptUpload', 'success');
@@ -100,10 +127,12 @@ export function mapLedgerToProcessingState(
     receiptLink: data.receiptLink ?? undefined,
     receiptFileName: data.receiptFile ?? undefined,
     orderCustomId: data.djangoPaymentSaveCustomId ?? undefined,
+    paidAmountLabel: data.paidAmountLabel ?? undefined,
     errorMessage: data.error?.message ?? undefined,
     supportReference: data.orderToken,
     shortSupportReference: data.orderToken.slice(0, 8),
     needsManualReview:
+      data.customerRecoveryStatus === 'paid_unresolved' ||
       data.status === 'fulfillment_blocked' ||
       data.status === 'fulfillment_failed' ||
       data.status === 'fulfillment_attention_required',
@@ -151,6 +180,7 @@ export function mapLedgerToProcessingState(
   }
 
   if (
+    data.customerRecoveryStatus === 'paid_unresolved' ||
     data.status === 'error' ||
     data.status === 'refunded' ||
     data.status === 'fulfillment_blocked' ||
