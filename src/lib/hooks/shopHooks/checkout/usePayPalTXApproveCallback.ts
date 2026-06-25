@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { OnApproveData } from '@paypal/paypal-js';
 import { OrderAuthorizeResponse, OrdersCapture } from '@paypal/paypal-server-sdk';
 import errorToast from '@/lib/error-toast';
@@ -29,13 +29,17 @@ async function readRouteErrorMessage(res: Response, fallback: string) {
 
 export const usePayPalTXApproveCallback = () => {
   const { push } = useShopRouter();
+  const [isFinalizingPayment, setIsFinalizingPayment] = useState(false);
   const orderToken = usePayPalIntentStore((state) => state.orderToken);
+  const setActiveCheckoutStage = usePayPalIntentStore((state) => state.setActiveCheckoutStage);
 
   const mainPayPalApproveCallback = useCallback(
     async (data: OnApproveData) => {
+      setIsFinalizingPayment(true);
       try {
         if (!orderToken) throw new Error('Missing PayPal order token');
         if (!data.orderID) throw new Error('Missing PayPal order ID');
+        setActiveCheckoutStage('paypal_approved', { orderToken });
 
         const authRes = await fetch('/next-api/paypal/orders/authorize', {
           method: 'POST',
@@ -53,6 +57,7 @@ export const usePayPalTXApproveCallback = () => {
         const authorizationId = authData?.purchaseUnits?.[0]?.payments?.authorizations?.[0]?.id;
 
         if (!authorizationId) throw new Error('Missing authorization ID');
+        setActiveCheckoutStage('capture_checking', { orderToken });
 
         const capRes = await fetch('/next-api/paypal/orders/capture', {
           method: 'POST',
@@ -73,18 +78,22 @@ export const usePayPalTXApproveCallback = () => {
         }
 
         // After capture, the browser moves directly into ledger-backed status viewing.
+        setActiveCheckoutStage('confirmation_opened', { orderToken });
         push(`/shop/checkout/confirmation/${encodeURIComponent(orderToken)}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
 
         console.error('PayPal approval error:', err);
         errorToast({ message });
+      } finally {
+        setIsFinalizingPayment(false);
       }
     },
-    [orderToken, push],
+    [orderToken, push, setActiveCheckoutStage],
   );
 
   return {
+    isFinalizingPayment,
     mainPayPalApproveCallback,
   };
 };

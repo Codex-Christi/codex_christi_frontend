@@ -14,6 +14,9 @@ import { CheckoutAccordionContext } from './ProductCheckout';
 const PayPalCheckout = dynamic(() =>
   import('./Paypal/PayPalMainCheckoutComponent').then((comp) => comp.default),
 );
+const ActivePayPalCheckoutRecoveryBanner = dynamic(() =>
+  import('./Paypal/ActivePayPalCheckoutRecoveryBanner').then((comp) => comp.default),
+);
 
 export type CheckoutOptions = 'card' | 'paypal_buttons' | 'google_pay' | '';
 
@@ -46,6 +49,10 @@ const PaymentSection = () => {
       </section>
 
       <div className='grid gap-8'>
+        <ActivePayPalCheckoutRecoveryBanner
+          onRetryPayPal={() => setPayOption('paypal_buttons')}
+        />
+
         <div className='space-y-4'>
           <p className='text-lg font-bold'>Pay with:</p>
 

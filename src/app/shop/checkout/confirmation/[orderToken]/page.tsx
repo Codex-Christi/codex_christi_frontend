@@ -65,6 +65,7 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
   const clearDjangoOrderIntent = useDjangoOrderIntentStore((store) => store.clearDjangoOrderIntent);
   const activeLocalOrderToken = usePayPalIntentStore((store) => store.orderToken);
   const clearIntent = usePayPalIntentStore((store) => store.clearIntent);
+  const clearActiveCheckout = usePayPalIntentStore((store) => store.clearActiveCheckout);
   const flowStatus = processingState?.flowStatus ?? 'processing';
   const steps =
     processingState?.steps ??
@@ -229,6 +230,10 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
             resetCheckoutRelatedStoresAndVars();
             setHasHydratedFromLedger(true);
           }
+
+          if (nextState.flowStatus === 'completed') {
+            clearActiveCheckout();
+          }
         }
 
         if (
@@ -252,7 +257,12 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
     return () => {
       cancelled = true;
     };
-  }, [hasHydratedFromLedger, resetCheckoutRelatedStoresAndVars, routeOrderToken]);
+  }, [
+    clearActiveCheckout,
+    hasHydratedFromLedger,
+    resetCheckoutRelatedStoresAndVars,
+    routeOrderToken,
+  ]);
 
   if (!routeOrderToken) {
     return (

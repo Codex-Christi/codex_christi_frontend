@@ -5,10 +5,12 @@ import { FC, useState } from 'react';
 import PayPalLoadingSkeleton from './PayPalLoadingSkeleton';
 
 const MyPaypalButtons: FC<
-  Omit<MyPayPalCardFieldInterface, 'billingAddress' | 'handleBillingAddressChange'>
+  Omit<MyPayPalCardFieldInterface, 'billingAddress' | 'handleBillingAddressChange'> & {
+    onCancel?: () => void;
+  }
 > = (props) => {
   // Props
-  const { mode, createOrder, onApprove } = props;
+  const { mode, createOrder, onApprove, onCancel } = props;
 
   const [isReady, setIsReady] = useState(false);
 
@@ -21,6 +23,7 @@ const MyPaypalButtons: FC<
       <PayPalButtons
         createOrder={createOrder}
         onApprove={onApprove}
+        onCancel={onCancel}
         onInit={() => setIsReady(true)}
         onError={(err) => {
           const message = err instanceof Error ? err.message : String(err);
