@@ -85,7 +85,7 @@ export default function AdminDashboardTopBar({
             className='h-[17px] w-[17px] opacity-90'
           />
           <span className='sr-only'>Notifications</span>
-          <span className='absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-rose-500 text-[10px] font-bold text-white'>
+          <span className='absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-rose-700 text-[10px] font-bold text-white'>
             8
           </span>
         </button>

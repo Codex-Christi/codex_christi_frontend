@@ -18,6 +18,12 @@ type AmbientSlideStyle = CSSProperties & {
   '--admin-ambient-position': string;
 };
 
+type AdminAmbientSlideshowCoverage = 'container' | 'scrollContent';
+
+type AdminAmbientSlideshowProps = {
+  coverage?: AdminAmbientSlideshowCoverage;
+};
+
 type AmbientSlideState = {
   activeIndex: number;
   previousIndex: number | null;
@@ -51,7 +57,9 @@ const ambientCrossFadeMs = 4200;
 const ambientCrossFadeCleanupMs = ambientCrossFadeMs + 100;
 const ambientCrossFadeDuration = `${ambientCrossFadeMs}ms`;
 
-export default function AdminAmbientSlideshow() {
+export default function AdminAmbientSlideshow({
+  coverage = 'container',
+}: AdminAmbientSlideshowProps) {
   const reducedMotion = usePrefersReducedAmbientMotion();
   const pageVisible = usePageVisible();
   const [slideState, setSlideState] = useState<AmbientSlideState>({
@@ -97,7 +105,14 @@ export default function AdminAmbientSlideshow() {
   }, [slideState.previousIndex]);
 
   return (
-    <div className={styles.slideshow} data-admin-ambient-slideshow aria-hidden='true'>
+    <div
+      className={cn(
+        styles.slideshow,
+        coverage === 'scrollContent' ? styles.scrollContentSlideshow : styles.containerSlideshow,
+      )}
+      data-admin-ambient-slideshow
+      aria-hidden='true'
+    >
       {visibleSlideIndexes.map((slideIndex) => {
         const slide = ambientSlides[slideIndex];
         const isActive = slideIndex === slideState.activeIndex;

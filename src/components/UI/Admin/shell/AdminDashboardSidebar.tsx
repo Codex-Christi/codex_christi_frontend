@@ -53,7 +53,7 @@ export default function AdminDashboardSidebar({
               <span className='h-2 w-2 rounded-full bg-emerald-300' />
               {identity?.role ?? 'Locked'}
             </div>
-            <p className='mt-2 truncate text-[11px] text-slate-500'>
+            <p className='mt-2 truncate text-[11px] text-slate-400'>
               {identity?.email ?? identity?.userID ?? 'Admin user'}
             </p>
           </AdminGlassPanel>

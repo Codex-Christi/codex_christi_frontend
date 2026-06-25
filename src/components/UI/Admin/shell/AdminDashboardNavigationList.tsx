@@ -30,7 +30,7 @@ export default function AdminDashboardNavigationList({
     >
       {groups.map((group) => (
         <section key={group.id} className='min-w-0 space-y-1'>
-          <p className='px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500'>
+          <p className='px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400'>
             {group.label}
           </p>
           <div className='grid min-w-0 gap-1'>
@@ -68,7 +68,7 @@ function AdminDashboardNavigationItem({
       <span className='min-w-0 flex-1'>
         <span className='block truncate'>{item.title}</span>
         {item.description ? (
-          <span className='mt-0.5 block truncate text-[11px] font-normal text-slate-500'>
+          <span className='mt-0.5 block truncate text-[11px] font-normal text-slate-400'>
             {item.description}
           </span>
         ) : null}

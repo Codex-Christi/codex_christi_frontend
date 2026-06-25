@@ -23,7 +23,7 @@ export default function AdminDashboardShell({
   const navigationGroups = useMemo(() => getPermittedAdminNavigationGroups(access), [access]);
 
   return (
-    <main className='relative isolate min-h-dvh overflow-x-hidden bg-[#141923] text-slate-50'>
+    <main className='relative isolate grid min-h-dvh overflow-x-hidden bg-[#141923] text-slate-50'>
       <AdminDashboardBackground />
 
       <AdminDashboardMobileDrawer
@@ -34,7 +34,7 @@ export default function AdminDashboardShell({
         onOpenChange={setMobileNavigationOpen}
       />
 
-      <div className='relative z-10 min-h-dvh xl:pl-[250px]'>
+      <div className='relative z-10 col-start-1 row-start-1 min-h-dvh xl:pl-[250px]'>
         <AdminDashboardSidebar
           activeSection={pageConfig.section}
           identity={identity}

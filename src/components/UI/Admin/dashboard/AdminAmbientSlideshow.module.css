@@ -1,11 +1,21 @@
 .slideshow {
-  position: absolute;
-  inset: 0;
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
   background-color: rgb(13, 17, 25);
-  contain: layout paint style;
+  contain: paint style;
+}
+
+.containerSlideshow {
+  position: absolute;
+  inset: 0;
+}
+
+.scrollContentSlideshow {
+  position: relative;
+  grid-area: 1 / 1;
+  min-height: 100dvh;
+  align-self: stretch;
 }
 
 .slide {
@@ -42,11 +52,11 @@
   background:
     linear-gradient(
       180deg,
-      rgba(8, 12, 20, 0.34),
-      rgba(8, 12, 20, 0.48) 58%,
-      rgba(8, 12, 20, 0.54)
+      rgba(8, 12, 20, 0.42),
+      rgba(8, 12, 20, 0.58) 58%,
+      rgba(8, 12, 20, 0.66)
     ),
-    linear-gradient(90deg, rgba(13, 18, 28, 0.24), transparent 42%, rgba(13, 18, 28, 0.28));
+    linear-gradient(90deg, rgba(13, 18, 28, 0.28), transparent 42%, rgba(13, 18, 28, 0.32));
   background-repeat: repeat-y;
   background-size: 100% 100dvh;
 }
@@ -66,8 +76,8 @@
   inset: 0;
   z-index: 3;
   background:
-    radial-gradient(circle at 50% 18%, transparent 0, rgba(8, 12, 20, 0.12) 62%),
-    linear-gradient(180deg, rgba(8, 12, 20, 0.04), rgba(8, 12, 20, 0.14));
+    radial-gradient(circle at 50% 18%, transparent 0, rgba(8, 12, 20, 0.16) 62%),
+    linear-gradient(180deg, rgba(8, 12, 20, 0.06), rgba(8, 12, 20, 0.22));
   background-repeat: repeat-y;
   background-size: 100% 100dvh;
 }
@@ -85,8 +95,8 @@
 
   .imageTone {
     background:
-      linear-gradient(180deg, rgba(8, 12, 20, 0.46), rgba(8, 12, 20, 0.58)),
-      linear-gradient(90deg, rgba(13, 18, 28, 0.24), transparent 38%, rgba(13, 18, 28, 0.3));
+      linear-gradient(180deg, rgba(8, 12, 20, 0.52), rgba(8, 12, 20, 0.66)),
+      linear-gradient(90deg, rgba(13, 18, 28, 0.28), transparent 38%, rgba(13, 18, 28, 0.34));
     background-repeat: repeat-y;
     background-size: 100% 100dvh;
   }

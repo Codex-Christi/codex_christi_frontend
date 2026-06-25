@@ -451,7 +451,7 @@ function ProductCard({
           <div className='grid grid-cols-3 gap-2 border-t border-white/[0.045] pt-2'>
             {metrics.map((metric) => (
               <span key={`${title}-${metric.label}`} className='min-w-0 text-xs'>
-                <span className='block truncate text-[9px] uppercase leading-3 tracking-[0.12em] text-slate-500 sm:text-[10px]'>
+                <span className='block truncate text-[9px] uppercase leading-3 tracking-[0.12em] text-slate-300 sm:text-[10px]'>
                   {metric.label}
                 </span>
                 <span
