@@ -1,30 +1,46 @@
 // app/api/logout/route.ts
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerDjangoApiBaseUrl } from '@/lib/django/getServerDjangoApiBaseUrl';
 import { deleteSession } from '@/lib/session/main-session';
 import { getServerRefreshToken } from '@/lib/session/server-session';
-import axios from 'axios';
-import { clearUserMainProfileStore } from '@/stores/userMainProfileStore';
-import { redirect } from 'next/navigation';
-
-const axiosClient = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL}`,
-});
+import { getHostnameFromHostHeader, isShopSiteHostname } from '@/lib/siteBaseUrls';
 
 export async function GET(req: NextRequest) {
-  const host = req.headers.get('host');
-  const protocol = req.headers.get('x-forwarded-proto') || 'http';
-  const redirectUrl = `${protocol}://${host}/auth/sign-in?from-logout=true`;
+  const hostname = getHostnameFromHostHeader(req.headers.get('host'));
+  const loginPath = isShopSiteHostname(hostname) ? '/auth/login' : '/auth/sign-in';
+  const redirectUrl = new URL(`${loginPath}?from-logout=true`, req.url);
 
   try {
     const mainRefreshToken = await getServerRefreshToken();
 
-    await axiosClient.post('/auth/user-logout', { refresh: mainRefreshToken });
-    clearUserMainProfileStore();
-    await deleteSession(); // allowed here
-    redirect(`${redirectUrl}`);
-  } catch (err: Error | unknown) {
+    if (mainRefreshToken) {
+      const response = await fetch(`${getServerDjangoApiBaseUrl()}/auth/user-logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ refresh: mainRefreshToken }),
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        console.warn('[auth.logout.django_failed]', {
+          status: response.status,
+          statusText: response.statusText,
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[auth.logout.failed]', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  } finally {
     await deleteSession();
-    console.log(`Failed to logout user. Reason: ${err}`);
-    redirect(`${redirectUrl}`);
   }
+
+  const response = NextResponse.redirect(redirectUrl);
+  response.headers.set('Cache-Control', 'no-store');
+
+  return response;
 }

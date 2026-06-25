@@ -1,9 +1,7 @@
 // src/hooks/useLogin.ts
 'use client';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import axios, { AxiosResponse } from 'axios';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
@@ -11,23 +9,12 @@ import { getSafeAdminReturnPath } from '@/lib/admin/admin-paths';
 import errorToast from '@/lib/error-toast';
 import loadingToast from '@/lib/loading-toast';
 import successToast from '@/lib/success-toast';
-import { createLoginSession } from '@/actions/login';
+import { loginUser } from '@/actions/login';
 import useAuthStore from '@/stores/authStore';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { isShopSiteHostname } from '@/lib/siteBaseUrls';
 
-const tokenClient = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL}`,
-});
-
 type loginType = { email: string; password: string };
-
-export type LoginDataReturnType = {
-  status: number;
-  success: boolean;
-  message: string;
-  data: { refresh: string; access: string };
-};
 
 interface SignInHookInterface {
   isLoading: boolean;
@@ -41,39 +28,38 @@ const defaultSignUpProcessState: SignInHookInterface = {
   errorMsg: '',
 };
 
+function getSameHostRefererPath() {
+  if (!document.referrer) return null;
+
+  try {
+    const referrerURL = new URL(document.referrer);
+
+    if (referrerURL.host !== window.location.host) return null;
+
+    return `${referrerURL.pathname}${referrerURL.search}`;
+  } catch {
+    return null;
+  }
+}
+
 export const useLogin = () => {
   const router = useRouter();
-  const autoUpDateSession = useAuthStore((state) => state.autoUpDateSession);
-
-  // State values
-  const [isClient, setIsClient] = useState(false);
-  const [referer, setReferer] = useState<string | null>(null);
-  const [loginReturnPath, setLoginReturnPath] = useState<string | null>(null);
+  const setSessionState = useAuthStore((state) => state.setSessionState);
 
   // State for login process
   const [loginProcessState, setLoginProcessState] = useState<SignInHookInterface>(
-    useMemo(() => defaultSignUpProcessState, []),
+    defaultSignUpProcessState,
   );
-
-  const isCodexChristiShop = isClient
-    ? isShopSiteHostname(window.location.hostname)
-    : false;
-
-  // Effect to set client-side state and referer
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsClient(true);
-      setReferer(document.referrer ? document.referrer.split(window.location.hostname)[1] : null);
-      setLoginReturnPath(
-        getSafeAdminReturnPath(new URLSearchParams(window.location.search).get('next')),
-      );
-    }
-    // run once on mount
-  }, []);
 
   // Main Login Func
   const login = useCallback(
     async (userDetails: loginType) => {
+      const isCodexChristiShop = isShopSiteHostname(window.location.hostname);
+      const referer = getSameHostRefererPath();
+      const loginReturnPath = getSafeAdminReturnPath(
+        new URLSearchParams(window.location.search).get('next'),
+      );
+
       setLoginProcessState((prev) => ({
         ...prev,
         isLoading: true,
@@ -84,22 +70,9 @@ export const useLogin = () => {
       });
 
       try {
-        const loginRes: AxiosResponse<LoginDataReturnType> = await tokenClient.post(
-          `/auth/user-login`,
-          {
-            ...userDetails,
-          },
-        );
+        const sessionStatus = await loginUser(userDetails);
 
-        if (loginRes?.data?.success) {
-          const { refresh: refreshToken, access: accessToken } = loginRes.data.data;
-
-          const sessionStatus = await createLoginSession(accessToken, refreshToken);
-
-          if (!sessionStatus.success) {
-            throw new Error(sessionStatus.error);
-          }
-
+        if (sessionStatus.success) {
           setLoginProcessState({
             isLoading: false,
             isError: false,
@@ -107,7 +80,8 @@ export const useLogin = () => {
           });
 
           // Sync the auth store from the server session we just created.
-          const sessionState = await autoUpDateSession();
+          const sessionState = sessionStatus.sessionState;
+          setSessionState(sessionState);
 
           if (sessionState.isAuthenticated) {
             // Fetch profile into Zustand BEFORE redirecting (non-shop flows)
@@ -149,40 +123,27 @@ export const useLogin = () => {
           throw new Error('Session verification failed');
         }
 
-        throw new Error(loginRes?.data?.message);
-      } catch (err: any) {
+        throw new Error(sessionStatus.error);
+      } catch (err: unknown) {
         toast.dismiss(loadingToastID);
 
-        if (err?.response?.data?.errors) {
-          setLoginProcessState((prev) => ({
-            ...prev,
-            isLoading: false,
-            isError: true,
-            errorMsg: err?.response?.data?.errors[0]?.message as string,
-          }));
-
-          errorToast({
-            message: err?.response?.data?.errors[0]?.message as string,
-          });
-
-          return;
-        }
+        const errorMessage = err instanceof Error ? err.message : String(err);
 
         setLoginProcessState((prev) => ({
           ...prev,
           isLoading: false,
           isError: true,
-          errorMsg: String(err),
+          errorMsg: errorMessage,
         }));
 
         errorToast({
-          message: String(err),
+          message: errorMessage,
         });
 
-        return String(err);
+        return errorMessage;
       }
     },
-    [autoUpDateSession, isCodexChristiShop, loginReturnPath, referer, router],
+    [router, setSessionState],
   );
 
   return { ...loginProcessState, login };

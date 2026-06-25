@@ -24,16 +24,20 @@ export const ContinueButton: FC<ContinueButtonInterface> = (props) => {
 interface SubmitButtonInterface extends ButtonProps {
   textValue: string;
 }
-export const SubmitButton: FC<SubmitButtonInterface> = (props) => {
+export const SubmitButton: FC<SubmitButtonInterface> = ({
+  textValue,
+  className,
+  ...props
+}) => {
   return (
     <Button
-      name='Submit form'
+      {...props}
       type='submit'
       variant='secondary'
       className={`mt-5 mx-auto font-bold text-[1.05rem] rounded-[2rem] flex 
-              px-5 !py-[1.25rem] h-[2.4rem] ${props.className}`}
+              px-5 !py-[1.25rem] h-[2.4rem] ${className ?? ''}`}
     >
-      {props.textValue} <RxCaretRight className='!text-[1.25rem] !stroke-1' />
+      {textValue} <RxCaretRight className='!text-[1.25rem] !stroke-1' />
     </Button>
   );
 };

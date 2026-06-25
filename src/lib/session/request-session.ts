@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
 import { deriveSessionState, SessionPayload } from './session-state';
+import {
+  buildExpiredAuthCookies,
+  decryptSessionToken,
+  getMainRefreshTokenFromCookieValue,
+  REFRESH_TOKEN_COOKIE_NAME,
+  SESSION_COOKIE_NAME,
+} from './session-cookies';
 
 type RequestSessionState = {
   isAuthenticated: boolean;
@@ -8,13 +14,10 @@ type RequestSessionState = {
   shouldClearCookies: boolean;
 };
 
-const secretKey = process.env.SESSION_SECRET;
-const encodedKey = new TextEncoder().encode(secretKey);
-
 export async function getRequestSessionState(
   req: NextRequest,
 ): Promise<RequestSessionState> {
-  const sessionCookie = req.cookies.get('session')?.value;
+  const sessionCookie = req.cookies.get(SESSION_COOKIE_NAME)?.value;
 
   if (!sessionCookie) {
     return {
@@ -25,9 +28,7 @@ export async function getRequestSessionState(
   }
 
   try {
-    const { payload } = await jwtVerify(sessionCookie, encodedKey, {
-      algorithms: ['HS256'],
-    });
+    const payload = await decryptSessionToken(sessionCookie);
     const sessionState = deriveSessionState(payload as SessionPayload, {
       hasSessionCookie: true,
     });
@@ -46,19 +47,16 @@ export async function getRequestSessionState(
   }
 }
 
-export function clearAuthCookies(response: NextResponse) {
-  response.cookies.set('session', '', {
-    expires: new Date(0),
-    httpOnly: true,
-    path: '/',
-    sameSite: 'lax',
-  });
-  response.cookies.set('refreshToken', '', {
-    expires: new Date(0),
-    httpOnly: true,
-    path: '/',
-    sameSite: 'lax',
-  });
+export async function getRequestRefreshToken(req: NextRequest) {
+  return getMainRefreshTokenFromCookieValue(
+    req.cookies.get(REFRESH_TOKEN_COOKIE_NAME)?.value,
+  );
+}
+
+export function clearAuthCookies(response: NextResponse, requestHeaders?: Headers) {
+  for (const cookie of buildExpiredAuthCookies(requestHeaders)) {
+    response.cookies.set(cookie.name, cookie.value, cookie.options);
+  }
 
   return response;
 }

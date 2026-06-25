@@ -32,6 +32,32 @@ Verification result:
 
 Important interpretation: these issues are runtime/security/design issues. The current compiler and lint setup will not catch most of them.
 
+## Implementation Status
+
+Completed in the current auth/session pass:
+
+- Password login now runs through `src/actions/login.ts` using server-side `fetch`; browser JavaScript no longer receives Django access or refresh tokens during login.
+- Login state is returned from the login server action, so the client no longer immediately calls `getAuthSessionState()` after creating a session.
+- Auth cookie create/delete behavior is centralized in `src/lib/session/session-cookies.ts`.
+- Cookie `secure` behavior is protocol-aware through forwarded headers instead of a hard-coded LAN/IP allowlist.
+- Cookie deletion now writes explicit expired cookies with the same path/security attributes used for creation.
+- Protected-route middleware now attempts access refresh from the `refreshToken` cookie before redirecting to login.
+- Refresh uses `DJANGO_AUTH_REFRESH_PATH` when configured and defaults to Django's `/auth/token/refresh`.
+- Refresh redirects back once with a loop guard (`__session_refreshed`) after setting fresh cookies.
+- Profile logout now delegates to `/api/logout`; the route uses server-side `fetch`, attempts Django logout when a refresh token exists, and always clears local cookies.
+- Auth-page redirects now apply only to `GET` requests, so Next server-action `POST`s are not redirected out from under login.
+- The login submit button disables while submitting and shows in-flight copy.
+
+Still pending or worth improving:
+
+- Django's refresh endpoint is `POST /auth/token/refresh`; set `DJANGO_AUTH_REFRESH_PATH` only if an environment needs to override it.
+- Server-side authenticated data fetchers still need refresh-on-`401` behavior, or a shared authenticated Django fetch wrapper.
+- Profile edit and shop shipping-address mutations should move fully behind server actions or route handlers so browser code never handles access tokens.
+- Signup, OTP, forgot-password, and reset-password hooks still use Axios and should be moved to `fetch` or server-owned actions for consistency.
+- `.shop` signup/OTP/password-reset pages are still missing.
+- Session cookies are signed JWTs that contain raw Django tokens; future hardening should use JWE encryption or opaque server-side session references.
+- Add automated tests for cookie creation/deletion, refresh-loop behavior, login/logout redirects, and host/domain routing.
+
 ## Edge Proxy Contract
 
 The `.shop` deployment is not a separate Next app route root. Nginx maps public `.shop` requests into the internal `/shop` subtree:
@@ -78,12 +104,13 @@ Files:
 
 Current behavior:
 
-- Browser posts email/password directly to Django `/auth/user-login`.
-- Django returns `access` and `refresh` tokens to browser JavaScript.
-- Browser calls the `createLoginSession` server action with both tokens.
+- Browser submits email/password to the `loginUser` server action.
+- `loginUser` posts to Django `/auth/user-login` with server-side `fetch`.
+- Django returns `access` and `refresh` tokens to the server action, not browser JavaScript.
 - `createSession` decodes the Django JWTs and creates two cookies:
   - `session`, expiring at access-token expiry.
   - `refreshToken`, expiring at refresh-token expiry.
+- The login action returns sanitized auth state to the client.
 - The cookie payloads contain the raw Django access and refresh tokens.
 
 ### Middleware Protection
@@ -99,8 +126,9 @@ Current behavior:
 
 - `/profile` and `/shop/account-overview` are protected by checking only the `session` cookie.
 - `/shop/auth/login` redirects authenticated users back to account overview.
-- If the `session` cookie is expired or invalid, middleware clears cookies only in some redirect paths.
-- The `refreshToken` cookie is not used to refresh access before redirecting to login.
+- If the `session` cookie is expired or invalid, middleware attempts refresh using the `refreshToken` cookie.
+- If refresh succeeds, middleware writes fresh cookies and redirects back once with a loop guard.
+- If refresh fails or the guard is already present, middleware clears auth cookies and redirects to the correct login route.
 
 ### Logout
 
@@ -114,9 +142,8 @@ Files:
 Current behavior:
 
 - Profile UI imports `logoutUser` into client components.
-- `logoutUser` retrieves the server refresh token and posts it to Django from the browser-side path.
-- Local cookies are deleted only after Django logout succeeds.
-- `/api/logout` does the safer thing: it reads the refresh token server-side, attempts Django logout, deletes local cookies even on error, and redirects.
+- `logoutUser` clears client profile state and redirects to `/api/logout`.
+- `/api/logout` reads the refresh token server-side, attempts Django logout with `fetch`, deletes local cookies even on error, and redirects.
 - `/next-api/logout` works because `next.config.mjs` rewrites `/next-api/:path*` to `/api/:path*`.
 
 ### Signup and OTP
@@ -159,10 +186,12 @@ Current behavior:
 
 ### P0: Browser JavaScript Can Receive Raw Tokens
 
-The current design exposes tokens to the browser in multiple paths:
+Status: partially fixed.
 
-- `useLogin.ts` receives access and refresh tokens directly from Django.
-- `actions/logout.ts` can retrieve the refresh token and use it from a client-triggered path.
+Previously exposed paths:
+
+- `useLogin.ts` received access and refresh tokens directly from Django. Fixed by moving password login into `loginUser`.
+- `actions/logout.ts` could retrieve the refresh token and use it from a client-triggered path. Fixed by delegating browser logout to `/api/logout`.
 - `EditProfileSubmitButton.tsx` retrieves the access token and sends a browser PATCH.
 - `shipping-address-modal.tsx` retrieves the access token and sends a browser PATCH.
 
@@ -188,17 +217,20 @@ Files:
 
 Impact:
 
-- A user with a valid refresh token is treated as logged out when the access cookie expires.
-- "Auto logout" can feel random because access expiry, backend expiry, and Zustand state are not coordinated.
+- Fixed for protected route navigation: a user with a valid refresh token can now refresh before redirecting to login.
+- Still pending for server-side authenticated fetches that receive a backend `401`.
 
 Implementation direction:
 
-- Add a refresh-aware session layer.
-- Confirm the Django refresh endpoint path and response shape.
+- Django refresh endpoint and response shape are confirmed:
+  - request: `POST /auth/token/refresh`
+  - body: `{ "refresh": string }`
+  - success: `201` with `{ "refresh": string, "access": string }`
 - On protected route access:
-  - If access session is valid, continue.
-  - If access session is expired but refresh is valid, refresh through Django, set new cookies, and redirect back to the same safe path.
-  - If refresh fails, clear local cookies and redirect to the correct login route.
+  - If access session is valid, continue. Implemented.
+  - If access session is expired but refresh is valid, refresh through Django, set new cookies, and redirect back to the same safe path. Implemented.
+  - If refresh fails, clear local cookies and redirect to the correct login route. Implemented.
+- Add refresh-aware server fetch helpers for profile/shop fetches that receive `401`.
 
 ### P0: Logout Does Not Always Clear Local Session
 
@@ -206,7 +238,9 @@ File:
 
 - `src/actions/logout.ts`
 
-Current problem:
+Status: fixed for the profile logout path and `/api/logout`.
+
+Previous problem:
 
 - If no refresh token exists, it throws before deleting local cookies.
 - If Django logout fails, local cookies are not deleted.
@@ -219,9 +253,9 @@ Impact:
 
 Implementation direction:
 
-- Replace client logout helper with a request to `/api/logout` or an equivalent server action.
-- Always delete local `session` and `refreshToken` cookies in a `finally` path.
-- Attempt Django token blacklist/revocation, but do not let backend logout failure prevent local logout.
+- Replace client logout helper with a request to `/api/logout` or an equivalent server action. Implemented.
+- Always delete local `session` and `refreshToken` cookies in a `finally` path. Implemented.
+- Attempt Django token blacklist/revocation, but do not let backend logout failure prevent local logout. Implemented.
 
 ### P1: `.shop` Signup Flow Is Missing
 
@@ -458,8 +492,8 @@ Refactor the session/Django boundary:
 
 Replace:
 
-- `useLogin.ts` direct Django token call with a server action that returns sanitized `{ success, redirectTo, message }`.
-- `actions/logout.ts` client token path with a redirect or fetch to `/api/logout`.
+- `useLogin.ts` direct Django token call with a server action that returns sanitized session state. Implemented.
+- `actions/logout.ts` client token path with a redirect or fetch to `/api/logout`. Implemented.
 - `EditProfileSubmitButton.tsx` browser bearer PATCH with a server action.
 - `shipping-address-modal.tsx` browser bearer PATCH with a server action.
 
@@ -470,7 +504,9 @@ Security rule:
 
 ### Phase 3: Implement Refresh-Aware Session Revalidation
 
-First confirm the Django refresh endpoint and response shape. This repo does not currently contain a refresh endpoint reference.
+Status: implemented for middleware-protected route access; still needs authenticated fetch integration.
+
+The confirmed Django endpoint is `POST /auth/token/refresh`, with body `{ refresh: string }` and success response `{ refresh: string, access: string }`. The implementation uses `DJANGO_AUTH_REFRESH_PATH` when configured and otherwise defaults to `/auth/token/refresh`.
 
 Expected shape will likely be one of:
 
@@ -480,23 +516,24 @@ Expected shape will likely be one of:
 
 Add a pure cookie builder:
 
-- Given access and refresh tokens, return signed/encrypted cookie values and expiry dates.
+- Given access and refresh tokens, return signed cookie values and expiry dates. Implemented in `src/lib/session/session-cookies.ts`.
 - It must be usable from:
-  - server actions via `cookies().set`
-  - route handlers via `response.cookies.set`
-  - middleware via `NextResponse.cookies.set`
+  - server actions via `cookies().set`. Implemented.
+  - route handlers via `response.cookies.set`. Implemented for deletion and available for create/update.
+  - middleware via `NextResponse.cookies.set`. Implemented.
 
 Middleware behavior for protected routes:
 
-1. If access session is valid: `NextResponse.next()`.
-2. If access is missing/expired and refresh is missing/invalid: clear cookies and redirect to correct login with safe `next`.
+1. If access session is valid: `NextResponse.next()`. Implemented.
+2. If access is missing/expired and refresh is missing/invalid: clear cookies and redirect to correct login. Implemented.
 3. If access is missing/expired and refresh is present:
    - Call Django refresh.
    - Set new cookies.
    - Redirect back to the same safe URL once, so the next request has fresh cookies.
    - If refresh fails, clear cookies and redirect to login.
+   - Implemented with `__session_refreshed` as a loop guard.
 
-Use a loop guard query param or response header so a failed refresh cannot redirect endlessly.
+Use a loop guard query param or response header so a failed refresh cannot redirect endlessly. Implemented with `__session_refreshed`.
 
 Server-side authenticated fetch behavior:
 
@@ -507,15 +544,17 @@ Server-side authenticated fetch behavior:
 
 ### Phase 4: Fix Logout End-to-End
 
+Status: implemented for profile logout and `/api/logout`.
+
 Replace client logout with a server-owned path:
 
-- Preferred browser action: `window.location.assign('/api/logout')` or a small `POST /api/logout`.
+- Preferred browser action: `window.location.assign('/api/logout')` or a small `POST /api/logout`. Implemented with `window.location.assign('/api/logout')`.
 - Server route:
-  - read refresh token server-side
-  - attempt Django logout/blacklist
-  - always delete local cookies
-  - redirect to the correct login page for the current host
-  - set `Cache-Control: no-store`
+  - read refresh token server-side. Implemented.
+  - attempt Django logout/blacklist. Implemented with `fetch`.
+  - always delete local cookies. Implemented.
+  - redirect to the correct login page for the current host. Implemented.
+  - set `Cache-Control: no-store`. Implemented.
 
 For `.shop`, public redirect should be:
 
@@ -662,20 +701,18 @@ Check for:
 
 ## Suggested Implementation Order
 
-1. Add route/domain helper and safe return-path helper.
-2. Update middleware to use helper and preserve `next`.
-3. Fix logout to be server-owned and always clear cookies.
-4. Move profile edit and shipping-address update behind server actions.
-5. Move login behind a server action so tokens never return to client code.
-6. Add refresh-aware session handling.
-7. Add `.shop` signup/OTP/password-reset pages.
-8. Convert signed token cookies to JWE or remove raw backend tokens from cookie payloads.
-9. Add Nginx cache bypass rules for auth/account/API/cookie requests.
-10. Run the manual verification matrix.
+1. Move profile edit and shipping-address update behind server actions or route handlers.
+2. Add a shared authenticated Django fetch helper that refreshes once on backend `401`.
+3. Convert signup, OTP, forgot-password, and reset-password hooks from Axios to `fetch` or server-owned actions.
+4. Add `.shop` signup/OTP/password-reset pages.
+5. Convert signed token cookies to JWE or remove raw backend tokens from cookie payloads.
+6. Add Nginx cache bypass rules for auth/account/API/cookie requests.
+7. Add automated tests for session-cookie create/delete, refresh redirect guard, and logout behavior.
+8. Run the manual verification matrix behind the actual proxy.
 
 ## Open Questions Before Coding
 
-- What is the Django refresh endpoint path and response body?
+- Should `DJANGO_AUTH_REFRESH_PATH` be kept as an override now that the canonical Django path is `/auth/token/refresh`?
 - Does Nginx currently set `Host` and `X-Forwarded-Proto` headers?
 - Does `www.codexchristi.shop` redirect to apex, or should the app support both?
 - Are `/shop/my-wishlist` and `/shop/account-overview/wishlist` both intentional?

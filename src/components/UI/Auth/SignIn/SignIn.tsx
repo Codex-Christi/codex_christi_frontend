@@ -16,7 +16,7 @@ import { getMainSiteUrl, isShopSiteHostname } from '@/lib/siteBaseUrls';
 
 // Main Component
 const SignIn = () => {
-  const { login } = useLogin();
+  const { login, isLoading } = useLogin();
   const hasMounted = useHasMounted();
   const isCodexChristiShop =
     hasMounted && isShopSiteHostname(window.location.hostname);
@@ -34,11 +34,13 @@ const SignIn = () => {
     mode: 'all',
     reValidateMode: 'onBlur',
   });
+  const isSubmitting = isLoading || signInForm.formState.isSubmitting;
 
   //   Signup form submit handler
   const signInFormSubmitHandler: SubmitHandler<signInSchemaType> = async (fieldValues, event) => {
     // Prevent default first
     event?.preventDefault();
+    if (isSubmitting) return;
 
     const { email, password } = fieldValues;
 
@@ -66,7 +68,12 @@ const SignIn = () => {
 
           <PasswordInput currentZodForm={signInForm} inputName='password' />
 
-          <SubmitButton name='Submit Button' textValue='Log In' />
+          <SubmitButton
+            name='Submit Button'
+            textValue={isSubmitting ? 'Logging in...' : 'Log In'}
+            disabled={isSubmitting}
+            aria-busy={isSubmitting}
+          />
         </form>
       </Form>
 

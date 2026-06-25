@@ -8,6 +8,10 @@ export const basicRedirect = (destination: string, req: NextRequest) => {
 };
 
 export const redirectLoggedInUserToProfile = async (req: NextRequest) => {
+  if (req.method !== 'GET') {
+    return NextResponse.next();
+  }
+
   // If user is logged in already, send them to profile.
   const sessionState = await getRequestSessionState(req);
 

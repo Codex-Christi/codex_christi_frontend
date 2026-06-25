@@ -1,13 +1,19 @@
 'use server';
 
-import { decrypt, getCookie } from './main-session';
+import { getCookie } from './main-session';
+import {
+  decryptSessionToken,
+  getMainRefreshTokenFromCookieValue,
+  REFRESH_TOKEN_COOKIE_NAME,
+  SESSION_COOKIE_NAME,
+} from './session-cookies';
 import { deriveSessionState, SessionPayload, SessionState } from './session-state';
 
 export async function getServerSessionState(): Promise<SessionState> {
-  const sessionCookie = await getCookie('session');
+  const sessionCookie = await getCookie(SESSION_COOKIE_NAME);
   const sessionValue = sessionCookie?.value;
   const payload = sessionValue
-    ? ((await decrypt(sessionValue)) as SessionPayload | undefined)
+    ? ((await decryptSessionToken(sessionValue)) as SessionPayload | undefined)
     : undefined;
 
   return deriveSessionState(payload, {
@@ -24,14 +30,7 @@ export async function getServerAccessToken() {
 }
 
 export async function getServerRefreshToken() {
-  const refreshTokenCookie = await getCookie('refreshToken');
-  const refreshTokenValue = refreshTokenCookie?.value;
+  const refreshTokenCookie = await getCookie(REFRESH_TOKEN_COOKIE_NAME);
 
-  if (!refreshTokenValue) {
-    return null;
-  }
-
-  const payload = (await decrypt(refreshTokenValue)) as SessionPayload | undefined;
-
-  return typeof payload?.mainRefreshToken === 'string' ? payload.mainRefreshToken : null;
+  return getMainRefreshTokenFromCookieValue(refreshTokenCookie?.value);
 }

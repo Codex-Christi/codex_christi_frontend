@@ -1,9 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+'use client';
+
 import loadingToast from '@/lib/loading-toast';
 import errorToast from '@/lib/error-toast';
-import successToast from '@/lib/success-toast';
-import { deleteSession } from '@/lib/session/main-session';
-import { getServerRefreshToken } from '@/lib/session/server-session';
 import { clearUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { toast } from 'sonner';
 
@@ -18,50 +16,17 @@ export const logoutUser = async (): Promise<boolean | LogoutResult> => {
   });
 
   try {
-    const mainRefreshToken = await getServerRefreshToken();
-
-    if (!mainRefreshToken) {
-      throw new Error('No refresh token found');
-    }
-
-    const response = await fetch(`${process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL}/auth/user-logout`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refresh: mainRefreshToken }),
-      cache: 'no-store',
-    });
-
-    const data = await response.json();
-
-    if (!response.ok || !data?.success) {
-      const message = data?.message || 'Logout failed.';
-      throw new Error(message);
-    }
-
-    // Ensure local session and in-memory user state are cleared before redirect
-    await deleteSession();
     clearUserMainProfileStore();
-
-    successToast({
-      message: 'You have successfully logged out.',
-      header: 'Logout Successful.',
-    });
-
     toast.dismiss(loadingToastID);
-
-    window.location.replace('/auth/sign-in');
+    window.location.assign('/api/logout');
 
     return true;
-  } catch (err: any) {
+  } catch (err: unknown) {
     toast.dismiss(loadingToastID);
 
-    const apiErrorMessage =
-      err?.response?.data?.errors?.[0]?.message ||
-      err?.response?.data?.message ||
-      err?.message ||
-      'Something went wrong. Please try again.';
+    const apiErrorMessage = err instanceof Error
+      ? err.message
+      : 'Something went wrong. Please try again.';
 
     errorToast({
       message: apiErrorMessage,
