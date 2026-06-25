@@ -11,6 +11,9 @@ type AmbientSlide = {
 };
 
 type AmbientSlideStyle = CSSProperties & {
+  '--admin-ambient-image-desktop': string;
+  '--admin-ambient-image-mobile': string;
+  '--admin-ambient-image-tablet': string;
   '--admin-ambient-position': string;
 };
 
@@ -103,20 +106,7 @@ export default function AdminAmbientSlideshow() {
             className={cn(styles.slide, isActive ? styles.slideVisible : styles.slideExiting)}
             data-admin-ambient-slide
             style={getAmbientSlideStyle(slide)}
-          >
-            <picture className={styles.picture}>
-              <source media='(max-width: 640px)' srcSet={getAmbientImageSrc(slide.id, 'mobile')} />
-              <source media='(max-width: 1180px)' srcSet={getAmbientImageSrc(slide.id, 'tablet')} />
-              <img
-                className={styles.image}
-                src={getAmbientImageSrc(slide.id, 'desktop')}
-                alt=''
-                decoding='async'
-                fetchPriority={slideIndex === 0 ? 'high' : 'low'}
-                loading={slideIndex === 0 ? 'eager' : 'lazy'}
-              />
-            </picture>
-          </span>
+          />
         );
       })}
       <div className={styles.imageTone} data-admin-ambient-image-tone />
@@ -132,6 +122,9 @@ export default function AdminAmbientSlideshow() {
 
 function getAmbientSlideStyle(slide: AmbientSlide): AmbientSlideStyle {
   return {
+    '--admin-ambient-image-desktop': `url("${getAmbientImageSrc(slide.id, 'desktop')}")`,
+    '--admin-ambient-image-mobile': `url("${getAmbientImageSrc(slide.id, 'mobile')}")`,
+    '--admin-ambient-image-tablet': `url("${getAmbientImageSrc(slide.id, 'tablet')}")`,
     '--admin-ambient-position': slide.position,
   };
 }
