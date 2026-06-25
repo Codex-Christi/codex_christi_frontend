@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 
-type Position =
+type ToastPosition =
   | 'top-left'
   | 'top-right'
   | 'bottom-left'
@@ -13,20 +13,22 @@ const loadingToast = ({
   header = 'Processing...',
   position = 'top-right',
   duration,
+  closeLabel = 'Close',
 }: {
   message: string;
   header?: string;
-  position?: Position;
+  position?: ToastPosition;
   duration?: number;
+  closeLabel?: string;
 }) => {
   const toastID = toast.loading(header, {
     description: message,
     action: {
-      label: 'Close',
+      label: closeLabel,
       onClick: () => toast.dismiss(toastID),
     },
-    position: position,
-    duration: duration,
+    position,
+    duration,
   });
 
   return toastID as number;

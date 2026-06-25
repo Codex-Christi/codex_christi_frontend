@@ -57,6 +57,39 @@ export function getHostnameFromHostHeader(host: string | null | undefined) {
   return host?.split(':')[0]?.toLowerCase() ?? '';
 }
 
+function getFirstHeaderValue(value: string | null | undefined) {
+  return value?.split(',')[0]?.trim() || null;
+}
+
+export function getRequestOrigin(
+  requestHeaders: Pick<Headers, 'get'>,
+  fallbackUrl?: string,
+) {
+  const fallback = fallbackUrl ? new URL(fallbackUrl) : null;
+  const host =
+    getFirstHeaderValue(requestHeaders.get('host')) ??
+    getFirstHeaderValue(requestHeaders.get('x-forwarded-host')) ??
+    fallback?.host;
+  const protocol =
+    getFirstHeaderValue(requestHeaders.get('x-forwarded-proto')) ??
+    fallback?.protocol.replace(/:$/, '') ??
+    'https';
+
+  if (!host) {
+    return fallback?.origin ?? getMainSiteBaseUrl();
+  }
+
+  return `${protocol}://${host}`;
+}
+
+export function getRequestUrl(
+  path: string,
+  requestHeaders: Pick<Headers, 'get'>,
+  fallbackUrl?: string,
+) {
+  return new URL(path, getRequestOrigin(requestHeaders, fallbackUrl));
+}
+
 export function isMainSiteHostname(hostname: string | null | undefined) {
   return matchesConfiguredHostname(hostname, getMainSiteHostname());
 }

@@ -20,7 +20,11 @@ import {
   SESSION_REFRESH_GUARD_PARAM,
 } from '../session/session-cookies';
 import { refreshDjangoSessionTokens } from '../session/session-refresh';
-import { getHostnameFromHostHeader, isShopSiteHostname } from '../siteBaseUrls';
+import {
+  getHostnameFromHostHeader,
+  getRequestUrl,
+  isShopSiteHostname,
+} from '../siteBaseUrls';
 
 export const redirectLoggedInUserToProfileMiddleware = async (request: NextRequest) => {
   return await redirectLoggedInUserToProfile(request);
@@ -37,13 +41,16 @@ function getPathWithSearchWithoutSessionRefreshGuard(req: NextRequest) {
   return `${cleanUrl.pathname}${cleanUrl.search}`;
 }
 
+function getRequestPathUrl(req: NextRequest, pathWithSearch: string) {
+  return getRequestUrl(pathWithSearch, req.headers, req.url);
+}
+
 function redirectWithoutSessionRefreshGuard(req: NextRequest) {
   if (!hasRefreshGuard(req)) return null;
 
-  const cleanUrl = req.nextUrl.clone();
-  cleanUrl.searchParams.delete(SESSION_REFRESH_GUARD_PARAM);
-
-  return NextResponse.redirect(cleanUrl);
+  return NextResponse.redirect(
+    getRequestPathUrl(req, getPathWithSearchWithoutSessionRefreshGuard(req)),
+  );
 }
 
 async function refreshRequestSession(req: NextRequest) {
@@ -62,7 +69,10 @@ async function refreshRequestSession(req: NextRequest) {
       refreshToken: refreshedTokens.refreshToken,
       requestHeaders: req.headers,
     });
-    const refreshUrl = req.nextUrl.clone();
+    const refreshUrl = getRequestPathUrl(
+      req,
+      `${req.nextUrl.pathname}${req.nextUrl.search}`,
+    );
     refreshUrl.searchParams.set(SESSION_REFRESH_GUARD_PARAM, '1');
 
     const response = NextResponse.redirect(refreshUrl);
@@ -112,9 +122,9 @@ export const redirectExpSessionToLoginPage = async (req: NextRequest) => {
   if (refreshResponse) return refreshResponse;
 
   const response = NextResponse.redirect(
-    new URL(
+    getRequestPathUrl(
+      req,
       `/auth/${isShopSiteHostname(hostname) ? 'login' : 'sign-in'}?sessionExp=true`,
-      req.url,
     ),
   );
 
@@ -135,7 +145,7 @@ export const protectAdminRouteMiddleware = async (req: NextRequest) => {
     if (refreshResponse) return refreshResponse;
 
     const response = NextResponse.redirect(
-      new URL(`/auth/sign-in?next=${encodeURIComponent(safeReturnPath)}`, req.url),
+      getRequestPathUrl(req, `/auth/sign-in?next=${encodeURIComponent(safeReturnPath)}`),
     );
 
     return clearFailedSessionCookiesIfNeeded({
@@ -158,7 +168,9 @@ export const protectAdminRouteMiddleware = async (req: NextRequest) => {
     return NextResponse.next();
   }
 
-  const response = NextResponse.redirect(new URL(buildAdminUnlockPath(safeReturnPath), req.url));
+  const response = NextResponse.redirect(
+    getRequestPathUrl(req, buildAdminUnlockPath(safeReturnPath)),
+  );
 
   if (adminSession.shouldClearCookie) {
     return clearAdminSessionCookie(response);

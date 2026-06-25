@@ -3,12 +3,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerDjangoApiBaseUrl } from '@/lib/django/getServerDjangoApiBaseUrl';
 import { deleteSession } from '@/lib/session/main-session';
 import { getServerRefreshToken } from '@/lib/session/server-session';
-import { getHostnameFromHostHeader, isShopSiteHostname } from '@/lib/siteBaseUrls';
+import {
+  getHostnameFromHostHeader,
+  getRequestUrl,
+  isShopSiteHostname,
+} from '@/lib/siteBaseUrls';
 
 export async function GET(req: NextRequest) {
   const hostname = getHostnameFromHostHeader(req.headers.get('host'));
   const loginPath = isShopSiteHostname(hostname) ? '/auth/login' : '/auth/sign-in';
-  const redirectUrl = new URL(`${loginPath}?from-logout=true`, req.url);
+  const redirectUrl = getRequestUrl(`${loginPath}?from-logout=true`, req.headers, req.url);
 
   try {
     const mainRefreshToken = await getServerRefreshToken();

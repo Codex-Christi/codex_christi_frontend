@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SubmitHandler, useForm } from 'react-hook-form';
+import { useEffect, useRef } from 'react';
 import { Form } from '@/components/UI/primitives/form';
 import { signInSchema, signInSchemaType } from '@/lib/formSchemas/signInSchema';
 import { EmailInput, PasswordInput } from '@/components/UI/Auth/FormFields';
@@ -13,11 +14,46 @@ import AppleIcon from '@/components/UI/general/IconComponents/AppleIcon';
 import GitHubIcon from '@/components/UI/general/IconComponents/GitHubIcon';
 import { useHasMounted } from '@/lib/hooks/useHasMounted';
 import { getMainSiteUrl, isShopSiteHostname } from '@/lib/siteBaseUrls';
+import successToast from '@/lib/success-toast';
+import errorToast from '@/lib/error-toast';
+
+type AuthNotice = {
+  key: string;
+  title: string;
+  description: string;
+  tone?: 'success' | 'message';
+};
+
+const AUTH_REDIRECT_NOTICES: AuthNotice[] = [
+  {
+    key: 'from-logout',
+    title: 'Logged out',
+    description: 'You have been signed out.',
+    tone: 'success',
+  },
+  {
+    key: 'sessionExp',
+    title: 'Sign in required',
+    description: 'Your session expired. Sign in to continue.',
+  },
+  {
+    key: 'from-master-transfer',
+    title: 'Sign in required',
+    description: 'Your admin transfer is complete. Sign in again to continue.',
+  },
+];
+
+function getAuthRedirectNotice(search: string) {
+  const searchParams = new URLSearchParams(search);
+
+  return AUTH_REDIRECT_NOTICES.find(({ key }) => searchParams.get(key) === 'true') ?? null;
+}
 
 // Main Component
 const SignIn = () => {
   const { login, isLoading } = useLogin();
   const hasMounted = useHasMounted();
+  const noticeShownRef = useRef(false);
   const isCodexChristiShop =
     hasMounted && isShopSiteHostname(window.location.hostname);
   const signUpHref =
@@ -35,6 +71,27 @@ const SignIn = () => {
     reValidateMode: 'onBlur',
   });
   const isSubmitting = isLoading || signInForm.formState.isSubmitting;
+
+  useEffect(() => {
+    if (noticeShownRef.current) return;
+
+    const notice = getAuthRedirectNotice(window.location.search);
+    if (!notice) return;
+
+    noticeShownRef.current = true;
+    const toastOptions = {
+      header: notice.title,
+      message: notice.description,
+      duration: 5000,
+    };
+
+    if (notice.tone === 'success') {
+      successToast(toastOptions);
+      return;
+    }
+
+    errorToast({ ...toastOptions, tone: 'message' });
+  }, []);
 
   //   Signup form submit handler
   const signInFormSubmitHandler: SubmitHandler<signInSchemaType> = async (fieldValues, event) => {

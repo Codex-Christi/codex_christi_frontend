@@ -1,32 +1,40 @@
-import { toast } from "sonner";
+import { toast } from 'sonner';
 
-type Position =
-	| "top-left"
-	| "top-right"
-	| "bottom-left"
-	| "bottom-right"
-	| "top-center"
-	| "bottom-center";
+type ToastPosition =
+	| 'top-left'
+	| 'top-right'
+	| 'bottom-left'
+	| 'bottom-right'
+	| 'top-center'
+	| 'bottom-center';
 
 const errorToast = ({
 	message,
-	header = "An error occured!",
-	position = "top-right",
+	header = 'An error occurred!',
+	position = 'top-right',
+	duration,
+	tone = 'error',
+	closeLabel = 'Close',
 }: {
 	message: string;
 	header?: string;
-	position?: Position;
+	position?: ToastPosition;
+	duration?: number;
+	tone?: 'error' | 'message';
+	closeLabel?: string;
 }) => {
-	const toastID = toast.error(header, {
+	const showToast = tone === 'message' ? toast.message : toast.error;
+	const toastID = showToast(header, {
 		description: message,
 		action: {
-			label: "Close",
+			label: closeLabel,
 			onClick: () => toast.dismiss(toastID),
 		},
-		position: position,
-    });
+		position,
+		duration,
+	});
 
-    return toastID;
+	return toastID;
 };
 
 export default errorToast;

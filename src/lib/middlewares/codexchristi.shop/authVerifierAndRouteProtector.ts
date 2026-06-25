@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestSessionState } from '@/lib/session/request-session';
-import { getHostnameFromHostHeader, isShopSiteHostname } from '@/lib/siteBaseUrls';
+import {
+  getHostnameFromHostHeader,
+  getRequestUrl,
+  isShopSiteHostname,
+} from '@/lib/siteBaseUrls';
 
 export const authVerifierAndRouteProtector = async (req: NextRequest) => {
   // Auth verifier for shop login page on the configured shop domain.
@@ -50,7 +54,11 @@ const checkAndRedirect = async ({
 
   if (sessionState.isAuthenticated) {
     return NextResponse.redirect(
-      new URL(`${isLocalHost ? '/shop' : isProdShopDomian ? '' : ''}/account-overview`, req.url),
+      getRequestUrl(
+        `${isLocalHost ? '/shop' : isProdShopDomian ? '' : ''}/account-overview`,
+        req.headers,
+        req.url,
+      ),
     );
   }
 
