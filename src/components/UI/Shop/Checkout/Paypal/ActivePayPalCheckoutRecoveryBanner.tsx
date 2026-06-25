@@ -7,11 +7,13 @@ import errorToast from '@/lib/error-toast';
 import successToast from '@/lib/success-toast';
 import { useShopRouter } from '@/lib/hooks/useShopRouter';
 import {
-  isActivePayPalCheckoutFresh,
   usePayPalIntentStore,
+  type ActivePayPalCheckout,
   type ActivePayPalCheckoutStage,
 } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 import type { PayPalTxPaymentStatusResponse } from '@/lib/paypal/txLedger/mapLedgerToProcessingState';
+
+const ACTIVE_PAYPAL_CHECKOUT_TTL_MS = 24 * 60 * 60 * 1000;
 
 const CONFIRMATION_STATUSES = new Set([
   'captured',
@@ -23,6 +25,13 @@ const CONFIRMATION_STATUSES = new Set([
   'completed',
   'error',
 ]);
+
+function isFreshActiveCheckout(activeCheckout: ActivePayPalCheckout | null) {
+  if (!activeCheckout) return false;
+  const updatedAt = new Date(activeCheckout.updatedAt).getTime();
+
+  return Number.isFinite(updatedAt) && Date.now() - updatedAt <= ACTIVE_PAYPAL_CHECKOUT_TTL_MS;
+}
 
 function getStageCopy(stage: ActivePayPalCheckoutStage) {
   if (stage === 'paypal_cancelled') {
@@ -57,7 +66,7 @@ export default function ActivePayPalCheckoutRecoveryBanner({
   const activeCheckout = usePayPalIntentStore((store) => store.activeCheckout);
   const setActiveCheckoutStage = usePayPalIntentStore((store) => store.setActiveCheckoutStage);
   const clearActiveCheckout = usePayPalIntentStore((store) => store.clearActiveCheckout);
-  const isFresh = isActivePayPalCheckoutFresh(activeCheckout);
+  const isFresh = isFreshActiveCheckout(activeCheckout);
   const copy = useMemo(
     () => getStageCopy(activeCheckout?.stage ?? 'paypal_order_created'),
     [activeCheckout?.stage],

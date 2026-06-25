@@ -35,15 +35,6 @@ type PayPalIntentState = {
 };
 type PayPalIntentPersistedState = Pick<PayPalIntentState, 'orderToken' | 'activeCheckout'>;
 
-export const ACTIVE_PAYPAL_CHECKOUT_TTL_MS = 24 * 60 * 60 * 1000;
-
-export function isActivePayPalCheckoutFresh(activeCheckout: ActivePayPalCheckout | null) {
-  if (!activeCheckout) return false;
-  const updatedAt = new Date(activeCheckout.updatedAt).getTime();
-
-  return Number.isFinite(updatedAt) && Date.now() - updatedAt <= ACTIVE_PAYPAL_CHECKOUT_TTL_MS;
-}
-
 function createActiveCheckout({
   orderToken,
   stage = 'paypal_order_created',
