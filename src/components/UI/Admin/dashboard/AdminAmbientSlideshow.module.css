@@ -18,18 +18,21 @@
   background-repeat: repeat-y;
   background-size: 100% auto;
   filter: blur(1.2px) brightness(0.68) contrast(1.08) saturate(0.92);
-  transition: opacity 1800ms ease-in-out;
   will-change: opacity;
 }
 
 .slideVisible {
   z-index: 1;
   opacity: 0.98;
+  animation: adminAmbientFadeIn var(--admin-ambient-crossfade-duration, 4200ms)
+    cubic-bezier(0.42, 0, 0.18, 1) both;
 }
 
 .slideExiting {
   z-index: 0;
   opacity: 0;
+  animation: adminAmbientFadeOut var(--admin-ambient-crossfade-duration, 4200ms)
+    cubic-bezier(0.42, 0, 0.18, 1) both;
 }
 
 .imageTone {
@@ -72,7 +75,7 @@
 @media (prefers-reduced-motion: reduce), (prefers-reduced-transparency: reduce) {
   .slide {
     filter: brightness(0.62) contrast(1.06) saturate(0.86);
-    transition: none;
+    animation: none;
     will-change: auto;
   }
 
@@ -100,6 +103,26 @@
     background: linear-gradient(180deg, rgba(8, 12, 20, 0.06), rgba(8, 12, 20, 0.18));
     background-repeat: repeat-y;
     background-size: 100% 100dvh;
+  }
+}
+
+@keyframes adminAmbientFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 0.98;
+  }
+}
+
+@keyframes adminAmbientFadeOut {
+  from {
+    opacity: 0.98;
+  }
+
+  to {
+    opacity: 0;
   }
 }
 

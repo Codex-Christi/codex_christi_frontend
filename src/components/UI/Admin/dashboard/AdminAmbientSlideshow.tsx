@@ -11,6 +11,7 @@ type AmbientSlide = {
 };
 
 type AmbientSlideStyle = CSSProperties & {
+  '--admin-ambient-crossfade-duration': string;
   '--admin-ambient-image-desktop': string;
   '--admin-ambient-image-mobile': string;
   '--admin-ambient-image-tablet': string;
@@ -45,9 +46,10 @@ const ambientSlides: AmbientSlide[] = [
   },
 ];
 
-const secondsPerSlide = 10;
-const slideIntervalMs = secondsPerSlide * 1000;
-const crossFadeMs = 1800;
+const ambientSlideDwellMs = 18000;
+const ambientCrossFadeMs = 4200;
+const ambientCrossFadeCleanupMs = ambientCrossFadeMs + 100;
+const ambientCrossFadeDuration = `${ambientCrossFadeMs}ms`;
 
 export default function AdminAmbientSlideshow() {
   const reducedMotion = usePrefersReducedAmbientMotion();
@@ -76,7 +78,7 @@ export default function AdminAmbientSlideshow() {
         activeIndex: (activeIndex + 1) % ambientSlides.length,
         previousIndex: activeIndex,
       }));
-    }, slideIntervalMs);
+    }, ambientSlideDwellMs);
 
     return () => window.clearInterval(intervalID);
   }, [pageVisible, reducedMotion]);
@@ -89,7 +91,7 @@ export default function AdminAmbientSlideshow() {
       setSlideState((current) =>
         current.previousIndex === previousIndex ? { ...current, previousIndex: null } : current,
       );
-    }, crossFadeMs);
+    }, ambientCrossFadeCleanupMs);
 
     return () => window.clearTimeout(timeoutID);
   }, [slideState.previousIndex]);
@@ -122,6 +124,7 @@ export default function AdminAmbientSlideshow() {
 
 function getAmbientSlideStyle(slide: AmbientSlide): AmbientSlideStyle {
   return {
+    '--admin-ambient-crossfade-duration': ambientCrossFadeDuration,
     '--admin-ambient-image-desktop': `url("${getAmbientImageSrc(slide.id, 'desktop')}")`,
     '--admin-ambient-image-mobile': `url("${getAmbientImageSrc(slide.id, 'mobile')}")`,
     '--admin-ambient-image-tablet': `url("${getAmbientImageSrc(slide.id, 'tablet')}")`,
