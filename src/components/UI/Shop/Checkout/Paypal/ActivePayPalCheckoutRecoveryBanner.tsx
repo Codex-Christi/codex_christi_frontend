@@ -9,6 +9,7 @@ import { useShopRouter } from '@/lib/hooks/useShopRouter';
 import {
   usePayPalIntentStore,
   type ActivePayPalCheckout,
+  type ActivePayPalCheckoutPaymentSurface,
   type ActivePayPalCheckoutStage,
 } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 import type { PayPalTxPaymentStatusResponse } from '@/lib/paypal/txLedger/mapLedgerToProcessingState';
@@ -33,11 +34,35 @@ function isFreshActiveCheckout(activeCheckout: ActivePayPalCheckout | null) {
   return Number.isFinite(updatedAt) && Date.now() - updatedAt <= ACTIVE_PAYPAL_CHECKOUT_TTL_MS;
 }
 
-function getStageCopy(stage: ActivePayPalCheckoutStage) {
+function getPaymentSurfaceCopy(paymentSurface?: ActivePayPalCheckoutPaymentSurface | null) {
+  if (paymentSurface === 'card') {
+    return {
+      cta: 'Continue with card',
+      label: 'card form',
+      nextSurface: 'card' as const,
+    };
+  }
+
+  if (paymentSurface === 'paypal_buttons') {
+    return {
+      cta: 'Continue with PayPal',
+      label: 'PayPal checkout',
+      nextSurface: 'paypal_buttons' as const,
+    };
+  }
+
+  return {
+    cta: 'Show payment options',
+    label: 'payment flow',
+    nextSurface: null,
+  };
+}
+
+function getStageCopy(stage: ActivePayPalCheckoutStage, paymentLabel: string) {
   if (stage === 'paypal_cancelled') {
     return {
       title: 'Payment was not completed',
-      description: 'You have not been charged. You can try PayPal again when ready.',
+      description: `You have not been charged. You can reopen the ${paymentLabel} when ready.`,
     };
   }
 
@@ -49,17 +74,17 @@ function getStageCopy(stage: ActivePayPalCheckoutStage) {
   }
 
   return {
-    title: 'Recent PayPal checkout found',
-    description: 'If you left PayPal early, we can check whether anything moved.',
+    title: 'Recent checkout attempt found',
+    description: `If you left the ${paymentLabel} early, we can check whether anything moved.`,
   };
 }
 
 type ActivePayPalCheckoutRecoveryBannerProps = {
-  onRetryPayPal: () => void;
+  onSelectPaymentSurface: (paymentSurface: ActivePayPalCheckoutPaymentSurface | null) => void;
 };
 
 export default function ActivePayPalCheckoutRecoveryBanner({
-  onRetryPayPal,
+  onSelectPaymentSurface,
 }: ActivePayPalCheckoutRecoveryBannerProps) {
   const { push } = useShopRouter();
   const [isChecking, setIsChecking] = useState(false);
@@ -67,9 +92,17 @@ export default function ActivePayPalCheckoutRecoveryBanner({
   const setActiveCheckoutStage = usePayPalIntentStore((store) => store.setActiveCheckoutStage);
   const clearActiveCheckout = usePayPalIntentStore((store) => store.clearActiveCheckout);
   const isFresh = isFreshActiveCheckout(activeCheckout);
+  const paymentSurfaceCopy = useMemo(
+    () => getPaymentSurfaceCopy(activeCheckout?.paymentSurface),
+    [activeCheckout?.paymentSurface],
+  );
   const copy = useMemo(
-    () => getStageCopy(activeCheckout?.stage ?? 'paypal_order_created'),
-    [activeCheckout?.stage],
+    () =>
+      getStageCopy(
+        activeCheckout?.stage ?? 'paypal_order_created',
+        paymentSurfaceCopy.label,
+      ),
+    [activeCheckout?.stage, paymentSurfaceCopy.label],
   );
 
   useEffect(() => {
@@ -163,11 +196,11 @@ export default function ActivePayPalCheckoutRecoveryBanner({
               Check status
             </Button>
             <Button
-              name='Try PayPal Again'
-              onClick={onRetryPayPal}
+              name={paymentSurfaceCopy.cta}
+              onClick={() => onSelectPaymentSurface(paymentSurfaceCopy.nextSurface)}
               className='h-auto rounded-full border border-white/12 bg-white/[0.045] px-4 py-2 text-xs font-semibold text-white/78 hover:bg-white/[0.08] hover:text-white'
             >
-              Try PayPal again
+              {paymentSurfaceCopy.cta}
             </Button>
           </div>
         </div>

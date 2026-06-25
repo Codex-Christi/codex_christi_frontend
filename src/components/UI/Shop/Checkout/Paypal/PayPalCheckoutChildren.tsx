@@ -107,6 +107,7 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
       setIntent({
         orderToken: payload.data.orderToken,
         stage: mode === 'paypal_buttons' ? 'paypal_window_opened' : 'paypal_order_created',
+        paymentSurface: mode === 'card' ? 'card' : 'paypal_buttons',
       });
 
       return payload.data.paypalOrderId;

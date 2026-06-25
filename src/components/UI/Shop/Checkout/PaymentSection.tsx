@@ -50,7 +50,7 @@ const PaymentSection = () => {
 
       <div className='grid gap-8'>
         <ActivePayPalCheckoutRecoveryBanner
-          onRetryPayPal={() => setPayOption('paypal_buttons')}
+          onSelectPaymentSurface={(paymentSurface) => setPayOption(paymentSurface ?? '')}
         />
 
         <div className='space-y-4'>

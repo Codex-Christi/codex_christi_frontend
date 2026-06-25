@@ -12,9 +12,12 @@ export type ActivePayPalCheckoutStage =
   | 'capture_checking'
   | 'confirmation_opened';
 
+export type ActivePayPalCheckoutPaymentSurface = 'paypal_buttons' | 'card';
+
 export type ActivePayPalCheckout = {
   orderToken: string;
   stage: ActivePayPalCheckoutStage;
+  paymentSurface?: ActivePayPalCheckoutPaymentSurface | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -25,10 +28,14 @@ type PayPalIntentState = {
   setIntent: (payload: {
     orderToken: string;
     stage?: ActivePayPalCheckoutStage;
+    paymentSurface?: ActivePayPalCheckoutPaymentSurface | null;
   }) => void;
   setActiveCheckoutStage: (
     stage: ActivePayPalCheckoutStage,
-    payload?: { orderToken?: string },
+    payload?: {
+      orderToken?: string;
+      paymentSurface?: ActivePayPalCheckoutPaymentSurface | null;
+    },
   ) => void;
   clearActiveCheckout: () => void;
   clearIntent: () => void;
@@ -38,15 +45,18 @@ type PayPalIntentPersistedState = Pick<PayPalIntentState, 'orderToken' | 'active
 function createActiveCheckout({
   orderToken,
   stage = 'paypal_order_created',
+  paymentSurface = null,
 }: {
   orderToken: string;
   stage?: ActivePayPalCheckoutStage;
+  paymentSurface?: ActivePayPalCheckoutPaymentSurface | null;
 }): ActivePayPalCheckout {
   const now = new Date().toISOString();
 
   return {
     orderToken,
     stage,
+    paymentSurface,
     createdAt: now,
     updatedAt: now,
   };
@@ -57,10 +67,10 @@ export const usePayPalIntentStore = create<PayPalIntentState>()(
     (set) => ({
       orderToken: undefined,
       activeCheckout: null,
-      setIntent: ({ orderToken, stage }) =>
+      setIntent: ({ orderToken, stage, paymentSurface }) =>
         set({
           orderToken,
-          activeCheckout: createActiveCheckout({ orderToken, stage }),
+          activeCheckout: createActiveCheckout({ orderToken, stage, paymentSurface }),
         }),
       setActiveCheckoutStage: (stage, payload) =>
         set((state) => {
@@ -70,6 +80,7 @@ export const usePayPalIntentStore = create<PayPalIntentState>()(
               ? createActiveCheckout({
                   orderToken: payload.orderToken,
                   stage,
+                  paymentSurface: payload.paymentSurface,
                 })
               : null);
 
@@ -81,6 +92,7 @@ export const usePayPalIntentStore = create<PayPalIntentState>()(
               ...activeCheckout,
               orderToken: payload?.orderToken ?? activeCheckout.orderToken,
               stage,
+              paymentSurface: payload?.paymentSurface ?? activeCheckout.paymentSurface ?? null,
               updatedAt: new Date().toISOString(),
             },
           };
