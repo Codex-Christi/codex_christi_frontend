@@ -13,14 +13,14 @@ const nicoMoji = localFont({
   src: '../res/fonts/Nico-Moji-latin.woff2',
   variable: '--font-nico',
   display: 'swap',
-  preload: true,
+  preload: false,
 });
 
 const OCR_ext = localFont({
   src: '../res/fonts/OCR-ext-latin.woff2',
   variable: '--font-ocr',
   display: 'swap',
-  preload: true,
+  preload: false,
 });
 
 const InterFont = localFont({

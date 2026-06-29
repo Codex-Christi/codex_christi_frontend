@@ -5,15 +5,18 @@ interface CometsContainerInterface {
   children?: ReactNode;
   className?: string;
   cometClassName?: string;
+  cometMotion?: 'animated' | 'static';
   variant?: 'page' | 'overlay';
 }
 
 const CometsContainer: FC<CometsContainerInterface> = (props) => {
   // Props
-  const { children, className, cometClassName, variant = 'page' } = props || {};
+  const { children, className, cometClassName, cometMotion = 'animated', variant = 'page' } =
+    props || {};
   const hasChildren = Boolean(children);
   const cometFieldClassName =
     'absolute -left-1/2 -top-1/2 h-[200%] min-h-dvh w-[200%] bg-[url("/media/img/home/comets_mobile.svg")] bg-repeat animate-ltr-linear-infinite !ease-linear motion-reduce:animate-none md:bg-[url("/media/img/home/comets_tablet.svg")] lg:bg-[url("/media/img/home/comets_ desktop.svg")]';
+  const cometMotionClassName = cometMotion === 'static' ? '!animate-none !transform-none' : null;
 
   if (variant === 'overlay') {
     return (
@@ -21,7 +24,7 @@ const CometsContainer: FC<CometsContainerInterface> = (props) => {
         aria-hidden='true'
         className={cn('pointer-events-none absolute inset-0 overflow-hidden', className)}
       >
-        <div className={cn(cometFieldClassName, cometClassName)} />
+        <div className={cn(cometFieldClassName, cometMotionClassName, cometClassName)} />
       </div>
     );
   }
@@ -42,7 +45,7 @@ const CometsContainer: FC<CometsContainerInterface> = (props) => {
           aria-hidden='true'
           className='pointer-events-none absolute inset-0 z-0 min-h-dvh overflow-hidden'
         >
-          <div className={cn(cometFieldClassName, cometClassName)} />
+          <div className={cn(cometFieldClassName, cometMotionClassName, cometClassName)} />
         </div>
       ) : null}
 
@@ -51,6 +54,7 @@ const CometsContainer: FC<CometsContainerInterface> = (props) => {
           aria-hidden='true'
           className={cn(
             cometFieldClassName,
+            cometMotionClassName,
             'pointer-events-none !-z-[1] min-h-[auto]',
             cometClassName,
           )}

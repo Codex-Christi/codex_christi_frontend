@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export default function ShopRootLayout({ children }: { children: ReactNode }) {
   return (
-    <CometsContainer>
+    <CometsContainer cometMotion='static'>
       <PublicCurrencyFXWrapper>
         <ShopNav />
         {children}
