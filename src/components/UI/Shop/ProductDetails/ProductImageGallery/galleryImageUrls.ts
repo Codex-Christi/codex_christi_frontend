@@ -1,6 +1,6 @@
 import {
-  toMerchizeImageUrl,
   toMerchizeProductPreviewUrl,
+  toMerchizeThumbnailUrl,
 } from '@/lib/merchizeStorefront/imageUrls';
 import type {
   BasicProductInterface,
@@ -10,7 +10,7 @@ import type {
 type ProductVariant = ProductVariantsInterface['data'][number];
 
 export function getVariantGalleryImageUrls(variant: ProductVariant | null | undefined) {
-  return (variant?.image_uris ?? []).map((uri) => toMerchizeImageUrl(uri)).filter(Boolean);
+  return (variant?.image_uris ?? []).map((uri) => toMerchizeThumbnailUrl(uri)).filter(Boolean);
 }
 
 export function getDefaultVariantGalleryImageUrls(
@@ -37,9 +37,10 @@ export function resolveProductGalleryImages({
 
   const safeInitialImages = (initialImageUrls ?? [])
     .map((imageUrl) => toMerchizeProductPreviewUrl(imageUrl))
+    .map((imageUrl) => toMerchizeThumbnailUrl(imageUrl))
     .filter(Boolean);
   if (safeInitialImages.length) return safeInitialImages;
 
-  const fallback = toMerchizeProductPreviewUrl(metadata?.image);
+  const fallback = toMerchizeThumbnailUrl(toMerchizeProductPreviewUrl(metadata?.image));
   return fallback ? [fallback] : [];
 }

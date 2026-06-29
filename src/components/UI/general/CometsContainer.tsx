@@ -14,9 +14,12 @@ const CometsContainer: FC<CometsContainerInterface> = (props) => {
   const { children, className, cometClassName, cometMotion = 'animated', variant = 'page' } =
     props || {};
   const hasChildren = Boolean(children);
-  const cometFieldClassName =
+  const animatedCometFieldClassName =
     'absolute -left-1/2 -top-1/2 h-[200%] min-h-dvh w-[200%] bg-[url("/media/img/home/comets_mobile.svg")] bg-repeat animate-ltr-linear-infinite !ease-linear motion-reduce:animate-none md:bg-[url("/media/img/home/comets_tablet.svg")] lg:bg-[url("/media/img/home/comets_ desktop.svg")]';
-  const cometMotionClassName = cometMotion === 'static' ? '!animate-none !transform-none' : null;
+  const staticCometFieldClassName =
+    'fixed inset-0 h-dvh w-screen bg-[url("/media/img/home/comets_mobile.svg")] bg-repeat bg-left-top !animate-none !transform-none md:bg-[url("/media/img/home/comets_tablet.svg")] lg:bg-[url("/media/img/home/comets_ desktop.svg")]';
+  const cometFieldClassName =
+    cometMotion === 'static' ? staticCometFieldClassName : animatedCometFieldClassName;
 
   if (variant === 'overlay') {
     return (
@@ -24,7 +27,7 @@ const CometsContainer: FC<CometsContainerInterface> = (props) => {
         aria-hidden='true'
         className={cn('pointer-events-none absolute inset-0 overflow-hidden', className)}
       >
-        <div className={cn(cometFieldClassName, cometMotionClassName, cometClassName)} />
+        <div className={cn(cometFieldClassName, cometClassName)} />
       </div>
     );
   }
@@ -45,7 +48,7 @@ const CometsContainer: FC<CometsContainerInterface> = (props) => {
           aria-hidden='true'
           className='pointer-events-none absolute inset-0 z-0 min-h-dvh overflow-hidden'
         >
-          <div className={cn(cometFieldClassName, cometMotionClassName, cometClassName)} />
+          <div className={cn(cometFieldClassName, cometClassName)} />
         </div>
       ) : null}
 
@@ -54,7 +57,6 @@ const CometsContainer: FC<CometsContainerInterface> = (props) => {
           aria-hidden='true'
           className={cn(
             cometFieldClassName,
-            cometMotionClassName,
             'pointer-events-none !-z-[1] min-h-[auto]',
             cometClassName,
           )}
