@@ -19,6 +19,7 @@ import { getPublishedShopProductPreview } from '@/lib/utils/shopHomePageProducts
 import { readProductSeoManifestEntry } from '@/lib/shop/seoManifest/read';
 import type { ProductSeoManifestEntry } from '@/lib/shop/seoManifest/types';
 import { recordShopMetadataSource } from '@/lib/shop/seoManifest/metadataObservability';
+import { toMerchizeProductPreviewUrl } from '@/lib/merchizeStorefront/imageUrls';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -35,10 +36,7 @@ export async function generateStaticParams() {
 function resolveProductImageUrl(image: string | undefined | null) {
   if (!image) return undefined;
   if (image.startsWith('/')) return getShopSiteUrl(image);
-  const imageUrl = image.startsWith('http')
-    ? image
-    : `https://d2dytk4tvgwhb4.cloudfront.net/${image}`;
-  return imageUrl.replace(/\/thumb\.jpg(?:[?#].*)?$/i, '');
+  return toMerchizeProductPreviewUrl(image) || undefined;
 }
 
 function getSnapshotMissProductMetadata(productId: string): Metadata {

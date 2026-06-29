@@ -11,6 +11,7 @@ export interface ProductDetailsProps {
   fetchedProductData: ProductResult;
   initialImageUrls: string[];
   descriptionSection?: ReactNode;
+  children?: ReactNode;
 }
 
 export interface OptionalProductVariantProps {
@@ -45,10 +46,11 @@ export const useProductDetailsContext = () => {
   return context;
 };
 
-const ProductDetails: FC<ProductDetailsProps> = ({
+export const ProductDetailsProvider: FC<ProductDetailsProps> = ({
   productId,
   fetchedProductData,
   initialImageUrls,
+  children,
 }) => {
   const [productVariants, setProductVariants] = useState<ProductVariantsInterface['data']>(
     fetchedProductData.productVariants,
@@ -72,10 +74,13 @@ const ProductDetails: FC<ProductDetailsProps> = ({
       setVariantLoadError(null);
 
       try {
-        const res = await fetch(`/next-api/shop/products/${encodeURIComponent(productId)}/variants`, {
-          credentials: 'same-origin',
-          signal: controller.signal,
-        });
+        const res = await fetch(
+          `/next-api/shop/products/${encodeURIComponent(productId)}/variants`,
+          {
+            credentials: 'same-origin',
+            signal: controller.signal,
+          },
+        );
         const json = (await res.json()) as {
           data?: ProductVariantsInterface['data'];
           error?: string;
@@ -134,12 +139,20 @@ const ProductDetails: FC<ProductDetailsProps> = ({
     ],
   );
 
-  //   JSX
   return (
-    // Main JSX
     <ProductDetailsContext.Provider value={contextValue}>
-      <ProductTitleAndSizesEtc />
+      {children ?? <ProductTitleAndSizesEtc />}
     </ProductDetailsContext.Provider>
+  );
+};
+
+export const ProductPurchasePanelContent = () => <ProductTitleAndSizesEtc />;
+
+const ProductDetails: FC<ProductDetailsProps> = (props) => {
+  return (
+    <ProductDetailsProvider {...props}>
+      <ProductPurchasePanelContent />
+    </ProductDetailsProvider>
   );
 };
 

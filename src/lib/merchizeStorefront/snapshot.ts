@@ -8,6 +8,7 @@ import type {
 import {
   firstStringValue,
   toMerchizeImageUrl,
+  toMerchizeProductPreviewUrl,
   toMerchizeThumbnailUrl,
 } from '@/lib/merchizeStorefront/imageUrls';
 import { getCategoryPagePath } from '@/lib/utils/shop/categoryPagePath';
@@ -175,7 +176,9 @@ function toBasicProductData(snapshot: {
 
 function getProductImageFromRawProduct(product: BasicProductData) {
   const galleryImage = firstStringValue((product as { gallery_uris?: unknown }).gallery_uris);
-  return galleryImage ? toMerchizeThumbnailUrl(galleryImage) : toMerchizeImageUrl(product.image);
+  return galleryImage
+    ? toMerchizeThumbnailUrl(galleryImage)
+    : toMerchizeProductPreviewUrl(product.image);
 }
 
 function getVariantPreviewImage(variantsJson: unknown) {

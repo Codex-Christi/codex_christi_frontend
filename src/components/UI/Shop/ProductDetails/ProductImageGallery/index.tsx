@@ -3,10 +3,13 @@
 import Image from 'next/image';
 import { useContext, useEffect, useMemo, useState, type ComponentType } from 'react';
 import { ProductDetailsContext } from '..';
-import { toMerchizeImageUrl } from '@/lib/merchizeStorefront/imageUrls';
-import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
+import type {
+  BasicProductInterface,
+  ProductVariantsInterface,
+} from '@/lib/merchizeStorefront/productTypes';
 import { imagePreventDefaults } from './galleryShared';
 import { useCurrentVariant } from '../currentVariantStore';
+import { resolveProductGalleryImages } from './galleryImageUrls';
 
 type ProductImageGalleryProps = {
   productMetaData?: BasicProductInterface['data'];
@@ -21,10 +24,9 @@ const EMPTY_IMAGE_URLS: string[] = [];
 function resolveInitialImages(
   metadata?: BasicProductInterface['data'],
   initialImageUrls?: string[],
+  variants?: ProductVariantsInterface['data'],
 ) {
-  if (initialImageUrls?.length) return initialImageUrls;
-  const fallback = toMerchizeImageUrl(metadata?.image);
-  return fallback ? [fallback] : [];
+  return resolveProductGalleryImages({ metadata, initialImageUrls, variants });
 }
 
 function ProductImageGalleryPreview({
@@ -33,12 +35,14 @@ function ProductImageGalleryPreview({
   onOpenFullscreen,
   onRequestInteractive,
   onShare,
+  productVariants,
 }: ProductImageGalleryProps & {
   onOpenFullscreen: () => void;
   onRequestInteractive: () => void;
   onShare: () => void;
+  productVariants?: ProductVariantsInterface['data'];
 }) {
-  const images = resolveInitialImages(productMetaData, initialImageUrls);
+  const images = resolveInitialImages(productMetaData, initialImageUrls, productVariants);
   const firstImageSrc = images[0];
   const title = productMetaData?.title || 'Product image';
 
@@ -149,6 +153,7 @@ export const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
 }) => {
   const productDetailsContext = useContext(ProductDetailsContext);
   const metadata = productMetaData ?? productDetailsContext?.productMetaData;
+  const productVariants = productDetailsContext?.productVariants;
   const hasVariantSelection = useCurrentVariant((state) =>
     Object.values(state.currentVariantOptions).some(Boolean),
   );
@@ -158,8 +163,9 @@ export const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
   );
   const [interactiveRequested, setInteractiveRequested] = useState(false);
   const [openInteractiveOnLoad, setOpenInteractiveOnLoad] = useState(false);
-  const [InteractiveGallery, setInteractiveGallery] =
-    useState<InteractiveGalleryComponent | null>(null);
+  const [InteractiveGallery, setInteractiveGallery] = useState<InteractiveGalleryComponent | null>(
+    null,
+  );
   const shouldLoadInteractive = interactiveRequested || hasVariantSelection;
 
   useEffect(() => {
@@ -196,6 +202,7 @@ export const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
       <ProductImageGalleryPreview
         productMetaData={metadata}
         initialImageUrls={stableInitialImageUrls}
+        productVariants={productVariants}
         onOpenFullscreen={() => {
           setOpenInteractiveOnLoad(true);
           setInteractiveRequested(true);
@@ -206,7 +213,7 @@ export const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
         }}
       />
     ),
-    [metadata, stableInitialImageUrls],
+    [metadata, productVariants, stableInitialImageUrls],
   );
 
   if (!InteractiveGallery) return preview;

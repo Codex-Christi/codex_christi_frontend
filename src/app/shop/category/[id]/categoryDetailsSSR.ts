@@ -23,7 +23,7 @@ import {
 import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
 import {
   firstStringValue,
-  toMerchizeImageUrl,
+  toMerchizeProductPreviewUrl,
   toMerchizeThumbnailUrl,
 } from '@/lib/merchizeStorefront/imageUrls';
 
@@ -62,7 +62,9 @@ type CategorySearchResponse = {
 
 function normalizeCategoryProductImage(product: CategoryProductDetail): CategoryProductDetail {
   const galleryImage = firstStringValue((product as { gallery_uris?: unknown }).gallery_uris);
-  const image = galleryImage ? toMerchizeThumbnailUrl(galleryImage) : toMerchizeImageUrl(product.image);
+  const image = galleryImage
+    ? toMerchizeThumbnailUrl(galleryImage)
+    : toMerchizeProductPreviewUrl(product.image);
 
   return image ? { ...product, image } : product;
 }

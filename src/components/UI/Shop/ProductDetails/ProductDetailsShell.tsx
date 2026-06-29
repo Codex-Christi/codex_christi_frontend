@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { ProductResult } from '@/lib/merchizeStorefront/productTypes';
-import ProductPurchasePanel from '.';
+import { ProductDetailsProvider, ProductPurchasePanelContent } from '.';
 import { ProductImageGallery } from './ProductImageGallery';
 
 const reviews = [
@@ -14,14 +14,7 @@ function ReviewStars() {
   return (
     <div aria-label='5 out of 5 stars' className='flex gap-0.5' role='img'>
       {Array.from({ length: 5 }).map((_, index) => (
-        <svg
-          key={index}
-          aria-hidden='true'
-          width='17'
-          height='16'
-          viewBox='0 0 17 16'
-          fill='none'
-        >
+        <svg key={index} aria-hidden='true' width='17' height='16' viewBox='0 0 17 16' fill='none'>
           <path
             d='M7.57994 1.85667C7.94432 1.10486 9.01532 1.10486 9.3797 1.85667L10.8177 4.82357C10.9634 5.12426 11.2497 5.33229 11.5807 5.37801L14.848 5.82936C15.6755 5.94367 16.0064 6.9621 15.4041 7.54095L13.0262 9.82624C12.7853 10.0578 12.676 10.3943 12.7348 10.7232L13.3151 13.9692C13.4621 14.7915 12.5956 15.421 11.859 15.0269L8.95147 13.4716C8.65679 13.314 8.30284 13.314 8.00816 13.4716L5.10015 15.0269C4.36346 15.421 3.49703 14.7914 3.64415 13.969L4.22477 10.7233C4.28361 10.3943 4.17426 10.0577 3.93333 9.82618L1.55556 7.54095C0.953272 6.9621 1.28416 5.94367 2.11166 5.82936L5.37894 5.37801C5.70994 5.33229 5.99623 5.12426 6.14197 4.82356L7.57994 1.85667Z'
             fill='white'
@@ -47,19 +40,21 @@ export default function ProductDetailsShell({
 }: ProductDetailsShellProps) {
   return (
     <div className='grid min-w-0 gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-6 xl:grid-cols-3'>
-      <div className='grid min-w-0 gap-4 lg:col-span-4 xl:col-span-2'>
-        <ProductImageGallery
-          productMetaData={fetchedProductData.productMetaData}
-          initialImageUrls={initialImageUrls}
-        />
-      </div>
-
-      <ProductPurchasePanel
+      <ProductDetailsProvider
         key={productId}
         productId={productId}
         fetchedProductData={fetchedProductData}
         initialImageUrls={initialImageUrls}
-      />
+      >
+        <div className='grid min-w-0 gap-4 lg:col-span-4 xl:col-span-2'>
+          <ProductImageGallery
+            productMetaData={fetchedProductData.productMetaData}
+            initialImageUrls={initialImageUrls}
+          />
+        </div>
+
+        <ProductPurchasePanelContent />
+      </ProductDetailsProvider>
 
       <div className='grid gap-4 lg:col-span-4 xl:col-span-2'>
         {descriptionSection}

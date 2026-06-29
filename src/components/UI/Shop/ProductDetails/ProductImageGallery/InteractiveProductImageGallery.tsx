@@ -9,8 +9,8 @@ import ActionButtons from './ActionButtons';
 import MainStage from './MainStage';
 import { type CarouselApi } from '@/components/UI/primitives/carousel';
 import { useLightboxHistory } from './useLightBoxHistory';
-import { toMerchizeImageUrl } from '@/lib/merchizeStorefront/imageUrls';
 import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
+import { getVariantGalleryImageUrls, resolveProductGalleryImages } from './galleryImageUrls';
 
 const ProductLightbox = dynamic(() => import('./ProductLightbox'), { ssr: false });
 
@@ -81,22 +81,22 @@ export const InteractiveProductImageGallery: React.FC<ProductImageGalleryProps> 
   const matchingVariant = useCurrentVariant((s) => s.matchingVariant);
   const productDetailsContext = useContext(ProductDetailsContext);
   const metadata = productMetaData ?? productDetailsContext?.productMetaData;
+  const productVariants = productDetailsContext?.productVariants;
   const stableInitialImageUrls = useMemo(
     () => initialImageUrls ?? productDetailsContext?.initialImageUrls ?? EMPTY_IMAGE_URLS,
     [initialImageUrls, productDetailsContext?.initialImageUrls],
   );
 
-  // Build image URLs (unchanged from your template)
   const images = useMemo(() => {
-    const image_uris = matchingVariant?.image_uris ?? [];
-    if (image_uris.length > 0) {
-      return image_uris.map((uri) => toMerchizeImageUrl(uri)).filter(Boolean);
-    }
+    const selectedVariantImages = getVariantGalleryImageUrls(matchingVariant);
+    if (selectedVariantImages.length > 0) return selectedVariantImages;
 
-    return stableInitialImageUrls.length > 0
-      ? stableInitialImageUrls
-      : [toMerchizeImageUrl(metadata?.image)].filter(Boolean);
-  }, [matchingVariant?.image_uris, metadata?.image, stableInitialImageUrls]);
+    return resolveProductGalleryImages({
+      metadata,
+      initialImageUrls: stableInitialImageUrls,
+      variants: productVariants,
+    });
+  }, [matchingVariant, metadata, productVariants, stableInitialImageUrls]);
 
   const loader = useImageListLoader(images);
   const imageKey = useMemo(() => images.join('|'), [images]);
