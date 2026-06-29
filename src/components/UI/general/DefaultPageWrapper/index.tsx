@@ -6,11 +6,10 @@ interface DefaultPageWrapperInterface {
   hasMainNav?: boolean | undefined;
 }
 
-const DefaultPageWrapper: FC<DefaultPageWrapperInterface> = ({ children, hasMainNav }) => {
-  // Vars
-
-  hasMainNav = hasMainNav === undefined || true ? true : false;
-
+const DefaultPageWrapper: FC<DefaultPageWrapperInterface> = ({
+  children,
+  hasMainNav = true,
+}) => {
   // Main JSX
   return (
     <>

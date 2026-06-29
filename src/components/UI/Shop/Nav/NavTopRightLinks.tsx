@@ -1,3 +1,5 @@
+'use client';
+
 import { FC } from 'react';
 import { SearchButtonOnly } from './NavSearch';
 import { CartIcon } from './NavIcons';
@@ -17,8 +19,8 @@ const NavTopRightLinks: FC = () => {
 
       <SearchButtonOnly
         name='Search Button'
+        type='button'
         className='scale-125 relative block lg:!hidden'
-        searchContext='mobile'
       />
 
       <>

@@ -27,7 +27,7 @@ const InterFont = localFont({
   src: '../res/fonts/Inter-latin.var.woff2',
   variable: '--font-inter',
   display: 'swap',
-  preload: true,
+  preload: false,
 });
 
 const TradeWinds = localFont({

@@ -1,6 +1,5 @@
-import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
 import Footer from '@/components/UI/general/Footer';
-import Link from 'next/link';
+import { getMainSiteUrl } from '@/lib/siteBaseUrls';
 
 const rainSymbols = ['0', '1', 'Ξ', '╳', '▲', '█'];
 const matrixRain = Array.from({ length: 42 }, (_, index) => ({
@@ -13,9 +12,9 @@ const matrixRain = Array.from({ length: 42 }, (_, index) => ({
 
 export default function NotFound() {
   return (
-    <DefaultPageWrapper hasMainNav>
+    <>
       <div
-        className={`relative flex flex-col items-center justify-center w-full h-[82vh] mt-20 bg-black text-white
+        className={`relative flex flex-col items-center justify-center w-full min-h-[82vh] bg-black text-white
        !select-none text-center overflow-hidden px-4`}
       >
         <div className='absolute inset-0 overflow-hidden pointer-events-none'>
@@ -54,15 +53,15 @@ export default function NotFound() {
         />
 
         <div className='mt-6 cc-404-fade-in-button'>
-          <Link
-            href='/'
+          <a
+            href={getMainSiteUrl('/')}
             className='px-6 py-3 text-white text-lg font-semibold bg-neon-blue rounded-lg shadow-neon hover:shadow-neon-glow transition-all font-ocr'
           >
             Return to Reality
-          </Link>
+          </a>
         </div>
       </div>
       <Footer />
-    </DefaultPageWrapper>
+    </>
   );
 }

@@ -1,21 +1,16 @@
-'use client';
-
 import React, { FC } from 'react';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import { categories, helperLinks } from './SubNavObj';
-import { usePathname } from 'next/navigation';
 import Divider from '../../general/Divider';
 
 const SubNav = () => {
-  const pathname = usePathname();
-
   // jsx
   return (
     <nav
       aria-label={`Categories' Links`}
       role='navigation'
       className={`flex flex-col gap-7 w-full max-w-[220px] 
-		${pathname === '/shop' ? 'bg-inherit' : 'lg:bg-[#3D3D3D4D]'} self-center py-2.5
+		lg:bg-[#3D3D3D4D] self-center py-2.5
         !overflow-y-auto  lg:!overflow-y-hidden
         lg:flex-row lg:items-center lg:justify-around lg:gap-[unset] lg:max-w-full lg:self-[unset]
        `}

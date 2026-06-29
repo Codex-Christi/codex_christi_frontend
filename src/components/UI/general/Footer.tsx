@@ -1,38 +1,37 @@
-import Link from "next/link";
-import Image from "next/image";
+/* eslint-disable @next/next/no-img-element */
 
 const Footer = () => {
     return (
         <footer className="bg-[#3d3d3d] text-white flex justify-between flex-wrap gap-4 p-8">
             <div className="flex items-center gap-7 flex-wrap">
-                <Link className="font-bold text-2xl border-r border-white pr-3.5" href="/contact-us">
+                <a className="font-bold text-2xl border-r border-white pr-3.5" href="/contact-us">
                     Contact Us
-                </Link>
+                </a>
 
                 <div className="flex items-center gap-8 flex-wrap">
-                    <Link href="">
-                        <Image src="/media/img/general/instagram-icon.svg" height={24} width={24} alt="Instagram" />
-                    </Link>
+                    <a href="#">
+                        <img src="/media/img/general/instagram-icon.svg" height={24} width={24} alt="Instagram" />
+                    </a>
 
-                    <Link href="">
-                        <Image src="/media/img/general/facebook-icon.svg" height={24} width={24} alt="Facebook" />
-                    </Link>
+                    <a href="#">
+                        <img src="/media/img/general/facebook-icon.svg" height={24} width={24} alt="Facebook" />
+                    </a>
 
-                    <Link href="">
-                        <Image src="/media/img/general/x-icon.svg" height={24} width={24} alt="X" />
-                    </Link>
+                    <a href="#">
+                        <img src="/media/img/general/x-icon.svg" height={24} width={24} alt="X" />
+                    </a>
 
-                    <Link href="">
-                        <Image src="/media/img/general/linkedin-icon.svg" height={24} width={24} alt="LinkedIn" />
-                    </Link>
+                    <a href="#">
+                        <img src="/media/img/general/linkedin-icon.svg" height={24} width={24} alt="LinkedIn" />
+                    </a>
 
-                    <Link href="">
-                        <Image src="/media/img/general/github-icon.svg" height={24} width={24} alt="Github" />
-                    </Link>
+                    <a href="#">
+                        <img src="/media/img/general/github-icon.svg" height={24} width={24} alt="Github" />
+                    </a>
 
-                    <Link href="">
-                        <Image src="/media/img/general/gmail-icon.svg" height={24} width={24} alt="Gmail" />
-                    </Link>
+                    <a href="#">
+                        <img src="/media/img/general/gmail-icon.svg" height={24} width={24} alt="Gmail" />
+                    </a>
                 </div>
             </div>
 
