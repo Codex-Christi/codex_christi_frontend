@@ -1,6 +1,7 @@
 'use client';
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 import { Button } from '@/components/UI/primitives/button';
 import { motion } from 'framer-motion';
@@ -54,6 +55,8 @@ const statusIcon = (stepStatus: 'idle' | 'pending' | 'success' | 'error') => {
 
 const CheckoutConfirmationPage = ({ params }: PageProps) => {
   const routeOrderToken = use(params)?.orderToken;
+  const searchParams = useSearchParams();
+  const isRecoveryReview = searchParams.get('view') === 'recovery';
   const [downloading, setDownloading] = useState(false);
   const [hasHydratedFromLedger, setHasHydratedFromLedger] = useState(false);
   const [processingState, setProcessingState] = useState<MappedProcessingState | null>(null);
@@ -155,6 +158,7 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
   }, [canDownloadReceipt, receiptFileName, receiptLink]);
 
   const resetCheckoutRelatedStoresAndVars = useCallback(() => {
+    if (isRecoveryReview) return;
     if (!routeOrderToken || activeLocalOrderToken !== routeOrderToken) return;
 
     clearIntent();
@@ -169,6 +173,7 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
     clearVerifiedEmails,
     resetCheckoutToStoreDefaults,
     activeLocalOrderToken,
+    isRecoveryReview,
     routeOrderToken,
   ]);
 
@@ -231,7 +236,7 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
             setHasHydratedFromLedger(true);
           }
 
-          if (nextState.flowStatus === 'completed') {
+          if (!isRecoveryReview && nextState.flowStatus === 'completed') {
             clearActiveCheckout();
           }
         }
@@ -260,6 +265,7 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
   }, [
     clearActiveCheckout,
     hasHydratedFromLedger,
+    isRecoveryReview,
     resetCheckoutRelatedStoresAndVars,
     routeOrderToken,
   ]);

@@ -1,5 +1,6 @@
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
+import type { PaidCheckoutRecoverySummary } from '@/stores/shop_stores/checkoutStore/paidCheckoutRecoveryStore';
 import type { DjangoOrderIntentPayload } from '@/lib/hooks/shopHooks/checkout/djangoOrderIntentMutationHooks';
 import type { BasicCheckoutInfoFormSchema } from './BasicCheckoutInfo';
 
@@ -20,6 +21,7 @@ export type PaidCheckoutRecoveryPromptState = {
   pendingCheckoutData: BasicCheckoutInfoFormSchema | null;
   recipientName: string;
   resendAvailableInSeconds: number;
+  verifiedCheckouts: PaidCheckoutRecoverySummary[];
 };
 
 export const DEFAULT_PAID_CHECKOUT_RECOVERY_PROMPT_STATE: PaidCheckoutRecoveryPromptState = {
@@ -28,6 +30,7 @@ export const DEFAULT_PAID_CHECKOUT_RECOVERY_PROMPT_STATE: PaidCheckoutRecoveryPr
   pendingCheckoutData: null,
   recipientName: '',
   resendAvailableInSeconds: 0,
+  verifiedCheckouts: [],
 };
 
 type DjangoOrderIntentPayloadData = {

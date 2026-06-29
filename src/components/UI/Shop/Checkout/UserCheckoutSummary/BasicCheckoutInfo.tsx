@@ -21,6 +21,11 @@ import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import dynamic from 'next/dynamic';
 import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore';
+import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
+import {
+  getFreshPaidCheckoutRecoverySessionForEmail,
+  getPaidCheckoutRecoverySessionRemainingMinutes,
+} from '@/stores/shop_stores/checkoutStore/paidCheckoutRecoveryStore';
 import {
   DEFAULT_PAID_CHECKOUT_RECOVERY_PROMPT_STATE,
   getCheckoutValuesFromStore,
@@ -71,6 +76,7 @@ export const BasicCheckoutInfo = () => {
   const [paidCheckoutRecoveryPrompt, setPaidCheckoutRecoveryPrompt] = useState(
     DEFAULT_PAID_CHECKOUT_RECOVERY_PROMPT_STATE,
   );
+  const [paidCheckoutRecoveryPromptVersion, setPaidCheckoutRecoveryPromptVersion] = useState(0);
   const [isCheckingPaidCheckoutRecovery, setIsCheckingPaidCheckoutRecovery] = useState(false);
 
   const { handleOpenItem } = useContext(CheckoutAccordionContext);
@@ -96,6 +102,8 @@ export const BasicCheckoutInfo = () => {
     openDjangoOrderIntentOtpModal,
   );
   const { createDjangoOrderIntent } = djangoOrderIntentEmailVerification;
+  const clearActivePayPalCheckout = usePayPalIntentStore((s) => s.clearActiveCheckout);
+  const clearPayPalIntent = usePayPalIntentStore((s) => s.clearIntent);
 
   const basicCheckoutInfoForm = useForm<BasicCheckoutInfoFormSchema>({
     resolver: zodResolver(BasicCheckoutInfoFormSchema),
@@ -210,10 +218,18 @@ export const BasicCheckoutInfo = () => {
       return;
     }
 
+    clearActivePayPalCheckout();
+    clearPayPalIntent();
+
     await createDjangoOrderIntentFromCheckoutInfo(
       paidCheckoutRecoveryPrompt.pendingCheckoutData,
     );
-  }, [createDjangoOrderIntentFromCheckoutInfo, paidCheckoutRecoveryPrompt.pendingCheckoutData]);
+  }, [
+    clearActivePayPalCheckout,
+    clearPayPalIntent,
+    createDjangoOrderIntentFromCheckoutInfo,
+    paidCheckoutRecoveryPrompt.pendingCheckoutData,
+  ]);
 
   async function onSubmit(data: BasicCheckoutInfoFormSchema) {
     saveBasicCheckoutInfoToStore(data);
@@ -221,6 +237,22 @@ export const BasicCheckoutInfo = () => {
     setIsCheckingPaidCheckoutRecovery(true);
 
     try {
+      const freshRecoverySession = getFreshPaidCheckoutRecoverySessionForEmail(data.email);
+
+      if (freshRecoverySession) {
+        setPaidCheckoutRecoveryPrompt({
+          pendingCheckoutData: data,
+          email: data.email,
+          recipientName: getRecipientName(data),
+          expiresInMinutes: getPaidCheckoutRecoverySessionRemainingMinutes(freshRecoverySession),
+          resendAvailableInSeconds: 0,
+          verifiedCheckouts: freshRecoverySession.checkouts,
+        });
+        setPaidCheckoutRecoveryPromptVersion((version) => version + 1);
+        setIsPaidCheckoutRecoveryOpen(true);
+        return;
+      }
+
       const paidCheckoutRecoveryStart = await startPaidCheckoutRecovery(data);
 
       if (paidCheckoutRecoveryStart.recoveryRequired) {
@@ -230,7 +262,9 @@ export const BasicCheckoutInfo = () => {
           recipientName: getRecipientName(data),
           expiresInMinutes: getPaidCheckoutRecoveryExpiryMinutes(paidCheckoutRecoveryStart),
           resendAvailableInSeconds: paidCheckoutRecoveryStart.resendAvailableInSeconds ?? 0,
+          verifiedCheckouts: [],
         });
+        setPaidCheckoutRecoveryPromptVersion((version) => version + 1);
         setIsPaidCheckoutRecoveryOpen(true);
         return;
       }
@@ -313,13 +347,14 @@ export const BasicCheckoutInfo = () => {
       </Form>
 
       <PaidCheckoutRecoveryModal
-        key={`${paidCheckoutRecoveryPrompt.email}-${paidCheckoutRecoveryPrompt.expiresInMinutes}-${paidCheckoutRecoveryPrompt.resendAvailableInSeconds}`}
+        key={`${paidCheckoutRecoveryPromptVersion}-${paidCheckoutRecoveryPrompt.email}-${paidCheckoutRecoveryPrompt.expiresInMinutes}-${paidCheckoutRecoveryPrompt.resendAvailableInSeconds}-${paidCheckoutRecoveryPrompt.verifiedCheckouts.map((checkout) => checkout.orderToken).join('|')}`}
         isOpen={isPaidCheckoutRecoveryOpen}
         onOpenChange={setIsPaidCheckoutRecoveryOpen}
         email={paidCheckoutRecoveryPrompt.email}
         recipientName={paidCheckoutRecoveryPrompt.recipientName}
         expiresInMinutes={paidCheckoutRecoveryPrompt.expiresInMinutes}
         resendAvailableInSeconds={paidCheckoutRecoveryPrompt.resendAvailableInSeconds}
+        initialVerifiedCheckouts={paidCheckoutRecoveryPrompt.verifiedCheckouts}
         onStartSeparateOrder={startNewOrderAfterPaidCheckoutRecoveryReview}
       />
       <DjangoOrderIntentOtpController

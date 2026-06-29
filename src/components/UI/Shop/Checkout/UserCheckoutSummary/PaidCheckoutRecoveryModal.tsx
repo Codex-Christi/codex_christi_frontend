@@ -9,6 +9,12 @@ import {
   DrawerClose,
   DrawerOverlay,
 } from '@/components/UI/primitives/drawer';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/UI/primitives/accordion';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/UI/primitives/input-otp';
 import { Button } from '@/components/UI/primitives/button';
 import {
@@ -27,26 +33,11 @@ import {
 } from 'lucide-react';
 import errorToast from '@/lib/error-toast';
 import { cn } from '@/lib/utils';
-
-type PaidCheckoutRecoverySummary = {
-  orderToken: string;
-  status: string;
-  receiptLink: string | null;
-  receiptFile: string | null;
-  djangoPaymentSaveCustomId: string | null;
-  supportReference: string;
-  shortSupportReference: string;
-  createdAt: string;
-  updatedAt: string;
-  placedAtLabel: string;
-  paidAmountLabel: string | null;
-  itemCount: number;
-  itemSummaryLabel: string | null;
-  itemTitles: string[];
-  shippingSummaryLabel: string | null;
-  statusLabel: string;
-  message: string;
-};
+import { useVisualViewportHeightCssVar } from '@/lib/hooks/useVisualViewportHeightCssVar';
+import {
+  usePaidCheckoutRecoveryStore,
+  type PaidCheckoutRecoverySummary,
+} from '@/stores/shop_stores/checkoutStore/paidCheckoutRecoveryStore';
 
 type PaidCheckoutRecoveryVerifyResponse =
   | {
@@ -84,6 +75,7 @@ type PaidCheckoutRecoveryModalProps = {
   recipientName?: string;
   expiresInMinutes?: number;
   resendAvailableInSeconds?: number;
+  initialVerifiedCheckouts?: PaidCheckoutRecoverySummary[];
   onStartSeparateOrder: () => Promise<void>;
 };
 
@@ -95,18 +87,27 @@ export const PaidCheckoutRecoveryModal = (props: PaidCheckoutRecoveryModalProps)
     recipientName,
     expiresInMinutes = 10,
     resendAvailableInSeconds = 0,
+    initialVerifiedCheckouts = [],
     onStartSeparateOrder,
   } = props;
   const [otp, setOtp] = React.useState('');
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [infoMessage, setInfoMessage] = React.useState<string | null>(null);
-  const [checkouts, setCheckouts] = React.useState<PaidCheckoutRecoverySummary[]>([]);
+  const [checkouts, setCheckouts] =
+    React.useState<PaidCheckoutRecoverySummary[]>(initialVerifiedCheckouts);
   const [isVerifying, setIsVerifying] = React.useState(false);
   const [isResending, setIsResending] = React.useState(false);
   const [isContinuing, setIsContinuing] = React.useState(false);
   const [resendCooldown, setResendCooldown] = React.useState(resendAvailableInSeconds);
-  const [hasVerifiedRecovery, setHasVerifiedRecovery] = React.useState(false);
+  const [hasVerifiedRecovery, setHasVerifiedRecovery] = React.useState(
+    initialVerifiedCheckouts.length > 0,
+  );
   const recoveryVerified = hasVerifiedRecovery;
+  const saveVerifiedRecoverySession = usePaidCheckoutRecoveryStore(
+    (s) => s.setVerifiedRecoverySession,
+  );
+
+  useVisualViewportHeightCssVar(isOpen);
 
   const resetRecoveryState = React.useCallback(() => {
     setOtp('');
@@ -163,13 +164,14 @@ export const PaidCheckoutRecoveryModal = (props: PaidCheckoutRecoveryModalProps)
 
       setCheckouts(payload.checkouts);
       setHasVerifiedRecovery(true);
+      saveVerifiedRecoverySession({ email, checkouts: payload.checkouts });
       setOtp('');
     } catch {
       setErrorMessage('Unable to verify the recovery code. Please try again.');
     } finally {
       setIsVerifying(false);
     }
-  }, [email, otp]);
+  }, [email, otp, saveVerifiedRecoverySession]);
 
   const resendRecoveryOtp = React.useCallback(async () => {
     if (resendCooldown > 0) return;
@@ -268,13 +270,13 @@ export const PaidCheckoutRecoveryModal = (props: PaidCheckoutRecoveryModalProps)
       <DrawerContent
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
-        className='!rounded-none h-full -mt-6 bg-transparent !border-none !fixed !bottom-0 flex items-center justify-center !right-0 !z-[520] w-full overflow-hidden'
+        className='!fixed !bottom-0 !right-0 !z-[520] flex h-[var(--checkout-modal-vh,100dvh)] min-h-[var(--checkout-modal-vh,100dvh)] w-full items-center justify-center overflow-hidden !rounded-none !border-none bg-transparent px-2 py-2 sm:py-4'
       >
         <div
           aria-hidden='true'
           className='checkout-recovery-backdrop pointer-events-none absolute inset-0 opacity-90 motion-reduce:animate-none'
         />
-        <section className='checkout-recovery-panel mx-auto flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md flex-col overflow-hidden rounded-[1.65rem] border border-white/20 bg-[linear-gradient(145deg,rgba(15,23,42,0.78),rgba(2,6,23,0.68)_52%,rgba(6,78,59,0.32))] p-5 text-white shadow-[0_26px_90px_rgba(8,47,73,0.34),0_0_0_1px_rgba(255,255,255,0.06)_inset] supports-[backdrop-filter]:backdrop-blur-xl sm:w-[92vw] sm:max-w-lg sm:rounded-[1.8rem] sm:p-6 md:max-w-2xl lg:max-w-3xl animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4 duration-300 motion-reduce:animate-none'>
+        <section className='checkout-recovery-panel mx-auto flex max-h-[calc(var(--checkout-modal-vh,100dvh)-1rem)] w-full max-w-md flex-col overflow-hidden rounded-[1.65rem] border border-white/20 bg-[linear-gradient(145deg,rgba(15,23,42,0.78),rgba(2,6,23,0.68)_52%,rgba(6,78,59,0.32))] p-5 text-white shadow-[0_26px_90px_rgba(8,47,73,0.34),0_0_0_1px_rgba(255,255,255,0.06)_inset] supports-[backdrop-filter]:backdrop-blur-xl sm:w-[92vw] sm:max-w-lg sm:rounded-[1.8rem] sm:p-6 md:max-w-2xl lg:max-w-3xl animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4 duration-300 motion-reduce:animate-none'>
           <div
             aria-hidden='true'
             className='pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-200/80 to-transparent'
@@ -384,7 +386,7 @@ export const PaidCheckoutRecoveryModal = (props: PaidCheckoutRecoveryModalProps)
                   </div>
                 </div>
               ) : (
-                <div className='flex min-h-0 flex-col'>
+                <div className='flex min-h-0 flex-col gap-4'>
                   <div className='rounded-2xl border border-emerald-200/20 bg-emerald-400/10 p-4'>
                     <p className='font-semibold text-emerald-100'>
                       {primaryCheckout ? 'Payment received' : 'No active recovery case remains'}
@@ -397,69 +399,123 @@ export const PaidCheckoutRecoveryModal = (props: PaidCheckoutRecoveryModalProps)
                   </div>
 
                   {primaryCheckout ? (
-                    <div className='mt-4 space-y-3'>
-                      <div className='grid grid-cols-2 gap-2 md:grid-cols-4'>
-                        <div className='rounded-xl border border-white/10 bg-white/[0.045] p-3'>
-                          <CreditCard className='mb-2 text-emerald-100' size={17} />
-                          <p className='text-[11px] uppercase text-white/42'>Paid</p>
-                          <p className='mt-1 truncate text-sm font-semibold text-white/90'>
-                            {primaryCheckout.paidAmountLabel ?? 'Received'}
+                    <div className='rounded-2xl border border-white/10 bg-white/[0.045] p-3'>
+                      <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+                        <div className='min-w-0'>
+                          <p className='text-sm font-semibold text-white/92'>
+                            {primaryCheckout.paidAmountLabel ?? 'Payment received'}
                           </p>
-                        </div>
-                        <div className='rounded-xl border border-white/10 bg-white/[0.045] p-3'>
-                          <Package className='mb-2 text-sky-100' size={17} />
-                          <p className='text-[11px] uppercase text-white/42'>Items</p>
-                          <p className='mt-1 truncate text-sm font-semibold text-white/90'>
+                          <p className='mt-1 truncate text-xs text-white/58'>
                             {primaryCheckout.itemSummaryLabel ??
                               `${primaryCheckout.itemCount || 1} item`}
                           </p>
                         </div>
-                        <div className='rounded-xl border border-white/10 bg-white/[0.045] p-3'>
-                          <MapPin className='mb-2 text-cyan-100' size={17} />
-                          <p className='text-[11px] uppercase text-white/42'>Ship to</p>
-                          <p className='mt-1 truncate text-sm font-semibold text-white/90'>
-                            {primaryCheckout.shippingSummaryLabel ?? 'On file'}
-                          </p>
+                        <div className='inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-200/18 bg-emerald-300/10 px-2.5 py-1 text-xs font-semibold text-emerald-100'>
+                          <CreditCard size={13} />
+                          Paid
                         </div>
-                        <div className='rounded-xl border border-white/10 bg-white/[0.045] p-3'>
-                          <Clock3 className='mb-2 text-violet-100' size={17} />
-                          <p className='text-[11px] uppercase text-white/42'>Placed</p>
-                          <p className='mt-1 truncate text-sm font-semibold text-white/90'>
+                      </div>
+
+                      <div className='mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3'>
+                        <div className='rounded-xl border border-white/10 bg-black/10 p-2.5'>
+                          <Clock3 className='mb-1.5 text-violet-100' size={15} />
+                          <p className='text-[10px] uppercase text-white/42'>Placed</p>
+                          <p className='mt-1 truncate text-xs font-semibold text-white/88'>
                             {primaryCheckout.placedAtLabel}
                           </p>
                         </div>
+                        <div className='rounded-xl border border-white/10 bg-black/10 p-2.5'>
+                          <Package className='mb-1.5 text-sky-100' size={15} />
+                          <p className='text-[10px] uppercase text-white/42'>Items</p>
+                          <p className='mt-1 truncate text-xs font-semibold text-white/88'>
+                            {primaryCheckout.itemCount || 1}
+                          </p>
+                        </div>
+                        <div className='col-span-2 rounded-xl border border-white/10 bg-black/10 p-2.5 sm:col-span-1'>
+                          <p className='text-[10px] uppercase text-white/42'>Ref</p>
+                          <div className='mt-1 flex items-center justify-between gap-2'>
+                            <p className='truncate text-xs font-semibold text-white/88'>
+                              {primaryCheckout.shortSupportReference}
+                              {hiddenCheckoutCount ? ` +${hiddenCheckoutCount}` : ''}
+                            </p>
+                            <button
+                              type='button'
+                              onClick={() =>
+                                copySupportReference(primaryCheckout.supportReference)
+                              }
+                              className='inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/15 text-white/78 transition hover:bg-white/10 hover:text-white'
+                              aria-label='Copy support reference'
+                            >
+                              <Clipboard size={13} />
+                            </button>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className='flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2 text-sm'>
-                        <span className='min-w-0 truncate text-white/70'>
-                          Ref:{' '}
-                          <span className='text-white'>
-                            {primaryCheckout.shortSupportReference}
-                          </span>
-                          {hiddenCheckoutCount ? ` +${hiddenCheckoutCount} more` : ''}
-                        </span>
-                        <button
-                          type='button'
-                          onClick={() => copySupportReference(primaryCheckout.supportReference)}
-                          className='inline-flex items-center gap-1.5 rounded-full border border-white/15 px-2.5 py-1 text-xs font-semibold text-white/78 transition hover:bg-white/10 hover:text-white'
-                        >
-                          <Clipboard size={14} />
-                          Copy
-                        </button>
-                      </div>
+                      <Accordion type='single' collapsible className='mt-3'>
+                        <AccordionItem value='recovered-order-details' className='border-white/10'>
+                          <AccordionTrigger className='rounded-xl px-2 py-3 text-sm font-semibold text-white/78 hover:text-white hover:no-underline'>
+                            Order details
+                          </AccordionTrigger>
+                          <AccordionContent className='space-y-3 px-1 pb-1'>
+                            <div className='grid gap-2 sm:grid-cols-2'>
+                              <div className='rounded-xl border border-white/10 bg-white/[0.035] p-3'>
+                                <MapPin className='mb-2 text-cyan-100' size={16} />
+                                <p className='text-[11px] uppercase text-white/42'>Ship to</p>
+                                <p className='mt-1 text-sm font-semibold text-white/88'>
+                                  {primaryCheckout.shippingSummaryLabel ?? 'On file'}
+                                </p>
+                              </div>
+                              <div className='rounded-xl border border-white/10 bg-white/[0.035] p-3'>
+                                <CheckCircle2 className='mb-2 text-emerald-100' size={16} />
+                                <p className='text-[11px] uppercase text-white/42'>Status</p>
+                                <p className='mt-1 text-sm font-semibold text-white/88'>
+                                  {primaryCheckout.statusLabel}
+                                </p>
+                              </div>
+                            </div>
 
-                      <p className='text-sm text-white/62'>{primaryCheckout.statusLabel}</p>
+                            {primaryCheckout.itemTitles.length ? (
+                              <div className='rounded-xl border border-white/10 bg-white/[0.035] p-3'>
+                                <p className='text-[11px] uppercase text-white/42'>Items</p>
+                                <p className='mt-1 text-sm leading-5 text-white/78'>
+                                  {primaryCheckout.itemTitles.join(', ')}
+                                </p>
+                              </div>
+                            ) : null}
 
-                      {primaryCheckout.receiptLink ? (
-                        <a
-                          href={primaryCheckout.receiptLink}
-                          target='_blank'
-                          rel='noreferrer'
-                          className='inline-flex text-sm font-semibold text-sky-100 underline underline-offset-4'
-                        >
-                          View receipt
-                        </a>
-                      ) : null}
+                            {checkouts.length > 1 ? (
+                              <div className='rounded-xl border border-white/10 bg-white/[0.035] p-3'>
+                                <p className='text-[11px] uppercase text-white/42'>
+                                  Other recovered checkouts
+                                </p>
+                                <div className='mt-2 space-y-1.5'>
+                                  {checkouts.slice(1).map((checkout) => (
+                                    <p
+                                      key={checkout.orderToken}
+                                      className='truncate text-xs text-white/68'
+                                    >
+                                      {checkout.shortSupportReference} ·{' '}
+                                      {checkout.paidAmountLabel ?? checkout.statusLabel}
+                                    </p>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {primaryCheckout.receiptLink ? (
+                              <a
+                                href={primaryCheckout.receiptLink}
+                                target='_blank'
+                                rel='noreferrer'
+                                className='inline-flex text-sm font-semibold text-sky-100 underline underline-offset-4'
+                              >
+                                View receipt
+                              </a>
+                            ) : null}
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
                     </div>
                   ) : null}
 

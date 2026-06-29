@@ -13,6 +13,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/UI/primitive
 import { IoMdClose } from 'react-icons/io';
 import errorToast from '@/lib/error-toast';
 import { FiClipboard } from 'react-icons/fi';
+import { useVisualViewportHeightCssVar } from '@/lib/hooks/useVisualViewportHeightCssVar';
 
 // Public imperative API for the Django order-intent email OTP modal.
 export type DjangoOrderIntentOtpModalHandles = { open: () => void; close: () => void };
@@ -50,6 +51,8 @@ export const DjangoOrderIntentOtpModal = React.forwardRef<
 
     const [value, setValue] = React.useState<string>(defaultValue ?? '');
     const [isComplete, setIsComplete] = React.useState(false);
+
+    useVisualViewportHeightCssVar(Boolean(isOpen));
 
     const clearValue = React.useCallback(() => {
       setValue('');
@@ -102,9 +105,9 @@ export const DjangoOrderIntentOtpModal = React.forwardRef<
         <DrawerContent
           onOpenAutoFocus={(e) => e.preventDefault()}
           onCloseAutoFocus={(e) => e.preventDefault()}
-          className='!rounded-none h-full -mt-6 bg-transparent !border-none !fixed !bottom-0 flex items-center justify-center !right-0 !z-[500] w-full overflow-hidden'
+          className='!fixed !bottom-0 !right-0 !z-[500] flex h-[var(--checkout-modal-vh,100dvh)] min-h-[var(--checkout-modal-vh,100dvh)] w-full items-center justify-center overflow-hidden !rounded-none !border-none bg-transparent px-2 py-2 sm:py-4'
         >
-          <div className='relative mx-auto max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md overflow-y-auto rounded-[1.65rem] border border-white/20 bg-[linear-gradient(145deg,rgba(15,23,42,0.78),rgba(2,6,23,0.68)_55%,rgba(8,47,73,0.24))] p-5 text-white shadow-[0_26px_90px_rgba(8,47,73,0.32),0_0_0_1px_rgba(255,255,255,0.06)_inset] supports-[backdrop-filter]:backdrop-blur-xl sm:w-[92vw] sm:max-w-lg sm:rounded-[1.8rem] sm:p-6 md:max-w-xl lg:max-w-2xl'>
+          <div className='relative mx-auto max-h-[calc(var(--checkout-modal-vh,100dvh)-1rem)] w-full max-w-md overflow-y-auto rounded-[1.65rem] border border-white/20 bg-[linear-gradient(145deg,rgba(15,23,42,0.78),rgba(2,6,23,0.68)_55%,rgba(8,47,73,0.24))] p-5 text-white shadow-[0_26px_90px_rgba(8,47,73,0.32),0_0_0_1px_rgba(255,255,255,0.06)_inset] supports-[backdrop-filter]:backdrop-blur-xl sm:w-[92vw] sm:max-w-lg sm:rounded-[1.8rem] sm:p-6 md:max-w-xl lg:max-w-2xl'>
             <div
               aria-hidden='true'
               className='pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-200/80 to-transparent'

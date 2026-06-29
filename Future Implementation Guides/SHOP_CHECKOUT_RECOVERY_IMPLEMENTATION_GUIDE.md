@@ -182,12 +182,19 @@ Current frontend safeguards:
 
 - `BasicCheckoutInfo` runs the paid checkout recovery scan before creating a Django order intent.
 - If unresolved paid ledger rows exist, Django intent creation is paused and the Next.js-owned checkout recovery OTP flow is shown.
+- After the Next.js-owned recovery OTP is verified, the browser stores a short-lived encrypted recovery review session for the email. Returning to checkout inside that window reopens the reviewed recovery state instead of forcing another recovery OTP.
+- The recovery review UI should keep the customer in the checkout context. It shows a compact paid-order summary first and uses an expandable details section for shipping, status, extra recovered checkouts, and receipt links.
+- Avoid routing the customer to the historical confirmation page from the recovery modal as the primary UX. Historical confirmation pages are status views and can have checkout cleanup side effects if opened as the current checkout.
+- If a historical confirmation page must be opened, use read-only recovery mode: `/shop/checkout/confirmation/{orderToken}?view=recovery`.
+- Confirmation read-only recovery mode must not clear the current cart, checkout form, verified email store, Django intent store, PayPal intent store, or active PayPal marker.
+- When the customer explicitly starts a separate new order from the recovery review UI, clear the stale active PayPal marker before continuing.
 - If no paid recovery case exists, the frontend checks for a recent locally persisted verified Django order intent for the same email before calling `/orders/intent` again.
 - The local verified Django intent reuse window is intentionally short: 15 minutes.
 - The local reuse guard is browser-scoped and encrypted in the existing checkout intent store. It is a UX guard, not a replacement for backend idempotency.
 - Stale SWR mutation errors from a previous failed OTP verification no longer block the next verification attempt.
 - The Django OTP modal clears the entered digits after submit, close, and failed verification paths so a previous OTP is not preserved visually.
 - If Django create returns `otp_status: "expired"`, the UI opens the OTP modal with explicit guidance to use Resend instead of showing a generic success message.
+- Checkout recovery and Django OTP drawers use the visual viewport height to remain centered and scrollable when mobile browsers open the keyboard.
 
 Relevant files:
 
@@ -197,6 +204,8 @@ src/components/UI/Shop/Checkout/UserCheckoutSummary/basicCheckoutInfoHelpers.ts
 src/components/UI/Shop/Checkout/UserCheckoutSummary/DjangoOrderIntentOtpController.tsx
 src/components/UI/Shop/Checkout/UserCheckoutSummary/DjangoOrderIntentOtpModal.tsx
 src/lib/hooks/shopHooks/checkout/useDjangoOrderIntentEmailVerification.ts
+src/lib/hooks/useVisualViewportHeightCssVar.ts
+src/stores/shop_stores/checkoutStore/paidCheckoutRecoveryStore.ts
 src/stores/shop_stores/checkoutStore/djangoOrderIntentStore.ts
 ```
 
