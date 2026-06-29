@@ -9,11 +9,14 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { shallow } from 'zustand/shallow';
 
 // 🧠 Types
-type Variant = ProductVariantsInterface['data'][0];
-type Variants = ProductVariantsInterface['data'];
+export type Variant = ProductVariantsInterface['data'][0];
+export type Variants = ProductVariantsInterface['data'];
 
 // keep the raw option type around for label setters etc.
-type VariantSelectionState = Record<string, string | null>;
+export type VariantSelectionState = Record<string, string | null>;
+
+const SELECTABLE_VARIANT_ATTRIBUTES = ['size', 'color', 'label'] as const;
+const SELECTABLE_VARIANT_ATTRIBUTE_SET = new Set<string>(SELECTABLE_VARIANT_ATTRIBUTES);
 
 interface CurrentVariantStore {
   matchingVariant: Variant | null;
@@ -54,6 +57,29 @@ const buildVariantValueMap = (variant: Variant): Record<string, string | undefin
 
   return map;
 };
+
+export function getRequiredVariantAttributes(variants: Variants) {
+  const attributes = new Set<string>();
+
+  variants.forEach((variant) => {
+    variant?.options?.forEach((opt) => {
+      const name = normalizeAttrName(opt?.attribute?.name);
+      if (SELECTABLE_VARIANT_ATTRIBUTE_SET.has(name)) attributes.add(name);
+    });
+  });
+
+  return SELECTABLE_VARIANT_ATTRIBUTES.filter((attribute) => attributes.has(attribute));
+}
+
+export function hasRequiredVariantSelections(
+  requiredAttributes: readonly string[],
+  selections: VariantSelectionState,
+) {
+  return requiredAttributes.every((attr) => {
+    const value = selections[attr];
+    return typeof value === 'string' && value.length > 0;
+  });
+}
 
 export const useCurrentVariant = create<CurrentVariantStore>()(
   subscribeWithSelector((set, get) => ({
@@ -112,13 +138,12 @@ export const useCurrentVariant = create<CurrentVariantStore>()(
       }
 
       const selections = get().currentVariantOptions;
+      const requiredAttributes = getRequiredVariantAttributes(variants);
 
-      // Only use attributes that actually have a non-empty selection
-      const activeKeys = Object.entries(selections)
-        .filter(([, v]) => v !== null && v !== '' && v !== 'product')
-        .map(([k]) => k);
-
-      if (activeKeys.length === 0) {
+      if (
+        !requiredAttributes.length ||
+        !hasRequiredVariantSelections(requiredAttributes, selections)
+      ) {
         set((s) => ({ ...s, matchingVariant: null }));
         return undefined;
       }
@@ -126,7 +151,7 @@ export const useCurrentVariant = create<CurrentVariantStore>()(
       const matched = variants.find((variant) => {
         const map = buildVariantValueMap(variant);
 
-        return activeKeys.every((attrName) => {
+        return requiredAttributes.every((attrName) => {
           const selected = selections[attrName];
           if (!selected) return false;
 
@@ -149,31 +174,17 @@ export function setupVariantAutoMatching(variants: Variants) {
     return () => {};
   }
 
-  // Determine which attributes are actually used to describe variants for this product.
-  // We treat these as the "required" selection set before we attempt a match.
-  const requiredAttributes = new Set<string>();
-
-  const firstVariant = variants[0];
-  firstVariant?.options?.forEach((opt) => {
-    const name = normalizeAttrName(opt?.attribute?.name);
-    if (name && name !== 'product') requiredAttributes.add(name);
-  });
+  const requiredAttributes = getRequiredVariantAttributes(variants);
 
   const syncMatchingVariant = (currentOptions: VariantSelectionState) => {
-    const activeKeys = Object.entries(currentOptions)
-      .filter(([, v]) => v !== null && v !== '')
-      .map(([k]) => k);
-
-    const hasAllRequired = Array.from(requiredAttributes).every((attr) => {
-      const v = currentOptions[attr];
-      return typeof v === 'string' && v.length > 0;
-    });
-
     const state = useCurrentVariant.getState();
 
     // If no active selection or not all required attributes are selected yet,
     // we do not attempt a match and clear any previous match.
-    if (!hasAllRequired || activeKeys.length === 0) {
+    if (
+      !requiredAttributes.length ||
+      !hasRequiredVariantSelections(requiredAttributes, currentOptions)
+    ) {
       if (state.matchingVariant !== null) {
         state.setMatchingVariant(null);
       }

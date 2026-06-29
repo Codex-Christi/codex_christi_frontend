@@ -3,9 +3,13 @@
 import React, { FC, use, useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '../../primitives/button';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
-import { setupVariantAutoMatching, useCurrentVariant } from './currentVariantStore';
+import {
+  getRequiredVariantAttributes,
+  hasRequiredVariantSelections,
+  setupVariantAutoMatching,
+  useCurrentVariant,
+} from './currentVariantStore';
 import { OptionalProductVariantProps, ProductDetailsContext } from '.';
-import { hasColorAndSize } from '@/lib/merchizeStorefront/productTypes';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import { useShallow } from 'zustand/react/shallow';
 import { checkProductLineAvail } from '@/actions/shop/product/[each]/checkProdLineAvail';
@@ -16,6 +20,20 @@ type Variant = NonNullable<OptionalProductVariantProps['variants'][number]>;
 // 1) Type guard to drop undefineds and satisfy TS narrowing on .filter
 function isVariant(v: OptionalProductVariantProps['variants'][number] | undefined): v is Variant {
   return !!v && typeof v._id === 'string' && Array.isArray(v.options);
+}
+
+const REQUIRED_ATTRIBUTE_LABELS: Record<string, string> = {
+  size: 'size',
+  color: 'color',
+  label: 'label',
+};
+
+function formatRequiredAttributes(attributes: readonly string[]) {
+  const labels = attributes.map((attribute) => REQUIRED_ATTRIBUTE_LABELS[attribute] ?? attribute);
+
+  if (labels.length === 1) return `a ${labels[0]}`;
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  return `${labels.slice(0, -1).join(', ')}, and ${labels[labels.length - 1]}`;
 }
 
 // Main Component
@@ -36,30 +54,42 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
   const slug = props.productMetaData?.slug ?? ctx?.productMetaData?.slug ?? '';
 
   // ---- Zustand selections with shallow memoization (one subscription) ----
-  const { matchingVariant, setMatchingVariant, resetVariantOptions } = useCurrentVariant(
-    useShallow((s) => ({
-      matchingVariant: s.matchingVariant,
-      setMatchingVariant: s.setMatchingVariant,
-      resetVariantOptions: s.resetVariantOptions,
-    })),
-  );
+  const { matchingVariant, setMatchingVariant, resetVariantOptions, currentVariantOptions } =
+    useCurrentVariant(
+      useShallow((s) => ({
+        matchingVariant: s.matchingVariant,
+        setMatchingVariant: s.setMatchingVariant,
+        resetVariantOptions: s.resetVariantOptions,
+        currentVariantOptions: s.currentVariantOptions,
+      })),
+    );
 
   const addToCart = useCartStore((s) => s.addToCart);
 
   // Debounce state: blocks rapid repeat clicks for 600ms
   const [isBusy, setIsBusy] = useState(false);
   const isLoadingVariants = props.isLoadingVariants ?? ctx?.variantLoadState === 'loading';
+  const requiredAttributes = useMemo(
+    () =>
+      getRequiredVariantAttributes(cleanVariants as Parameters<typeof setupVariantAutoMatching>[0]),
+    [cleanVariants],
+  );
+  const hasAllRequiredSelections = hasRequiredVariantSelections(
+    requiredAttributes,
+    currentVariantOptions,
+  );
 
   // Use the cleaned array for messaging & indexing
   const selectOptionsMessage = useMemo(() => {
     if (isLoadingVariants) return 'Product options are still loading.';
     if (cleanVariants.length === 0) return 'This item is unavailable.';
-    return hasColorAndSize(cleanVariants[0]?.options ?? [])
-      ? 'Please select a size and color before adding to cart.'
-      : 'Please select a size before adding to cart.';
-  }, [cleanVariants, isLoadingVariants]);
+    if (requiredAttributes.length === 0) {
+      return 'Please select product options before adding to cart.';
+    }
+    return `Please select ${formatRequiredAttributes(requiredAttributes)} before adding to cart.`;
+  }, [cleanVariants.length, isLoadingVariants, requiredAttributes]);
 
-  const canSubmit = Boolean(matchingVariant?._id) && !isLoadingVariants;
+  const canSubmit = Boolean(matchingVariant?._id) && hasAllRequiredSelections && !isLoadingVariants;
 
   const addToCartHandler = useCallback(async () => {
     // leading-edge debounce
@@ -86,7 +116,9 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
 
       if (matchingVariantLineProductOption) {
         if (!ctx) {
-          await fail('Unable to verify production availability right now. Please refresh and try again.');
+          await fail(
+            'Unable to verify production availability right now. Please refresh and try again.',
+          );
           return;
         }
 
@@ -97,7 +129,9 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
 
         // Hard gate: if we cannot verify, we do NOT proceed (prevents backend SKU-not-available surprises).
         if (!lineCheckResp?.ok) {
-          await fail('We could not verify availability for production. Please try again in a moment.');
+          await fail(
+            'We could not verify availability for production. Please try again in a moment.',
+          );
           return;
         }
 
