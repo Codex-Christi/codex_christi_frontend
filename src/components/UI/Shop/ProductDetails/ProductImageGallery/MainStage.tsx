@@ -14,6 +14,7 @@ import {
 import Image from 'next/image';
 import { GalleryPrevButton } from '../GalleryPrevButton';
 import { GalleryNextButton } from '../GalleryNextButton';
+import styles from '../ProductDetails.module.css';
 
 function MainStage({
   images,
@@ -47,7 +48,7 @@ function MainStage({
   }, [imageKey]);
 
   return (
-    <div className='relative w-full min-w-0 rounded-[20px] sm:flex-1'>
+    <div className={styles.mainStage}>
       <Carousel
         className='w-full min-w-0'
         opts={{ align: 'start', watchDrag: true, loop: true }}
@@ -60,7 +61,7 @@ function MainStage({
             return (
               <CarouselItem key={i} className='basis-full'>
                 <div
-                  className='relative w-full aspect-[16/18] md:aspect-[16/13] rounded-[20px] overflow-hidden cursor-zoom-in'
+                  className={styles.mainImageFrame}
                   onClick={() => setOpen(true)}
                 >
                   {shouldRenderImage ? (
@@ -70,7 +71,7 @@ function MainStage({
                       fetchPriority={i === 0 ? 'high' : 'low'}
                       loading={i === 0 ? 'eager' : 'lazy'}
                       decoding={i === 0 ? 'sync' : 'async'}
-                      className='size-full object-cover object-top'
+                      className={styles.mediaFill}
                       fill
                       src={loader.srcWithRetry(src, i)}
                       alt={metaTitle || 'Product image'}

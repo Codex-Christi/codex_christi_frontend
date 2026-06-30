@@ -11,6 +11,7 @@ import { type CarouselApi } from '@/components/UI/primitives/carousel';
 import { useLightboxHistory } from './useLightBoxHistory';
 import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
 import { getVariantGalleryImageUrls, resolveProductGalleryImages } from './galleryImageUrls';
+import styles from '../ProductDetails.module.css';
 
 const ProductLightbox = dynamic(() => import('./ProductLightbox'), { ssr: false });
 
@@ -164,10 +165,7 @@ export const InteractiveProductImageGallery: React.FC<ProductImageGalleryProps> 
   const safeCurrentItem = images.length === 1 ? 0 : currentItem;
 
   return (
-    <div
-      className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-2 lg:p-8 flex w-full min-w-0 max-w-full flex-col gap-8 items-start sm:gap-12 sm:flex-row lg:flex-col-reverse xl:flex-row'
-      id='mainGallery'
-    >
+    <div className={styles.galleryPanel} id='mainGallery'>
       {/* Thumbnails */}
       <ThumbsPanel
         images={images}
@@ -178,7 +176,7 @@ export const InteractiveProductImageGallery: React.FC<ProductImageGalleryProps> 
       />
 
       {/* Main image + side actions */}
-      <div className='flex w-full min-w-0 flex-col items-start gap-4 sm:flex-1 sm:flex-row sm:gap-8 sm:order-2'>
+      <div className={styles.galleryMainColumn}>
         <MainStage
           images={images}
           metaTitle={metadata?.title}

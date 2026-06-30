@@ -10,6 +10,7 @@ import type {
 import { imagePreventDefaults } from './galleryShared';
 import { useCurrentVariant } from '../currentVariantStore';
 import { resolveProductGalleryImages } from './galleryImageUrls';
+import styles from '../ProductDetails.module.css';
 
 type ProductImageGalleryProps = {
   productMetaData?: BasicProductInterface['data'];
@@ -47,20 +48,17 @@ function ProductImageGalleryPreview({
   const title = productMetaData?.title || 'Product image';
 
   return (
-    <div
-      className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-2 lg:p-8 flex w-full min-w-0 max-w-full flex-col gap-8 items-start sm:gap-12 sm:flex-row lg:flex-col-reverse xl:flex-row'
-      id='mainGallery'
-    >
+    <div className={styles.galleryPanel} id='mainGallery'>
       <div
         className='grid w-full min-w-0 grid-cols-5 gap-4 order-2 sm:w-auto sm:grid-cols-1 sm:order-1 lg:w-full lg:grid-cols-5 xl:w-auto xl:grid-cols-1 xl:order-1'
         aria-hidden='true'
       >
-        <div className='rounded-[18px] sm:rounded-[20px] size-16 sm:size-20 border-[2.5px] border-white shadow-md shadow-gray-300 overflow-hidden bg-black/10'>
+        <div className={styles.thumbFrame}>
           {firstImageSrc && (
             <Image
               {...imagePreventDefaults}
               alt=''
-              className='rounded-[20px] size-full object-cover object-top'
+              className={styles.thumbImage}
               src={firstImageSrc}
               width={80}
               height={80}
@@ -71,10 +69,10 @@ function ProductImageGalleryPreview({
         </div>
       </div>
 
-      <div className='flex w-full min-w-0 flex-col items-start gap-4 sm:flex-1 sm:flex-row sm:gap-8 sm:order-2'>
-        <div className='relative w-full min-w-0 rounded-[20px] sm:flex-1'>
+      <div className={styles.galleryMainColumn}>
+        <div className={styles.mainStage}>
           <div
-            className='relative w-full aspect-[16/18] md:aspect-[16/13] rounded-[20px] overflow-hidden bg-black/10'
+            className={styles.mainImageFrame}
             role='button'
             tabIndex={0}
             aria-label='Open product image gallery'
@@ -93,7 +91,7 @@ function ProductImageGalleryPreview({
                 fetchPriority='high'
                 loading='eager'
                 decoding='async'
-                className='size-full object-cover object-top'
+                className={styles.mediaFill}
                 fill
                 src={firstImageSrc}
                 alt={title}

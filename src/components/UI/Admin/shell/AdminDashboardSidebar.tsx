@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
 import AdminGlassPanel from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import AdminDashboardNavigationList from './AdminDashboardNavigationList';
+import styles from './AdminDashboardShell.module.css';
 import type {
   AdminDashboardIdentity,
   AdminDashboardNavigationGroup,
@@ -21,7 +22,7 @@ export default function AdminDashboardSidebar({
   navigationGroups,
 }: AdminDashboardSidebarProps) {
   return (
-    <aside className='hidden overflow-x-hidden border-r border-white/[0.055] bg-[rgba(20,25,35,0.80)] shadow-[12px_0_38px_rgba(0,0,0,0.14)] supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 xl:fixed xl:left-0 xl:top-0 xl:z-50 xl:block xl:h-dvh xl:w-[250px]'>
+    <aside className={styles.desktopSidebar}>
       <div className='flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden'>
         <Link
           href='/admin'

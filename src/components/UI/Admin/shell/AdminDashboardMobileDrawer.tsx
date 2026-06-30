@@ -14,6 +14,7 @@ import {
 import { useRouteChangeAware } from '@/lib/hooks/useRouteChangeAware';
 import AdminGlassPanel from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import AdminDashboardNavigationList from './AdminDashboardNavigationList';
+import styles from './AdminDashboardShell.module.css';
 import type {
   AdminDashboardIdentity,
   AdminDashboardNavigationGroup,
@@ -41,10 +42,10 @@ export default function AdminDashboardMobileDrawer({
 
   return (
     <Drawer direction='left' open={open} onOpenChange={onOpenChange}>
-      <DrawerOverlay className='bg-[#141923]/42 !backdrop-blur-[3px] xl:hidden' />
+      <DrawerOverlay className={styles.mobileDrawerOverlay} />
       <DrawerContent
         data-testid='admin-dashboard-mobile-drawer'
-        className='!fixed !bottom-0 !left-0 !z-[500] h-[100dvh] min-h-[100dvh] w-full max-w-[360px] overflow-hidden !rounded-none border-r border-white/[0.055] bg-[rgba(20,25,35,0.82)] text-slate-50 shadow-[24px_0_70px_rgba(0,0,0,0.30)] after:!hidden supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 xl:hidden'
+        className={styles.mobileDrawerContent}
       >
         <DrawerTitle className='sr-only'>Admin navigation</DrawerTitle>
         <DrawerDescription className='sr-only'>

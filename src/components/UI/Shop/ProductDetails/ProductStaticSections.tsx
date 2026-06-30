@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import DOMPurify from 'isomorphic-dompurify';
+import styles from './ProductDetails.module.css';
 
 export function ProductDescriptionSection({ description }: { description: string }) {
   const sanitizedHTML = DOMPurify.sanitize(description, {
@@ -9,19 +10,7 @@ export function ProductDescriptionSection({ description }: { description: string
 
   return (
     <div
-      className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-4 min-h-0 overflow-hidden lg:p-8
-      [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-white
-      [&_p]:text-sm [&_p]:leading-7 [&_p]:text-slate-100
-      [&_ul]:grid [&_ul]:gap-2 [&_ul]:pl-5 [&_li]:list-disc [&_li]:text-sm [&_li]:leading-6
-      [&_.product-table-outer]:w-full [&_.product-table-outer]:min-w-0 [&_.product-table-outer]:max-w-full [&_.product-table-outer]:overflow-hidden
-      [&_.product-size-table-scroll]:mt-4 [&_.product-size-table-scroll]:w-full [&_.product-size-table-scroll]:min-w-0 [&_.product-size-table-scroll]:max-w-full [&_.product-size-table-scroll]:overflow-x-auto
-      [&_.product-size-table-scroll]:rounded-xl [&_.product-size-table-scroll]:border [&_.product-size-table-scroll]:border-white/15
-      [&_.product-size-table-scroll]:bg-slate-950/20 [&_.product-size-table-scroll]:[-webkit-overflow-scrolling:touch]
-      [&_table]:min-w-[42rem] [&_table]:w-full [&_table]:border-collapse [&_table]:text-left [&_table]:text-sm
-      [&_thead]:bg-slate-950/60 [&_tbody_tr:nth-child(even)]:bg-white/5
-      [&_th]:!w-auto [&_th]:whitespace-nowrap [&_th]:border-b [&_th]:border-white/15 [&_th]:px-3 [&_th]:py-3 [&_th]:font-semibold [&_th]:text-white
-      [&_td]:whitespace-nowrap [&_td]:border-t [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-2.5 [&_td]:text-slate-100
-      [&_img]:mx-auto [&_img]:h-auto [&_img]:w-full [&_img]:max-w-[500px] [&_img]:rounded-lg'
+      className={`${styles.productPanel} ${styles.spaceMedium} ${styles.descriptionPanel}`}
     >
       <h2 className='font-bold text-2xl'>Product Details</h2>
 

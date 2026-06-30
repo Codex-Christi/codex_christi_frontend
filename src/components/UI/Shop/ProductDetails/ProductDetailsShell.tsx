@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { ProductResult } from '@/lib/merchizeStorefront/productTypes';
 import { ProductDetailsProvider, ProductPurchasePanelContent } from '.';
 import { ProductImageGallery } from './ProductImageGallery';
+import styles from './ProductDetails.module.css';
 
 const reviews = [
   'Very comfortable, fits perfectly and I think it is affordable for the above price.',
@@ -59,7 +60,7 @@ export default function ProductDetailsShell({
       <div className='grid gap-4 lg:col-span-4 xl:col-span-2'>
         {descriptionSection}
 
-        <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-2 lg:p-8'>
+        <div className={`${styles.productPanel} ${styles.spaceSmall}`}>
           <h2 className='font-bold text-2xl'>Specifications</h2>
 
           <ul className='space-y-2 list-disc list-inside'>
@@ -72,7 +73,7 @@ export default function ProductDetailsShell({
           </ul>
         </div>
 
-        <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-8 lg:p-8'>
+        <div className={`${styles.productPanel} ${styles.spaceXL}`}>
           <div className='space-y-1'>
             <h2 className='font-bold text-2xl'>Customer Reviews & Ratings</h2>
             <p>4.8 out of 5 Stars</p>
@@ -88,7 +89,7 @@ export default function ProductDetailsShell({
           </div>
 
           <div className='grid place-content-center'>
-            <Link className='border border-white p-[10px] rounded-md' href=''>
+            <Link className={styles.reviewLink} href=''>
               See more reviews
             </Link>
           </div>

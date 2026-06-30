@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowUpLeft, ChevronDown, Lock, Menu, RefreshCw, Search } from 'lucide-react';
+import styles from './AdminDashboardShell.module.css';
 
 type AdminDashboardTopBarProps = {
   onOpenMobileNavigation: () => void;
@@ -16,7 +17,7 @@ export default function AdminDashboardTopBar({
   title,
 }: AdminDashboardTopBarProps) {
   return (
-    <header className='sticky top-0 z-40 flex min-h-20 flex-wrap items-center gap-3 border-b border-white/[0.055] bg-[rgba(20,25,35,0.80)] px-3 py-3 shadow-[0_12px_32px_rgba(0,0,0,0.13)] supports-[backdrop-filter]:backdrop-blur-[18px] supports-[backdrop-filter]:backdrop-saturate-150 sm:gap-4 sm:px-5 xl:fixed xl:left-[250px] xl:right-0 xl:top-0 xl:h-20 xl:flex-nowrap'>
+    <header className={styles.topBar}>
       <button
         type='button'
         aria-label='Open admin navigation'
@@ -31,7 +32,7 @@ export default function AdminDashboardTopBar({
         <p className='truncate text-xs text-slate-400'>{subtitle}</p>
       </div>
 
-      <div className='order-last flex min-w-full flex-1 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:order-none sm:min-w-[320px] lg:min-w-[280px] xl:min-w-[320px] xl:max-w-[470px]'>
+      <div className={styles.topBarSearch}>
         <Search size={16} />
         <span className='truncate text-sm'>{searchPlaceholder}</span>
         <kbd className='ml-auto rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[11px] text-slate-400'>

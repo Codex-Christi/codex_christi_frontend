@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
-import { cn } from '@/lib/utils';
 import dynamic from 'next/dynamic';
 import { getMainSiteBaseUrl } from '@/lib/siteBaseUrls';
 
@@ -56,17 +55,15 @@ export default function RootLayout({
 }>) {
   // Main HTML Document
   return (
-    <html lang='en' className='!overflow-x-hidden !overflow-y-auto '>
+    <html lang='en'>
       {/* !w-screen */}
       <body
-        className={cn(
-          ` font-inter bg-black text-white !max-w-full !overflow-x-hidden antialiased break-words [word-break:break-word] [word-wrap:break-word]`,
-          // break-words [word-break:break-word] [word-wrap:break-word]
+        className={[
           nicoMoji.variable,
           OCR_ext.variable,
           InterFont.variable,
           TradeWinds.variable,
-        )}
+        ].join(' ')}
       >
         {children}
         <AllRootProviders />

@@ -5,6 +5,7 @@ import {
   LoadingOverlay,
   imagePreventDefaults,
 } from './galleryShared';
+import styles from '../ProductDetails.module.css';
 
 function ThumbsPanel({
   images,
@@ -28,16 +29,16 @@ function ThumbsPanel({
           key={index}
           type='button'
           onClick={() => onSelect(index)}
-          className={`rounded-[18px] sm:rounded-[20px] size-16 sm:size-20 border-[2.5px] cursor-pointer ${
-            index === currentIndex ? 'border-white shadow-md shadow-gray-300' : 'border-transparent'
-          } `}
+          className={`${styles.thumbButton} ${
+            index === currentIndex ? styles.thumbButtonActive : ''
+          }`}
           aria-label={`Go to image ${index + 1}`}
         >
           <div className='relative h-full w-full'>
             <Image
               {...imagePreventDefaults}
               alt={metaTitle || 'Product image'}
-              className='rounded-[20px] size-full transition-[filter,opacity,transform] !object-cover object-top bg-top'
+              className={styles.thumbImage}
               src={loader.srcWithRetry(image, index)}
               width={80}
               height={80}

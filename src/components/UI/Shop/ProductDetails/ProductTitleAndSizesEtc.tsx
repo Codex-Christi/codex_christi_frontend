@@ -10,6 +10,7 @@ import {
   ColorAttribute,
   ProductVariantOptions,
 } from '@/lib/merchizeStorefront/productTypes';
+import styles from './ProductDetails.module.css';
 
 const AddToCart = dynamic(() => import('./AddToCart').then((mod) => mod.AddToCart));
 const BuyNow = dynamic(() => import('./BuyNow').then((mod) => mod.BuyNow));
@@ -71,13 +72,13 @@ const ProductTitleAndSizesEtc = () => {
   //  JSX
   return (
     <div className='grid gap-4 lg:col-span-2 xl:col-span-1'>
-      <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[20px] space-y-6 lg:p-8'>
+      <div className={`${styles.productPanel} ${styles.spaceLarge}`}>
         <div className='space-y-3'>
           <h2 className='font-bold text-2xl'>{title}</h2>
 
           <div className='flex items-start gap-2'>
             <div className='space-y-3 cursor-pointer'>
-              <h3 className='font-bold text-xl select-none text-[1.1rem]'>
+              <h3 className={styles.priceHeading}>
                 <Suspense fallback={<PriceSkeleton className='h-5 w-24' />}>
                   <GlobalProductPrice usdAmount={Number(retail_price)} />
                 </Suspense>
