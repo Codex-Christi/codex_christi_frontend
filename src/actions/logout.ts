@@ -18,7 +18,7 @@ export const logoutUser = async (): Promise<boolean | LogoutResult> => {
   try {
     clearUserMainProfileStore();
     toast.dismiss(loadingToastID);
-    window.location.assign('/api/logout');
+    window.location.assign('/next-api/logout');
 
     return true;
   } catch (err: unknown) {

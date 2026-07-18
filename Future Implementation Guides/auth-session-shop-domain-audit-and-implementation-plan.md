@@ -44,7 +44,7 @@ Completed in the current auth/session pass:
 - Protected-route middleware now attempts access refresh from the `refreshToken` cookie before redirecting to login.
 - Refresh uses `DJANGO_AUTH_REFRESH_PATH` when configured and defaults to Django's `/auth/token/refresh`.
 - Refresh redirects back once with a loop guard (`__session_refreshed`) after setting fresh cookies.
-- Profile logout now delegates to `/api/logout`; the route uses server-side `fetch`, attempts Django logout when a refresh token exists, and always clears local cookies.
+- Profile logout now delegates to `/next-api/logout`; the Next rewrite maps it to `/api/logout`, whose route uses server-side `fetch`, attempts Django logout when a refresh token exists, and always clears local cookies.
 - Auth-page redirects now apply only to `GET` requests, so Next server-action `POST`s are not redirected out from under login.
 - The login submit button disables while submitting and shows in-flight copy.
 
@@ -142,7 +142,7 @@ Files:
 Current behavior:
 
 - Profile UI imports `logoutUser` into client components.
-- `logoutUser` clears client profile state and redirects to `/api/logout`.
+- `logoutUser` clears client profile state and redirects to `/next-api/logout`.
 - `/api/logout` reads the refresh token server-side, attempts Django logout with `fetch`, deletes local cookies even on error, and redirects.
 - `/next-api/logout` works because `next.config.mjs` rewrites `/next-api/:path*` to `/api/:path*`.
 
@@ -191,7 +191,7 @@ Status: partially fixed.
 Previously exposed paths:
 
 - `useLogin.ts` received access and refresh tokens directly from Django. Fixed by moving password login into `loginUser`.
-- `actions/logout.ts` could retrieve the refresh token and use it from a client-triggered path. Fixed by delegating browser logout to `/api/logout`.
+- `actions/logout.ts` could retrieve the refresh token and use it from a client-triggered path. Fixed by delegating browser logout to `/next-api/logout`.
 - `EditProfileSubmitButton.tsx` retrieves the access token and sends a browser PATCH.
 - `shipping-address-modal.tsx` retrieves the access token and sends a browser PATCH.
 
@@ -244,7 +244,7 @@ Previous problem:
 
 - If no refresh token exists, it throws before deleting local cookies.
 - If Django logout fails, local cookies are not deleted.
-- Profile UI calls this path instead of the safer `/api/logout` route.
+- Profile UI used to call the browser-side token path instead of the safer Next logout route.
 
 Impact:
 
@@ -253,7 +253,7 @@ Impact:
 
 Implementation direction:
 
-- Replace client logout helper with a request to `/api/logout` or an equivalent server action. Implemented.
+- Replace client logout helper with a request to `/next-api/logout` or an equivalent server action. Implemented.
 - Always delete local `session` and `refreshToken` cookies in a `finally` path. Implemented.
 - Attempt Django token blacklist/revocation, but do not let backend logout failure prevent local logout. Implemented.
 
@@ -493,7 +493,7 @@ Refactor the session/Django boundary:
 Replace:
 
 - `useLogin.ts` direct Django token call with a server action that returns sanitized session state. Implemented.
-- `actions/logout.ts` client token path with a redirect or fetch to `/api/logout`. Implemented.
+- `actions/logout.ts` client token path with a redirect or fetch to `/next-api/logout`. Implemented.
 - `EditProfileSubmitButton.tsx` browser bearer PATCH with a server action.
 - `shipping-address-modal.tsx` browser bearer PATCH with a server action.
 
@@ -548,7 +548,7 @@ Status: implemented for profile logout and `/api/logout`.
 
 Replace client logout with a server-owned path:
 
-- Preferred browser action: `window.location.assign('/api/logout')` or a small `POST /api/logout`. Implemented with `window.location.assign('/api/logout')`.
+- Preferred browser action: `window.location.assign('/next-api/logout')` or a small `POST /next-api/logout`. Implemented with `window.location.assign('/next-api/logout')`.
 - Server route:
   - read refresh token server-side. Implemented.
   - attempt Django logout/blacklist. Implemented with `fetch`.
@@ -568,7 +568,7 @@ For `.org`, redirect should be:
 
 Client-side stores:
 
-- After route-based logout, clear Zustand persisted stores on the login page when `from-logout=true`, or keep a tiny client logout wrapper that clears stores first and then navigates to `/api/logout`.
+- After route-based logout, clear Zustand persisted stores on the login page when `from-logout=true`, or keep a tiny client logout wrapper that clears stores first and then navigates to `/next-api/logout`.
 
 ### Phase 5: Add Native `.shop` Signup and Recovery Pages
 
