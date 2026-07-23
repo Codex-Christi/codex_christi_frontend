@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import PaidOrderRecoveryDetailPanel from '@/components/UI/Admin/dashboard/PaidOrderRecoveryDetailPanel';
+import { formatAdminSystemTimestamp } from '@/lib/admin/formatAdminSystemTimestamp';
 import { requireAdminPage } from '@/lib/admin/require-admin';
 import { getAdminPaidOrderRecoveryDetail } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
 
@@ -52,8 +53,8 @@ export default async function AdminPaidOrderRecoveryDetailPage({
             severity: notification.severity,
             status: notification.status,
             recipient: notification.recipient,
-            createdAt: notification.createdAt.toISOString(),
-            sentAt: notification.sentAt?.toISOString() ?? null,
+            createdAt: formatAdminSystemTimestamp(notification.createdAt) ?? 'Unknown time',
+            sentAt: formatAdminSystemTimestamp(notification.sentAt),
             lastErrorMessage: notification.lastErrorMessage,
           }))}
           customerNotifications={recovery.customerNotifications.map((notification) => ({
@@ -61,8 +62,8 @@ export default async function AdminPaidOrderRecoveryDetailPage({
             type: notification.type,
             status: notification.status,
             recipient: notification.recipient,
-            createdAt: notification.createdAt.toISOString(),
-            sentAt: notification.sentAt?.toISOString() ?? null,
+            createdAt: formatAdminSystemTimestamp(notification.createdAt) ?? 'Unknown time',
+            sentAt: formatAdminSystemTimestamp(notification.sentAt),
             lastErrorMessage: notification.lastErrorMessage,
           }))}
           variant='page'

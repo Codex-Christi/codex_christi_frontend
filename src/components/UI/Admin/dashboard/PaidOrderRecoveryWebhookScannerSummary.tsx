@@ -5,10 +5,12 @@ import type { PaidOrderRecoveryDetail } from './adminShopDashboardTypes';
 
 type PaidOrderRecoveryWebhookScannerSummaryProps = {
   detail: PaidOrderRecoveryDetail;
+  embedded?: boolean;
 };
 
 export default function PaidOrderRecoveryWebhookScannerSummary({
   detail,
+  embedded = false,
 }: PaidOrderRecoveryWebhookScannerSummaryProps) {
   const latestWebhook = detail.webhookEvents[0];
   const latestWebhookSource = latestWebhook
@@ -17,15 +19,22 @@ export default function PaidOrderRecoveryWebhookScannerSummary({
   const scannerIsEligible = detail.scannerState.eligible;
 
   return (
-    <section className='rounded-xl border border-cyan-300/12 bg-cyan-300/[0.035] p-4'>
+    <section
+      className={cn(
+        'rounded-xl border p-4',
+        embedded ? 'border-white/10 bg-black/15' : 'border-cyan-300/12 bg-cyan-300/[0.035]',
+      )}
+    >
       <div className='mb-4 flex flex-wrap items-center justify-between gap-3'>
         <div>
-          <p className='text-xs uppercase tracking-[0.12em] text-cyan-100/75'>Webhook & Scanner</p>
-          <h3 className='mt-1 text-sm font-semibold text-white'>Backend delivery status</h3>
+          <p className='text-xs font-semibold uppercase tracking-[0.1em] text-cyan-100'>
+            Webhook & scanner
+          </p>
+          <h3 className='mt-1 text-base font-semibold text-white'>Backend delivery status</h3>
         </div>
         <span
           className={cn(
-            'inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[10px] uppercase tracking-[0.08em]',
+            'inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-medium',
             scannerIsEligible
               ? 'border-amber-300/25 bg-amber-300/10 text-amber-100'
               : 'border-slate-300/15 bg-slate-300/8 text-slate-300',
@@ -46,7 +55,7 @@ export default function PaidOrderRecoveryWebhookScannerSummary({
         />
 
         <div className='rounded-lg border border-white/10 bg-slate-950/30 p-3'>
-          <div className='flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-slate-500'>
+          <div className='flex items-center gap-2 text-xs font-medium text-slate-400'>
             <Webhook size={13} />
             Latest webhook
           </div>
@@ -56,7 +65,7 @@ export default function PaidOrderRecoveryWebhookScannerSummary({
                 <p className='truncate text-sm font-medium text-slate-100'>
                   {latestWebhook.eventType}
                 </p>
-                <p className='mt-1 text-xs text-slate-500'>
+                <p className='mt-1 text-xs text-slate-400'>
                   {latestWebhook.processingStatus} · attempts {latestWebhook.attemptCount}
                 </p>
                 <p className='mt-2 text-xs leading-5 text-slate-400'>
@@ -71,7 +80,7 @@ export default function PaidOrderRecoveryWebhookScannerSummary({
                   </p>
                 ) : null}
               </div>
-              <div className='flex items-center gap-2 text-xs text-slate-500 sm:justify-end'>
+              <div className='flex items-center gap-2 text-xs text-slate-400 sm:justify-end'>
                 <Clock3 size={13} />
                 <span>
                   {latestWebhook.processedAt ??
@@ -86,7 +95,7 @@ export default function PaidOrderRecoveryWebhookScannerSummary({
               ) : null}
             </div>
           ) : (
-            <p className='mt-3 text-sm text-slate-500'>No correlated webhook event stored.</p>
+            <p className='mt-3 text-sm text-slate-400'>No correlated webhook event stored.</p>
           )}
         </div>
       </div>
@@ -116,12 +125,12 @@ function StatusTile({
           : 'border-white/10 bg-slate-950/30',
       )}
     >
-      <div className='flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-slate-500'>
+      <div className='flex items-center gap-2 text-xs font-medium text-slate-400'>
         <Icon size={13} />
         {label}
       </div>
       <p className='mt-3 text-sm font-medium text-slate-100'>{value}</p>
-      <p className='mt-1 text-xs leading-5 text-slate-500'>{detail}</p>
+      <p className='mt-1 text-xs leading-5 text-slate-400'>{detail}</p>
     </div>
   );
 }

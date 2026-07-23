@@ -1,6 +1,7 @@
-import { Clock3, Copy, ExternalLink, MapPin, Package, ReceiptText, UserRound } from 'lucide-react';
+import { Clock3, MapPin, Package, UserRound } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import AdminCopyValueButton from './AdminCopyValueButton';
 import AdminGlassPanel from './AdminGlassPanel';
 import PaidOrderRecoveryAddressOverrideForm from './PaidOrderRecoveryAddressOverrideForm';
 import PaidOrderRecoveryRawLedgerDialog from './PaidOrderRecoveryRawLedgerDialog';
@@ -45,23 +46,11 @@ export function PaidOrderRecoveryActivitySection({ detail }: { detail: PaidOrder
 function OrderContextPanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
   return (
     <AdminGlassPanel className='overflow-hidden'>
-      <div className='flex flex-col items-start gap-3 border-b border-white/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5'>
+      <div className='border-b border-white/10 px-4 py-4 sm:px-5'>
         <div className='min-w-0'>
-          <h3 className='text-sm font-semibold text-white'>Order Context</h3>
-          <p className='mt-1 text-xs text-slate-500'>Customer, items, and receipt context.</p>
+          <h3 className='text-base font-semibold text-white'>Order & customer</h3>
+          <p className='mt-1 text-sm text-slate-400'>Who placed the order and what they bought.</p>
         </div>
-        {detail.receiptLink ? (
-          <a
-            href={detail.receiptLink}
-            target='_blank'
-            rel='noreferrer'
-            className='inline-flex items-center gap-2 rounded-lg border border-cyan-300/20 bg-cyan-300/8 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:border-cyan-200/40 hover:bg-cyan-300/12'
-          >
-            <ReceiptText size={14} />
-            Receipt
-            <ExternalLink size={12} />
-          </a>
-        ) : null}
       </div>
 
       <div className='grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 p-4 sm:p-5'>
@@ -80,7 +69,7 @@ function OrderContextPanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
           <div className='mb-3 flex items-center justify-between gap-3'>
             <div>
               <p className='text-sm font-medium text-white'>Items</p>
-              <p className='mt-1 text-xs text-slate-500'>
+              <p className='mt-1 text-sm text-slate-400'>
                 {detail.items.length} line item{detail.items.length === 1 ? '' : 's'} in this paid
                 order.
               </p>
@@ -111,16 +100,16 @@ function OrderContextPanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
                   </div>
                   <div className='min-w-0 flex-1'>
                     <p className='truncate text-sm font-medium text-slate-100'>{item.title}</p>
-                    <p className='mt-1 truncate text-xs text-slate-500'>{item.variant}</p>
+                    <p className='mt-1 break-words text-sm text-slate-400'>{item.variant}</p>
                   </div>
                   <div className='col-start-2 flex items-center justify-between gap-3 text-left sm:block sm:shrink-0 sm:text-right'>
                     <p className='text-sm font-medium text-slate-100'>{item.unitPrice}</p>
-                    <p className='text-xs text-slate-500 sm:mt-1'>Qty {item.quantity}</p>
+                    <p className='text-sm text-slate-400 sm:mt-1'>Qty {item.quantity}</p>
                   </div>
                 </div>
               ))
             ) : (
-              <p className='rounded-lg border border-white/10 bg-white/[0.03] px-3 py-4 text-sm text-slate-500'>
+              <p className='rounded-lg border border-white/10 bg-white/[0.03] px-3 py-4 text-sm text-slate-400'>
                 No cart snapshot was stored for this order.
               </p>
             )}
@@ -142,8 +131,8 @@ function DeliveryContextPanel({
     <AdminGlassPanel className='overflow-hidden'>
       <div className='flex flex-wrap items-start justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5'>
         <div>
-          <h3 className='text-sm font-semibold text-white'>Fulfillment Address</h3>
-          <p className='mt-1 text-xs text-slate-500'>
+          <h3 className='text-base font-semibold text-white'>Fulfillment address</h3>
+          <p className='mt-1 text-sm text-slate-400'>
             Original checkout address and audited fulfillment correction state.
           </p>
         </div>
@@ -182,11 +171,11 @@ function DeliveryContextPanel({
         {detail.hasAddressOverride ? (
           <div className='grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-[minmax(0,1fr)_minmax(240px,0.72fr)]'>
             <div className='rounded-lg border border-amber-300/14 bg-amber-300/[0.04] p-3'>
-              <p className='text-xs uppercase tracking-[0.08em] text-amber-200'>Override note</p>
+              <p className='text-sm font-medium text-amber-100'>Override note</p>
               <p className='mt-2 text-sm text-slate-200'>
                 {detail.addressOverrideReason ?? 'No reason recorded.'}
               </p>
-              <p className='mt-2 text-xs text-slate-500'>
+              <p className='mt-2 text-sm text-slate-400'>
                 {detail.addressOverriddenBy ?? 'admin'} ·{' '}
                 {detail.addressOverriddenAt ?? 'time unavailable'}
               </p>
@@ -204,21 +193,30 @@ function DeliveryContextPanel({
 }
 
 function ReferencePanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
+  const groups = groupReferences(detail.references);
+
   return (
     <AdminGlassPanel className='overflow-hidden'>
       <div className='flex flex-col items-start gap-3 border-b border-white/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5'>
         <div className='min-w-0'>
-          <h3 className='text-sm font-semibold text-white'>References</h3>
-          <p className='mt-1 text-xs text-slate-500'>
-            Cross-system identifiers for escalation and support.
+          <h3 className='text-base font-semibold text-white'>Cross-system references</h3>
+          <p className='mt-1 text-sm text-slate-400'>
+            Grouped identifiers for investigation and escalation.
           </p>
         </div>
         <PaidOrderRecoveryRawLedgerDialog rawDebug={detail.rawDebug} />
       </div>
 
-      <div className='divide-y divide-white/10'>
-        {detail.references.map((reference) => (
-          <ReferenceRow key={reference.label} reference={reference} />
+      <div className='space-y-5 p-4 sm:p-5'>
+        {groups.map((group) => (
+          <section key={group.label}>
+            <h4 className='mb-2 text-sm font-semibold text-slate-200'>{group.label}</h4>
+            <div className='overflow-hidden rounded-lg border border-white/10 bg-black/10'>
+              {group.references.map((reference) => (
+                <ReferenceRow key={reference.label} reference={reference} />
+              ))}
+            </div>
+          </section>
         ))}
       </div>
     </AdminGlassPanel>
@@ -226,43 +224,93 @@ function ReferencePanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
 }
 
 function ActivityPanel({ activity }: { activity: PaidOrderRecoveryActivityItem[] }) {
+  const operatorActivity = activity.filter((item) => item.kind === 'operator');
+  const systemActivity = activity.filter((item) => item.kind === 'system');
+
   return (
     <AdminGlassPanel className='overflow-hidden'>
-      <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
-        <h3 className='text-sm font-semibold text-white'>Activity</h3>
-        <p className='mt-1 text-xs text-slate-500'>Important order and recovery events.</p>
+      <div className='border-b border-white/10 px-4 py-4 sm:px-5'>
+        <h3 className='text-base font-semibold text-white'>Changes & audit</h3>
+        <p className='mt-1 text-sm text-slate-400'>
+          Operator mutations are separated from automated processing events. Times use the system
+          timezone.
+        </p>
       </div>
 
-      <div className='space-y-0 px-4 py-4 sm:px-5'>
-        {activity.map((item, index) => (
-          <div
-            key={`${item.label}-${item.time}`}
-            className='relative grid grid-cols-[16px_minmax(0,1fr)] gap-3 pb-5 last:pb-0'
-          >
-            {index < activity.length - 1 ? (
-              <span className='absolute left-[7px] top-4 h-[calc(100%-16px)] w-px bg-white/10' />
-            ) : null}
-            <span
-              className={cn(
-                'mt-1.5 h-3.5 w-3.5 rounded-full border',
-                item.tone === 'emerald' && 'border-emerald-300/40 bg-emerald-300/20',
-                item.tone === 'amber' && 'border-amber-300/40 bg-amber-300/20',
-                item.tone === 'rose' && 'border-rose-300/40 bg-rose-300/20',
-                item.tone === 'cyan' && 'border-cyan-300/40 bg-cyan-300/20',
-                item.tone === 'slate' && 'border-slate-300/30 bg-slate-300/12',
-              )}
-            />
-            <div>
-              <div className='flex flex-wrap items-center justify-between gap-2'>
-                <p className='text-sm font-medium text-slate-100'>{item.label}</p>
-                <p className='text-xs text-slate-500'>{item.time}</p>
-              </div>
-              <p className='mt-1 text-xs leading-5 text-slate-500'>{item.description}</p>
-            </div>
+      <div className='space-y-5 px-4 py-4 sm:px-5'>
+        <section>
+          <div className='mb-3 flex flex-wrap items-center justify-between gap-2'>
+            <h4 className='text-sm font-semibold text-slate-100'>Operator changes</h4>
+            <span className='rounded-full border border-cyan-300/20 bg-cyan-300/[0.08] px-2 py-0.5 text-xs text-cyan-100'>
+              {operatorActivity.length}
+            </span>
           </div>
-        ))}
+          {operatorActivity.length ? (
+            <ActivityList activity={operatorActivity} />
+          ) : (
+            <p className='rounded-lg border border-white/10 bg-white/[0.025] px-3 py-3 text-sm text-slate-400'>
+              No operator changes have been recorded.
+            </p>
+          )}
+        </section>
+
+        <details
+          className='group rounded-lg border border-white/10 bg-white/[0.02]'
+          open={operatorActivity.length === 0}
+        >
+          <summary className='flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60'>
+            <span>
+              <span className='block text-sm font-semibold text-slate-100'>
+                Automated system history
+              </span>
+              <span className='mt-0.5 block text-sm text-slate-400'>
+                Webhooks, saves, recovery attempts, and fulfillment events
+              </span>
+            </span>
+            <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-slate-300'>
+              {systemActivity.length}
+            </span>
+          </summary>
+          <div className='border-t border-white/10 px-3 py-4'>
+            <ActivityList activity={systemActivity} />
+          </div>
+        </details>
       </div>
     </AdminGlassPanel>
+  );
+}
+
+function ActivityList({ activity }: { activity: PaidOrderRecoveryActivityItem[] }) {
+  return (
+    <div>
+      {activity.map((item, index) => (
+        <div
+          key={`${item.label}-${item.time}`}
+          className='relative grid grid-cols-[16px_minmax(0,1fr)] gap-3 pb-5 last:pb-0'
+        >
+          {index < activity.length - 1 ? (
+            <span className='absolute left-[7px] top-4 h-[calc(100%-16px)] w-px bg-white/10' />
+          ) : null}
+          <span
+            className={cn(
+              'mt-1.5 h-3.5 w-3.5 rounded-full border',
+              item.tone === 'emerald' && 'border-emerald-300/50 bg-emerald-300/25',
+              item.tone === 'amber' && 'border-amber-300/50 bg-amber-300/25',
+              item.tone === 'rose' && 'border-rose-300/50 bg-rose-300/25',
+              item.tone === 'cyan' && 'border-cyan-300/50 bg-cyan-300/25',
+              item.tone === 'slate' && 'border-slate-300/40 bg-slate-300/15',
+            )}
+          />
+          <div>
+            <div className='flex flex-wrap items-start justify-between gap-x-3 gap-y-1'>
+              <p className='text-sm font-medium text-slate-100'>{item.label}</p>
+              <p className='text-sm text-slate-400'>{item.time}</p>
+            </div>
+            <p className='mt-1 text-sm leading-5 text-slate-300'>{item.description}</p>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -282,7 +330,7 @@ function AddressBlock({
         emphasized ? 'border-cyan-300/18 bg-cyan-300/[0.045]' : 'border-white/10 bg-white/[0.025]',
       )}
     >
-      <div className='flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-slate-500'>
+      <div className='flex items-center gap-2 text-sm font-medium text-slate-300'>
         <MapPin size={13} />
         {label}
       </div>
@@ -294,7 +342,7 @@ function AddressBlock({
           <p>{address.country}</p>
         </div>
       ) : (
-        <p className='mt-3 text-sm text-slate-500'>No address recorded.</p>
+        <p className='mt-3 text-sm text-slate-400'>No address recorded.</p>
       )}
     </div>
   );
@@ -302,16 +350,42 @@ function AddressBlock({
 
 function ReferenceRow({ reference }: { reference: PaidOrderRecoveryReference }) {
   return (
-    <div className='grid grid-cols-[minmax(0,1fr)] gap-1.5 px-4 py-3 text-sm sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] sm:gap-3 sm:px-5'>
-      <p className='text-slate-500'>{reference.label}</p>
+    <div className='grid grid-cols-[minmax(0,1fr)] gap-1.5 border-b border-white/10 px-3 py-3 text-sm last:border-b-0 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] sm:gap-3'>
+      <p className='text-slate-400'>{reference.label}</p>
       <div className='flex min-w-0 items-start justify-start gap-2 text-left sm:justify-end sm:text-right'>
-        <p className='min-w-0 break-all font-mono text-[11px] text-slate-200 sm:truncate'>
+        <p className='min-w-0 break-all font-mono text-xs leading-5 text-slate-200'>
           {reference.value ?? '—'}
         </p>
-        {reference.value ? <Copy size={12} className='shrink-0 text-slate-600' /> : null}
+        {reference.value ? (
+          <AdminCopyValueButton label={reference.label} value={reference.value} />
+        ) : null}
       </div>
     </div>
   );
+}
+
+function groupReferences(references: PaidOrderRecoveryReference[]) {
+  const groups = [
+    { label: 'Payment & webhooks', references: [] as PaidOrderRecoveryReference[] },
+    { label: 'Post-payment processing', references: [] as PaidOrderRecoveryReference[] },
+    { label: 'Merchize fulfillment', references: [] as PaidOrderRecoveryReference[] },
+    { label: 'Checkout & identity', references: [] as PaidOrderRecoveryReference[] },
+  ];
+
+  for (const reference of references) {
+    const label = reference.label.toLowerCase();
+    const group = label.startsWith('merchize')
+      ? groups[2]
+      : label.includes('paypal') || label.includes('webhook')
+        ? groups[0]
+        : label.includes('processing') || label.includes('django') || label.includes('scanner')
+          ? groups[1]
+          : groups[3];
+
+    group.references.push(reference);
+  }
+
+  return groups.filter((group) => group.references.length > 0);
 }
 
 function MiniInfo({
@@ -327,12 +401,12 @@ function MiniInfo({
 }) {
   return (
     <div className='rounded-lg border border-white/10 bg-white/[0.03] p-3'>
-      <div className='flex items-center gap-2 text-xs uppercase tracking-[0.08em] text-slate-500'>
+      <div className='flex items-center gap-2 text-sm font-medium text-slate-300'>
         <Icon size={13} />
         {label}
       </div>
-      <p className='mt-3 truncate text-sm font-medium text-slate-100'>{value}</p>
-      {subvalue ? <p className='mt-1 truncate text-xs text-slate-500'>{subvalue}</p> : null}
+      <p className='mt-3 break-words text-sm font-medium text-slate-100'>{value}</p>
+      {subvalue ? <p className='mt-1 break-all text-sm text-slate-400'>{subvalue}</p> : null}
     </div>
   );
 }

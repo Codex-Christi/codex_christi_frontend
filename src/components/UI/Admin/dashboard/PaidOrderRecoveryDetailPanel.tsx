@@ -1,16 +1,21 @@
-import { ArrowDownLeft, ArrowLeft, ArrowRight, CheckCircle2, X } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import AdminGlassPanel from './AdminGlassPanel';
+import { getAdminGlassPanelClassName, default as AdminGlassPanel } from './AdminGlassPanel';
 import AdminNotificationHistoryPanel from './AdminNotificationHistoryPanel';
 import AdminPaidOrderRecoveryActionsPanel from './AdminPaidOrderRecoveryActionsPanel';
-import { AdminPaidOrderRecoveryStatusBadge } from './AdminStatusBadge';
 import CustomerNotificationHistoryPanel from './CustomerNotificationHistoryPanel';
-import PaidOrderRecoveryFulfillmentEvidencePanel from './PaidOrderRecoveryFulfillmentEvidencePanel';
 import {
   PaidOrderRecoveryActivitySection,
   PaidOrderRecoveryPrimaryContextSections,
   PaidOrderRecoverySecondaryContextSections,
 } from './PaidOrderRecoveryDetailSections';
+import {
+  getManualReleaseReadinessWarning,
+  PaidOrderRecoveryBlockerPanel,
+  PaidOrderRecoveryCaseSummary,
+  PaidOrderRecoveryPaymentEvidencePanel,
+  PaidOrderRecoveryPostPaymentPipeline,
+} from './PaidOrderRecoveryOverviewPanels';
 import PaidOrderRecoveryWebhookScannerSummary from './PaidOrderRecoveryWebhookScannerSummary';
 import type {
   AdminNotificationHistoryItem,
@@ -39,151 +44,114 @@ export default function PaidOrderRecoveryDetailPanel({
   onClose,
   variant = 'panel',
 }: PaidOrderRecoveryDetailPanelProps) {
+  const releaseReadinessWarning = getManualReleaseReadinessWarning(detail.merchizeFulfillmentOps);
+
   return (
-    <AdminGlassPanel
+    <div
       className={cn(
-        'flex min-h-0 flex-col overflow-hidden',
-        variant === 'panel' ? 'max-h-full xl:sticky xl:top-5 xl:min-h-[760px]' : 'min-h-[620px]',
+        'min-w-0',
+        variant === 'panel' &&
+          getAdminGlassPanelClassName(
+            'flex max-h-full min-h-0 flex-col overflow-hidden xl:sticky xl:top-5 xl:min-h-[760px]',
+          ),
       )}
     >
-      <div className='flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-4 text-slate-400 sm:px-5'>
-        <div className='flex items-center gap-2 text-sm'>
-          <ArrowLeft size={16} />
-          {variant === 'page' ? 'Paid Order Recovery Detail' : 'Paid Order Recovery'}
-        </div>
-        {onClose ? (
-          <div className='flex items-center gap-4'>
-            <ArrowLeft size={16} />
-            <ArrowRight size={16} />
+      {variant === 'panel' ? (
+        <div className='flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-4 text-slate-300 sm:px-5'>
+          <div className='text-sm font-medium'>Paid Order Recovery</div>
+          {onClose ? (
             <button
               type='button'
               aria-label='Close paid order recovery detail'
               onClick={onClose}
-              className='rounded-md text-slate-400 transition hover:text-white'
+              className='rounded-md p-1 text-slate-300 transition hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/60'
             >
               <X size={16} />
             </button>
-          </div>
-        ) : null}
-      </div>
+          ) : null}
+        </div>
+      ) : null}
 
-      <div className='min-h-0 flex-1 space-y-4 overflow-visible p-4 sm:p-5'>
-        <section className='grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]'>
-          <div className='min-w-0 rounded-xl border border-white/10 bg-white/[0.025] p-4'>
-            <div className='flex flex-wrap items-start justify-between gap-3'>
-              <div className='min-w-0'>
-                <p className='text-xs uppercase tracking-[0.12em] text-slate-500'>
-                  Support reference
-                </p>
-                <h2 className='mt-2 text-2xl font-semibold text-white'>{recovery.supportRef}</h2>
-                <p className='mt-2 break-all text-sm text-slate-400'>{detail.customerEmail}</p>
+      <div
+        className={cn(
+          'min-w-0 space-y-5',
+          variant === 'panel' && 'min-h-0 flex-1 overflow-y-auto p-4 sm:p-5',
+        )}
+      >
+        <div className='flex min-w-0 flex-col gap-4 xl:grid xl:grid-cols-2 xl:items-start'>
+          <div className='contents xl:block xl:space-y-4'>
+            <section aria-label='Recovery case' className='order-1 min-w-0'>
+              <PaidOrderRecoveryCaseSummary recovery={recovery} detail={detail} />
+            </section>
+            <section aria-label='Post-payment pipeline' className='order-4 min-w-0'>
+              <PaidOrderRecoveryPostPaymentPipeline timeline={timeline} detail={detail} />
+            </section>
+          </div>
+
+          <div className='contents xl:block xl:space-y-4'>
+            <section aria-label='Payment evidence' className='order-2 min-w-0'>
+              <PaidOrderRecoveryPaymentEvidencePanel recovery={recovery} detail={detail} />
+            </section>
+            <aside className='order-3 min-w-0 space-y-4 self-start'>
+              <PaidOrderRecoveryBlockerPanel recovery={recovery} detail={detail} />
+              <div className='xl:sticky xl:top-24'>
+                <RecoveryActionsPanel
+                  recovery={recovery}
+                  detail={detail}
+                  manualReleaseReadinessWarning={releaseReadinessWarning}
+                />
               </div>
-              <AdminPaidOrderRecoveryStatusBadge status={recovery.status} />
-            </div>
-
-            <div className='mt-5 grid gap-3 sm:grid-cols-3'>
-              <SummaryStat label='Paid amount' value={recovery.amount} />
-              <SummaryStat label='Payment rail' value='PayPal' />
-              <SummaryStat label='Current step' value={recovery.step} />
-            </div>
-          </div>
-
-          <div className='min-w-0 rounded-xl border border-rose-300/12 bg-rose-300/[0.035] p-4'>
-            <p className='text-xs uppercase tracking-[0.12em] text-rose-200'>Last error</p>
-            <div className='mt-3 flex items-start gap-2'>
-              <span className='mt-1.5 h-2 w-2 shrink-0 rounded-full bg-rose-400' />
-              <div className='min-w-0'>
-                <p className='break-words text-sm font-medium text-slate-100'>{recovery.error}</p>
-                <p className='mt-2 text-xs leading-5 text-slate-500'>
-                  Review the order context before retrying this paid order.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <PaidOrderRecoveryWebhookScannerSummary detail={detail} />
-        <PaidOrderRecoveryFulfillmentEvidencePanel summary={detail.merchizeFulfillmentOps} />
-
-        <div className='grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]'>
-          <div className='min-w-0 space-y-4'>
-            <TimelinePanel timeline={timeline} />
-            <PaidOrderRecoveryPrimaryContextSections
-              detail={detail}
-              orderToken={recovery.orderToken}
-            />
-            <PaidOrderRecoveryActivitySection detail={detail} />
-            <NotificationsPanel
-              notifications={notifications}
-              customerNotifications={customerNotifications}
-              orderToken={recovery.orderToken}
-            />
-          </div>
-
-          <div className='min-w-0 space-y-4'>
-            <RecoveryActionsPanel recovery={recovery} detail={detail} />
-            <PaidOrderRecoverySecondaryContextSections detail={detail} />
+            </aside>
           </div>
         </div>
-      </div>
-    </AdminGlassPanel>
-  );
-}
 
-function TimelinePanel({ timeline }: { timeline: TimelineItem[] }) {
-  return (
-    <AdminGlassPanel className='overflow-hidden'>
-      <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
-        <h3 className='text-sm font-semibold text-white'>Timeline</h3>
-        <p className='mt-1 text-xs text-slate-500'>Core server-side processing checkpoints.</p>
-      </div>
-      <div className='space-y-4 p-4 sm:p-5'>
-        {timeline.map((item) => (
-          <TimelineRow key={item.label} item={item} />
-        ))}
-      </div>
-    </AdminGlassPanel>
-  );
-}
+        <section aria-labelledby='order-fulfillment-heading' className='min-w-0 space-y-4'>
+          <SectionHeading
+            id='order-fulfillment-heading'
+            eyebrow='Order & fulfillment'
+            title='Customer, items, and delivery context'
+            description='Review the order information that recovery actions are allowed to mutate.'
+          />
+          <PaidOrderRecoveryPrimaryContextSections
+            detail={detail}
+            orderToken={recovery.orderToken}
+          />
+        </section>
 
-function NotificationsPanel({
-  notifications,
-  customerNotifications,
-  orderToken,
-}: {
-  notifications: AdminNotificationHistoryItem[];
-  customerNotifications: CustomerNotificationHistoryItem[];
-  orderToken: string;
-}) {
-  return (
-    <AdminGlassPanel className='overflow-hidden'>
-      <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
-        <h3 className='text-sm font-semibold text-white'>Notifications</h3>
-        <p className='mt-1 text-xs text-slate-500'>Internal recovery alerts for this paid order.</p>
+        <section
+          aria-label='Changes and communications'
+          className='grid min-w-0 gap-4 xl:grid-cols-2'
+        >
+          <PaidOrderRecoveryActivitySection detail={detail} />
+          <CommunicationsPanel
+            notifications={notifications}
+            customerNotifications={customerNotifications}
+            orderToken={recovery.orderToken}
+          />
+        </section>
+
+        <TechnicalDiagnostics detail={detail} />
       </div>
-      <div className='p-4 sm:p-5'>
-        <AdminNotificationHistoryPanel notifications={notifications} orderToken={orderToken} />
-        <CustomerNotificationHistoryPanel
-          notifications={customerNotifications}
-          orderToken={orderToken}
-        />
-      </div>
-    </AdminGlassPanel>
+    </div>
   );
 }
 
 function RecoveryActionsPanel({
   recovery,
   detail,
+  manualReleaseReadinessWarning,
 }: {
   recovery: PaidOrderRecoveryRow;
   detail: PaidOrderRecoveryDetail;
+  manualReleaseReadinessWarning: string | null;
 }) {
   return (
     <AdminGlassPanel className='overflow-hidden'>
-      <div className='border-b border-white/10 px-4 py-3 sm:px-5'>
-        <h3 className='text-sm font-semibold text-white'>Recovery Actions</h3>
-        <p className='mt-1 text-xs text-slate-500'>Operator controls for this paid order.</p>
+      <div className='border-b border-white/10 px-4 py-4 sm:px-5'>
+        <h3 className='text-base font-semibold text-white'>Available actions</h3>
+        <p className='mt-1 text-sm leading-6 text-slate-300'>
+          Actions continue from durable post-payment checkpoints.
+        </p>
       </div>
       <div className='p-4 sm:p-5'>
         <AdminPaidOrderRecoveryActionsPanel
@@ -192,47 +160,108 @@ function RecoveryActionsPanel({
           needsProviderDetailSync={detail.needsProviderDetailSync}
           requiresManualRelease={detail.requiresManualRelease}
           recoveryStatus={recovery.status}
+          manualReleaseReadinessWarning={manualReleaseReadinessWarning}
         />
-        <button
-          type='button'
-          className='mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-rose-300/30 bg-rose-400/8 px-3 py-3 text-sm font-medium text-rose-200'
-        >
-          <ArrowDownLeft size={16} />
-          Add Internal Note
-        </button>
       </div>
     </AdminGlassPanel>
   );
 }
 
-function TimelineRow({ item }: { item: TimelineItem }) {
+function CommunicationsPanel({
+  notifications,
+  customerNotifications,
+  orderToken,
+}: {
+  notifications: AdminNotificationHistoryItem[];
+  customerNotifications: CustomerNotificationHistoryItem[];
+  orderToken: string;
+}) {
+  const failedCount = [...notifications, ...customerNotifications].filter(
+    (notification) => notification.status === 'failed',
+  ).length;
+
   return (
-    <div className='grid grid-cols-[18px_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm sm:grid-cols-[18px_minmax(0,1fr)_auto]'>
-      <span
-        className={cn(
-          'row-span-2 mt-1 grid h-3.5 w-3.5 place-items-center rounded-full sm:row-span-1',
-          item.state === 'done' && 'bg-emerald-500',
-          item.state === 'failed' && 'bg-rose-500',
-          item.state === 'pending' && 'bg-slate-500',
-        )}
-      >
-        {item.state === 'done' ? <CheckCircle2 size={10} /> : null}
-      </span>
-      <span className={cn(item.state === 'failed' ? 'text-rose-300' : 'text-slate-200')}>
-        {item.label}
-      </span>
-      <span className='col-start-2 text-xs text-slate-500 sm:col-start-3 sm:row-start-1'>
-        {item.time}
-      </span>
-    </div>
+    <AdminGlassPanel className='overflow-hidden'>
+      <details className='group' open={failedCount > 0}>
+        <summary className='flex cursor-pointer list-none items-start justify-between gap-4 px-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-200/60 sm:px-5'>
+          <div>
+            <p className='text-xs font-semibold uppercase tracking-[0.1em] text-cyan-100'>
+              Communications
+            </p>
+            <h3 className='mt-1 text-base font-semibold text-white'>
+              Admin and customer notifications
+            </h3>
+            <p className='mt-1 text-sm leading-6 text-slate-300'>
+              {failedCount
+                ? `${failedCount} failed notification${failedCount === 1 ? '' : 's'} needs attention.`
+                : `${notifications.length + customerNotifications.length} notification${
+                    notifications.length + customerNotifications.length === 1 ? '' : 's'
+                  } recorded. Successful history is collapsed.`}
+            </p>
+          </div>
+          <ChevronDown
+            size={17}
+            className='mt-1 shrink-0 text-slate-300 transition group-open:rotate-180'
+          />
+        </summary>
+        <div className='border-t border-white/10 p-4 sm:p-5'>
+          <AdminNotificationHistoryPanel notifications={notifications} orderToken={orderToken} />
+          <CustomerNotificationHistoryPanel
+            notifications={customerNotifications}
+            orderToken={orderToken}
+          />
+        </div>
+      </details>
+    </AdminGlassPanel>
   );
 }
 
-function SummaryStat({ label, value }: { label: string; value: string }) {
+function TechnicalDiagnostics({ detail }: { detail: PaidOrderRecoveryDetail }) {
+  return (
+    <AdminGlassPanel className='overflow-hidden'>
+      <details className='group'>
+        <summary className='flex cursor-pointer list-none items-start justify-between gap-4 px-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-200/60 sm:px-5'>
+          <div>
+            <p className='text-xs font-semibold uppercase tracking-[0.1em] text-slate-300'>
+              Advanced
+            </p>
+            <h3 className='mt-1 text-base font-semibold text-white'>Technical diagnostics</h3>
+            <p className='mt-1 text-sm leading-6 text-slate-300'>
+              Webhook delivery, scanner eligibility, system identifiers, and raw ledger data.
+            </p>
+          </div>
+          <ChevronDown
+            size={17}
+            className='mt-1 shrink-0 text-slate-300 transition group-open:rotate-180'
+          />
+        </summary>
+        <div className='space-y-4 border-t border-white/10 p-4 sm:p-5'>
+          <PaidOrderRecoveryWebhookScannerSummary detail={detail} embedded />
+          <PaidOrderRecoverySecondaryContextSections detail={detail} />
+        </div>
+      </details>
+    </AdminGlassPanel>
+  );
+}
+
+function SectionHeading({
+  id,
+  eyebrow,
+  title,
+  description,
+}: {
+  id: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
   return (
     <div>
-      <p className='text-[10px] uppercase tracking-[0.12em] text-slate-500'>{label}</p>
-      <p className='mt-1 truncate text-sm font-medium text-slate-100'>{value}</p>
+      <p className='text-xs font-semibold uppercase tracking-[0.1em] text-cyan-100'>{eyebrow}</p>
+      <h2 id={id} className='mt-1 text-xl font-semibold tracking-tight text-white'>
+        {title}
+      </h2>
+      <p className='mt-1 text-sm leading-6 text-slate-300'>{description}</p>
     </div>
   );
 }

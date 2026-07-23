@@ -2,6 +2,7 @@ import 'server-only';
 
 import { formatDistanceToNowStrict } from 'date-fns';
 
+import { formatAdminSystemTimestamp } from '@/lib/admin/formatAdminSystemTimestamp';
 import { getRecoveryScannerMinAgeMinutes } from '@/lib/paypal/txLedger/processingPolicy';
 import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
@@ -407,12 +408,12 @@ function buildTimeline(row: {
     { label: 'Payment Ledger Created', time: created, state: 'done' },
     {
       label: 'Receipt Prepared',
-      time: row.receiptLink ? updated : 'Pending',
+      time: row.receiptLink ? 'Time not recorded' : 'Pending',
       state: row.receiptLink ? 'done' : 'pending',
     },
     {
       label: 'Payment Saved to Django',
-      time: row.djangoPaymentSaveCustomId ? updated : 'Pending',
+      time: row.djangoPaymentSaveCustomId ? 'Time not recorded' : 'Pending',
       state: row.djangoPaymentSaveCustomId ? 'done' : 'pending',
     },
   ];
@@ -502,24 +503,39 @@ function buildTimeline(row: {
 }
 
 function formatTimelineDate(date: Date) {
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  return formatAdminSystemTimestamp(date, { includeYear: false }) ?? '—';
 }
 
 function formatLongDate(date: Date | null | undefined) {
-  if (!date) return '—';
+  return formatAdminSystemTimestamp(date) ?? '—';
+}
 
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+function getStoredReadinessSummary(payload: unknown) {
+  const record = asRecord(payload);
+  const blockers = Array.isArray(record?.blockers)
+    ? record.blockers.flatMap((value) => {
+        const blocker = asRecord(value);
+        const code = asString(blocker?.code);
+        const message = asString(blocker?.message);
+        const category = asString(blocker?.category);
+
+        return code && message && category
+          ? [
+              {
+                code,
+                message,
+                category,
+                retryable: blocker?.retryable === true,
+              },
+            ]
+          : [];
+      })
+    : [];
+
+  return {
+    status: asString(record?.status),
+    blockers,
+  };
 }
 
 function mapMerchizeFulfillmentOpsSummary(row: {
@@ -553,10 +569,15 @@ function mapMerchizeFulfillmentOpsSummary(row: {
   lastTicketSyncAt: Date | null;
   lastSyncErrorCode: string | null;
   lastSyncErrorMessage: string | null;
+  merchizeProductionReadinessPayload: unknown;
 }): MerchizeFulfillmentOpsAdminSummary {
+  const readiness = getStoredReadinessSummary(row.merchizeProductionReadinessPayload);
+
   return {
     syncStatus: row.syncStatus,
     productionGateStatus: row.productionGateStatus,
+    readinessStatus: readiness.status,
+    readinessBlockers: readiness.blockers,
     merchizeExternalOrderNumber: row.merchizeExternalOrderNumber,
     merchizeOrderId: row.merchizeOrderId,
     merchizeStatus: row.merchizeStatus,
@@ -637,6 +658,7 @@ async function getMerchizeFulfillmentOpsSummaries(orderTokens: string[]) {
         lastTicketSyncAt: true,
         lastSyncErrorCode: true,
         lastSyncErrorMessage: true,
+        merchizeProductionReadinessPayload: true,
       },
     });
 
@@ -729,12 +751,16 @@ function buildActivity(row: {
   lastErrorMessage: string | null;
   webhookEvents: PaidOrderRecoveryWebhookEvent[];
 }): PaidOrderRecoveryActivityItem[] {
-  const activity: PaidOrderRecoveryActivityItem[] = [
+  type DatedActivityItem = PaidOrderRecoveryActivityItem & { sortAt: number };
+
+  const activity: DatedActivityItem[] = [
     {
       label: 'Ledger created',
       description: 'Paid checkout entered the post-payment ledger.',
       time: formatLongDate(row.createdAt),
       tone: 'slate',
+      kind: 'system',
+      sortAt: row.createdAt.getTime(),
     },
   ];
 
@@ -742,8 +768,10 @@ function buildActivity(row: {
     activity.push({
       label: 'Receipt prepared',
       description: 'Customer receipt was generated and attached to the order record.',
-      time: formatLongDate(row.updatedAt),
+      time: 'Time not recorded',
       tone: 'cyan',
+      kind: 'system',
+      sortAt: Number.NEGATIVE_INFINITY,
     });
   }
 
@@ -759,6 +787,8 @@ function buildActivity(row: {
       }`,
       time: latestWebhook.processedAt ?? latestWebhook.lastAttemptAt ?? latestWebhook.createdAt,
       tone: latestWebhook.processingStatus === 'processed' ? 'emerald' : 'amber',
+      kind: 'system',
+      sortAt: latestWebhook.occurredAtMs,
     });
   }
 
@@ -770,6 +800,8 @@ function buildActivity(row: {
       }.`,
       time: formatLongDate(row.processingTriggeredAt),
       tone: row.processingTriggerSource === 'webhook' ? 'cyan' : 'amber',
+      kind: row.processingTriggerSource === 'manual_admin' ? 'operator' : 'system',
+      sortAt: row.processingTriggeredAt.getTime(),
     });
   }
 
@@ -777,8 +809,10 @@ function buildActivity(row: {
     activity.push({
       label: 'Payment saved',
       description: 'The payment was saved to the Django order backend.',
-      time: formatLongDate(row.updatedAt),
+      time: 'Time not recorded',
       tone: 'emerald',
+      kind: 'system',
+      sortAt: Number.NEGATIVE_INFINITY,
     });
   }
 
@@ -789,6 +823,8 @@ function buildActivity(row: {
         row.fulfillmentAddressOverrideReason ?? 'Admin saved a fulfillment address override.',
       time: formatLongDate(row.fulfillmentAddressOverriddenAt),
       tone: 'amber',
+      kind: 'operator',
+      sortAt: row.fulfillmentAddressOverriddenAt.getTime(),
     });
   }
 
@@ -798,6 +834,8 @@ function buildActivity(row: {
       description: 'The order finished its server-side post-payment flow.',
       time: formatLongDate(row.processingCompletedAt),
       tone: 'emerald',
+      kind: 'system',
+      sortAt: row.processingCompletedAt.getTime(),
     });
   } else if (row.lastErrorMessage) {
     activity.push({
@@ -809,10 +847,20 @@ function buildActivity(row: {
         row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED
           ? 'amber'
           : 'rose',
+      kind: 'system',
+      sortAt: row.updatedAt.getTime(),
     });
   }
 
-  return activity;
+  return activity
+    .sort((left, right) => right.sortAt - left.sortAt)
+    .map((item) => ({
+      label: item.label,
+      description: item.description,
+      time: item.time,
+      tone: item.tone,
+      kind: item.kind,
+    }));
 }
 
 function mapWebhookEvent(event: {
@@ -839,6 +887,7 @@ function mapWebhookEvent(event: {
     createdAt: formatLongDate(event.createdAt),
     processedAt: event.processedAt ? formatLongDate(event.processedAt) : null,
     lastAttemptAt: event.lastAttemptAt ? formatLongDate(event.lastAttemptAt) : null,
+    occurredAtMs: (event.processedAt ?? event.lastAttemptAt ?? event.createdAt).getTime(),
     lastErrorMessage: event.lastErrorMessage,
     matchedWebhookBindingKey: event.matchedWebhookBindingKey,
     matchedWebhookId: event.matchedWebhookId,
@@ -945,6 +994,7 @@ function buildDetail(row: {
       row.merchizeFulfillmentOps?.productionGateStatus ===
         MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.MANUAL_RELEASE_REQUIRED);
   const captureCompletion = getPayPalCaptureCompletion(row.capturePayload);
+  const captureAmount = asNumber(captureCompletion.amount?.value);
   const inferredProcessingSource = getPayPalLedgerInferredProcessingSourceDisplay({
     checkoutSurfaceLabel: row.checkoutSurfaceLabel,
     hasCapturePayload: Boolean(row.capturePayload),
@@ -962,8 +1012,8 @@ function buildDetail(row: {
     hasAddressOverride: Boolean(overrideAddress),
     addressCorrectionProviderApplied: Boolean(
       overrideAddress &&
-        row.merchizeFulfillmentOps?.providerAddressUpdatedAt &&
-        row.merchizeFulfillmentOps.addressReviewStatus !== 'provider_update_failed',
+      row.merchizeFulfillmentOps?.providerAddressUpdatedAt &&
+      row.merchizeFulfillmentOps.addressReviewStatus !== 'provider_update_failed',
     ),
     addressOverrideReason: row.fulfillmentAddressOverrideReason,
     addressOverriddenAt: row.fulfillmentAddressOverriddenAt
@@ -1040,6 +1090,21 @@ function buildDetail(row: {
       { label: 'Scanner eligibility', value: getScannerState(row).reason },
     ],
     activity: buildActivity(row),
+    paymentEvidence: {
+      captured: captureCompletion.ok,
+      status: captureCompletion.status,
+      captureId: captureCompletion.captureId,
+      paypalOrderId: row.paypalOrderId,
+      amount:
+        captureAmount === null
+          ? null
+          : formatCurrency(
+              captureAmount,
+              captureCompletion.amount?.currency ?? row.initialCurrency,
+            ),
+      djangoPaymentSaved: Boolean(row.djangoPaymentSaveCustomId),
+      proof: captureCompletion.reason,
+    },
     webhookEvents: row.webhookEvents,
     scannerState: getScannerState(row),
     merchizeFulfillmentOps: row.merchizeFulfillmentOps,

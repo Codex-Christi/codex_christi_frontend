@@ -3,14 +3,7 @@ import type { PayPalLedgerSourceTone } from '@/lib/paypal/txLedger/paypalLedgerP
 
 export type ToolTone = 'cyan' | 'emerald' | 'amber' | 'rose' | 'violet' | 'blue';
 export type ToolState =
-  | 'healthy'
-  | 'action'
-  | 'pending'
-  | 'critical'
-  | 'review'
-  | 'ready'
-  | 'open'
-  | 'warning';
+  'healthy' | 'action' | 'pending' | 'critical' | 'review' | 'ready' | 'open' | 'warning';
 
 export type AdminIcon = ComponentType<{
   size?: number;
@@ -101,6 +94,7 @@ export type PaidOrderRecoveryWebhookEvent = {
   createdAt: string;
   processedAt: string | null;
   lastAttemptAt: string | null;
+  occurredAtMs: number;
   lastErrorMessage: string | null;
   matchedWebhookBindingKey: string | null;
   matchedWebhookId: string | null;
@@ -115,11 +109,31 @@ export type PaidOrderRecoveryActivityItem = {
   description: string;
   time: string;
   tone: 'slate' | 'emerald' | 'amber' | 'rose' | 'cyan';
+  kind: 'operator' | 'system';
+};
+
+export type PaidOrderRecoveryPaymentEvidence = {
+  captured: boolean;
+  status: string | null;
+  captureId: string | null;
+  paypalOrderId: string | null;
+  amount: string | null;
+  djangoPaymentSaved: boolean;
+  proof: string;
+};
+
+export type MerchizeReadinessBlockerSummary = {
+  code: string;
+  message: string;
+  category: string;
+  retryable: boolean;
 };
 
 export type MerchizeFulfillmentOpsAdminSummary = {
   syncStatus: string;
   productionGateStatus: string | null;
+  readinessStatus: string | null;
+  readinessBlockers: MerchizeReadinessBlockerSummary[];
   merchizeExternalOrderNumber: string;
   merchizeOrderId: string | null;
   merchizeStatus: string | null;
@@ -171,6 +185,7 @@ export type PaidOrderRecoveryDetail = {
   items: PaidOrderRecoveryLineItem[];
   references: PaidOrderRecoveryReference[];
   activity: PaidOrderRecoveryActivityItem[];
+  paymentEvidence: PaidOrderRecoveryPaymentEvidence;
   webhookEvents: PaidOrderRecoveryWebhookEvent[];
   scannerState: PaidOrderRecoveryScannerState;
   merchizeFulfillmentOps: MerchizeFulfillmentOpsAdminSummary | null;
