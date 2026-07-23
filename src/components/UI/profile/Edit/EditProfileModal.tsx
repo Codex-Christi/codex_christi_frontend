@@ -81,8 +81,8 @@ const EditProfileModal = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
             <AlertDialogDescription className='text-gray-200'>
-              You have profile edits that haven&apos;t been saved yet. If you close now, those changes
-              will be lost.
+              You have profile edits that haven&apos;t been saved yet. If you close now, those
+              changes will be lost.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -105,22 +105,24 @@ const EditProfileModal = ({
         onOpenChange={handleDrawerOpenChange}
         shouldScaleBackground
       >
-      <DrawerOverlay className='bg-black/[0.01] !backdrop-blur-[10px]' />
+        <DrawerOverlay className='bg-black/[0.01] !backdrop-blur-[10px]' />
 
-      <DrawerContent className='!fixed !inset-0 !z-[500] flex items-center justify-center !border-none !bg-transparent pointer-events-none'>
-        <DrawerTitle className='sr-only'>
-          <DrawerDescription>Edit Profile Modal</DrawerDescription>
-        </DrawerTitle>
+        <DrawerContent className='!fixed !inset-0 !z-[500] flex items-center justify-center !border-none !bg-transparent pointer-events-none'>
+          <DrawerTitle className='sr-only'>
+            <DrawerDescription data-vaul-no-drag className='select-text'>
+              Edit Profile Modal
+            </DrawerDescription>
+          </DrawerTitle>
 
-        <div className='pointer-events-auto w-[92%] max-w-[720px] mt-0 md:-mt-8 lg:-mt-16'>
-          <div
-            className='flex h-[calc(100vh-3rem)] max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-[12px]
+          <div className='pointer-events-auto w-[92%] max-w-[720px] mt-0 md:-mt-8 lg:-mt-16'>
+            <div
+              className='flex h-[calc(100vh-3rem)] max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-[12px]
            bg-[#050505]/95 text-white shadow-[0_25px_60px_rgba(0,0,0,0.65)] backdrop-blur-xl md:h-[calc(100vh-4rem)]'
-          >
-            <EditModalFields isOpen={isActive} onRequestClose={requestClose} />
+            >
+              <EditModalFields data-vaul-no-drag isOpen={isActive} onRequestClose={requestClose} />
+            </div>
           </div>
-        </div>
-      </DrawerContent>
+        </DrawerContent>
       </Drawer>
     </>
   );
