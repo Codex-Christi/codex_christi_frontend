@@ -203,8 +203,11 @@ The paid-order recovery detail page now exposes these bounded actions:
   but Merchize does not report `pushed`, the action reopens the row as
   `fulfillment_attention_required` and creates an internal warning.
 - **Correct Fulfillment Address** saves an audited ledger correction. For an imported order it also
-  reads current buyer details, updates Merchize buyer details, regenerates the stable receipt object,
-  and reruns readiness. A local-only save is reported explicitly when provider mutation fails.
+  resolves/backfills the Fulfillment Ops row and actionable `merchizeOrderId` when necessary, reads
+  current buyer details, updates Merchize buyer details, reads the buyer details back to verify every
+  submitted address field, regenerates the stable receipt object, and reruns readiness. A true
+  pre-import correction may remain local-only. An accepted Django import must update Merchize or
+  report an explicit partial failure; it must never be mislabeled as an initial-import save.
 - **Regenerate Receipt** rebuilds the receipt from durable payment/cart evidence and the active
   address correction. The stable object URL remains the same and uses no-store cache policy.
 - **Verify and Release** is master-admin-only and requires password step-up, confirmation, and a
@@ -215,6 +218,10 @@ The paid-order recovery detail page now exposes these bounded actions:
 Django payment save and accepted Django catalog import are not replayed. Django address columns are
 historical in this phase because no verified Django address-amendment endpoint exists; the receipt
 link remains valid because the corrected PDF replaces the object at the stable URL.
+
+Address correction also fails closed once provider detail/send-to-fulfillment evidence reports the
+order as pushed. Changing the local ledger or receipt after that point cannot be presented as a
+provider address update; provider intervention is required before shipment.
 
 The existing `/next-api/jobs/paypal-tx-ledger-recovery-scan` cron also performs synchronous
 Merchize lifecycle reconciliation for pushed, non-delivered orders. It refreshes detail/items,
@@ -288,7 +295,10 @@ Preferred ledger fields:
 - `merchizeFulfillmentProcessingId`: Django processing row ID from fulfillment response.
 - `merchizeProviderOrderId`: Merchize platform order ID returned by external-number lookup. This is the `{id}` used for in-depth details and later POD actions such as view, edit, pause, change product, change processing, and tracking/status operations.
 - `merchizeProviderOrderCode`: provider order code returned by Merchize/Django processing.
-- `fulfillmentAddressOverride`: audited correction used for initial provider import or pre-release provider buyer-detail correction and receipt regeneration.
+- `fulfillmentAddressOverride`: audited correction used for initial provider import or pre-release
+  provider buyer-detail correction and receipt regeneration. For an accepted Django import, the
+  action first backfills any missing Fulfillment Ops row through external-number lookup and verifies
+  the provider mutation with a buyer-details read-back.
 
 Avoid:
 
@@ -1957,8 +1967,8 @@ Continue from the current checkpoint:
    resumption, and notification deduplication.
 2. Verify the Fulfillment Evidence panel against dev data and confirm page loads create no provider
    sync attempts.
-3. Apply the committed Merchize Fulfillment Ops migrations to production only after dev/staging E2E
-   passes.
+3. Keep the already-applied dev and production Merchize Fulfillment Ops migrations in parity as new
+   schema changes are introduced.
 4. Run one controlled live-provider canary with deliberate awareness that production release can
    charge the Merchize balance.
 5. Normalize richer tracking/package, invoice, ticket, item-mismatch, and history summaries before

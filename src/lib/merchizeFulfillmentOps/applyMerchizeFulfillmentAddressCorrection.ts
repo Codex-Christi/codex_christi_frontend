@@ -20,6 +20,7 @@ import {
   MERCHIZE_ADDRESS_REVIEW_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS,
 } from './status';
+import { getMerchizeBuyerAddressMismatchFields } from './addressCorrectionVerification';
 
 type FulfillmentAddressCorrection = {
   line1: string;
@@ -64,6 +65,46 @@ function isProviderReleaseVerified(detail: unknown, sendToFulfillment: unknown) 
   return progress === 'pushed' || sendData?.pushed === true;
 }
 
+class MerchizeAddressCorrectionVerificationError extends Error {
+  constructor(mismatchFields: string[]) {
+    super(
+      `Merchize did not confirm the updated buyer address fields: ${mismatchFields.join(', ')}.`,
+    );
+    this.name = 'MerchizeAddressCorrectionVerificationError';
+  }
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function verifyMerchizeBuyerAddress(
+  merchizeOrderId: string,
+  expected: MerchizeBuyerAddress,
+) {
+  let mismatchFields: string[] = [];
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (attempt > 0) await wait(400);
+
+    try {
+      const response = await getMerchizeBuyerDetails(merchizeOrderId);
+      const providerFailure = getProviderFailure(response);
+      if (providerFailure) throw new Error(providerFailure);
+
+      lastError = null;
+      mismatchFields = getMerchizeBuyerAddressMismatchFields(response, expected);
+      if (mismatchFields.length === 0) return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError) throw lastError;
+  throw new MerchizeAddressCorrectionVerificationError(mismatchFields);
+}
+
 export async function applyMerchizeFulfillmentAddressCorrection(args: {
   orderToken: string;
   customerName: string;
@@ -81,9 +122,9 @@ export async function applyMerchizeFulfillmentAddressCorrection(args: {
 
   if (!order?.merchizeOrderId) {
     return {
-      ok: true as const,
-      providerUpdated: false as const,
-      message: 'Address correction saved for the initial provider import.',
+      ok: false as const,
+      error:
+        'The imported Merchize order does not have an actionable provider order ID. Resolve provider identity before applying an address correction.',
     };
   }
 
@@ -140,6 +181,7 @@ export async function applyMerchizeFulfillmentAddressCorrection(args: {
     const response = await updateMerchizeBuyerDetails(order.merchizeOrderId, payload);
     const providerFailure = getProviderFailure(response);
     if (providerFailure) throw new Error(providerFailure);
+    await verifyMerchizeBuyerAddress(order.merchizeOrderId, payload);
 
     const updatedAt = new Date();
     await prisma.$transaction(async (tx) => {
@@ -161,7 +203,11 @@ export async function applyMerchizeFulfillmentAddressCorrection(args: {
         where: { id: attempt.id },
         data: {
           status: MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.SUCCEEDED,
-          responseSummary: summarizeProviderResponse(response),
+          responseSummary: {
+            success: true,
+            addressVerified: true,
+            verifiedFieldCount: 6,
+          },
           finishedAt: updatedAt,
         },
       });
@@ -175,13 +221,17 @@ export async function applyMerchizeFulfillmentAddressCorrection(args: {
   } catch (error) {
     const message =
       error instanceof MerchizeApiError ? error.message : safeLogErrorMessage(error);
+    const errorCode =
+      error instanceof MerchizeAddressCorrectionVerificationError
+        ? 'MERCHIZE_ADDRESS_CORRECTION_NOT_VERIFIED'
+        : 'MERCHIZE_ADDRESS_CORRECTION_FAILED';
     const failedAt = new Date();
     await prisma.$transaction(async (tx) => {
       await tx.merchizeFulfillmentOrder.update({
         where: { id: order.id },
         data: {
           addressReviewStatus: MERCHIZE_ADDRESS_REVIEW_STATUS.PROVIDER_UPDATE_FAILED,
-          lastSyncErrorCode: 'MERCHIZE_ADDRESS_CORRECTION_FAILED',
+          lastSyncErrorCode: errorCode,
           lastSyncErrorMessage: message,
         },
       });
@@ -189,7 +239,7 @@ export async function applyMerchizeFulfillmentAddressCorrection(args: {
         where: { id: attempt.id },
         data: {
           status: MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.FAILED,
-          errorCode: 'MERCHIZE_ADDRESS_CORRECTION_FAILED',
+          errorCode,
           errorMessage: message,
           responseSummary:
             error instanceof MerchizeApiError

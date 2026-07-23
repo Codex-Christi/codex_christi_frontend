@@ -56,8 +56,8 @@ accepted Django catalog import.
 | Canonical lookup | `GET /order/external/orders/order-detail` | Query with `merchizeExternalOrderNumber + fulfillmentIdentifier`; only `data._id` becomes `merchizeOrderId`. |
 | In-depth detail | `GET /order/orders/{merchizeOrderId}` | Persists current order/item state and supplies provider address, artwork, order, and push evidence. |
 | Address suggestion | `GET /order/orders/{merchizeOrderId}/address-suggestion` | Readiness evidence only. An empty suggestion list is not proof of validity. |
-| Buyer details | `GET /order/orders/{merchizeOrderId}/buyerdetails` | Reads the existing provider identity/contact fields before an audited address correction. |
-| Address correction | `POST /order/orders/{merchizeOrderId}/buyerdetails` | Applies an admin correction to the already imported provider order before receipt regeneration and readiness recheck. |
+| Buyer details | `GET /order/orders/{merchizeOrderId}/buyerdetails` | Reads existing provider identity/contact fields before correction and verifies the persisted address after correction. |
+| Address correction | `POST /order/orders/{merchizeOrderId}/buyerdetails` | Requests an admin correction to the already imported provider order. Its success envelope is an acknowledgement, not persistence proof; a buyer-details read-back must match before receipt regeneration and readiness recheck. |
 | Buyer display status | `GET /order/orders/{merchizeOrderId}/buyerdetails/display-status` | Adapter is available for diagnostics; not required by the automatic release decision. |
 | Mark address valid | `POST /order/orders/{merchizeOrderId}/mark-valid-address` | Adapter exists, but automatic code does not use it to override provider validation. Buyer/admin confirmation semantics must remain explicit. |
 | Unfulfilled items | `GET /order/orders/{merchizeOrderId}/unfulfilled` | Blocks inactive/deleted/unmapped catalog products and captures item evidence. |
@@ -2169,11 +2169,26 @@ address suggestion found
 -> notify admin
 -> optionally notify customer with safe correction request
 -> save corrected address locally
+-> if Django import was accepted but Fulfillment Ops identity is missing:
+   register the accepted external number and resolve merchizeOrderId from lookup data._id
 -> POST /order/orders/{merchizeOrderId}/buyerdetails
+-> GET /order/orders/{merchizeOrderId}/buyerdetails
+-> compare line1, line2, city, state, postal code, and ISO-2 country code
 -> rerun address suggestion
 -> rerun cost/fee checks
--> mark address_corrected only after provider accepts the edit
+-> mark providerAddressUpdatedAt only after provider read-back confirms the edit
 ```
+
+Local-only behavior is valid only before Django has accepted the catalog-backed import. Once the
+accepted `200`/`201` process contract exists, a missing Fulfillment Ops row is recoverable
+correlation debt: registration and canonical external-number lookup must run before mutation. If
+lookup is pending or fails, preserve the local correction but show a provider-not-updated failure.
+Never report that case as an initial-import success.
+
+The correction path must read live detail/send-to-fulfillment evidence before mutation. If Merchize
+already reports `pushed`, fail closed and require provider intervention. A successful mutation is
+verified with one immediate buyer-details GET and at most one short-backoff retry; logs and admin
+actions store only verification status and mismatched semantic field names, never address values.
 
 Customer email rules:
 
@@ -2476,12 +2491,13 @@ Before starting Merchize Fulfillment Ops DB implementation:
 1. Add `MerchizeFulfillmentAddressReview`.
 2. Add address suggestion refresh action.
 3. Add customer-safe address correction email template.
-4. Add admin address correction form.
-5. Save corrected address locally with reason.
-6. Call `updateMerchizeBuyerDetails(...)`.
-7. Rerun address suggestion.
-8. Rerun cost/fee checks.
-9. Mark address corrected only after provider accepts the update.
+4. **Implemented:** admin address correction form with required reason.
+5. **Implemented:** save the corrected address locally and regenerate the stable receipt.
+6. **Implemented:** backfill missing accepted-order correlation, call
+   `updateMerchizeBuyerDetails(...)`, and verify persistence by reading buyer details back.
+7. **Implemented:** rerun the bounded production-readiness checks after verified provider mutation.
+8. Remaining: dedicated address-review rows and customer correction-request messaging.
+9. Remaining: normalize richer cost-delta evidence when a correction changes fulfillment cost.
 
 ## Phase 8 - Production hold/open controls
 

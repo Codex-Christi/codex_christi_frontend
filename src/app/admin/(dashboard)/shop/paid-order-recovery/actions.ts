@@ -40,6 +40,7 @@ import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/l
 import { isMerchizeLookupPendingProviderProcessingError } from '@/lib/merchizeFulfillmentOps/lookupPending';
 import { CODEX_CHRISTI_FULFILLMENT_IDENTIFIER } from '@/lib/merchizeFulfillmentOps/fulfillmentIdentifier';
 import { applyMerchizeFulfillmentAddressCorrection } from '@/lib/merchizeFulfillmentOps/applyMerchizeFulfillmentAddressCorrection';
+import { resolveMerchizeFulfillmentAddressCorrectionTarget } from '@/lib/merchizeFulfillmentOps/resolveMerchizeFulfillmentAddressCorrectionTarget';
 import { runMerchizeProductionReadinessChecks } from '@/lib/merchizeFulfillmentOps/runMerchizeProductionReadinessChecks';
 import { MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS } from '@/lib/merchizeFulfillmentOps/status';
 import {
@@ -1143,12 +1144,17 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
       where: { orderToken },
       select: {
         orderToken: true,
+        paypalOrderId: true,
         authorizePayload: true,
         cartSnapshot: true,
         customerName: true,
         customerEmail: true,
+        djangoOrderIntentUuid: true,
         djangoOrderIntentOrderId: true,
+        djangoPaymentSaveCustomId: true,
         fulfillmentAddressOverride: true,
+        merchizeFulfillmentResponsePayload: true,
+        merchizeProviderOrderCode: true,
       },
     });
     if (!existing) {
@@ -1181,18 +1187,56 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
       status: 'started',
       metadata: { country: normalizedAddress.shipping_country },
     });
-    const providerCorrection = await applyMerchizeFulfillmentAddressCorrection({
-      orderToken,
-      customerName: existing.customerName,
-      address: {
-        line1: normalizedAddress.shipping_address_line_1,
-        line2: normalizedAddress.shipping_address_line_2,
-        city: normalizedAddress.shipping_city,
-        state: normalizedAddress.shipping_state,
-        postalCode: normalizedAddress.zip_code,
-        country: normalizedAddress.shipping_country,
-      },
+    type ProviderCorrectionResult = Awaited<
+      ReturnType<typeof applyMerchizeFulfillmentAddressCorrection>
+    > | {
+      ok: true;
+      providerUpdated: false;
+      message: string;
+    };
+    let providerCorrection: ProviderCorrectionResult;
+    let providerIdentityBackfilled = false;
+    let providerTargetErrorCode: string | null = null;
+    const target = await resolveMerchizeFulfillmentAddressCorrectionTarget({
+      orderToken: existing.orderToken,
+      paypalOrderId: existing.paypalOrderId,
+      djangoOrderIntentUuid: existing.djangoOrderIntentUuid,
+      djangoOrderIntentOrderId: existing.djangoOrderIntentOrderId,
+      djangoPaymentSaveCustomId: existing.djangoPaymentSaveCustomId,
+      merchizeFulfillmentResponsePayload: existing.merchizeFulfillmentResponsePayload,
+      merchizeProviderOrderCode: existing.merchizeProviderOrderCode,
+      customerEmail: existing.customerEmail,
+      cartSnapshot: existing.cartSnapshot,
+      correctedShippingSnapshot: normalizedAddress,
     });
+
+    if (!target.ok) {
+      providerTargetErrorCode = target.errorCode;
+      providerCorrection = {
+        ok: false,
+        error: target.errorMessage,
+      };
+    } else if (!target.providerUpdateRequired) {
+      providerCorrection = {
+        ok: true,
+        providerUpdated: false,
+        message: 'Address correction saved for the initial provider import.',
+      };
+    } else {
+      providerIdentityBackfilled = target.providerIdentityBackfilled;
+      providerCorrection = await applyMerchizeFulfillmentAddressCorrection({
+        orderToken,
+        customerName: existing.customerName,
+        address: {
+          line1: normalizedAddress.shipping_address_line_1,
+          line2: normalizedAddress.shipping_address_line_2,
+          city: normalizedAddress.shipping_city,
+          state: normalizedAddress.shipping_state,
+          postalCode: normalizedAddress.zip_code,
+          country: normalizedAddress.shipping_country,
+        },
+      });
+    }
 
     if (!providerCorrection.ok) {
       await writeMerchizeFulfillmentAdminAction({
@@ -1202,6 +1246,10 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
         reason: reason.trim(),
         status: 'failed',
         errorMessage: providerCorrection.error,
+        metadata: {
+          providerIdentityBackfilled,
+          providerTargetErrorCode,
+        },
       });
       await writeAdminAuditLog({
         actor: admin,
@@ -1209,7 +1257,12 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
         targetType: 'orderToken',
         targetId: orderToken,
         outcome: 'failure',
-        metadata: { providerUpdated: false, localCorrectionSaved: true },
+        metadata: {
+          providerUpdated: false,
+          localCorrectionSaved: true,
+          providerIdentityBackfilled,
+          providerTargetErrorCode,
+        },
       });
       await refreshPaidOrderRecoveryProjectionSafely(orderToken);
       revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
@@ -1271,6 +1324,7 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
       status: 'succeeded',
       metadata: {
         providerUpdated: providerCorrection.providerUpdated,
+        providerIdentityBackfilled,
         receiptRegenerated: true,
         readinessStatus: readiness?.ok ? readiness.readiness.status : null,
       },
@@ -1283,6 +1337,7 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
       outcome: 'success',
       metadata: {
         providerUpdated: providerCorrection.providerUpdated,
+        providerIdentityBackfilled,
         receiptRegenerated: true,
         readinessStatus: readiness?.ok ? readiness.readiness.status : null,
       },
