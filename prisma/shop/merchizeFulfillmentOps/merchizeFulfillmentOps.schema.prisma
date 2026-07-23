@@ -41,29 +41,46 @@ model MerchizeFulfillmentOrder {
   orderCurrency         String?
 
   // Production gate state.
-  productionGateStatus   String?
-  addressReviewStatus    String?
-  costReviewStatus       String?
-  progressStatus         String?
-  deliveryStatus         String?
-  releasedToProductionAt DateTime?
-  heldAt                 DateTime?
-  lastAddressCheckAt     DateTime?
-  lastCostCheckAt        DateTime?
-  lastProgressSyncAt     DateTime?
-  lastTrackingSyncAt     DateTime?
-  lastHistorySyncAt      DateTime?
+  productionGateStatus     String?
+  addressReviewStatus      String?
+  itemReviewStatus         String?
+  artworkReviewStatus      String?
+  costReviewStatus         String?
+  attentionReviewStatus    String?
+  providerPushProgress     String?
+  progressStatus           String?
+  deliveryStatus           String?
+  manualReleaseRequired    Boolean   @default(false)
+  providerPaidAt           DateTime?
+  releasedToProductionAt   DateTime?
+  pushAcknowledgedAt       DateTime?
+  pushVerifiedAt           DateTime?
+  providerAddressUpdatedAt DateTime?
+  heldAt                   DateTime?
+  lastReadinessCheckAt     DateTime?
+  lastAddressCheckAt       DateTime?
+  lastCostCheckAt          DateTime?
+  lastProgressSyncAt       DateTime?
+  lastTrackingSyncAt       DateTime?
+  lastHistorySyncAt        DateTime?
+  lastTicketSyncAt         DateTime?
 
   // Access-controlled raw provider snapshots.
-  djangoProcessResponsePayload      Json?
-  merchizeExternalLookupPayload     Json?
-  merchizeInDepthOrderDetailPayload Json?
-  merchizeAddressSuggestionPayload  Json?
-  merchizeFulfillmentCostPayload    Json?
-  merchizeTransactionFeePayload     Json?
-  merchizeProgressPayload           Json?
-  merchizeTrackingPayload           Json?
-  merchizeHistoryPayload            Json?
+  djangoProcessResponsePayload       Json?
+  merchizeExternalLookupPayload      Json?
+  merchizeInDepthOrderDetailPayload  Json?
+  merchizeAddressSuggestionPayload   Json?
+  merchizeUnfulfilledItemsPayload    Json?
+  merchizeRequireAttentionPayload    Json?
+  merchizeSendToFulfillmentPayload   Json?
+  merchizeProductionReadinessPayload Json?
+  merchizeFulfillmentCostPayload     Json?
+  merchizeTransactionFeePayload      Json?
+  merchizeProgressPayload            Json?
+  merchizeInternalProgressPayload    Json?
+  merchizeTrackingPayload            Json?
+  merchizeHistoryPayload             Json?
+  merchizeTicketsPayload             Json?
 
   // Operational state.
   syncStatus           String
@@ -91,7 +108,12 @@ model MerchizeFulfillmentOrder {
   @@index([syncStatus])
   @@index([productionGateStatus])
   @@index([addressReviewStatus])
+  @@index([itemReviewStatus])
+  @@index([artworkReviewStatus])
   @@index([costReviewStatus])
+  @@index([attentionReviewStatus])
+  @@index([providerPushProgress])
+  @@index([manualReleaseRequired])
   @@index([progressStatus])
   @@index([deliveryStatus])
   @@index([updatedAt])

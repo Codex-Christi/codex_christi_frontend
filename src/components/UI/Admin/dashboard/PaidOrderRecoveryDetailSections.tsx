@@ -144,12 +144,14 @@ function DeliveryContextPanel({
         <div>
           <h3 className='text-sm font-semibold text-white'>Fulfillment Address</h3>
           <p className='mt-1 text-xs text-slate-500'>
-            Address currently used for the fulfillment retry.
+            Original checkout address and audited fulfillment correction state.
           </p>
         </div>
         {detail.hasAddressOverride ? (
           <span className='rounded-md border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.08em] text-amber-200'>
-            Override active
+            {detail.addressCorrectionProviderApplied
+              ? 'Provider correction applied'
+              : 'Local correction saved'}
           </span>
         ) : null}
       </div>
@@ -159,7 +161,7 @@ function DeliveryContextPanel({
           <AddressBlock
             label={
               detail.hasAddressOverride
-                ? 'Active fulfillment address'
+                ? 'Corrected fulfillment address'
                 : 'Original fulfillment address'
             }
             address={detail.activeAddress}

@@ -6,7 +6,7 @@ import { getMainSiteUrl } from '@/lib/siteBaseUrls';
 const DEFAULT_PENDING_SEND_LIMIT = 25;
 
 export const CUSTOMER_NOTIFICATION_TYPE = {
-  PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED: 'paid_order_fulfillment_push_accepted',
+  PAID_ORDER_FULFILLMENT_PUSH_VERIFIED: 'paid_order_fulfillment_push_verified',
 } as const;
 
 export const CUSTOMER_NOTIFICATION_STATUS = {
@@ -20,7 +20,7 @@ type CustomerNotificationDb = Pick<typeof paypalTxLedger, 'customerNotificationO
 type CustomerNotificationOutboxDelegate = CustomerNotificationDb['customerNotificationOutbox'];
 type CustomerNotificationRow = Awaited<ReturnType<CustomerNotificationOutboxDelegate['findFirst']>>;
 
-type CustomerFulfillmentPushAcceptedPayload = {
+type CustomerFulfillmentPushVerifiedPayload = {
   orderToken: string;
   paypalOrderId?: string | null;
   customerName: string;
@@ -29,7 +29,7 @@ type CustomerFulfillmentPushAcceptedPayload = {
   supportReference: string;
 };
 
-type EnqueueCustomerFulfillmentPushAcceptedProps = {
+type EnqueueCustomerFulfillmentPushVerifiedProps = {
   db?: CustomerNotificationDb;
   orderToken: string;
   paypalOrderId?: string | null;
@@ -57,14 +57,14 @@ function normalizeEmail(email: string) {
 
 function buildDedupeKey(orderToken: string, recipient: string) {
   return [
-    CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED,
+    CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_VERIFIED,
     orderToken,
     recipient,
   ].join(':');
 }
 
-function buildCustomerFulfillmentPushAcceptedEmailHtml(
-  payload: CustomerFulfillmentPushAcceptedPayload,
+function buildCustomerFulfillmentPushVerifiedEmailHtml(
+  payload: CustomerFulfillmentPushVerifiedPayload,
 ) {
   const logoUrl = getMainSiteUrl('/media/img/general/logo-glow-tiny.jpg');
   const receiptLink = payload.receiptLink
@@ -113,14 +113,14 @@ function buildCustomerFulfillmentPushAcceptedEmailHtml(
 </html>`;
 }
 
-export async function enqueueCustomerFulfillmentPushAcceptedNotification({
+export async function enqueueCustomerFulfillmentPushVerifiedNotification({
   db = paypalTxLedger,
   orderToken,
   paypalOrderId,
   customerName,
   customerEmail,
   receiptLink,
-}: EnqueueCustomerFulfillmentPushAcceptedProps) {
+}: EnqueueCustomerFulfillmentPushVerifiedProps) {
   const outbox = getCustomerNotificationOutboxDelegate(db);
   const recipient = normalizeEmail(customerEmail);
 
@@ -134,7 +134,7 @@ export async function enqueueCustomerFulfillmentPushAcceptedNotification({
     );
   }
 
-  const payload: CustomerFulfillmentPushAcceptedPayload = {
+  const payload: CustomerFulfillmentPushVerifiedPayload = {
     orderToken,
     paypalOrderId,
     customerName,
@@ -148,7 +148,7 @@ export async function enqueueCustomerFulfillmentPushAcceptedNotification({
       {
         orderToken,
         paypalOrderId,
-        type: CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED,
+        type: CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_VERIFIED,
         status: CUSTOMER_NOTIFICATION_STATUS.PENDING,
         dedupeKey: buildDedupeKey(orderToken, recipient),
         recipient,
@@ -177,7 +177,7 @@ async function sendCustomerNotificationRow(
     };
   }
 
-  const payload = row.payload as CustomerFulfillmentPushAcceptedPayload;
+  const payload = row.payload as CustomerFulfillmentPushVerifiedPayload;
 
   try {
     const { sendMailFromPrimaryAgent } = await import('@/lib/zeptomail/sendMailFromPrimaryAgent');
@@ -192,7 +192,7 @@ async function sendCustomerNotificationRow(
         },
       ],
       subject: `We are preparing your order · ${payload.supportReference.slice(0, 8)}`,
-      htmlbody: buildCustomerFulfillmentPushAcceptedEmailHtml(payload),
+      htmlbody: buildCustomerFulfillmentPushVerifiedEmailHtml(payload),
     });
 
     await outbox.update({

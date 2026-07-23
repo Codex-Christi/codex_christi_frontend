@@ -2035,7 +2035,7 @@ Important:
 - The runner must be able to finish the order from ledger state alone, without any browser-only context.
 - The runner must not replay PayPal capture.
 - Completed prerequisites such as receipt upload and Django payment save must be detected by persisted artifacts and skipped.
-- Fulfillment completion means push-to-fulfillment accepted, not merely catalog import accepted.
+- Fulfillment completion means the provider subsequently verifies the order as pushed; the push POST acknowledgement and catalog import acceptance are both intermediate states.
 
 **Important: server-only crypto**
 

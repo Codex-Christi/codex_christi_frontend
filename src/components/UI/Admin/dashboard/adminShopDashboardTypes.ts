@@ -123,11 +123,21 @@ export type MerchizeFulfillmentOpsAdminSummary = {
   merchizeExternalOrderNumber: string;
   merchizeOrderId: string | null;
   merchizeStatus: string | null;
+  addressReviewStatus: string | null;
+  itemReviewStatus: string | null;
+  artworkReviewStatus: string | null;
   progressStatus: string | null;
   deliveryStatus: string | null;
   costReviewStatus: string | null;
+  attentionReviewStatus: string | null;
+  providerPushProgress: string | null;
+  manualReleaseRequired: boolean;
   itemCount: number;
   releasedToProductionAt: string | null;
+  pushAcknowledgedAt: string | null;
+  pushVerifiedAt: string | null;
+  providerAddressUpdatedAt: string | null;
+  lastReadinessCheckAt: string | null;
   lastLookupAt: string | null;
   lastDetailSyncAt: string | null;
   lastProgressSyncAt: string | null;
@@ -150,6 +160,7 @@ export type PaidOrderRecoveryDetail = {
   originalAddress: PaidOrderRecoveryAddress | null;
   activeAddress: PaidOrderRecoveryAddress | null;
   hasAddressOverride: boolean;
+  addressCorrectionProviderApplied: boolean;
   addressOverrideReason: string | null;
   addressOverriddenAt: string | null;
   addressOverriddenBy: string | null;
@@ -161,7 +172,7 @@ export type PaidOrderRecoveryDetail = {
   merchizeFulfillmentOps: MerchizeFulfillmentOpsAdminSummary | null;
   rawDebug: Record<string, unknown>;
   needsProviderDetailSync: boolean;
-  requiresPushOverride: boolean;
+  requiresManualRelease: boolean;
 };
 
 export type AdminNotificationHistoryItem = {

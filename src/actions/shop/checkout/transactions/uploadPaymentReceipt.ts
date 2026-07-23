@@ -17,7 +17,9 @@ export async function uploadPaymentReceiptToR2({
         Key: `paypal/${filename}`,
         Body: fileBody,
         ContentType: 'application/pdf',
-        CacheControl: 'public, max-age=31536000',
+        // Receipt objects can be regenerated after an audited fulfillment-address
+        // correction, so clients and the CDN must revalidate the stable object URL.
+        CacheControl: 'private, no-store, max-age=0, must-revalidate',
       }),
     );
 

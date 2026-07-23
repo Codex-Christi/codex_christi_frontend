@@ -16,7 +16,8 @@ import loadingToast from '@/lib/loading-toast';
 import successToast from '@/lib/success-toast';
 import { cn } from '@/lib/utils';
 import {
-  overrideMerchizePushDisabledAndReleaseAction,
+  regeneratePaidOrderReceiptAction,
+  releaseMerchizeFulfillmentToProductionAction,
   retryAdminPaidOrderRecoveryAction,
   syncAdminMerchizeProviderDetailsAction,
 } from '@/app/admin/(dashboard)/shop/paid-order-recovery/actions';
@@ -26,7 +27,7 @@ type AdminRecoveryActionsPanelProps = {
   orderToken: string;
   isCompleted: boolean;
   needsProviderDetailSync: boolean;
-  requiresPushOverride: boolean;
+  requiresManualRelease: boolean;
   recoveryStatus: 'failed' | 'recovery' | 'pending' | 'completed' | 'sync' | 'attention';
 };
 
@@ -34,7 +35,7 @@ export default function AdminPaidOrderRecoveryActionsPanel({
   orderToken,
   isCompleted,
   needsProviderDetailSync,
-  requiresPushOverride,
+  requiresManualRelease,
   recoveryStatus,
 }: AdminRecoveryActionsPanelProps) {
   const router = useRouter();
@@ -133,19 +134,19 @@ export default function AdminPaidOrderRecoveryActionsPanel({
     }
 
     const confirmed = window.confirm(
-      'This will override the disabled Merchize push gate and release this paid order to fulfillment. Continue?',
+      'This will rerun non-bypassable readiness checks, override only the configuration or order-age gate, and request Merchize production release. Continue?',
     );
 
     if (!confirmed) return;
 
     startTransition(async () => {
       const toastId = loadingToast({
-        header: 'Releasing fulfillment push',
-        message: 'Running the master-admin push override for this order.',
+        header: 'Releasing to production',
+        message: 'Verifying readiness and running the master-admin production release.',
       });
 
       try {
-        const result = await overrideMerchizePushDisabledAndReleaseAction({
+        const result = await releaseMerchizeFulfillmentToProductionAction({
           orderToken,
           password: overridePassword,
           reason: overrideReason,
@@ -154,7 +155,7 @@ export default function AdminPaidOrderRecoveryActionsPanel({
 
         if (!result.ok) {
           errorToast({
-            header: 'Push override did not complete',
+            header: 'Production release did not complete',
             message: result.error,
           });
           router.refresh();
@@ -171,8 +172,33 @@ export default function AdminPaidOrderRecoveryActionsPanel({
       } catch (error) {
         toast.dismiss(toastId);
         errorToast({
-          header: 'Push override failed',
-          message: error instanceof Error ? error.message : 'Push override failed.',
+          header: 'Production release failed',
+          message: error instanceof Error ? error.message : 'Production release failed.',
+        });
+      }
+    });
+  };
+
+  const handleReceiptRegeneration = () => {
+    startTransition(async () => {
+      const toastId = loadingToast({
+        header: 'Regenerating receipt',
+        message: 'Rebuilding the receipt from the durable ledger and active address correction.',
+      });
+      try {
+        const result = await regeneratePaidOrderReceiptAction({ orderToken });
+        toast.dismiss(toastId);
+        if (!result.ok) {
+          errorToast({ header: 'Receipt not regenerated', message: result.error });
+          return;
+        }
+        successToast({ header: 'Receipt regenerated', message: result.message });
+        router.refresh();
+      } catch (error) {
+        toast.dismiss(toastId);
+        errorToast({
+          header: 'Receipt not regenerated',
+          message: error instanceof Error ? error.message : 'Receipt regeneration failed.',
         });
       }
     });
@@ -180,15 +206,15 @@ export default function AdminPaidOrderRecoveryActionsPanel({
 
   return (
     <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2'>
-      {requiresPushOverride ? (
+      {requiresManualRelease ? (
         <div className='sm:col-span-2 xl:col-span-1 2xl:col-span-2 rounded-lg border border-amber-300/18 bg-amber-300/[0.06] p-3'>
           <div className='flex items-start gap-2'>
             <KeyRound size={16} className='mt-0.5 shrink-0 text-amber-100' />
             <div>
-              <p className='text-sm font-medium text-amber-50'>Push disabled by configuration</p>
+              <p className='text-sm font-medium text-amber-50'>Manual production release required</p>
               <p className='mt-1 text-xs leading-5 text-amber-50/70'>
-                Master admin release is required before this order can be pushed to Merchize
-                fulfillment.
+                A master admin can bypass the configuration or seven-day release gate. Address,
+                catalog, artwork, cost, and provider-attention blockers are never bypassed.
               </p>
             </div>
           </div>
@@ -215,22 +241,23 @@ export default function AdminPaidOrderRecoveryActionsPanel({
               disabled={isPending || isCompleted}
               onClick={handlePushOverride}
             >
-              {isPending ? 'Releasing...' : 'Override and Push'}
+              {isPending ? 'Releasing...' : 'Verify and Release'}
             </ActionButton>
           </div>
         </div>
       ) : null}
 
+      <ActionButton
+        icon={SearchCheck}
+        tone='cyan'
+        disabled={isPending}
+        onClick={handleProviderDetailSync}
+      >
+        {isPending ? 'Verifying...' : 'Verify Provider State'}
+      </ActionButton>
+
       {needsProviderDetailSync ? (
         <>
-          <ActionButton
-            icon={SearchCheck}
-            tone='cyan'
-            disabled={isPending}
-            onClick={handleProviderDetailSync}
-          >
-            {isPending ? 'Syncing...' : 'Sync Provider Details'}
-          </ActionButton>
           <ActionButton
             icon={RefreshCw}
             tone='cyan'
@@ -263,8 +290,8 @@ export default function AdminPaidOrderRecoveryActionsPanel({
         View in Ledger
       </ActionButton>
 
-      <ActionButton icon={ClipboardList} disabled>
-        Regenerate Receipt
+      <ActionButton icon={ClipboardList} disabled={isPending} onClick={handleReceiptRegeneration}>
+        {isPending ? 'Working...' : 'Regenerate Receipt'}
       </ActionButton>
 
       <ActionButton icon={CheckCircle2} disabled>

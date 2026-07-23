@@ -12,17 +12,25 @@ export interface PaymentReceiptProps {
   cart?: CompletedTxInterface['cart'];
   customer: CompletedTxInterface['customer'];
   ORD_string: CompletedTxInterface['ORD_string'];
+  shippingAddressOverride?: {
+    shipping_address_line_1: string;
+    shipping_address_line_2?: string;
+    shipping_city: string;
+    shipping_state: string;
+    zip_code: string;
+    shipping_country: string;
+  } | null;
 }
 
 export const savePaymentReceiptToCloud = async (encodedProps: string) => {
   try {
     // Decrypt and parse data
-    const { authData, cart, customer, ORD_string } = JSON.parse(
+    const { authData, cart, customer, ORD_string, shippingAddressOverride } = JSON.parse(
       decryptForPostProcessingServerAction(encodedProps),
     ) as PaymentReceiptProps;
     const { email: customerEmail, name: customerName } = customer || {};
 
-    const pdfBuffer = await createPaypalShopInvoicePDF(authData, cart);
+    const pdfBuffer = await createPaypalShopInvoicePDF(authData, cart, shippingAddressOverride);
 
     // Upload to r2
     const { accessLink } = await uploadPaymentReceiptToR2({

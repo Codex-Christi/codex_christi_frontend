@@ -61,16 +61,27 @@ export type MerchizeFulfillmentOrderMinAggregateOutputType = {
   orderCurrency: string | null
   productionGateStatus: string | null
   addressReviewStatus: string | null
+  itemReviewStatus: string | null
+  artworkReviewStatus: string | null
   costReviewStatus: string | null
+  attentionReviewStatus: string | null
+  providerPushProgress: string | null
   progressStatus: string | null
   deliveryStatus: string | null
+  manualReleaseRequired: boolean | null
+  providerPaidAt: Date | null
   releasedToProductionAt: Date | null
+  pushAcknowledgedAt: Date | null
+  pushVerifiedAt: Date | null
+  providerAddressUpdatedAt: Date | null
   heldAt: Date | null
+  lastReadinessCheckAt: Date | null
   lastAddressCheckAt: Date | null
   lastCostCheckAt: Date | null
   lastProgressSyncAt: Date | null
   lastTrackingSyncAt: Date | null
   lastHistorySyncAt: Date | null
+  lastTicketSyncAt: Date | null
   syncStatus: string | null
   lastSyncErrorCode: string | null
   lastSyncErrorMessage: string | null
@@ -109,16 +120,27 @@ export type MerchizeFulfillmentOrderMaxAggregateOutputType = {
   orderCurrency: string | null
   productionGateStatus: string | null
   addressReviewStatus: string | null
+  itemReviewStatus: string | null
+  artworkReviewStatus: string | null
   costReviewStatus: string | null
+  attentionReviewStatus: string | null
+  providerPushProgress: string | null
   progressStatus: string | null
   deliveryStatus: string | null
+  manualReleaseRequired: boolean | null
+  providerPaidAt: Date | null
   releasedToProductionAt: Date | null
+  pushAcknowledgedAt: Date | null
+  pushVerifiedAt: Date | null
+  providerAddressUpdatedAt: Date | null
   heldAt: Date | null
+  lastReadinessCheckAt: Date | null
   lastAddressCheckAt: Date | null
   lastCostCheckAt: Date | null
   lastProgressSyncAt: Date | null
   lastTrackingSyncAt: Date | null
   lastHistorySyncAt: Date | null
+  lastTicketSyncAt: Date | null
   syncStatus: string | null
   lastSyncErrorCode: string | null
   lastSyncErrorMessage: string | null
@@ -157,25 +179,42 @@ export type MerchizeFulfillmentOrderCountAggregateOutputType = {
   orderCurrency: number
   productionGateStatus: number
   addressReviewStatus: number
+  itemReviewStatus: number
+  artworkReviewStatus: number
   costReviewStatus: number
+  attentionReviewStatus: number
+  providerPushProgress: number
   progressStatus: number
   deliveryStatus: number
+  manualReleaseRequired: number
+  providerPaidAt: number
   releasedToProductionAt: number
+  pushAcknowledgedAt: number
+  pushVerifiedAt: number
+  providerAddressUpdatedAt: number
   heldAt: number
+  lastReadinessCheckAt: number
   lastAddressCheckAt: number
   lastCostCheckAt: number
   lastProgressSyncAt: number
   lastTrackingSyncAt: number
   lastHistorySyncAt: number
+  lastTicketSyncAt: number
   djangoProcessResponsePayload: number
   merchizeExternalLookupPayload: number
   merchizeInDepthOrderDetailPayload: number
   merchizeAddressSuggestionPayload: number
+  merchizeUnfulfilledItemsPayload: number
+  merchizeRequireAttentionPayload: number
+  merchizeSendToFulfillmentPayload: number
+  merchizeProductionReadinessPayload: number
   merchizeFulfillmentCostPayload: number
   merchizeTransactionFeePayload: number
   merchizeProgressPayload: number
+  merchizeInternalProgressPayload: number
   merchizeTrackingPayload: number
   merchizeHistoryPayload: number
+  merchizeTicketsPayload: number
   syncStatus: number
   lastSyncErrorCode: number
   lastSyncErrorMessage: number
@@ -226,16 +265,27 @@ export type MerchizeFulfillmentOrderMinAggregateInputType = {
   orderCurrency?: true
   productionGateStatus?: true
   addressReviewStatus?: true
+  itemReviewStatus?: true
+  artworkReviewStatus?: true
   costReviewStatus?: true
+  attentionReviewStatus?: true
+  providerPushProgress?: true
   progressStatus?: true
   deliveryStatus?: true
+  manualReleaseRequired?: true
+  providerPaidAt?: true
   releasedToProductionAt?: true
+  pushAcknowledgedAt?: true
+  pushVerifiedAt?: true
+  providerAddressUpdatedAt?: true
   heldAt?: true
+  lastReadinessCheckAt?: true
   lastAddressCheckAt?: true
   lastCostCheckAt?: true
   lastProgressSyncAt?: true
   lastTrackingSyncAt?: true
   lastHistorySyncAt?: true
+  lastTicketSyncAt?: true
   syncStatus?: true
   lastSyncErrorCode?: true
   lastSyncErrorMessage?: true
@@ -274,16 +324,27 @@ export type MerchizeFulfillmentOrderMaxAggregateInputType = {
   orderCurrency?: true
   productionGateStatus?: true
   addressReviewStatus?: true
+  itemReviewStatus?: true
+  artworkReviewStatus?: true
   costReviewStatus?: true
+  attentionReviewStatus?: true
+  providerPushProgress?: true
   progressStatus?: true
   deliveryStatus?: true
+  manualReleaseRequired?: true
+  providerPaidAt?: true
   releasedToProductionAt?: true
+  pushAcknowledgedAt?: true
+  pushVerifiedAt?: true
+  providerAddressUpdatedAt?: true
   heldAt?: true
+  lastReadinessCheckAt?: true
   lastAddressCheckAt?: true
   lastCostCheckAt?: true
   lastProgressSyncAt?: true
   lastTrackingSyncAt?: true
   lastHistorySyncAt?: true
+  lastTicketSyncAt?: true
   syncStatus?: true
   lastSyncErrorCode?: true
   lastSyncErrorMessage?: true
@@ -322,25 +383,42 @@ export type MerchizeFulfillmentOrderCountAggregateInputType = {
   orderCurrency?: true
   productionGateStatus?: true
   addressReviewStatus?: true
+  itemReviewStatus?: true
+  artworkReviewStatus?: true
   costReviewStatus?: true
+  attentionReviewStatus?: true
+  providerPushProgress?: true
   progressStatus?: true
   deliveryStatus?: true
+  manualReleaseRequired?: true
+  providerPaidAt?: true
   releasedToProductionAt?: true
+  pushAcknowledgedAt?: true
+  pushVerifiedAt?: true
+  providerAddressUpdatedAt?: true
   heldAt?: true
+  lastReadinessCheckAt?: true
   lastAddressCheckAt?: true
   lastCostCheckAt?: true
   lastProgressSyncAt?: true
   lastTrackingSyncAt?: true
   lastHistorySyncAt?: true
+  lastTicketSyncAt?: true
   djangoProcessResponsePayload?: true
   merchizeExternalLookupPayload?: true
   merchizeInDepthOrderDetailPayload?: true
   merchizeAddressSuggestionPayload?: true
+  merchizeUnfulfilledItemsPayload?: true
+  merchizeRequireAttentionPayload?: true
+  merchizeSendToFulfillmentPayload?: true
+  merchizeProductionReadinessPayload?: true
   merchizeFulfillmentCostPayload?: true
   merchizeTransactionFeePayload?: true
   merchizeProgressPayload?: true
+  merchizeInternalProgressPayload?: true
   merchizeTrackingPayload?: true
   merchizeHistoryPayload?: true
+  merchizeTicketsPayload?: true
   syncStatus?: true
   lastSyncErrorCode?: true
   lastSyncErrorMessage?: true
@@ -466,25 +544,42 @@ export type MerchizeFulfillmentOrderGroupByOutputType = {
   orderCurrency: string | null
   productionGateStatus: string | null
   addressReviewStatus: string | null
+  itemReviewStatus: string | null
+  artworkReviewStatus: string | null
   costReviewStatus: string | null
+  attentionReviewStatus: string | null
+  providerPushProgress: string | null
   progressStatus: string | null
   deliveryStatus: string | null
+  manualReleaseRequired: boolean
+  providerPaidAt: Date | null
   releasedToProductionAt: Date | null
+  pushAcknowledgedAt: Date | null
+  pushVerifiedAt: Date | null
+  providerAddressUpdatedAt: Date | null
   heldAt: Date | null
+  lastReadinessCheckAt: Date | null
   lastAddressCheckAt: Date | null
   lastCostCheckAt: Date | null
   lastProgressSyncAt: Date | null
   lastTrackingSyncAt: Date | null
   lastHistorySyncAt: Date | null
+  lastTicketSyncAt: Date | null
   djangoProcessResponsePayload: runtime.JsonValue | null
   merchizeExternalLookupPayload: runtime.JsonValue | null
   merchizeInDepthOrderDetailPayload: runtime.JsonValue | null
   merchizeAddressSuggestionPayload: runtime.JsonValue | null
+  merchizeUnfulfilledItemsPayload: runtime.JsonValue | null
+  merchizeRequireAttentionPayload: runtime.JsonValue | null
+  merchizeSendToFulfillmentPayload: runtime.JsonValue | null
+  merchizeProductionReadinessPayload: runtime.JsonValue | null
   merchizeFulfillmentCostPayload: runtime.JsonValue | null
   merchizeTransactionFeePayload: runtime.JsonValue | null
   merchizeProgressPayload: runtime.JsonValue | null
+  merchizeInternalProgressPayload: runtime.JsonValue | null
   merchizeTrackingPayload: runtime.JsonValue | null
   merchizeHistoryPayload: runtime.JsonValue | null
+  merchizeTicketsPayload: runtime.JsonValue | null
   syncStatus: string
   lastSyncErrorCode: string | null
   lastSyncErrorMessage: string | null
@@ -546,25 +641,42 @@ export type MerchizeFulfillmentOrderWhereInput = {
   orderCurrency?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
   productionGateStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
   addressReviewStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
+  itemReviewStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
+  artworkReviewStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
   costReviewStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
+  attentionReviewStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
+  providerPushProgress?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
   progressStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
   deliveryStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
+  manualReleaseRequired?: Prisma.BoolFilter<"MerchizeFulfillmentOrder"> | boolean
+  providerPaidAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   releasedToProductionAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  pushAcknowledgedAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  pushVerifiedAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  providerAddressUpdatedAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   heldAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  lastReadinessCheckAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastAddressCheckAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastCostCheckAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastProgressSyncAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastTrackingSyncAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastHistorySyncAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  lastTicketSyncAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   djangoProcessResponsePayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeExternalLookupPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeInDepthOrderDetailPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeAddressSuggestionPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
+  merchizeUnfulfilledItemsPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
+  merchizeRequireAttentionPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
+  merchizeSendToFulfillmentPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
+  merchizeProductionReadinessPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeFulfillmentCostPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeTransactionFeePayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeProgressPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
+  merchizeInternalProgressPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeTrackingPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeHistoryPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
+  merchizeTicketsPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   syncStatus?: Prisma.StringFilter<"MerchizeFulfillmentOrder"> | string
   lastSyncErrorCode?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
   lastSyncErrorMessage?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
@@ -606,25 +718,42 @@ export type MerchizeFulfillmentOrderOrderByWithRelationInput = {
   orderCurrency?: Prisma.SortOrderInput | Prisma.SortOrder
   productionGateStatus?: Prisma.SortOrderInput | Prisma.SortOrder
   addressReviewStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  itemReviewStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  artworkReviewStatus?: Prisma.SortOrderInput | Prisma.SortOrder
   costReviewStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  attentionReviewStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  providerPushProgress?: Prisma.SortOrderInput | Prisma.SortOrder
   progressStatus?: Prisma.SortOrderInput | Prisma.SortOrder
   deliveryStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  manualReleaseRequired?: Prisma.SortOrder
+  providerPaidAt?: Prisma.SortOrderInput | Prisma.SortOrder
   releasedToProductionAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  pushAcknowledgedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  pushVerifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  providerAddressUpdatedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   heldAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastReadinessCheckAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastAddressCheckAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastCostCheckAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastProgressSyncAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastTrackingSyncAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastHistorySyncAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastTicketSyncAt?: Prisma.SortOrderInput | Prisma.SortOrder
   djangoProcessResponsePayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeExternalLookupPayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeInDepthOrderDetailPayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeAddressSuggestionPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeUnfulfilledItemsPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeRequireAttentionPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeSendToFulfillmentPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeProductionReadinessPayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeFulfillmentCostPayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeTransactionFeePayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeProgressPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeInternalProgressPayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeTrackingPayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeHistoryPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeTicketsPayload?: Prisma.SortOrderInput | Prisma.SortOrder
   syncStatus?: Prisma.SortOrder
   lastSyncErrorCode?: Prisma.SortOrderInput | Prisma.SortOrder
   lastSyncErrorMessage?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -669,25 +798,42 @@ export type MerchizeFulfillmentOrderWhereUniqueInput = Prisma.AtLeast<{
   orderCurrency?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
   productionGateStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
   addressReviewStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
+  itemReviewStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
+  artworkReviewStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
   costReviewStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
+  attentionReviewStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
+  providerPushProgress?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
   progressStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
   deliveryStatus?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
+  manualReleaseRequired?: Prisma.BoolFilter<"MerchizeFulfillmentOrder"> | boolean
+  providerPaidAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   releasedToProductionAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  pushAcknowledgedAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  pushVerifiedAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  providerAddressUpdatedAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   heldAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  lastReadinessCheckAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastAddressCheckAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastCostCheckAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastProgressSyncAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastTrackingSyncAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastHistorySyncAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  lastTicketSyncAt?: Prisma.DateTimeNullableFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   djangoProcessResponsePayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeExternalLookupPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeInDepthOrderDetailPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeAddressSuggestionPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
+  merchizeUnfulfilledItemsPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
+  merchizeRequireAttentionPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
+  merchizeSendToFulfillmentPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
+  merchizeProductionReadinessPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeFulfillmentCostPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeTransactionFeePayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeProgressPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
+  merchizeInternalProgressPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeTrackingPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   merchizeHistoryPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
+  merchizeTicketsPayload?: Prisma.JsonNullableFilter<"MerchizeFulfillmentOrder">
   syncStatus?: Prisma.StringFilter<"MerchizeFulfillmentOrder"> | string
   lastSyncErrorCode?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
   lastSyncErrorMessage?: Prisma.StringNullableFilter<"MerchizeFulfillmentOrder"> | string | null
@@ -729,25 +875,42 @@ export type MerchizeFulfillmentOrderOrderByWithAggregationInput = {
   orderCurrency?: Prisma.SortOrderInput | Prisma.SortOrder
   productionGateStatus?: Prisma.SortOrderInput | Prisma.SortOrder
   addressReviewStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  itemReviewStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  artworkReviewStatus?: Prisma.SortOrderInput | Prisma.SortOrder
   costReviewStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  attentionReviewStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  providerPushProgress?: Prisma.SortOrderInput | Prisma.SortOrder
   progressStatus?: Prisma.SortOrderInput | Prisma.SortOrder
   deliveryStatus?: Prisma.SortOrderInput | Prisma.SortOrder
+  manualReleaseRequired?: Prisma.SortOrder
+  providerPaidAt?: Prisma.SortOrderInput | Prisma.SortOrder
   releasedToProductionAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  pushAcknowledgedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  pushVerifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  providerAddressUpdatedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   heldAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastReadinessCheckAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastAddressCheckAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastCostCheckAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastProgressSyncAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastTrackingSyncAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastHistorySyncAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastTicketSyncAt?: Prisma.SortOrderInput | Prisma.SortOrder
   djangoProcessResponsePayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeExternalLookupPayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeInDepthOrderDetailPayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeAddressSuggestionPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeUnfulfilledItemsPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeRequireAttentionPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeSendToFulfillmentPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeProductionReadinessPayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeFulfillmentCostPayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeTransactionFeePayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeProgressPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeInternalProgressPayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeTrackingPayload?: Prisma.SortOrderInput | Prisma.SortOrder
   merchizeHistoryPayload?: Prisma.SortOrderInput | Prisma.SortOrder
+  merchizeTicketsPayload?: Prisma.SortOrderInput | Prisma.SortOrder
   syncStatus?: Prisma.SortOrder
   lastSyncErrorCode?: Prisma.SortOrderInput | Prisma.SortOrder
   lastSyncErrorMessage?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -794,25 +957,42 @@ export type MerchizeFulfillmentOrderScalarWhereWithAggregatesInput = {
   orderCurrency?: Prisma.StringNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | string | null
   productionGateStatus?: Prisma.StringNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | string | null
   addressReviewStatus?: Prisma.StringNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | string | null
+  itemReviewStatus?: Prisma.StringNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | string | null
+  artworkReviewStatus?: Prisma.StringNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | string | null
   costReviewStatus?: Prisma.StringNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | string | null
+  attentionReviewStatus?: Prisma.StringNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | string | null
+  providerPushProgress?: Prisma.StringNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | string | null
   progressStatus?: Prisma.StringNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | string | null
   deliveryStatus?: Prisma.StringNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | string | null
+  manualReleaseRequired?: Prisma.BoolWithAggregatesFilter<"MerchizeFulfillmentOrder"> | boolean
+  providerPaidAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   releasedToProductionAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  pushAcknowledgedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  pushVerifiedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  providerAddressUpdatedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   heldAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  lastReadinessCheckAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastAddressCheckAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastCostCheckAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastProgressSyncAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastTrackingSyncAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   lastHistorySyncAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | Date | string | null
+  lastTicketSyncAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | Date | string | null
   djangoProcessResponsePayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
   merchizeExternalLookupPayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
   merchizeInDepthOrderDetailPayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
   merchizeAddressSuggestionPayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
+  merchizeUnfulfilledItemsPayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
+  merchizeRequireAttentionPayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
+  merchizeSendToFulfillmentPayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
+  merchizeProductionReadinessPayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
   merchizeFulfillmentCostPayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
   merchizeTransactionFeePayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
   merchizeProgressPayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
+  merchizeInternalProgressPayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
   merchizeTrackingPayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
   merchizeHistoryPayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
+  merchizeTicketsPayload?: Prisma.JsonNullableWithAggregatesFilter<"MerchizeFulfillmentOrder">
   syncStatus?: Prisma.StringWithAggregatesFilter<"MerchizeFulfillmentOrder"> | string
   lastSyncErrorCode?: Prisma.StringNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | string | null
   lastSyncErrorMessage?: Prisma.StringNullableWithAggregatesFilter<"MerchizeFulfillmentOrder"> | string | null
@@ -851,25 +1031,42 @@ export type MerchizeFulfillmentOrderCreateInput = {
   orderCurrency?: string | null
   productionGateStatus?: string | null
   addressReviewStatus?: string | null
+  itemReviewStatus?: string | null
+  artworkReviewStatus?: string | null
   costReviewStatus?: string | null
+  attentionReviewStatus?: string | null
+  providerPushProgress?: string | null
   progressStatus?: string | null
   deliveryStatus?: string | null
+  manualReleaseRequired?: boolean
+  providerPaidAt?: Date | string | null
   releasedToProductionAt?: Date | string | null
+  pushAcknowledgedAt?: Date | string | null
+  pushVerifiedAt?: Date | string | null
+  providerAddressUpdatedAt?: Date | string | null
   heldAt?: Date | string | null
+  lastReadinessCheckAt?: Date | string | null
   lastAddressCheckAt?: Date | string | null
   lastCostCheckAt?: Date | string | null
   lastProgressSyncAt?: Date | string | null
   lastTrackingSyncAt?: Date | string | null
   lastHistorySyncAt?: Date | string | null
+  lastTicketSyncAt?: Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus: string
   lastSyncErrorCode?: string | null
   lastSyncErrorMessage?: string | null
@@ -911,25 +1108,42 @@ export type MerchizeFulfillmentOrderUncheckedCreateInput = {
   orderCurrency?: string | null
   productionGateStatus?: string | null
   addressReviewStatus?: string | null
+  itemReviewStatus?: string | null
+  artworkReviewStatus?: string | null
   costReviewStatus?: string | null
+  attentionReviewStatus?: string | null
+  providerPushProgress?: string | null
   progressStatus?: string | null
   deliveryStatus?: string | null
+  manualReleaseRequired?: boolean
+  providerPaidAt?: Date | string | null
   releasedToProductionAt?: Date | string | null
+  pushAcknowledgedAt?: Date | string | null
+  pushVerifiedAt?: Date | string | null
+  providerAddressUpdatedAt?: Date | string | null
   heldAt?: Date | string | null
+  lastReadinessCheckAt?: Date | string | null
   lastAddressCheckAt?: Date | string | null
   lastCostCheckAt?: Date | string | null
   lastProgressSyncAt?: Date | string | null
   lastTrackingSyncAt?: Date | string | null
   lastHistorySyncAt?: Date | string | null
+  lastTicketSyncAt?: Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus: string
   lastSyncErrorCode?: string | null
   lastSyncErrorMessage?: string | null
@@ -971,25 +1185,42 @@ export type MerchizeFulfillmentOrderUpdateInput = {
   orderCurrency?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   productionGateStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   addressReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  itemReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  artworkReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   costReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  attentionReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerPushProgress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   progressStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveryStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  manualReleaseRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  providerPaidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   releasedToProductionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushAcknowledgedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  providerAddressUpdatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   heldAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastReadinessCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastAddressCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastCostCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastProgressSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastTrackingSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHistorySyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastTicketSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus?: Prisma.StringFieldUpdateOperationsInput | string
   lastSyncErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastSyncErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1031,25 +1262,42 @@ export type MerchizeFulfillmentOrderUncheckedUpdateInput = {
   orderCurrency?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   productionGateStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   addressReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  itemReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  artworkReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   costReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  attentionReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerPushProgress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   progressStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveryStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  manualReleaseRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  providerPaidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   releasedToProductionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushAcknowledgedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  providerAddressUpdatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   heldAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastReadinessCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastAddressCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastCostCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastProgressSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastTrackingSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHistorySyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastTicketSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus?: Prisma.StringFieldUpdateOperationsInput | string
   lastSyncErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastSyncErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1091,25 +1339,42 @@ export type MerchizeFulfillmentOrderCreateManyInput = {
   orderCurrency?: string | null
   productionGateStatus?: string | null
   addressReviewStatus?: string | null
+  itemReviewStatus?: string | null
+  artworkReviewStatus?: string | null
   costReviewStatus?: string | null
+  attentionReviewStatus?: string | null
+  providerPushProgress?: string | null
   progressStatus?: string | null
   deliveryStatus?: string | null
+  manualReleaseRequired?: boolean
+  providerPaidAt?: Date | string | null
   releasedToProductionAt?: Date | string | null
+  pushAcknowledgedAt?: Date | string | null
+  pushVerifiedAt?: Date | string | null
+  providerAddressUpdatedAt?: Date | string | null
   heldAt?: Date | string | null
+  lastReadinessCheckAt?: Date | string | null
   lastAddressCheckAt?: Date | string | null
   lastCostCheckAt?: Date | string | null
   lastProgressSyncAt?: Date | string | null
   lastTrackingSyncAt?: Date | string | null
   lastHistorySyncAt?: Date | string | null
+  lastTicketSyncAt?: Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus: string
   lastSyncErrorCode?: string | null
   lastSyncErrorMessage?: string | null
@@ -1148,25 +1413,42 @@ export type MerchizeFulfillmentOrderUpdateManyMutationInput = {
   orderCurrency?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   productionGateStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   addressReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  itemReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  artworkReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   costReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  attentionReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerPushProgress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   progressStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveryStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  manualReleaseRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  providerPaidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   releasedToProductionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushAcknowledgedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  providerAddressUpdatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   heldAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastReadinessCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastAddressCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastCostCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastProgressSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastTrackingSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHistorySyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastTicketSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus?: Prisma.StringFieldUpdateOperationsInput | string
   lastSyncErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastSyncErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1205,25 +1487,42 @@ export type MerchizeFulfillmentOrderUncheckedUpdateManyInput = {
   orderCurrency?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   productionGateStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   addressReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  itemReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  artworkReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   costReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  attentionReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerPushProgress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   progressStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveryStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  manualReleaseRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  providerPaidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   releasedToProductionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushAcknowledgedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  providerAddressUpdatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   heldAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastReadinessCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastAddressCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastCostCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastProgressSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastTrackingSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHistorySyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastTicketSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus?: Prisma.StringFieldUpdateOperationsInput | string
   lastSyncErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastSyncErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1262,25 +1561,42 @@ export type MerchizeFulfillmentOrderCountOrderByAggregateInput = {
   orderCurrency?: Prisma.SortOrder
   productionGateStatus?: Prisma.SortOrder
   addressReviewStatus?: Prisma.SortOrder
+  itemReviewStatus?: Prisma.SortOrder
+  artworkReviewStatus?: Prisma.SortOrder
   costReviewStatus?: Prisma.SortOrder
+  attentionReviewStatus?: Prisma.SortOrder
+  providerPushProgress?: Prisma.SortOrder
   progressStatus?: Prisma.SortOrder
   deliveryStatus?: Prisma.SortOrder
+  manualReleaseRequired?: Prisma.SortOrder
+  providerPaidAt?: Prisma.SortOrder
   releasedToProductionAt?: Prisma.SortOrder
+  pushAcknowledgedAt?: Prisma.SortOrder
+  pushVerifiedAt?: Prisma.SortOrder
+  providerAddressUpdatedAt?: Prisma.SortOrder
   heldAt?: Prisma.SortOrder
+  lastReadinessCheckAt?: Prisma.SortOrder
   lastAddressCheckAt?: Prisma.SortOrder
   lastCostCheckAt?: Prisma.SortOrder
   lastProgressSyncAt?: Prisma.SortOrder
   lastTrackingSyncAt?: Prisma.SortOrder
   lastHistorySyncAt?: Prisma.SortOrder
+  lastTicketSyncAt?: Prisma.SortOrder
   djangoProcessResponsePayload?: Prisma.SortOrder
   merchizeExternalLookupPayload?: Prisma.SortOrder
   merchizeInDepthOrderDetailPayload?: Prisma.SortOrder
   merchizeAddressSuggestionPayload?: Prisma.SortOrder
+  merchizeUnfulfilledItemsPayload?: Prisma.SortOrder
+  merchizeRequireAttentionPayload?: Prisma.SortOrder
+  merchizeSendToFulfillmentPayload?: Prisma.SortOrder
+  merchizeProductionReadinessPayload?: Prisma.SortOrder
   merchizeFulfillmentCostPayload?: Prisma.SortOrder
   merchizeTransactionFeePayload?: Prisma.SortOrder
   merchizeProgressPayload?: Prisma.SortOrder
+  merchizeInternalProgressPayload?: Prisma.SortOrder
   merchizeTrackingPayload?: Prisma.SortOrder
   merchizeHistoryPayload?: Prisma.SortOrder
+  merchizeTicketsPayload?: Prisma.SortOrder
   syncStatus?: Prisma.SortOrder
   lastSyncErrorCode?: Prisma.SortOrder
   lastSyncErrorMessage?: Prisma.SortOrder
@@ -1324,16 +1640,27 @@ export type MerchizeFulfillmentOrderMaxOrderByAggregateInput = {
   orderCurrency?: Prisma.SortOrder
   productionGateStatus?: Prisma.SortOrder
   addressReviewStatus?: Prisma.SortOrder
+  itemReviewStatus?: Prisma.SortOrder
+  artworkReviewStatus?: Prisma.SortOrder
   costReviewStatus?: Prisma.SortOrder
+  attentionReviewStatus?: Prisma.SortOrder
+  providerPushProgress?: Prisma.SortOrder
   progressStatus?: Prisma.SortOrder
   deliveryStatus?: Prisma.SortOrder
+  manualReleaseRequired?: Prisma.SortOrder
+  providerPaidAt?: Prisma.SortOrder
   releasedToProductionAt?: Prisma.SortOrder
+  pushAcknowledgedAt?: Prisma.SortOrder
+  pushVerifiedAt?: Prisma.SortOrder
+  providerAddressUpdatedAt?: Prisma.SortOrder
   heldAt?: Prisma.SortOrder
+  lastReadinessCheckAt?: Prisma.SortOrder
   lastAddressCheckAt?: Prisma.SortOrder
   lastCostCheckAt?: Prisma.SortOrder
   lastProgressSyncAt?: Prisma.SortOrder
   lastTrackingSyncAt?: Prisma.SortOrder
   lastHistorySyncAt?: Prisma.SortOrder
+  lastTicketSyncAt?: Prisma.SortOrder
   syncStatus?: Prisma.SortOrder
   lastSyncErrorCode?: Prisma.SortOrder
   lastSyncErrorMessage?: Prisma.SortOrder
@@ -1372,16 +1699,27 @@ export type MerchizeFulfillmentOrderMinOrderByAggregateInput = {
   orderCurrency?: Prisma.SortOrder
   productionGateStatus?: Prisma.SortOrder
   addressReviewStatus?: Prisma.SortOrder
+  itemReviewStatus?: Prisma.SortOrder
+  artworkReviewStatus?: Prisma.SortOrder
   costReviewStatus?: Prisma.SortOrder
+  attentionReviewStatus?: Prisma.SortOrder
+  providerPushProgress?: Prisma.SortOrder
   progressStatus?: Prisma.SortOrder
   deliveryStatus?: Prisma.SortOrder
+  manualReleaseRequired?: Prisma.SortOrder
+  providerPaidAt?: Prisma.SortOrder
   releasedToProductionAt?: Prisma.SortOrder
+  pushAcknowledgedAt?: Prisma.SortOrder
+  pushVerifiedAt?: Prisma.SortOrder
+  providerAddressUpdatedAt?: Prisma.SortOrder
   heldAt?: Prisma.SortOrder
+  lastReadinessCheckAt?: Prisma.SortOrder
   lastAddressCheckAt?: Prisma.SortOrder
   lastCostCheckAt?: Prisma.SortOrder
   lastProgressSyncAt?: Prisma.SortOrder
   lastTrackingSyncAt?: Prisma.SortOrder
   lastHistorySyncAt?: Prisma.SortOrder
+  lastTicketSyncAt?: Prisma.SortOrder
   syncStatus?: Prisma.SortOrder
   lastSyncErrorCode?: Prisma.SortOrder
   lastSyncErrorMessage?: Prisma.SortOrder
@@ -1428,6 +1766,10 @@ export type IntFieldUpdateOperationsInput = {
   decrement?: number
   multiply?: number
   divide?: number
+}
+
+export type BoolFieldUpdateOperationsInput = {
+  set?: boolean
 }
 
 export type NullableDateTimeFieldUpdateOperationsInput = {
@@ -1509,25 +1851,42 @@ export type MerchizeFulfillmentOrderCreateWithoutItemsInput = {
   orderCurrency?: string | null
   productionGateStatus?: string | null
   addressReviewStatus?: string | null
+  itemReviewStatus?: string | null
+  artworkReviewStatus?: string | null
   costReviewStatus?: string | null
+  attentionReviewStatus?: string | null
+  providerPushProgress?: string | null
   progressStatus?: string | null
   deliveryStatus?: string | null
+  manualReleaseRequired?: boolean
+  providerPaidAt?: Date | string | null
   releasedToProductionAt?: Date | string | null
+  pushAcknowledgedAt?: Date | string | null
+  pushVerifiedAt?: Date | string | null
+  providerAddressUpdatedAt?: Date | string | null
   heldAt?: Date | string | null
+  lastReadinessCheckAt?: Date | string | null
   lastAddressCheckAt?: Date | string | null
   lastCostCheckAt?: Date | string | null
   lastProgressSyncAt?: Date | string | null
   lastTrackingSyncAt?: Date | string | null
   lastHistorySyncAt?: Date | string | null
+  lastTicketSyncAt?: Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus: string
   lastSyncErrorCode?: string | null
   lastSyncErrorMessage?: string | null
@@ -1568,25 +1927,42 @@ export type MerchizeFulfillmentOrderUncheckedCreateWithoutItemsInput = {
   orderCurrency?: string | null
   productionGateStatus?: string | null
   addressReviewStatus?: string | null
+  itemReviewStatus?: string | null
+  artworkReviewStatus?: string | null
   costReviewStatus?: string | null
+  attentionReviewStatus?: string | null
+  providerPushProgress?: string | null
   progressStatus?: string | null
   deliveryStatus?: string | null
+  manualReleaseRequired?: boolean
+  providerPaidAt?: Date | string | null
   releasedToProductionAt?: Date | string | null
+  pushAcknowledgedAt?: Date | string | null
+  pushVerifiedAt?: Date | string | null
+  providerAddressUpdatedAt?: Date | string | null
   heldAt?: Date | string | null
+  lastReadinessCheckAt?: Date | string | null
   lastAddressCheckAt?: Date | string | null
   lastCostCheckAt?: Date | string | null
   lastProgressSyncAt?: Date | string | null
   lastTrackingSyncAt?: Date | string | null
   lastHistorySyncAt?: Date | string | null
+  lastTicketSyncAt?: Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus: string
   lastSyncErrorCode?: string | null
   lastSyncErrorMessage?: string | null
@@ -1643,25 +2019,42 @@ export type MerchizeFulfillmentOrderUpdateWithoutItemsInput = {
   orderCurrency?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   productionGateStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   addressReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  itemReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  artworkReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   costReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  attentionReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerPushProgress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   progressStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveryStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  manualReleaseRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  providerPaidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   releasedToProductionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushAcknowledgedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  providerAddressUpdatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   heldAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastReadinessCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastAddressCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastCostCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastProgressSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastTrackingSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHistorySyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastTicketSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus?: Prisma.StringFieldUpdateOperationsInput | string
   lastSyncErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastSyncErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1702,25 +2095,42 @@ export type MerchizeFulfillmentOrderUncheckedUpdateWithoutItemsInput = {
   orderCurrency?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   productionGateStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   addressReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  itemReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  artworkReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   costReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  attentionReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerPushProgress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   progressStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveryStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  manualReleaseRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  providerPaidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   releasedToProductionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushAcknowledgedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  providerAddressUpdatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   heldAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastReadinessCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastAddressCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastCostCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastProgressSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastTrackingSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHistorySyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastTicketSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus?: Prisma.StringFieldUpdateOperationsInput | string
   lastSyncErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastSyncErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1761,25 +2171,42 @@ export type MerchizeFulfillmentOrderCreateWithoutSyncAttemptsInput = {
   orderCurrency?: string | null
   productionGateStatus?: string | null
   addressReviewStatus?: string | null
+  itemReviewStatus?: string | null
+  artworkReviewStatus?: string | null
   costReviewStatus?: string | null
+  attentionReviewStatus?: string | null
+  providerPushProgress?: string | null
   progressStatus?: string | null
   deliveryStatus?: string | null
+  manualReleaseRequired?: boolean
+  providerPaidAt?: Date | string | null
   releasedToProductionAt?: Date | string | null
+  pushAcknowledgedAt?: Date | string | null
+  pushVerifiedAt?: Date | string | null
+  providerAddressUpdatedAt?: Date | string | null
   heldAt?: Date | string | null
+  lastReadinessCheckAt?: Date | string | null
   lastAddressCheckAt?: Date | string | null
   lastCostCheckAt?: Date | string | null
   lastProgressSyncAt?: Date | string | null
   lastTrackingSyncAt?: Date | string | null
   lastHistorySyncAt?: Date | string | null
+  lastTicketSyncAt?: Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus: string
   lastSyncErrorCode?: string | null
   lastSyncErrorMessage?: string | null
@@ -1820,25 +2247,42 @@ export type MerchizeFulfillmentOrderUncheckedCreateWithoutSyncAttemptsInput = {
   orderCurrency?: string | null
   productionGateStatus?: string | null
   addressReviewStatus?: string | null
+  itemReviewStatus?: string | null
+  artworkReviewStatus?: string | null
   costReviewStatus?: string | null
+  attentionReviewStatus?: string | null
+  providerPushProgress?: string | null
   progressStatus?: string | null
   deliveryStatus?: string | null
+  manualReleaseRequired?: boolean
+  providerPaidAt?: Date | string | null
   releasedToProductionAt?: Date | string | null
+  pushAcknowledgedAt?: Date | string | null
+  pushVerifiedAt?: Date | string | null
+  providerAddressUpdatedAt?: Date | string | null
   heldAt?: Date | string | null
+  lastReadinessCheckAt?: Date | string | null
   lastAddressCheckAt?: Date | string | null
   lastCostCheckAt?: Date | string | null
   lastProgressSyncAt?: Date | string | null
   lastTrackingSyncAt?: Date | string | null
   lastHistorySyncAt?: Date | string | null
+  lastTicketSyncAt?: Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus: string
   lastSyncErrorCode?: string | null
   lastSyncErrorMessage?: string | null
@@ -1895,25 +2339,42 @@ export type MerchizeFulfillmentOrderUpdateWithoutSyncAttemptsInput = {
   orderCurrency?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   productionGateStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   addressReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  itemReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  artworkReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   costReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  attentionReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerPushProgress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   progressStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveryStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  manualReleaseRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  providerPaidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   releasedToProductionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushAcknowledgedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  providerAddressUpdatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   heldAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastReadinessCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastAddressCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastCostCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastProgressSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastTrackingSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHistorySyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastTicketSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus?: Prisma.StringFieldUpdateOperationsInput | string
   lastSyncErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastSyncErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1954,25 +2415,42 @@ export type MerchizeFulfillmentOrderUncheckedUpdateWithoutSyncAttemptsInput = {
   orderCurrency?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   productionGateStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   addressReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  itemReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  artworkReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   costReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  attentionReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerPushProgress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   progressStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveryStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  manualReleaseRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  providerPaidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   releasedToProductionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushAcknowledgedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  providerAddressUpdatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   heldAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastReadinessCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastAddressCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastCostCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastProgressSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastTrackingSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHistorySyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastTicketSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus?: Prisma.StringFieldUpdateOperationsInput | string
   lastSyncErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastSyncErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2013,25 +2491,42 @@ export type MerchizeFulfillmentOrderCreateWithoutAdminActionsInput = {
   orderCurrency?: string | null
   productionGateStatus?: string | null
   addressReviewStatus?: string | null
+  itemReviewStatus?: string | null
+  artworkReviewStatus?: string | null
   costReviewStatus?: string | null
+  attentionReviewStatus?: string | null
+  providerPushProgress?: string | null
   progressStatus?: string | null
   deliveryStatus?: string | null
+  manualReleaseRequired?: boolean
+  providerPaidAt?: Date | string | null
   releasedToProductionAt?: Date | string | null
+  pushAcknowledgedAt?: Date | string | null
+  pushVerifiedAt?: Date | string | null
+  providerAddressUpdatedAt?: Date | string | null
   heldAt?: Date | string | null
+  lastReadinessCheckAt?: Date | string | null
   lastAddressCheckAt?: Date | string | null
   lastCostCheckAt?: Date | string | null
   lastProgressSyncAt?: Date | string | null
   lastTrackingSyncAt?: Date | string | null
   lastHistorySyncAt?: Date | string | null
+  lastTicketSyncAt?: Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus: string
   lastSyncErrorCode?: string | null
   lastSyncErrorMessage?: string | null
@@ -2072,25 +2567,42 @@ export type MerchizeFulfillmentOrderUncheckedCreateWithoutAdminActionsInput = {
   orderCurrency?: string | null
   productionGateStatus?: string | null
   addressReviewStatus?: string | null
+  itemReviewStatus?: string | null
+  artworkReviewStatus?: string | null
   costReviewStatus?: string | null
+  attentionReviewStatus?: string | null
+  providerPushProgress?: string | null
   progressStatus?: string | null
   deliveryStatus?: string | null
+  manualReleaseRequired?: boolean
+  providerPaidAt?: Date | string | null
   releasedToProductionAt?: Date | string | null
+  pushAcknowledgedAt?: Date | string | null
+  pushVerifiedAt?: Date | string | null
+  providerAddressUpdatedAt?: Date | string | null
   heldAt?: Date | string | null
+  lastReadinessCheckAt?: Date | string | null
   lastAddressCheckAt?: Date | string | null
   lastCostCheckAt?: Date | string | null
   lastProgressSyncAt?: Date | string | null
   lastTrackingSyncAt?: Date | string | null
   lastHistorySyncAt?: Date | string | null
+  lastTicketSyncAt?: Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus: string
   lastSyncErrorCode?: string | null
   lastSyncErrorMessage?: string | null
@@ -2147,25 +2659,42 @@ export type MerchizeFulfillmentOrderUpdateWithoutAdminActionsInput = {
   orderCurrency?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   productionGateStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   addressReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  itemReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  artworkReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   costReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  attentionReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerPushProgress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   progressStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveryStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  manualReleaseRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  providerPaidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   releasedToProductionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushAcknowledgedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  providerAddressUpdatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   heldAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastReadinessCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastAddressCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastCostCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastProgressSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastTrackingSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHistorySyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastTicketSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus?: Prisma.StringFieldUpdateOperationsInput | string
   lastSyncErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastSyncErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2206,25 +2735,42 @@ export type MerchizeFulfillmentOrderUncheckedUpdateWithoutAdminActionsInput = {
   orderCurrency?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   productionGateStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   addressReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  itemReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  artworkReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   costReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  attentionReviewStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  providerPushProgress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   progressStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveryStatus?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  manualReleaseRequired?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  providerPaidAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   releasedToProductionAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushAcknowledgedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  pushVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  providerAddressUpdatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   heldAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastReadinessCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastAddressCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastCostCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastProgressSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastTrackingSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastHistorySyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastTicketSyncAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   djangoProcessResponsePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeExternalLookupPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeInDepthOrderDetailPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeAddressSuggestionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeUnfulfilledItemsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeRequireAttentionPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeSendToFulfillmentPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeProductionReadinessPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeFulfillmentCostPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTransactionFeePayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeInternalProgressPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeTrackingPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   merchizeHistoryPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  merchizeTicketsPayload?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   syncStatus?: Prisma.StringFieldUpdateOperationsInput | string
   lastSyncErrorCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastSyncErrorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2314,25 +2860,42 @@ export type MerchizeFulfillmentOrderSelect<ExtArgs extends runtime.Types.Extensi
   orderCurrency?: boolean
   productionGateStatus?: boolean
   addressReviewStatus?: boolean
+  itemReviewStatus?: boolean
+  artworkReviewStatus?: boolean
   costReviewStatus?: boolean
+  attentionReviewStatus?: boolean
+  providerPushProgress?: boolean
   progressStatus?: boolean
   deliveryStatus?: boolean
+  manualReleaseRequired?: boolean
+  providerPaidAt?: boolean
   releasedToProductionAt?: boolean
+  pushAcknowledgedAt?: boolean
+  pushVerifiedAt?: boolean
+  providerAddressUpdatedAt?: boolean
   heldAt?: boolean
+  lastReadinessCheckAt?: boolean
   lastAddressCheckAt?: boolean
   lastCostCheckAt?: boolean
   lastProgressSyncAt?: boolean
   lastTrackingSyncAt?: boolean
   lastHistorySyncAt?: boolean
+  lastTicketSyncAt?: boolean
   djangoProcessResponsePayload?: boolean
   merchizeExternalLookupPayload?: boolean
   merchizeInDepthOrderDetailPayload?: boolean
   merchizeAddressSuggestionPayload?: boolean
+  merchizeUnfulfilledItemsPayload?: boolean
+  merchizeRequireAttentionPayload?: boolean
+  merchizeSendToFulfillmentPayload?: boolean
+  merchizeProductionReadinessPayload?: boolean
   merchizeFulfillmentCostPayload?: boolean
   merchizeTransactionFeePayload?: boolean
   merchizeProgressPayload?: boolean
+  merchizeInternalProgressPayload?: boolean
   merchizeTrackingPayload?: boolean
   merchizeHistoryPayload?: boolean
+  merchizeTicketsPayload?: boolean
   syncStatus?: boolean
   lastSyncErrorCode?: boolean
   lastSyncErrorMessage?: boolean
@@ -2375,25 +2938,42 @@ export type MerchizeFulfillmentOrderSelectCreateManyAndReturn<ExtArgs extends ru
   orderCurrency?: boolean
   productionGateStatus?: boolean
   addressReviewStatus?: boolean
+  itemReviewStatus?: boolean
+  artworkReviewStatus?: boolean
   costReviewStatus?: boolean
+  attentionReviewStatus?: boolean
+  providerPushProgress?: boolean
   progressStatus?: boolean
   deliveryStatus?: boolean
+  manualReleaseRequired?: boolean
+  providerPaidAt?: boolean
   releasedToProductionAt?: boolean
+  pushAcknowledgedAt?: boolean
+  pushVerifiedAt?: boolean
+  providerAddressUpdatedAt?: boolean
   heldAt?: boolean
+  lastReadinessCheckAt?: boolean
   lastAddressCheckAt?: boolean
   lastCostCheckAt?: boolean
   lastProgressSyncAt?: boolean
   lastTrackingSyncAt?: boolean
   lastHistorySyncAt?: boolean
+  lastTicketSyncAt?: boolean
   djangoProcessResponsePayload?: boolean
   merchizeExternalLookupPayload?: boolean
   merchizeInDepthOrderDetailPayload?: boolean
   merchizeAddressSuggestionPayload?: boolean
+  merchizeUnfulfilledItemsPayload?: boolean
+  merchizeRequireAttentionPayload?: boolean
+  merchizeSendToFulfillmentPayload?: boolean
+  merchizeProductionReadinessPayload?: boolean
   merchizeFulfillmentCostPayload?: boolean
   merchizeTransactionFeePayload?: boolean
   merchizeProgressPayload?: boolean
+  merchizeInternalProgressPayload?: boolean
   merchizeTrackingPayload?: boolean
   merchizeHistoryPayload?: boolean
+  merchizeTicketsPayload?: boolean
   syncStatus?: boolean
   lastSyncErrorCode?: boolean
   lastSyncErrorMessage?: boolean
@@ -2432,25 +3012,42 @@ export type MerchizeFulfillmentOrderSelectUpdateManyAndReturn<ExtArgs extends ru
   orderCurrency?: boolean
   productionGateStatus?: boolean
   addressReviewStatus?: boolean
+  itemReviewStatus?: boolean
+  artworkReviewStatus?: boolean
   costReviewStatus?: boolean
+  attentionReviewStatus?: boolean
+  providerPushProgress?: boolean
   progressStatus?: boolean
   deliveryStatus?: boolean
+  manualReleaseRequired?: boolean
+  providerPaidAt?: boolean
   releasedToProductionAt?: boolean
+  pushAcknowledgedAt?: boolean
+  pushVerifiedAt?: boolean
+  providerAddressUpdatedAt?: boolean
   heldAt?: boolean
+  lastReadinessCheckAt?: boolean
   lastAddressCheckAt?: boolean
   lastCostCheckAt?: boolean
   lastProgressSyncAt?: boolean
   lastTrackingSyncAt?: boolean
   lastHistorySyncAt?: boolean
+  lastTicketSyncAt?: boolean
   djangoProcessResponsePayload?: boolean
   merchizeExternalLookupPayload?: boolean
   merchizeInDepthOrderDetailPayload?: boolean
   merchizeAddressSuggestionPayload?: boolean
+  merchizeUnfulfilledItemsPayload?: boolean
+  merchizeRequireAttentionPayload?: boolean
+  merchizeSendToFulfillmentPayload?: boolean
+  merchizeProductionReadinessPayload?: boolean
   merchizeFulfillmentCostPayload?: boolean
   merchizeTransactionFeePayload?: boolean
   merchizeProgressPayload?: boolean
+  merchizeInternalProgressPayload?: boolean
   merchizeTrackingPayload?: boolean
   merchizeHistoryPayload?: boolean
+  merchizeTicketsPayload?: boolean
   syncStatus?: boolean
   lastSyncErrorCode?: boolean
   lastSyncErrorMessage?: boolean
@@ -2489,25 +3086,42 @@ export type MerchizeFulfillmentOrderSelectScalar = {
   orderCurrency?: boolean
   productionGateStatus?: boolean
   addressReviewStatus?: boolean
+  itemReviewStatus?: boolean
+  artworkReviewStatus?: boolean
   costReviewStatus?: boolean
+  attentionReviewStatus?: boolean
+  providerPushProgress?: boolean
   progressStatus?: boolean
   deliveryStatus?: boolean
+  manualReleaseRequired?: boolean
+  providerPaidAt?: boolean
   releasedToProductionAt?: boolean
+  pushAcknowledgedAt?: boolean
+  pushVerifiedAt?: boolean
+  providerAddressUpdatedAt?: boolean
   heldAt?: boolean
+  lastReadinessCheckAt?: boolean
   lastAddressCheckAt?: boolean
   lastCostCheckAt?: boolean
   lastProgressSyncAt?: boolean
   lastTrackingSyncAt?: boolean
   lastHistorySyncAt?: boolean
+  lastTicketSyncAt?: boolean
   djangoProcessResponsePayload?: boolean
   merchizeExternalLookupPayload?: boolean
   merchizeInDepthOrderDetailPayload?: boolean
   merchizeAddressSuggestionPayload?: boolean
+  merchizeUnfulfilledItemsPayload?: boolean
+  merchizeRequireAttentionPayload?: boolean
+  merchizeSendToFulfillmentPayload?: boolean
+  merchizeProductionReadinessPayload?: boolean
   merchizeFulfillmentCostPayload?: boolean
   merchizeTransactionFeePayload?: boolean
   merchizeProgressPayload?: boolean
+  merchizeInternalProgressPayload?: boolean
   merchizeTrackingPayload?: boolean
   merchizeHistoryPayload?: boolean
+  merchizeTicketsPayload?: boolean
   syncStatus?: boolean
   lastSyncErrorCode?: boolean
   lastSyncErrorMessage?: boolean
@@ -2521,7 +3135,7 @@ export type MerchizeFulfillmentOrderSelectScalar = {
   updatedAt?: boolean
 }
 
-export type MerchizeFulfillmentOrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderToken" | "paypalOrderId" | "djangoOrderIntentUuid" | "djangoOrderIntentOrderId" | "djangoPaymentSaveCustomId" | "merchizeExternalOrderNumber" | "merchizeOrderId" | "merchizeOrderCode" | "merchizeIdentifier" | "merchizeStatus" | "merchizeSubStatus" | "merchizeIsEnqueued" | "merchizeIsDeleted" | "merchizeHidden" | "customerEmailRedacted" | "shippingCity" | "shippingState" | "shippingCountry" | "itemCount" | "totalQuantity" | "orderCurrency" | "productionGateStatus" | "addressReviewStatus" | "costReviewStatus" | "progressStatus" | "deliveryStatus" | "releasedToProductionAt" | "heldAt" | "lastAddressCheckAt" | "lastCostCheckAt" | "lastProgressSyncAt" | "lastTrackingSyncAt" | "lastHistorySyncAt" | "djangoProcessResponsePayload" | "merchizeExternalLookupPayload" | "merchizeInDepthOrderDetailPayload" | "merchizeAddressSuggestionPayload" | "merchizeFulfillmentCostPayload" | "merchizeTransactionFeePayload" | "merchizeProgressPayload" | "merchizeTrackingPayload" | "merchizeHistoryPayload" | "syncStatus" | "lastSyncErrorCode" | "lastSyncErrorMessage" | "lastLookupAt" | "lastDetailSyncAt" | "duplicateDetectedAt" | "manuallyLinkedAt" | "manuallyLinkedBy" | "manualLinkReason" | "createdAt" | "updatedAt", ExtArgs["result"]["merchizeFulfillmentOrder"]>
+export type MerchizeFulfillmentOrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderToken" | "paypalOrderId" | "djangoOrderIntentUuid" | "djangoOrderIntentOrderId" | "djangoPaymentSaveCustomId" | "merchizeExternalOrderNumber" | "merchizeOrderId" | "merchizeOrderCode" | "merchizeIdentifier" | "merchizeStatus" | "merchizeSubStatus" | "merchizeIsEnqueued" | "merchizeIsDeleted" | "merchizeHidden" | "customerEmailRedacted" | "shippingCity" | "shippingState" | "shippingCountry" | "itemCount" | "totalQuantity" | "orderCurrency" | "productionGateStatus" | "addressReviewStatus" | "itemReviewStatus" | "artworkReviewStatus" | "costReviewStatus" | "attentionReviewStatus" | "providerPushProgress" | "progressStatus" | "deliveryStatus" | "manualReleaseRequired" | "providerPaidAt" | "releasedToProductionAt" | "pushAcknowledgedAt" | "pushVerifiedAt" | "providerAddressUpdatedAt" | "heldAt" | "lastReadinessCheckAt" | "lastAddressCheckAt" | "lastCostCheckAt" | "lastProgressSyncAt" | "lastTrackingSyncAt" | "lastHistorySyncAt" | "lastTicketSyncAt" | "djangoProcessResponsePayload" | "merchizeExternalLookupPayload" | "merchizeInDepthOrderDetailPayload" | "merchizeAddressSuggestionPayload" | "merchizeUnfulfilledItemsPayload" | "merchizeRequireAttentionPayload" | "merchizeSendToFulfillmentPayload" | "merchizeProductionReadinessPayload" | "merchizeFulfillmentCostPayload" | "merchizeTransactionFeePayload" | "merchizeProgressPayload" | "merchizeInternalProgressPayload" | "merchizeTrackingPayload" | "merchizeHistoryPayload" | "merchizeTicketsPayload" | "syncStatus" | "lastSyncErrorCode" | "lastSyncErrorMessage" | "lastLookupAt" | "lastDetailSyncAt" | "duplicateDetectedAt" | "manuallyLinkedAt" | "manuallyLinkedBy" | "manualLinkReason" | "createdAt" | "updatedAt", ExtArgs["result"]["merchizeFulfillmentOrder"]>
 export type MerchizeFulfillmentOrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   items?: boolean | Prisma.MerchizeFulfillmentOrder$itemsArgs<ExtArgs>
   syncAttempts?: boolean | Prisma.MerchizeFulfillmentOrder$syncAttemptsArgs<ExtArgs>
@@ -2563,25 +3177,42 @@ export type $MerchizeFulfillmentOrderPayload<ExtArgs extends runtime.Types.Exten
     orderCurrency: string | null
     productionGateStatus: string | null
     addressReviewStatus: string | null
+    itemReviewStatus: string | null
+    artworkReviewStatus: string | null
     costReviewStatus: string | null
+    attentionReviewStatus: string | null
+    providerPushProgress: string | null
     progressStatus: string | null
     deliveryStatus: string | null
+    manualReleaseRequired: boolean
+    providerPaidAt: Date | null
     releasedToProductionAt: Date | null
+    pushAcknowledgedAt: Date | null
+    pushVerifiedAt: Date | null
+    providerAddressUpdatedAt: Date | null
     heldAt: Date | null
+    lastReadinessCheckAt: Date | null
     lastAddressCheckAt: Date | null
     lastCostCheckAt: Date | null
     lastProgressSyncAt: Date | null
     lastTrackingSyncAt: Date | null
     lastHistorySyncAt: Date | null
+    lastTicketSyncAt: Date | null
     djangoProcessResponsePayload: runtime.JsonValue | null
     merchizeExternalLookupPayload: runtime.JsonValue | null
     merchizeInDepthOrderDetailPayload: runtime.JsonValue | null
     merchizeAddressSuggestionPayload: runtime.JsonValue | null
+    merchizeUnfulfilledItemsPayload: runtime.JsonValue | null
+    merchizeRequireAttentionPayload: runtime.JsonValue | null
+    merchizeSendToFulfillmentPayload: runtime.JsonValue | null
+    merchizeProductionReadinessPayload: runtime.JsonValue | null
     merchizeFulfillmentCostPayload: runtime.JsonValue | null
     merchizeTransactionFeePayload: runtime.JsonValue | null
     merchizeProgressPayload: runtime.JsonValue | null
+    merchizeInternalProgressPayload: runtime.JsonValue | null
     merchizeTrackingPayload: runtime.JsonValue | null
     merchizeHistoryPayload: runtime.JsonValue | null
+    merchizeTicketsPayload: runtime.JsonValue | null
     syncStatus: string
     lastSyncErrorCode: string | null
     lastSyncErrorMessage: string | null
@@ -3043,25 +3674,42 @@ export interface MerchizeFulfillmentOrderFieldRefs {
   readonly orderCurrency: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'String'>
   readonly productionGateStatus: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'String'>
   readonly addressReviewStatus: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'String'>
+  readonly itemReviewStatus: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'String'>
+  readonly artworkReviewStatus: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'String'>
   readonly costReviewStatus: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'String'>
+  readonly attentionReviewStatus: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'String'>
+  readonly providerPushProgress: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'String'>
   readonly progressStatus: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'String'>
   readonly deliveryStatus: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'String'>
+  readonly manualReleaseRequired: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Boolean'>
+  readonly providerPaidAt: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'DateTime'>
   readonly releasedToProductionAt: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'DateTime'>
+  readonly pushAcknowledgedAt: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'DateTime'>
+  readonly pushVerifiedAt: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'DateTime'>
+  readonly providerAddressUpdatedAt: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'DateTime'>
   readonly heldAt: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'DateTime'>
+  readonly lastReadinessCheckAt: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'DateTime'>
   readonly lastAddressCheckAt: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'DateTime'>
   readonly lastCostCheckAt: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'DateTime'>
   readonly lastProgressSyncAt: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'DateTime'>
   readonly lastTrackingSyncAt: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'DateTime'>
   readonly lastHistorySyncAt: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'DateTime'>
+  readonly lastTicketSyncAt: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'DateTime'>
   readonly djangoProcessResponsePayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
   readonly merchizeExternalLookupPayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
   readonly merchizeInDepthOrderDetailPayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
   readonly merchizeAddressSuggestionPayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
+  readonly merchizeUnfulfilledItemsPayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
+  readonly merchizeRequireAttentionPayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
+  readonly merchizeSendToFulfillmentPayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
+  readonly merchizeProductionReadinessPayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
   readonly merchizeFulfillmentCostPayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
   readonly merchizeTransactionFeePayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
   readonly merchizeProgressPayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
+  readonly merchizeInternalProgressPayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
   readonly merchizeTrackingPayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
   readonly merchizeHistoryPayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
+  readonly merchizeTicketsPayload: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'Json'>
   readonly syncStatus: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'String'>
   readonly lastSyncErrorCode: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'String'>
   readonly lastSyncErrorMessage: Prisma.FieldRef<"MerchizeFulfillmentOrder", 'String'>

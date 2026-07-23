@@ -29,15 +29,17 @@ import {
   MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_ERROR_CODE,
 } from '@/lib/merchizeFulfillmentOps/lookupPending';
 import { syncMerchizeFulfillmentOperationalSnapshots } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOperationalSnapshots';
+import { runMerchizeProductionReadinessChecks } from '@/lib/merchizeFulfillmentOps/runMerchizeProductionReadinessChecks';
+import { verifyMerchizeFulfillmentPush } from '@/lib/merchizeFulfillmentOps/verifyMerchizeFulfillmentPush';
 import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/lib/merchizeFulfillmentOps/merchizeMapper';
 import {
-  enqueueAdminFulfillmentPushAcceptedNotification,
+  enqueueAdminFulfillmentPushVerifiedNotification,
   enqueueAdminRecoveryNotification,
   ADMIN_NOTIFICATION_SEVERITY,
   sendPendingAdminRecoveryNotificationsForOrder,
 } from '@/lib/paypal/txLedger/adminNotificationOutbox';
 import {
-  enqueueCustomerFulfillmentPushAcceptedNotification,
+  enqueueCustomerFulfillmentPushVerifiedNotification,
   sendPendingCustomerNotificationsForOrder,
 } from '@/lib/paypal/txLedger/customerNotificationOutbox';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
@@ -52,6 +54,7 @@ const POST_PROCESSING_LEASE_MS = 5 * 60_000;
 
 type RunPaidFulfillmentProcessingOptions = {
   overrideMerchizeFulfillmentPushDisabled?: boolean;
+  allowStaleMerchizeOrderManualRelease?: boolean;
   triggerDetail?: string;
   triggerSource?:
     | 'capture_route'
@@ -263,7 +266,39 @@ async function markFulfillmentLookupPendingForAutomaticRetry(args: {
   });
 }
 
-async function notifyFulfillmentPushAccepted(args: {
+async function markFulfillmentProviderPendingForAutomaticRetry(args: {
+  orderToken: string;
+  lockId: string;
+  errorCode: string;
+  requestPayload?: unknown;
+  responsePayload?: unknown;
+  merchizeFulfillmentProcessingId?: string | null;
+  merchizeProviderOrderId?: string | null;
+  merchizeProviderOrderCode?: string | null;
+}) {
+  await updateLockedRow(args.orderToken, args.lockId, {
+    status: PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
+    lastErrorCode: args.errorCode,
+    lastErrorMessage: null,
+    merchizeFulfillmentRequestPayload:
+      args.requestPayload === undefined ? undefined : toLedgerJson(args.requestPayload),
+    merchizeFulfillmentResponsePayload:
+      args.responsePayload === undefined ? undefined : toLedgerJson(args.responsePayload),
+    merchizeFulfillmentProcessingId: args.merchizeFulfillmentProcessingId ?? undefined,
+    merchizeProviderOrderId: args.merchizeProviderOrderId ?? undefined,
+    merchizeProviderOrderCode: args.merchizeProviderOrderCode ?? undefined,
+    postProcessingLockId: null,
+    postProcessingLockedAt: null,
+    postProcessingLockExpiresAt: null,
+  } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
+
+  console.info('[merchize.fulfillment_ops.provider_state_pending_for_retry]', {
+    orderToken: args.orderToken,
+    errorCode: args.errorCode,
+  });
+}
+
+async function notifyFulfillmentPushVerified(args: {
   orderToken: string;
   row: {
     paypalOrderId: string | null;
@@ -275,7 +310,7 @@ async function notifyFulfillmentPushAccepted(args: {
   merchizeOrderId?: string | null;
   merchizeOrderCode?: string | null;
 }) {
-  await enqueueCustomerFulfillmentPushAcceptedNotification({
+  await enqueueCustomerFulfillmentPushVerifiedNotification({
     orderToken: args.orderToken,
     paypalOrderId: args.row.paypalOrderId,
     customerName: args.row.customerName,
@@ -289,7 +324,7 @@ async function notifyFulfillmentPushAccepted(args: {
     });
   });
 
-  await enqueueAdminFulfillmentPushAcceptedNotification({
+  await enqueueAdminFulfillmentPushVerifiedNotification({
     orderToken: args.orderToken,
     paypalOrderId: args.row.paypalOrderId,
     customerName: args.row.customerName,
@@ -406,6 +441,9 @@ export async function runPaidFulfillmentProcessing(
           cart: row.cartSnapshot as CartVariant[],
           customer,
           ORD_string,
+          shippingAddressOverride:
+            (row.fulfillmentAddressOverride as PaymentReceiptProps['shippingAddressOverride']) ??
+            null,
         }),
       );
 
@@ -571,7 +609,72 @@ export async function runPaidFulfillmentProcessing(
         return;
       }
 
-      if (!options.overrideMerchizeFulfillmentPushDisabled && !isMerchizeFulfillmentPushEnabled()) {
+      const readinessCheck = await runMerchizeProductionReadinessChecks(orderToken, {
+        allowStaleOrderManualRelease: options.allowStaleMerchizeOrderManualRelease,
+      });
+      if (!readinessCheck.ok) {
+        await markFulfillmentProviderPendingForAutomaticRetry({
+          orderToken,
+          lockId,
+          errorCode: readinessCheck.errorCode,
+          requestPayload: fulfillmentRequestPayload,
+          responsePayload: fulfillmentResponsePayload,
+          merchizeFulfillmentProcessingId,
+          merchizeProviderOrderId,
+          merchizeProviderOrderCode,
+        });
+        return;
+      }
+
+      const { readiness } = readinessCheck;
+      if (!readiness.ready) {
+        const primaryBlocker = readiness.primaryBlocker;
+        const errorCode = primaryBlocker?.code ?? 'MERCHIZE_PRODUCTION_READINESS_BLOCKED';
+        const errorMessage =
+          primaryBlocker?.message ?? 'Merchize production-readiness checks did not pass.';
+        const retryableOnly =
+          readiness.blockers.length > 0 && readiness.blockers.every((blocker) => blocker.retryable);
+
+        if (retryableOnly) {
+          await markFulfillmentProviderPendingForAutomaticRetry({
+            orderToken,
+            lockId,
+            errorCode,
+            requestPayload: fulfillmentRequestPayload,
+            responsePayload: fulfillmentResponsePayload,
+            merchizeFulfillmentProcessingId,
+            merchizeProviderOrderId,
+            merchizeProviderOrderCode,
+          });
+          return;
+        }
+
+        await markFulfillmentAttentionRequiredAndNotify({
+          orderToken,
+          lockId,
+          row,
+          errorCode,
+          errorMessage,
+          issueSummary: readiness.blockers.map((blocker) => blocker.message),
+          requestPayload: fulfillmentRequestPayload,
+          responsePayload: fulfillmentResponsePayload,
+          merchizeFulfillmentProcessingId,
+          merchizeProviderOrderId,
+          merchizeProviderOrderCode,
+        });
+        return;
+      }
+
+      let pushVerification =
+        readiness.providerPushState === 'pushed'
+          ? await verifyMerchizeFulfillmentPush(orderToken, { retryDelaysMs: [0] })
+          : null;
+
+      if (
+        !pushVerification &&
+        !options.overrideMerchizeFulfillmentPushDisabled &&
+        !isMerchizeFulfillmentPushEnabled()
+      ) {
         const message =
           'Merchize push-to-fulfillment is disabled by MERCHIZE_FULFILLMENT_PUSH_ENABLED=false.';
         await recordMerchizeFulfillmentPushDisabledByConfig({
@@ -600,25 +703,74 @@ export async function runPaidFulfillmentProcessing(
         return;
       }
 
-      try {
-        await pushMerchizeFulfillmentOrderToProduction({
+      if (!pushVerification) {
+        const acknowledgedRecently =
+          readinessCheck.pushAcknowledgedAt &&
+          !readinessCheck.pushVerifiedAt &&
+          Date.now() - readinessCheck.pushAcknowledgedAt.getTime() < POST_PROCESSING_LEASE_MS;
+        const shouldVerifyExistingPush =
+          readiness.providerPushState === 'pending' || acknowledgedRecently;
+
+        if (!shouldVerifyExistingPush) {
+          try {
+            await pushMerchizeFulfillmentOrderToProduction({
+              orderToken,
+              merchizeExternalOrderNumber,
+              merchizeOrderCode: merchizeProviderOrderCode,
+              identifier: CODEX_CHRISTI_FULFILLMENT_IDENTIFIER,
+            });
+          } catch (pushError) {
+            const message =
+              pushError instanceof Error
+                ? pushError.message
+                : 'Merchize push-to-fulfillment failed.';
+            await markFulfillmentFailedAndNotify({
+              orderToken,
+              lockId,
+              row,
+              errorCode:
+                pushError instanceof MerchizeFulfillmentPushError
+                  ? pushError.code
+                  : 'MERCHIZE_PUSH_FAILED',
+              errorMessage: message,
+              requestPayload: fulfillmentRequestPayload,
+              responsePayload: fulfillmentResponsePayload,
+              merchizeFulfillmentProcessingId,
+              merchizeProviderOrderId,
+              merchizeProviderOrderCode,
+            });
+            return;
+          }
+        }
+
+        pushVerification = await verifyMerchizeFulfillmentPush(orderToken);
+      }
+
+      if (pushVerification.status === 'pending') {
+        await markFulfillmentProviderPendingForAutomaticRetry({
           orderToken,
-          merchizeExternalOrderNumber,
-          merchizeOrderCode: merchizeProviderOrderCode,
-          identifier: CODEX_CHRISTI_FULFILLMENT_IDENTIFIER,
+          lockId,
+          errorCode: 'MERCHIZE_PUSH_VERIFICATION_PENDING',
+          requestPayload: fulfillmentRequestPayload,
+          responsePayload: fulfillmentResponsePayload,
+          merchizeFulfillmentProcessingId,
+          merchizeProviderOrderId,
+          merchizeProviderOrderCode,
         });
-      } catch (pushError) {
-        const message =
-          pushError instanceof Error ? pushError.message : 'Merchize push-to-fulfillment failed.';
+        return;
+      }
+
+      if (pushVerification.status === 'failed') {
         await markFulfillmentFailedAndNotify({
           orderToken,
           lockId,
           row,
-          errorCode:
-            pushError instanceof MerchizeFulfillmentPushError
-              ? pushError.code
-              : 'MERCHIZE_PUSH_FAILED',
-          errorMessage: message,
+          errorCode: pushVerification.errorCode,
+          errorMessage: pushVerification.errorMessage,
+          issueSummary: [
+            pushVerification.errorMessage,
+            'Review the provider address, catalog mapping, artwork, and fulfillment-cost evidence before retrying.',
+          ],
           requestPayload: fulfillmentRequestPayload,
           responsePayload: fulfillmentResponsePayload,
           merchizeFulfillmentProcessingId,
@@ -651,7 +803,7 @@ export async function runPaidFulfillmentProcessing(
         });
       });
 
-      await notifyFulfillmentPushAccepted({
+      await notifyFulfillmentPushVerified({
         orderToken,
         row,
         merchizeExternalOrderNumber,

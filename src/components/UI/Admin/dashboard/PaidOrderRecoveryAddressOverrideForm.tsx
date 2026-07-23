@@ -80,8 +80,8 @@ export default function PaidOrderRecoveryAddressOverrideForm({
 
     setIsSaving(true);
     const toastId = loadingToast({
-      header: 'Saving address override',
-      message: 'Updating the fulfillment address used by retry actions.',
+      header: 'Applying address correction',
+      message: 'Updating the ledger, imported Merchize order, and corrected receipt.',
     });
 
     try {
@@ -108,10 +108,14 @@ export default function PaidOrderRecoveryAddressOverrideForm({
         return;
       }
 
-      successToast({
-        header: 'Override saved',
-        message: result.message,
-      });
+      if (result.tone === 'warning') {
+        toast.warning('Address updated; review still required', { description: result.message });
+      } else {
+        successToast({
+          header: 'Address correction applied',
+          message: result.message,
+        });
+      }
       setOpen(false);
       router.refresh();
     } catch (error) {
@@ -144,12 +148,12 @@ export default function PaidOrderRecoveryAddressOverrideForm({
           </span>
           <span className='min-w-0 flex-1'>
             <span className='block text-sm font-medium text-slate-100'>
-              {hasExistingOverride ? 'Edit fulfillment override' : 'Override fulfillment address'}
+              {hasExistingOverride ? 'Edit address correction' : 'Correct fulfillment address'}
             </span>
             <span className='mt-1 block text-xs leading-5 text-slate-500'>
               {hasExistingOverride
-                ? 'Update the corrected address that retry actions will use.'
-                : 'Save a corrected address before retrying this paid order.'}
+                ? 'Apply a revised address to the ledger, provider order, and receipt.'
+                : 'Correct the address before this paid order is released to production.'}
             </span>
             <span className='mt-3 inline-flex items-center gap-2 rounded-md border border-cyan-300/20 bg-slate-950/26 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition group-hover:border-cyan-200/35'>
               {hasExistingOverride ? 'Open editor' : 'Add override'}
@@ -167,9 +171,12 @@ export default function PaidOrderRecoveryAddressOverrideForm({
         <div className='flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3'>
           <div>
             <h4 className='text-sm font-semibold text-white'>
-              {hasExistingOverride ? 'Edit fulfillment override' : 'Override fulfillment address'}
+              {hasExistingOverride ? 'Edit address correction' : 'Correct fulfillment address'}
             </h4>
-            <p className='mt-1 text-xs text-slate-500'>Used by the next retry action.</p>
+            <p className='mt-1 text-xs text-slate-500'>
+              Applies to the imported Merchize order and regenerated receipt. Django payment save is
+              not replayed.
+            </p>
           </div>
           <button
             type='button'
@@ -248,7 +255,7 @@ export default function PaidOrderRecoveryAddressOverrideForm({
               className='inline-flex items-center gap-2 rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-sm font-medium text-cyan-100 transition hover:border-cyan-200/40 hover:bg-cyan-300/14 disabled:cursor-not-allowed disabled:opacity-50'
             >
               <Save size={15} />
-              {isSaving ? 'Saving...' : 'Save override'}
+              {isSaving ? 'Applying...' : 'Apply correction'}
             </button>
           </div>
         </form>

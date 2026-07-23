@@ -88,8 +88,13 @@ function getPath(root: unknown, path: Array<string | number>) {
 function needsProviderDetailSync(payload: unknown, merchizeOpsSyncStatus?: string | null) {
   const detailOrPushSyncedStatuses = new Set<string>([
     MERCHIZE_FULFILLMENT_SYNC_STATUS.DETAIL_SYNCED,
+    MERCHIZE_FULFILLMENT_SYNC_STATUS.READINESS_CHECKING,
+    MERCHIZE_FULFILLMENT_SYNC_STATUS.READINESS_BLOCKED,
+    MERCHIZE_FULFILLMENT_SYNC_STATUS.READINESS_READY,
     MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_PENDING,
-    MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_ACCEPTED,
+    MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_ACKNOWLEDGED,
+    MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_VERIFICATION_PENDING,
+    MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_VERIFIED,
     MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_FAILED,
     MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_DISABLED,
   ]);
@@ -425,12 +430,23 @@ function buildTimeline(row: {
     });
   } else if (
     row.merchizeFulfillmentOpsProductionGateStatus ===
-    MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_ACCEPTED
+    MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFIED
   ) {
     items.push({
-      label: 'Merchize Push Accepted',
+      label: 'Merchize Push Verified',
       time: row.merchizeFulfillmentOpsReleasedToProductionAt ?? completed,
       state: 'done',
+    });
+  } else if (
+    row.merchizeFulfillmentOpsProductionGateStatus ===
+      MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_ACKNOWLEDGED ||
+    row.merchizeFulfillmentOpsProductionGateStatus ===
+      MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFICATION_PENDING
+  ) {
+    items.push({
+      label: 'Merchize Push Awaiting Verification',
+      time: updated,
+      state: 'pending',
     });
   } else if (
     row.merchizeFulfillmentOpsProductionGateStatus ===
@@ -512,11 +528,21 @@ function mapMerchizeFulfillmentOpsSummary(row: {
   merchizeExternalOrderNumber: string;
   merchizeOrderId: string | null;
   merchizeStatus: string | null;
+  addressReviewStatus: string | null;
+  itemReviewStatus: string | null;
+  artworkReviewStatus: string | null;
   progressStatus: string | null;
   deliveryStatus: string | null;
   costReviewStatus: string | null;
+  attentionReviewStatus: string | null;
+  providerPushProgress: string | null;
+  manualReleaseRequired: boolean;
   itemCount: number;
   releasedToProductionAt: Date | null;
+  pushAcknowledgedAt: Date | null;
+  pushVerifiedAt: Date | null;
+  providerAddressUpdatedAt: Date | null;
+  lastReadinessCheckAt: Date | null;
   lastLookupAt: Date | null;
   lastDetailSyncAt: Date | null;
   lastProgressSyncAt: Date | null;
@@ -530,12 +556,26 @@ function mapMerchizeFulfillmentOpsSummary(row: {
     merchizeExternalOrderNumber: row.merchizeExternalOrderNumber,
     merchizeOrderId: row.merchizeOrderId,
     merchizeStatus: row.merchizeStatus,
+    addressReviewStatus: row.addressReviewStatus,
+    itemReviewStatus: row.itemReviewStatus,
+    artworkReviewStatus: row.artworkReviewStatus,
     progressStatus: row.progressStatus,
     deliveryStatus: row.deliveryStatus,
     costReviewStatus: row.costReviewStatus,
+    attentionReviewStatus: row.attentionReviewStatus,
+    providerPushProgress: row.providerPushProgress,
+    manualReleaseRequired: row.manualReleaseRequired,
     itemCount: row.itemCount,
     releasedToProductionAt: row.releasedToProductionAt
       ? formatLongDate(row.releasedToProductionAt)
+      : null,
+    pushAcknowledgedAt: row.pushAcknowledgedAt ? formatLongDate(row.pushAcknowledgedAt) : null,
+    pushVerifiedAt: row.pushVerifiedAt ? formatLongDate(row.pushVerifiedAt) : null,
+    providerAddressUpdatedAt: row.providerAddressUpdatedAt
+      ? formatLongDate(row.providerAddressUpdatedAt)
+      : null,
+    lastReadinessCheckAt: row.lastReadinessCheckAt
+      ? formatLongDate(row.lastReadinessCheckAt)
       : null,
     lastLookupAt: row.lastLookupAt ? formatLongDate(row.lastLookupAt) : null,
     lastDetailSyncAt: row.lastDetailSyncAt ? formatLongDate(row.lastDetailSyncAt) : null,
@@ -564,11 +604,21 @@ async function getMerchizeFulfillmentOpsSummaries(orderTokens: string[]) {
         merchizeExternalOrderNumber: true,
         merchizeOrderId: true,
         merchizeStatus: true,
+        addressReviewStatus: true,
+        itemReviewStatus: true,
+        artworkReviewStatus: true,
         progressStatus: true,
         deliveryStatus: true,
         costReviewStatus: true,
+        attentionReviewStatus: true,
+        providerPushProgress: true,
+        manualReleaseRequired: true,
         itemCount: true,
         releasedToProductionAt: true,
+        pushAcknowledgedAt: true,
+        pushVerifiedAt: true,
+        providerAddressUpdatedAt: true,
+        lastReadinessCheckAt: true,
         lastLookupAt: true,
         lastDetailSyncAt: true,
         lastProgressSyncAt: true,
@@ -874,11 +924,14 @@ function buildDetail(row: {
     row.merchizeFulfillmentResponsePayload,
     row.merchizeFulfillmentOps?.syncStatus,
   );
-  const requiresPushOverride =
+  const requiresManualRelease =
     row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED &&
     (row.lastErrorCode === 'MERCHIZE_PUSH_DISABLED_BY_CONFIG' ||
+      row.lastErrorCode === 'MERCHIZE_MANUAL_RELEASE_REQUIRED' ||
       row.merchizeFulfillmentOps?.productionGateStatus ===
-        MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_DISABLED);
+        MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_DISABLED ||
+      row.merchizeFulfillmentOps?.productionGateStatus ===
+        MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.MANUAL_RELEASE_REQUIRED);
   const captureCompletion = getPayPalCaptureCompletion(row.capturePayload);
   const inferredProcessingSource = getPayPalLedgerInferredProcessingSourceDisplay({
     checkoutSurfaceLabel: row.checkoutSurfaceLabel,
@@ -895,6 +948,11 @@ function buildDetail(row: {
     originalAddress,
     activeAddress,
     hasAddressOverride: Boolean(overrideAddress),
+    addressCorrectionProviderApplied: Boolean(
+      overrideAddress &&
+        row.merchizeFulfillmentOps?.providerAddressUpdatedAt &&
+        row.merchizeFulfillmentOps.addressReviewStatus !== 'provider_update_failed',
+    ),
     addressOverrideReason: row.fulfillmentAddressOverrideReason,
     addressOverriddenAt: row.fulfillmentAddressOverriddenAt
       ? formatLongDate(row.fulfillmentAddressOverriddenAt)
@@ -942,6 +1000,26 @@ function buildDetail(row: {
         label: 'Merchize cost status',
         value: row.merchizeFulfillmentOps?.costReviewStatus ?? null,
       },
+      {
+        label: 'Merchize address readiness',
+        value: row.merchizeFulfillmentOps?.addressReviewStatus ?? null,
+      },
+      {
+        label: 'Merchize item readiness',
+        value: row.merchizeFulfillmentOps?.itemReviewStatus ?? null,
+      },
+      {
+        label: 'Merchize artwork readiness',
+        value: row.merchizeFulfillmentOps?.artworkReviewStatus ?? null,
+      },
+      {
+        label: 'Merchize provider attention',
+        value: row.merchizeFulfillmentOps?.attentionReviewStatus ?? null,
+      },
+      {
+        label: 'Merchize push progress',
+        value: row.merchizeFulfillmentOps?.providerPushProgress ?? null,
+      },
       { label: 'Latest PayPal webhook event', value: row.webhookEvents[0]?.eventType ?? null },
       {
         label: 'Latest webhook delivery status',
@@ -954,7 +1032,7 @@ function buildDetail(row: {
     scannerState: getScannerState(row),
     merchizeFulfillmentOps: row.merchizeFulfillmentOps,
     needsProviderDetailSync: providerDetailSyncNeeded,
-    requiresPushOverride,
+    requiresManualRelease,
     rawDebug: {
       orderToken: row.orderToken,
       userId: row.userId,
@@ -971,7 +1049,7 @@ function buildDetail(row: {
       merchizeExternalOrderNumber,
       merchizeFulfillmentOps: row.merchizeFulfillmentOps,
       needsProviderDetailSync: providerDetailSyncNeeded,
-      requiresPushOverride,
+      requiresManualRelease,
       captureCompletion,
       scannerState: getScannerState(row),
       webhookEvents: row.webhookEvents,

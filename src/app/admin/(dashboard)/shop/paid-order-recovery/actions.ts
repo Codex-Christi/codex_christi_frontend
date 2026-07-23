@@ -14,7 +14,10 @@ import {
   requireMasterAdminAction,
 } from '@/lib/admin/require-admin';
 import {
+  ADMIN_NOTIFICATION_SEVERITY,
+  enqueueAdminRecoveryNotification,
   resendAdminRecoveryNotification,
+  sendPendingAdminRecoveryNotificationsForOrder,
   suppressAdminRecoveryNotification,
 } from '@/lib/paypal/txLedger/adminNotificationOutbox';
 import { resendCustomerNotification } from '@/lib/paypal/txLedger/customerNotificationOutbox';
@@ -28,6 +31,7 @@ import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfi
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
+import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { getAdminOpsLedgerPrisma } from '@/lib/prisma/adminOpsLedger/adminOpsLedgerPrisma';
 import { registerAcceptedMerchizeFulfillmentProcess } from '@/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentProcess';
 import { syncMerchizeFulfillmentOrder } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOrder';
@@ -35,10 +39,19 @@ import { syncMerchizeFulfillmentOperationalSnapshots } from '@/lib/merchizeFulfi
 import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/lib/merchizeFulfillmentOps/merchizeMapper';
 import { isMerchizeLookupPendingProviderProcessingError } from '@/lib/merchizeFulfillmentOps/lookupPending';
 import { CODEX_CHRISTI_FULFILLMENT_IDENTIFIER } from '@/lib/merchizeFulfillmentOps/fulfillmentIdentifier';
+import { applyMerchizeFulfillmentAddressCorrection } from '@/lib/merchizeFulfillmentOps/applyMerchizeFulfillmentAddressCorrection';
+import { runMerchizeProductionReadinessChecks } from '@/lib/merchizeFulfillmentOps/runMerchizeProductionReadinessChecks';
+import { MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS } from '@/lib/merchizeFulfillmentOps/status';
 import {
   getMerchizeFulfillmentOpsPrisma,
   isMerchizeFulfillmentOpsDatabaseConfigured,
 } from '@/lib/prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOpsPrisma';
+import {
+  savePaymentReceiptToCloud,
+  type PaymentReceiptProps,
+} from '@/actions/shop/paypal/processAndUploadCompletedTx/savePaymentReceiptToCloud';
+import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
+import type { CartVariant } from '@/stores/shop_stores/cartStore';
 
 type AdminNotificationActionResult =
   | { ok: true; message: string; tone?: 'success' | 'warning' }
@@ -237,6 +250,115 @@ async function writeMerchizeFulfillmentAdminAction(args: {
       metadata: args.metadata ? JSON.parse(JSON.stringify(args.metadata)) : undefined,
     },
   });
+}
+
+async function regeneratePaidOrderReceiptFromLedger(row: {
+  orderToken: string;
+  authorizePayload: unknown;
+  cartSnapshot: unknown;
+  customerName: string;
+  customerEmail: string;
+  djangoOrderIntentOrderId: string | null;
+  fulfillmentAddressOverride: unknown;
+}) {
+  if (!row.authorizePayload) {
+    throw new Error('The PayPal authorization snapshot is missing; receipt cannot be regenerated.');
+  }
+
+  const payload: PaymentReceiptProps = {
+    authData: row.authorizePayload as PaymentReceiptProps['authData'],
+    cart: row.cartSnapshot as CartVariant[],
+    customer: { name: row.customerName, email: row.customerEmail },
+    ORD_string: row.djangoOrderIntentOrderId ?? row.orderToken,
+    shippingAddressOverride:
+      (row.fulfillmentAddressOverride as PaymentReceiptProps['shippingAddressOverride']) ?? null,
+  };
+  const result = await savePaymentReceiptToCloud(
+    encryptForPostProcessingServerAction(JSON.stringify(payload)),
+  );
+
+  if (!result.success || !('pdfReceiptLink' in result) || !('receiptFileName' in result)) {
+    throw new Error('message' in result ? result.message : 'Receipt regeneration failed.');
+  }
+
+  await paypalTxLedger.paypalIntent.update({
+    where: { orderToken: row.orderToken },
+    data: {
+      receiptLink: result.pdfReceiptLink,
+      receiptFile: result.receiptFileName,
+    },
+  });
+
+  return result;
+}
+
+async function reconcileCompletedLedgerWithProviderReadiness(args: {
+  orderToken: string;
+  readiness: Awaited<ReturnType<typeof runMerchizeProductionReadinessChecks>>;
+}) {
+  if (!args.readiness.ok || args.readiness.readiness.providerPushState === 'pushed') return false;
+  const readiness = args.readiness.readiness;
+
+  const row = await paypalTxLedger.paypalIntent.findUnique({
+    where: { orderToken: args.orderToken },
+    select: {
+      status: true,
+      processingCompletedAt: true,
+      paypalOrderId: true,
+      customerName: true,
+      customerEmail: true,
+      receiptLink: true,
+    },
+  });
+  if (!row || (row.status !== PAYPAL_LEDGER_STATUS.COMPLETED && !row.processingCompletedAt)) {
+    return false;
+  }
+
+  const primaryBlocker = readiness.primaryBlocker;
+  const errorCode =
+    primaryBlocker?.code ??
+    (readiness.providerPushState === 'failed'
+      ? 'MERCHIZE_PUSH_PROVIDER_STATE_FAILED'
+      : 'MERCHIZE_PUSH_NOT_VERIFIED');
+  const errorMessage =
+    primaryBlocker?.message ??
+    (readiness.providerPushState === 'failed'
+      ? 'Merchize reports that the fulfillment push failed after the earlier command acknowledgment.'
+      : 'The paid ledger was marked completed without a verified Merchize push state.');
+
+  await paypalTxLedger.$transaction(async (tx) => {
+    await tx.paypalIntent.update({
+      where: { orderToken: args.orderToken },
+      data: {
+        status: PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED,
+        processingCompletedAt: null,
+        lastErrorCode: errorCode,
+        lastErrorMessage: errorMessage,
+        postProcessingLockId: null,
+        postProcessingLockedAt: null,
+        postProcessingLockExpiresAt: null,
+      },
+    });
+    await enqueueAdminRecoveryNotification({
+      db: tx,
+      orderToken: args.orderToken,
+      paypalOrderId: row.paypalOrderId,
+      customerName: row.customerName,
+      customerEmail: row.customerEmail,
+      receiptLink: row.receiptLink,
+      ledgerStatus: PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED,
+      errorCode,
+      errorMessage,
+      issueSummary:
+        readiness.blockers.length > 0
+          ? readiness.blockers.map((blocker) => blocker.message)
+          : [errorMessage],
+      severity: ADMIN_NOTIFICATION_SEVERITY.WARNING,
+    });
+  });
+  await refreshPaidOrderRecoveryProjectionSafely(args.orderToken);
+  await sendPendingAdminRecoveryNotificationsForOrder(args.orderToken).catch(() => undefined);
+  return true;
 }
 
 export type AdminRecoveryScannerActionResult =
@@ -615,7 +737,7 @@ export async function retryAdminPaidOrderRecoveryAction({
   }
 }
 
-export async function overrideMerchizePushDisabledAndReleaseAction({
+export async function releaseMerchizeFulfillmentToProductionAction({
   orderToken,
   password,
   reason,
@@ -624,7 +746,7 @@ export async function overrideMerchizePushDisabledAndReleaseAction({
   password: string;
   reason: string;
 }): Promise<AdminNotificationActionResult> {
-  const action = 'shop.paid_order_recovery.override_push_disabled_release';
+  const action = 'shop.paid_order_recovery.release_fulfillment_to_production';
 
   try {
     const releaseReason = reason.trim();
@@ -654,7 +776,7 @@ export async function overrideMerchizePushDisabledAndReleaseAction({
     const rejectAfterStepUp = async (error: string) => {
       await writeMerchizeFulfillmentAdminAction({
         orderToken,
-        action: 'manual_push_disabled_override',
+        action: 'manual_production_release',
         actor: admin.userID,
         reason: releaseReason,
         status: 'failed',
@@ -677,7 +799,7 @@ export async function overrideMerchizePushDisabledAndReleaseAction({
 
     await writeMerchizeFulfillmentAdminAction({
       orderToken,
-      action: 'manual_push_disabled_override',
+      action: 'manual_production_release',
       actor: admin.userID,
       reason: releaseReason,
       status: 'started',
@@ -702,11 +824,28 @@ export async function overrideMerchizePushDisabledAndReleaseAction({
       return rejectAfterStepUp('This order is already completed.');
     }
 
+    const merchizeOpsGate = isMerchizeFulfillmentOpsDatabaseConfigured()
+      ? await getMerchizeFulfillmentOpsPrisma().merchizeFulfillmentOrder.findFirst({
+          where: { orderToken },
+          orderBy: { updatedAt: 'desc' },
+          select: { productionGateStatus: true },
+        })
+      : null;
+    const isManualReleaseGate =
+      merchizeOpsGate?.productionGateStatus ===
+        MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_DISABLED ||
+      merchizeOpsGate?.productionGateStatus ===
+        MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.MANUAL_RELEASE_REQUIRED;
+
     if (
-      existing.status !== 'fulfillment_attention_required' ||
-      existing.lastErrorCode !== 'MERCHIZE_PUSH_DISABLED_BY_CONFIG'
+      existing.status !== PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED ||
+      (!isManualReleaseGate &&
+        ![
+          'MERCHIZE_PUSH_DISABLED_BY_CONFIG',
+          'MERCHIZE_MANUAL_RELEASE_REQUIRED',
+        ].includes(existing.lastErrorCode ?? ''))
     ) {
-      return rejectAfterStepUp('This order is not waiting on the push-disabled release gate.');
+      return rejectAfterStepUp('This order is not waiting on a master-admin production release.');
     }
 
     if (existing.postProcessingLockExpiresAt && existing.postProcessingLockExpiresAt > new Date()) {
@@ -720,7 +859,8 @@ export async function overrideMerchizePushDisabledAndReleaseAction({
 
     await runPaidFulfillmentProcessing(orderToken, {
       overrideMerchizeFulfillmentPushDisabled: true,
-      triggerDetail: 'admin_push_disabled_override_release',
+      allowStaleMerchizeOrderManualRelease: true,
+      triggerDetail: 'admin_manual_production_release',
       triggerSource: 'manual_admin',
     });
 
@@ -739,7 +879,7 @@ export async function overrideMerchizePushDisabledAndReleaseAction({
     if (updated?.processingCompletedAt) {
       await writeMerchizeFulfillmentAdminAction({
         orderToken,
-        action: 'manual_push_disabled_override',
+        action: 'manual_production_release',
         actor: admin.userID,
         reason: releaseReason,
         status: 'succeeded',
@@ -754,14 +894,14 @@ export async function overrideMerchizePushDisabledAndReleaseAction({
 
       return {
         ok: true,
-        message: 'Push override completed and the order moved to fulfillment.',
+        message: 'Merchize confirmed the order moved into fulfillment.',
       };
     }
 
     const error = updated?.lastErrorMessage ?? `Release ended in ${updated?.status ?? 'unknown'}.`;
     await writeMerchizeFulfillmentAdminAction({
       orderToken,
-      action: 'manual_push_disabled_override',
+      action: 'manual_production_release',
       actor: admin.userID,
       reason: releaseReason,
       status: 'failed',
@@ -783,7 +923,7 @@ export async function overrideMerchizePushDisabledAndReleaseAction({
   } catch (error) {
     return {
       ok: false,
-      error: getAdminActionErrorMessage(error, 'Push override failed.'),
+      error: getAdminActionErrorMessage(error, 'Production release failed.'),
     };
   }
 }
@@ -878,12 +1018,6 @@ export async function syncAdminMerchizeProviderDetailsAction({
     }
 
     const sync = await syncMerchizeFulfillmentOrder(existing.orderToken);
-    const snapshots = sync.ok
-      ? await syncMerchizeFulfillmentOperationalSnapshots(existing.orderToken)
-      : null;
-
-    revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
-    revalidatePath('/admin/shop/paid-order-recovery');
 
     if (!sync.ok) {
       if (isMerchizeLookupPendingProviderProcessingError(sync.errorCode)) {
@@ -900,12 +1034,54 @@ export async function syncAdminMerchizeProviderDetailsAction({
       };
     }
 
+    const [readiness, snapshots] = await Promise.all([
+      runMerchizeProductionReadinessChecks(existing.orderToken),
+      syncMerchizeFulfillmentOperationalSnapshots(existing.orderToken),
+    ]);
+    const reopenedCompletedLedger = await reconcileCompletedLedgerWithProviderReadiness({
+      orderToken: existing.orderToken,
+      readiness,
+    });
+
+    await writeAdminAuditLog({
+      actor: admin,
+      action: 'shop.paid_order_recovery.sync_merchize_provider_details',
+      targetType: 'orderToken',
+      targetId: orderToken,
+      outcome: readiness.ok ? 'success' : 'failure',
+      metadata: {
+        readinessStatus: readiness.ok ? readiness.readiness.status : null,
+        providerPushState: readiness.ok ? readiness.readiness.providerPushState : null,
+        reopenedCompletedLedger,
+      },
+    });
+    revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+    revalidatePath('/admin/shop/paid-order-recovery');
+
+    if (!readiness.ok) {
+      return {
+        ok: true,
+        tone: 'warning',
+        message: `Provider details synced, but readiness verification is pending: ${readiness.errorMessage}`,
+      };
+    }
+
+    if (!readiness.readiness.ready) {
+      return {
+        ok: true,
+        tone: 'warning',
+        message: `${reopenedCompletedLedger ? 'The premature completed state was reopened. ' : ''}${readiness.readiness.primaryBlocker?.message ?? 'Production readiness is blocked.'}`,
+      };
+    }
+
     return {
       ok: true,
+      tone:
+        readiness.readiness.providerPushState === 'pushed' && snapshots.ok ? 'success' : 'warning',
       message:
-        snapshots && !snapshots.ok
-          ? `Merchize provider details synced for ${sync.merchizeOrderId}; review snapshot attempts for progress, tracking, or invoice gaps.`
-          : `Merchize provider details synced for ${sync.merchizeOrderId}.`,
+        readiness.readiness.providerPushState === 'pushed'
+          ? `Merchize provider state is verified for ${sync.merchizeOrderId}.`
+          : `Production readiness passed for ${sync.merchizeOrderId}, but the order is not yet verified as pushed.`,
     };
   } catch (error) {
     return {
@@ -931,11 +1107,12 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
   };
   reason: string;
 }): Promise<AdminNotificationActionResult> {
+  const auditAction = 'shop.paid_order_recovery.address_correction_save';
   try {
     const admin = await requireAdminAction('shop.recovery.run');
     await writeAdminAuditLog({
       actor: admin,
-      action: 'shop.paid_order_recovery.address_override_save',
+      action: auditAction,
       targetType: 'orderToken',
       targetId: orderToken,
       outcome: 'started',
@@ -962,20 +1139,152 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
       };
     }
 
+    const existing = await paypalTxLedger.paypalIntent.findUnique({
+      where: { orderToken },
+      select: {
+        orderToken: true,
+        authorizePayload: true,
+        cartSnapshot: true,
+        customerName: true,
+        customerEmail: true,
+        djangoOrderIntentOrderId: true,
+        fulfillmentAddressOverride: true,
+      },
+    });
+    if (!existing) {
+      return { ok: false, error: 'Recovery row was not found.' };
+    }
+
+    const normalizedAddress = {
+      shipping_address_line_1: address.line1.trim(),
+      shipping_address_line_2: address.line2?.trim() ?? '',
+      shipping_city: address.city.trim(),
+      shipping_state: address.state.trim(),
+      zip_code: address.postalCode.trim(),
+      shipping_country: address.country.trim(),
+    };
     await paypalTxLedger.paypalIntent.update({
       where: { orderToken },
       data: {
-        fulfillmentAddressOverride: {
-          shipping_address_line_1: address.line1.trim(),
-          shipping_address_line_2: address.line2?.trim() ?? '',
-          shipping_city: address.city.trim(),
-          shipping_state: address.state.trim(),
-          zip_code: address.postalCode.trim(),
-          shipping_country: address.country.trim(),
-        },
+        fulfillmentAddressOverride: normalizedAddress,
         fulfillmentAddressOverrideReason: reason.trim(),
-        fulfillmentAddressOverriddenBy: 'admin',
+        fulfillmentAddressOverriddenBy: admin.userID,
         fulfillmentAddressOverriddenAt: new Date(),
+      },
+    });
+
+    await writeMerchizeFulfillmentAdminAction({
+      orderToken,
+      action: 'provider_address_correction',
+      actor: admin.userID,
+      reason: reason.trim(),
+      status: 'started',
+      metadata: { country: normalizedAddress.shipping_country },
+    });
+    const providerCorrection = await applyMerchizeFulfillmentAddressCorrection({
+      orderToken,
+      customerName: existing.customerName,
+      address: {
+        line1: normalizedAddress.shipping_address_line_1,
+        line2: normalizedAddress.shipping_address_line_2,
+        city: normalizedAddress.shipping_city,
+        state: normalizedAddress.shipping_state,
+        postalCode: normalizedAddress.zip_code,
+        country: normalizedAddress.shipping_country,
+      },
+    });
+
+    if (!providerCorrection.ok) {
+      await writeMerchizeFulfillmentAdminAction({
+        orderToken,
+        action: 'provider_address_correction',
+        actor: admin.userID,
+        reason: reason.trim(),
+        status: 'failed',
+        errorMessage: providerCorrection.error,
+      });
+      await writeAdminAuditLog({
+        actor: admin,
+        action: auditAction,
+        targetType: 'orderToken',
+        targetId: orderToken,
+        outcome: 'failure',
+        metadata: { providerUpdated: false, localCorrectionSaved: true },
+      });
+      await refreshPaidOrderRecoveryProjectionSafely(orderToken);
+      revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+      return {
+        ok: false,
+        error: `Correction was saved locally but Merchize was not updated: ${providerCorrection.error}`,
+      };
+    }
+
+    try {
+      await regeneratePaidOrderReceiptFromLedger({
+        ...existing,
+        fulfillmentAddressOverride: normalizedAddress,
+      });
+    } catch (receiptError) {
+      const receiptMessage = getAdminActionErrorMessage(
+        receiptError,
+        'Corrected receipt regeneration failed.',
+      );
+      await writeMerchizeFulfillmentAdminAction({
+        orderToken,
+        action: 'provider_address_correction',
+        actor: admin.userID,
+        reason: reason.trim(),
+        status: 'partial_failure',
+        errorMessage: receiptMessage,
+        metadata: { providerUpdated: providerCorrection.providerUpdated },
+      });
+      await writeAdminAuditLog({
+        actor: admin,
+        action: auditAction,
+        targetType: 'orderToken',
+        targetId: orderToken,
+        outcome: 'failure',
+        metadata: {
+          providerUpdated: providerCorrection.providerUpdated,
+          localCorrectionSaved: true,
+          receiptRegenerated: false,
+        },
+      });
+      await refreshPaidOrderRecoveryProjectionSafely(orderToken);
+      revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+      return {
+        ok: false,
+        error: providerCorrection.providerUpdated
+          ? `Merchize was updated, but the corrected receipt was not regenerated: ${receiptMessage}`
+          : `The correction was saved for initial import, but the receipt was not regenerated: ${receiptMessage}`,
+      };
+    }
+    const readiness = providerCorrection.providerUpdated
+      ? await runMerchizeProductionReadinessChecks(orderToken)
+      : null;
+
+    await writeMerchizeFulfillmentAdminAction({
+      orderToken,
+      action: 'provider_address_correction',
+      actor: admin.userID,
+      reason: reason.trim(),
+      status: 'succeeded',
+      metadata: {
+        providerUpdated: providerCorrection.providerUpdated,
+        receiptRegenerated: true,
+        readinessStatus: readiness?.ok ? readiness.readiness.status : null,
+      },
+    });
+    await writeAdminAuditLog({
+      actor: admin,
+      action: auditAction,
+      targetType: 'orderToken',
+      targetId: orderToken,
+      outcome: 'success',
+      metadata: {
+        providerUpdated: providerCorrection.providerUpdated,
+        receiptRegenerated: true,
+        readinessStatus: readiness?.ok ? readiness.readiness.status : null,
       },
     });
     await refreshPaidOrderRecoveryProjectionSafely(orderToken);
@@ -984,12 +1293,71 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
 
     return {
       ok: true,
-      message: 'Fulfillment address override saved.',
+      tone: readiness?.ok && !readiness.readiness.ready ? 'warning' : 'success',
+      message: providerCorrection.providerUpdated
+        ? readiness?.ok && !readiness.readiness.ready
+          ? `Merchize and the receipt were updated. The order remains blocked: ${readiness.readiness.primaryBlocker?.message ?? 'readiness checks are incomplete.'}`
+          : 'Merchize and the corrected receipt were updated. Production readiness passed.'
+        : 'Address correction and receipt were saved for the initial provider import.',
     };
   } catch (error) {
     return {
       ok: false,
       error: getAdminActionErrorMessage(error, 'Address override could not be saved.'),
+    };
+  }
+}
+
+export async function regeneratePaidOrderReceiptAction({
+  orderToken,
+}: {
+  orderToken: string;
+}): Promise<AdminNotificationActionResult> {
+  const action = 'shop.paid_order_recovery.receipt_regenerate';
+  try {
+    const admin = await requireAdminAction('shop.recovery.run');
+    await writeAdminAuditLog({
+      actor: admin,
+      action,
+      targetType: 'orderToken',
+      targetId: orderToken,
+      outcome: 'started',
+    });
+    const row = await paypalTxLedger.paypalIntent.findUnique({
+      where: { orderToken },
+      select: {
+        orderToken: true,
+        authorizePayload: true,
+        cartSnapshot: true,
+        customerName: true,
+        customerEmail: true,
+        djangoOrderIntentOrderId: true,
+        fulfillmentAddressOverride: true,
+      },
+    });
+    if (!row) return { ok: false, error: 'Recovery row was not found.' };
+
+    await regeneratePaidOrderReceiptFromLedger(row);
+    await writeAdminAuditLog({
+      actor: admin,
+      action,
+      targetType: 'orderToken',
+      targetId: orderToken,
+      outcome: 'success',
+      metadata: { usedAddressCorrection: Boolean(row.fulfillmentAddressOverride) },
+    });
+    await refreshPaidOrderRecoveryProjectionSafely(orderToken);
+    revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+    return {
+      ok: true,
+      message: row.fulfillmentAddressOverride
+        ? 'Receipt regenerated with the corrected fulfillment address.'
+        : 'Receipt regenerated from the original checkout record.',
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: getAdminActionErrorMessage(error, 'Receipt could not be regenerated.'),
     };
   }
 }

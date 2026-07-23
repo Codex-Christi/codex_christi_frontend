@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runPayPalRecoveryScanner } from '@/lib/paypal/txLedger/recoveryScanner';
+import { runMerchizeFulfillmentLifecycleScanner } from '@/lib/merchizeFulfillmentOps/fulfillmentLifecycleScanner';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,7 +14,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await runPayPalRecoveryScanner();
+    const [paymentRecovery, fulfillmentLifecycle] = await Promise.all([
+      runPayPalRecoveryScanner(),
+      runMerchizeFulfillmentLifecycleScanner(),
+    ]);
+    const result = {
+      ok: paymentRecovery.ok && fulfillmentLifecycle.ok,
+      paymentRecovery,
+      fulfillmentLifecycle,
+    };
     return NextResponse.json(result, { status: result.ok ? 200 : 207 });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -42,6 +42,21 @@ export type MerchizeExternalOrderSnapshotResponse = {
   data?: unknown;
 };
 
+export type MerchizeBuyerAddress = {
+  full_name: string;
+  email?: string;
+  phone?: string;
+  address: string;
+  address2?: string;
+  city: string;
+  postal_code: string;
+  country_code: string;
+  country?: string;
+  state?: string;
+  attention_request_id?: string;
+  [key: string]: unknown;
+};
+
 export class MerchizeApiError extends Error {
   status: number | null;
   code: string;
@@ -315,6 +330,18 @@ export async function listMerchizeExternalOrdersInvoice(
   );
 }
 
+export async function listMerchizeExternalOrdersTickets(
+  references: MerchizeExternalOrderReference[],
+) {
+  return merchizeRequest<MerchizeExternalOrderSnapshotResponse>(
+    '/order/external/orders/list-orders-ticket',
+    {
+      method: 'POST',
+      body: buildExternalOrderListBody(references),
+    },
+  );
+}
+
 export async function getMerchizeInDepthOrderDetail(merchizeOrderId: string) {
   return merchizeRequest<MerchizeInDepthOrderDetailResponse>(
     `/order/orders/${encodeURIComponent(merchizeOrderId)}`,
@@ -324,6 +351,35 @@ export async function getMerchizeInDepthOrderDetail(merchizeOrderId: string) {
 export async function getMerchizeAddressSuggestion(merchizeOrderId: string) {
   return merchizeRequest<unknown>(
     `/order/orders/${encodeURIComponent(merchizeOrderId)}/address-suggestion`,
+  );
+}
+
+export async function getMerchizeBuyerDetails(merchizeOrderId: string) {
+  return merchizeRequest<unknown>(
+    `/order/orders/${encodeURIComponent(merchizeOrderId)}/buyerdetails`,
+  );
+}
+
+export async function updateMerchizeBuyerDetails(
+  merchizeOrderId: string,
+  address: MerchizeBuyerAddress,
+) {
+  return merchizeRequest<MerchizeExternalOrderMutationResponse>(
+    `/order/orders/${encodeURIComponent(merchizeOrderId)}/buyerdetails`,
+    { method: 'POST', body: address },
+  );
+}
+
+export async function getMerchizeBuyerDetailsDisplayStatus(merchizeOrderId: string) {
+  return merchizeRequest<unknown>(
+    `/order/orders/${encodeURIComponent(merchizeOrderId)}/buyerdetails/display-status`,
+  );
+}
+
+export async function markMerchizeAddressValid(merchizeOrderId: string, status: string) {
+  return merchizeRequest<MerchizeExternalOrderMutationResponse>(
+    `/order/orders/${encodeURIComponent(merchizeOrderId)}/mark-valid-address`,
+    { method: 'POST', body: { status } },
   );
 }
 
@@ -346,5 +402,23 @@ export async function getMerchizeOrderHistory(merchizeOrderId: string) {
 export async function getMerchizeOrderProgress(merchizeOrderId: string) {
   return merchizeRequest<unknown>(
     `/order/get-order-progress/${encodeURIComponent(merchizeOrderId)}`,
+  );
+}
+
+export async function getMerchizeUnfulfilledItems(merchizeOrderId: string) {
+  return merchizeRequest<unknown>(
+    `/order/orders/${encodeURIComponent(merchizeOrderId)}/unfulfilled`,
+  );
+}
+
+export async function getMerchizeRequireAttention(merchizeOrderId: string) {
+  return merchizeRequest<unknown>(
+    `/order/orders/${encodeURIComponent(merchizeOrderId)}/require-attention`,
+  );
+}
+
+export async function getMerchizeSendToFulfillmentDate(merchizeOrderId: string) {
+  return merchizeRequest<unknown>(
+    `/order/orders/${encodeURIComponent(merchizeOrderId)}/send-to-fulfillment-date`,
   );
 }

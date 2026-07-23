@@ -12,7 +12,7 @@ const DEFAULT_PENDING_SEND_LIMIT = 25;
 export const ADMIN_NOTIFICATION_TYPE = {
   PAID_ORDER_RECOVERY_REQUIRED: 'paid_order_recovery_required',
   PAID_ORDER_RECOVERY_SCANNER_CANDIDATE: 'paid_order_recovery_scanner_candidate',
-  PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED: 'paid_order_fulfillment_push_accepted',
+  PAID_ORDER_FULFILLMENT_PUSH_VERIFIED: 'paid_order_fulfillment_push_verified',
   PAYPAL_LEDGER_WEBHOOK_DRIFT: 'paypal_ledger_webhook_drift',
   PAYMENT_RECONCILIATION_REQUIRED: 'payment_reconciliation_required',
 } as const;
@@ -58,7 +58,7 @@ type AdminRecoveryNotificationPayload = {
   footnote?: string;
 };
 
-type AdminFulfillmentPushAcceptedNotificationPayload = {
+type AdminFulfillmentPushVerifiedNotificationPayload = {
   orderToken: string;
   paypalOrderId?: string | null;
   customerName: string;
@@ -100,7 +100,7 @@ type EnqueueAdminRecoveryNotificationProps = {
   recipientGroupKey?: string;
 };
 
-type EnqueueAdminFulfillmentPushAcceptedNotificationProps = {
+type EnqueueAdminFulfillmentPushVerifiedNotificationProps = {
   db?: AdminNotificationDb;
   orderToken: string;
   paypalOrderId?: string | null;
@@ -413,8 +413,8 @@ function buildAdminRecoveryAlertEmailHtml(payload: AdminRecoveryNotificationPayl
   });
 }
 
-function buildAdminFulfillmentPushAcceptedEmailHtml(
-  payload: AdminFulfillmentPushAcceptedNotificationPayload,
+function buildAdminFulfillmentPushVerifiedEmailHtml(
+  payload: AdminFulfillmentPushVerifiedNotificationPayload,
 ) {
   const bodyHtml = buildAdminEmailDetailGrid([
     {
@@ -443,10 +443,10 @@ function buildAdminFulfillmentPushAcceptedEmailHtml(
   return buildAdminEmailShell({
     tone: 'emerald',
     alertLabel: 'Fulfillment Ready',
-    eyebrow: 'Fulfillment Push Accepted',
+    eyebrow: 'Fulfillment Push Verified',
     heading: 'A paid order moved to fulfillment',
     intro:
-      'Payment, receipt, Django payment save, Django fulfillment processing, provider detail sync, and Merchize push-to-fulfillment completed.',
+      'Payment-side work completed and Merchize provider state now confirms the order was pushed to fulfillment.',
     bodyHtml,
     buttonHref: payload.adminDetailUrl,
     buttonLabel: 'Open Order Detail',
@@ -657,7 +657,7 @@ export async function enqueueAdminPayPalLedgerWebhookDriftNotification({
   return { created: result.count, dedupeBase, skipped: false as const };
 }
 
-export async function enqueueAdminFulfillmentPushAcceptedNotification({
+export async function enqueueAdminFulfillmentPushVerifiedNotification({
   db = paypalTxLedger,
   orderToken,
   paypalOrderId,
@@ -667,8 +667,8 @@ export async function enqueueAdminFulfillmentPushAcceptedNotification({
   merchizeExternalOrderNumber,
   merchizeOrderId,
   merchizeOrderCode,
-}: EnqueueAdminFulfillmentPushAcceptedNotificationProps) {
-  const type = ADMIN_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED;
+}: EnqueueAdminFulfillmentPushVerifiedNotificationProps) {
+  const type = ADMIN_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_VERIFIED;
   const stage = ADMIN_NOTIFICATION_STAGE.FULFILLMENT;
   const severity = ADMIN_NOTIFICATION_SEVERITY.INFO;
   const recipients = await resolveAdminNotificationRecipients({
@@ -680,7 +680,7 @@ export async function enqueueAdminFulfillmentPushAcceptedNotification({
     return { created: 0, skipped: true as const };
   }
 
-  const payload: AdminFulfillmentPushAcceptedNotificationPayload = {
+  const payload: AdminFulfillmentPushVerifiedNotificationPayload = {
     orderToken,
     paypalOrderId,
     customerName,
@@ -699,7 +699,7 @@ export async function enqueueAdminFulfillmentPushAcceptedNotification({
       paypalOrderId,
       type,
       stage,
-      errorCode: 'PUSH_ACCEPTED',
+      errorCode: 'PUSH_VERIFIED',
       severity,
       status: ADMIN_NOTIFICATION_STATUS.PENDING,
       dedupeKey: buildNotificationDedupeKey({
@@ -707,7 +707,7 @@ export async function enqueueAdminFulfillmentPushAcceptedNotification({
         recipient,
         type,
         stage,
-        errorCode: 'PUSH_ACCEPTED',
+        errorCode: 'PUSH_VERIFIED',
       }),
       recipient,
       payload,
@@ -746,7 +746,9 @@ async function sendAdminRecoveryNotificationRow(
     return { id: row.id, ok: false as const, error: 'Missing recipient email.' };
   }
 
-  const isPushAccepted = row.type === ADMIN_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_ACCEPTED;
+  const isPushVerified =
+    row.type === ADMIN_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_VERIFIED ||
+    row.type === 'paid_order_fulfillment_push_accepted';
   const isPaymentReconciliation =
     row.type === ADMIN_NOTIFICATION_TYPE.PAYMENT_RECONCILIATION_REQUIRED;
   const isPayPalLedgerWebhookDrift =
@@ -754,16 +756,16 @@ async function sendAdminRecoveryNotificationRow(
 
   try {
     const { sendMailFromPrimaryAgent } = await import('@/lib/zeptomail/sendMailFromPrimaryAgent');
-    const subject = isPushAccepted
-      ? `Paid order pushed to fulfillment · ${(row.payload as AdminFulfillmentPushAcceptedNotificationPayload).supportReference.slice(0, 8)}`
+    const subject = isPushVerified
+      ? `Paid order verified in fulfillment · ${(row.payload as AdminFulfillmentPushVerifiedNotificationPayload).supportReference.slice(0, 8)}`
       : isPayPalLedgerWebhookDrift
         ? `PayPal ledger webhook env drift · ${(row.payload as AdminPayPalLedgerWebhookDriftNotificationPayload).envVarName}`
         : isPaymentReconciliation
           ? `Payment reconciliation required · ${(row.payload as AdminRecoveryNotificationPayload).supportReference}`
           : `Paid order recovery required · ${(row.payload as AdminRecoveryNotificationPayload).supportReference}`;
-    const htmlbody = isPushAccepted
-      ? buildAdminFulfillmentPushAcceptedEmailHtml(
-          row.payload as AdminFulfillmentPushAcceptedNotificationPayload,
+    const htmlbody = isPushVerified
+      ? buildAdminFulfillmentPushVerifiedEmailHtml(
+          row.payload as AdminFulfillmentPushVerifiedNotificationPayload,
         )
       : isPayPalLedgerWebhookDrift
         ? buildAdminPayPalLedgerWebhookDriftEmailHtml(

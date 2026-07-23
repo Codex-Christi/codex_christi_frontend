@@ -8,6 +8,11 @@ import {
   getMerchizeExternalOrderInvoice,
   getMerchizeExternalOrderProgress,
   getMerchizeExternalOrderTracking,
+  getMerchizeOrderHistory,
+  getMerchizeOrderProgress,
+  getMerchizeSendToFulfillmentDate,
+  getMerchizeTransactionFee,
+  listMerchizeExternalOrdersTickets,
   MerchizeApiError,
   type MerchizeExternalOrderReference,
 } from './merchizeClient';
@@ -25,7 +30,12 @@ import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/
 type SnapshotAction =
   | 'external_order_progress'
   | 'external_order_tracking'
-  | 'external_order_invoice';
+  | 'external_order_invoice'
+  | 'external_order_tickets'
+  | 'provider_order_history'
+  | 'provider_internal_progress'
+  | 'provider_send_to_fulfillment'
+  | 'provider_transaction_fee';
 
 type SnapshotResult = {
   ok: boolean;
@@ -155,6 +165,7 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
       merchizeExternalOrderNumber: true,
       merchizeOrderCode: true,
       merchizeIdentifier: true,
+      merchizeOrderId: true,
     },
   });
 
@@ -201,6 +212,16 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
 
     try {
       const payload = await request();
+      const payloadRecord = asRecord(payload);
+      if (payloadRecord?.success === false) {
+        throw new MerchizeApiError(
+          asString(payloadRecord.message) ?? `Merchize rejected the ${action} snapshot request.`,
+          {
+            code: `MERCHIZE_${action.toUpperCase()}_REJECTED`,
+            responseSummary: payload,
+          },
+        );
+      }
       await persist(payload);
       await prisma.merchizeFulfillmentSyncAttempt.update({
         where: { id: attempt.id },
@@ -230,50 +251,118 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
     }
   }
 
-  await runSnapshot(
-    'external_order_progress',
-    () => getMerchizeExternalOrderProgress(reference),
-    async (payload) => {
-      await prisma.merchizeFulfillmentOrder.update({
-        where: { id: orderRow.id },
-        data: {
-          merchizeProgressPayload: toOptionalPrismaJson(payload),
-          progressStatus: summarizeProgressStatus(payload),
-          lastProgressSyncAt: new Date(),
-        },
-      });
-    },
-  );
+  await Promise.all([
+    runSnapshot(
+      'external_order_progress',
+      () => getMerchizeExternalOrderProgress(reference),
+      async (payload) => {
+        await prisma.merchizeFulfillmentOrder.update({
+          where: { id: orderRow.id },
+          data: {
+            merchizeProgressPayload: toOptionalPrismaJson(payload),
+            progressStatus: summarizeProgressStatus(payload),
+            lastProgressSyncAt: new Date(),
+          },
+        });
+      },
+    ),
+    runSnapshot(
+      'external_order_tracking',
+      () => getMerchizeExternalOrderTracking(reference),
+      async (payload) => {
+        await prisma.merchizeFulfillmentOrder.update({
+          where: { id: orderRow.id },
+          data: {
+            merchizeTrackingPayload: toOptionalPrismaJson(payload),
+            deliveryStatus: summarizeDeliveryStatus(payload),
+            lastTrackingSyncAt: new Date(),
+          },
+        });
+      },
+    ),
+    runSnapshot(
+      'external_order_invoice',
+      () => getMerchizeExternalOrderInvoice(reference),
+      async (payload) => {
+        await prisma.merchizeFulfillmentOrder.update({
+          where: { id: orderRow.id },
+          data: {
+            merchizeFulfillmentCostPayload: toOptionalPrismaJson(payload),
+            costReviewStatus: summarizeCostReviewStatus(payload),
+            lastCostCheckAt: new Date(),
+          },
+        });
+      },
+    ),
+    runSnapshot(
+      'external_order_tickets',
+      () => listMerchizeExternalOrdersTickets([reference]),
+      async (payload) => {
+        await prisma.merchizeFulfillmentOrder.update({
+          where: { id: orderRow.id },
+          data: {
+            merchizeTicketsPayload: toOptionalPrismaJson(payload),
+            lastTicketSyncAt: new Date(),
+          },
+        });
+      },
+    ),
+  ]);
 
-  await runSnapshot(
-    'external_order_tracking',
-    () => getMerchizeExternalOrderTracking(reference),
-    async (payload) => {
-      await prisma.merchizeFulfillmentOrder.update({
-        where: { id: orderRow.id },
-        data: {
-          merchizeTrackingPayload: toOptionalPrismaJson(payload),
-          deliveryStatus: summarizeDeliveryStatus(payload),
-          lastTrackingSyncAt: new Date(),
+  if (orderRow.merchizeOrderId) {
+    await Promise.all([
+      runSnapshot(
+        'provider_order_history',
+        () => getMerchizeOrderHistory(orderRow.merchizeOrderId as string),
+        async (payload) => {
+          await prisma.merchizeFulfillmentOrder.update({
+            where: { id: orderRow.id },
+            data: {
+              merchizeHistoryPayload: toOptionalPrismaJson(payload),
+              lastHistorySyncAt: new Date(),
+            },
+          });
         },
-      });
-    },
-  );
-
-  await runSnapshot(
-    'external_order_invoice',
-    () => getMerchizeExternalOrderInvoice(reference),
-    async (payload) => {
-      await prisma.merchizeFulfillmentOrder.update({
-        where: { id: orderRow.id },
-        data: {
-          merchizeFulfillmentCostPayload: toOptionalPrismaJson(payload),
-          costReviewStatus: summarizeCostReviewStatus(payload),
-          lastCostCheckAt: new Date(),
+      ),
+      runSnapshot(
+        'provider_internal_progress',
+        () => getMerchizeOrderProgress(orderRow.merchizeOrderId as string),
+        async (payload) => {
+          await prisma.merchizeFulfillmentOrder.update({
+            where: { id: orderRow.id },
+            data: {
+              merchizeInternalProgressPayload: toOptionalPrismaJson(payload),
+              lastProgressSyncAt: new Date(),
+            },
+          });
         },
-      });
-    },
-  );
+      ),
+      runSnapshot(
+        'provider_send_to_fulfillment',
+        () => getMerchizeSendToFulfillmentDate(orderRow.merchizeOrderId as string),
+        async (payload) => {
+          await prisma.merchizeFulfillmentOrder.update({
+            where: { id: orderRow.id },
+            data: {
+              merchizeSendToFulfillmentPayload: toOptionalPrismaJson(payload),
+            },
+          });
+        },
+      ),
+      runSnapshot(
+        'provider_transaction_fee',
+        () => getMerchizeTransactionFee(orderRow.merchizeOrderId as string),
+        async (payload) => {
+          await prisma.merchizeFulfillmentOrder.update({
+            where: { id: orderRow.id },
+            data: {
+              merchizeTransactionFeePayload: toOptionalPrismaJson(payload),
+            },
+          });
+        },
+      ),
+    ]);
+  }
 
   await refreshPaidOrderRecoveryProjectionSafely(orderToken);
 

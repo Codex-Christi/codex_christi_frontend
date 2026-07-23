@@ -253,9 +253,10 @@ export async function pushMerchizeFulfillmentOrderToProduction(
         await tx.merchizeFulfillmentOrder.update({
           where: { id: order.id },
           data: {
-            syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_ACCEPTED,
-            productionGateStatus: MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_ACCEPTED,
-            releasedToProductionAt: new Date(),
+            syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_ACKNOWLEDGED,
+            productionGateStatus:
+              MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_ACKNOWLEDGED,
+            pushAcknowledgedAt: new Date(),
             lastSyncErrorCode: null,
             lastSyncErrorMessage: null,
           },

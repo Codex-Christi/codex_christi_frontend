@@ -14,6 +14,15 @@ type InvoiceLineItem = {
   };
 };
 
+type InvoiceShippingAddressOverride = {
+  shipping_address_line_1: string;
+  shipping_address_line_2?: string;
+  shipping_city: string;
+  shipping_state: string;
+  zip_code: string;
+  shipping_country: string;
+};
+
 function getCreateTime(authData: OrderResponseBody) {
   return (
     (authData as OrderResponseBody & { createTime?: string }).createTime ??
@@ -109,6 +118,7 @@ function getCartLineItems(cart: CartVariant[] | undefined, currencyCode: string)
 export const createPaypalShopInvoicePDF = async (
   authData: OrderResponseBody,
   cart?: CartVariant[],
+  shippingAddressOverride?: InvoiceShippingAddressOverride | null,
 ) => {
   ensureHelveticaAFM();
 
@@ -176,15 +186,37 @@ export const createPaypalShopInvoicePDF = async (
         };
       };
     } | null)?.shipping;
-    if (shipping) {
-      const address = shipping.address;
+    if (shipping || shippingAddressOverride) {
+      const address = shipping?.address;
+      const addressLine1 =
+        shippingAddressOverride?.shipping_address_line_1 ??
+        address?.addressLine1 ??
+        address?.address_line_1 ??
+        '';
+      const addressLine2 =
+        shippingAddressOverride?.shipping_address_line_2 ??
+        address?.addressLine2 ??
+        address?.address_line_2 ??
+        '';
+      const city =
+        shippingAddressOverride?.shipping_city ??
+        address?.adminArea2 ??
+        address?.admin_area_2 ??
+        '';
+      const state =
+        shippingAddressOverride?.shipping_state ??
+        address?.adminArea1 ??
+        address?.admin_area_1 ??
+        '';
+      const postalCode =
+        shippingAddressOverride?.zip_code ?? address?.postalCode ?? address?.postal_code ?? '';
       doc
         .text('Ship To:', 400, 150)
-        .text(shipping.name?.fullName ?? shipping.name?.full_name ?? '', 400, 165)
-        .text(address?.addressLine1 ?? address?.address_line_1 ?? '', 400, 180)
-        .text(
-          `${address?.adminArea2 ?? address?.admin_area_2 ?? ''}, ${address?.adminArea1 ?? address?.admin_area_1 ?? ''} ${address?.postalCode ?? address?.postal_code ?? ''}`,
-        )
+        .text(shipping?.name?.fullName ?? shipping?.name?.full_name ?? getPayerName(payer), 400, 165)
+        .text(addressLine1, 400, 180)
+        .text(addressLine2, 400, 195)
+        .text(`${city}, ${state} ${postalCode}`, 400, 210)
+        .text(shippingAddressOverride?.shipping_country ?? '', 400, 225)
         .moveDown(1);
     }
 

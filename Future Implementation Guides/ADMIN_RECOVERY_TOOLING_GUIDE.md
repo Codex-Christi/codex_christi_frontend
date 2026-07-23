@@ -1,6 +1,6 @@
 # Admin And Recovery Tooling Guide
 
-Last updated: 2026-06-20
+Last updated: 2026-07-21
 
 This guide isolates the admin and checkout recovery work from the broader PayPal TX ledger guide. Use it as the source of truth for the next implementation phase: admin visibility, support recovery, retry operations, and maintenance tooling.
 
@@ -129,8 +129,8 @@ The fulfillment runner now sends tracked notifications for both blocking states 
 Implemented behavior:
 
 - Failure/blocking/attention states create durable `AdminNotificationOutbox` rows and attempt email delivery through `paid_order_fulfillment_issues`, with `ORDER_RECOVERY_ADMIN_EMAILS` as the bootstrap fallback.
-- Successful push acceptance creates `paid_order_fulfillment_push_accepted` rows in `CustomerNotificationOutbox` and sends the customer-safe "we're working on your order" email.
-- Successful push acceptance also creates low-severity `paid_order_fulfillment_push_accepted` rows in `AdminNotificationOutbox`, routed through `paid_order_fulfillment_success`.
+- Verified provider push creates `paid_order_fulfillment_push_verified` rows in `CustomerNotificationOutbox` and sends the customer-safe "we're working on your order" email.
+- Verified provider push also creates low-severity `paid_order_fulfillment_push_verified` rows in `AdminNotificationOutbox`, routed through `paid_order_fulfillment_success`.
 - The admin detail page shows admin notification history and customer notification history without dumping raw provider payloads.
 - Failed or pending customer notification rows can be resent from the paid-order recovery detail page.
 
@@ -151,8 +151,40 @@ Current runtime status:
 - The paid-order recovery detail page shows a manual release form only when the row is waiting at the push-disabled gate.
 - Manual release requires master admin authorization, fresh password step-up, explicit browser confirmation, and an admin reason.
 - Manual release resumes the paid fulfillment runner with `overrideMerchizeFulfillmentPushDisabled: true`. It must not replay PayPal capture, receipt upload, Django payment save, or an already accepted Django process/import.
-- On manual release success, Merchize Ops records `push_accepted`, sets `releasedToProductionAt`, the PayPal ledger becomes `completed`, and customer/admin success notifications are enqueued and sent.
+- On manual release success, Merchize Ops records acknowledgment and then verifies provider state. Only `push_verified` sets `releasedToProductionAt`, completes the PayPal ledger, and sends customer/admin success notifications.
 - On manual release failure, the order remains recoverable, provider push failure state is persisted where available, and the internal recovery notification/email path remains active.
+
+### Current Provider Recovery Actions
+
+The paid-order recovery detail page now exposes these bounded actions:
+
+- **Verify Provider State** reruns canonical external-number lookup, in-depth detail/item sync,
+  production-readiness checks, and synchronous progress/tracking/invoice/ticket/history checks. It is
+  available even on old `completed` rows. If the ledger was completed from command acknowledgment
+  but Merchize does not report `pushed`, the action reopens the row as
+  `fulfillment_attention_required` and creates an internal warning.
+- **Correct Fulfillment Address** saves an audited ledger correction. For an imported order it also
+  reads current buyer details, updates Merchize buyer details, regenerates the stable receipt object,
+  and reruns readiness. A local-only save is reported explicitly when provider mutation fails.
+- **Regenerate Receipt** rebuilds the receipt from durable payment/cart evidence and the active
+  address correction. The stable object URL remains the same and uses no-store cache policy.
+- **Verify and Release** is master-admin-only and requires password step-up, confirmation, and a
+  reason. It bypasses only `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false` and the provider's seven-day
+  manual-release gate. It cannot bypass invalid address, unavailable/unmapped product, missing
+  artwork, unavailable cost, or provider-attention blockers.
+
+Django payment save and accepted Django catalog import are not replayed. Django address columns are
+historical in this phase because no verified Django address-amendment endpoint exists; the receipt
+link remains valid because the corrected PDF replaces the object at the stable URL.
+
+The existing `/next-api/jobs/paypal-tx-ledger-recovery-scan` cron also performs synchronous
+Merchize lifecycle reconciliation for pushed, non-delivered orders. It refreshes detail/items,
+readiness/attention, progress, tracking, invoice/refund/surcharge evidence, provider tickets,
+history, transaction fee, and send-to-fulfillment state. Repeated snapshot failures and new
+non-retryable provider issues produce deduplicated admin warnings without replaying payment or push.
+
+Webhook ingestion is explicitly deferred. See the authoritative endpoint and webhook matrix in
+`MERCHIZE_FULFILLMENT_OPS_GUIDE.md`.
 
 Target customer behavior during a push-disabled test:
 
@@ -168,7 +200,7 @@ Use the full current runbook in `MERCHIZE_FULFILLMENT_OPS_GUIDE.md` for checkout
 2. Search by the copied `orderToken`, PayPal order ID, or customer email only in the secured admin UI.
 3. Open `/admin/shop/paid-order-recovery/[orderToken]`.
 4. Confirm the detail page shows the PayPal ledger stage, receipt state, Django payment-save custom ID, Merchize external order number when known, Merchize Ops sync status, production gate status, and notification history.
-5. For successful push acceptance, confirm the detail page shows `push_accepted`/`push_to_fulfillment_accepted`, admin notification history, and customer notification history.
+5. For successful provider release, confirm the detail page shows `push_verified`/`push_to_fulfillment_verified`, `pushAcknowledgedAt`, `pushVerifiedAt`, admin notification history, and customer notification history.
 6. For `MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING`, confirm the row stays customer-safe and scanner-resumable, the admin list/detail page shows provider sync pending, and no critical recovery email is sent for the initial provider-indexing lag. After repeated pending attempts or the grace window, confirm the row escalates to `MERCHIZE_LOOKUP_NOT_FOUND` and creates the normal recovery alert.
 7. For failure or blocked states, confirm a notification outbox row exists and that resend/suppress actions work without changing the PayPal ledger stage.
 8. For `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false`, confirm the row shows `fulfillment_attention_required`, the manual release form appears, the master-admin password/reason are required, and release resumes through `runPaidFulfillmentProcessing(orderToken, { overrideMerchizeFulfillmentPushDisabled: true })` without replaying PayPal capture, receipt upload, Django payment save, or an already accepted Django process response.
@@ -177,7 +209,7 @@ Current expected notification behavior:
 
 - Failure/blocking states should create durable `AdminNotificationOutbox` rows and attempt email delivery.
 - Push-disabled attention-required states should create durable `AdminNotificationOutbox` rows and attempt email delivery.
-- Successful automatic push acceptance creates customer and admin success notification rows and attempts delivery.
+- Successful automatic push verification creates customer and admin success notification rows and attempts delivery.
 - Successful manual release creates the same customer and admin success notification rows, deduped by order/recipient/type.
 
 ## Naming Rules
@@ -201,7 +233,7 @@ Preferred ledger fields:
 - `merchizeFulfillmentProcessingId`: Django processing row ID from fulfillment response.
 - `merchizeProviderOrderId`: Merchize platform order ID returned by external-number lookup. This is the `{id}` used for in-depth details and later POD actions such as view, edit, pause, change product, change processing, and tracking/status operations.
 - `merchizeProviderOrderCode`: provider order code returned by Merchize/Django processing.
-- `fulfillmentAddressOverride`: admin-provided fulfillment address used on retry.
+- `fulfillmentAddressOverride`: audited correction used for initial provider import or pre-release provider buyer-detail correction and receipt regeneration.
 
 Avoid:
 
@@ -607,8 +639,9 @@ Expected behavior:
 - If receipt already exists, skip receipt generation.
 - If `djangoPaymentSaveCustomId` already exists, skip Django payment save.
 - If catalog import has not completed, run the catalog-backed fulfillment stage.
-- If push-to-fulfillment has not been accepted, run the push stage.
-- If push-to-fulfillment is accepted, set the paid checkout fulfillment runner to `completed`.
+- If provider production release has not been acknowledged, run the push stage after readiness.
+- If the command is acknowledged but provider state is not final, keep the row scanner-resumable.
+- Set the paid checkout runner to `completed` only after provider state verifies `pushed`.
 - If local fulfillment payload validation fails, set `fulfillment_blocked`, persist the attempted payload and local validation envelope, and enqueue an internal alert.
 - If Django/Merchize returns HTTP 2xx with `success: false`, `processing_status: failed`, or an unsafe provider error, set `fulfillment_failed`, persist request/response payloads, and enqueue an internal alert.
 
@@ -618,7 +651,7 @@ Purpose:
 
 - Retry or run only the provider fulfillment stages when receipt and Django payment save are already complete.
 - Use this for catalog-import/push-to-fulfillment repair, not for payment retry.
-- Do not use this for rows whose push-to-fulfillment is already accepted and whose provider details are merely unsynced.
+- Do not issue another push for rows whose provider state is already verified; use synchronous lifecycle reconciliation instead.
 
 Required row fields:
 
@@ -638,8 +671,8 @@ Rules:
 - Save `merchizeFulfillmentResponsePayload`.
 - Save `merchizeFulfillmentProcessingId`, `merchizeProviderOrderId`, and `merchizeProviderOrderCode` when returned.
 - Treat HTTP success as transport success only. Fulfillment succeeds only when the response body indicates business success.
-- Treat accepted `200 | 201` responses with `processing_status: completed` as accepted handoff states only when the process contract covers push-to-fulfillment.
-- If Django does not cover push-to-fulfillment, call the server-only Merchize push adapter before completion.
+- Treat accepted `200 | 201` Django responses with `processing_status: completed` as catalog-import handoff states, including the known informational message.
+- Call the server-only Merchize push adapter only after readiness, then verify final provider state before completion.
 - Store provider platform IDs only after the Merchize external-number lookup confirms them.
 - On validation/provider failure, keep the row unresolved and visible for repair/retry.
 
@@ -655,18 +688,12 @@ Rules:
 - Use `authorizePayload`, `cartSnapshot`, customer data, and `djangoOrderIntentOrderId ?? orderToken`.
 - Do not depend only on PayPal item payloads because PayPal may not echo item-level data.
 - Save the new `receiptLink` and `receiptFile`.
-- Keep the old receipt reference visible in audit notes if audit storage exists later.
-- Allow this action on `completed` rows, but require a confirmation dialog and an admin reason.
-- Prefer uploading a new versioned R2 object instead of overwriting the existing object key.
-- Use a filename suffix such as `-v2`, `-v3`, or a timestamp to avoid stale CDN/browser cache.
+- Record the action in admin audit history.
+- Allow this action on `completed` rows under the normal protected recovery permission.
+- Replace the stable R2 object because Django already stores that receipt URL and payment save must not be replayed.
+- Set `Cache-Control: private, no-store, max-age=0, must-revalidate` so corrected content is not masked by stale CDN/browser cache.
 - Update the ledger row to point to the new `receiptLink` and `receiptFile` after upload succeeds.
-- Keep the old receipt URL visible to admins until immutable audit storage exists.
-
-Avoid direct same-key overwrites by default:
-
-- Current receipt uploads use long public caching.
-- A same-key overwrite may leave admins or customers seeing the old PDF from cache.
-- A versioned key gives support a fresh URL and preserves traceability.
+- Do not create a second Django payment-save row merely to update the receipt URL.
 
 ### Save Fulfillment Address Override
 
@@ -686,7 +713,10 @@ Rules:
 - Require an explicit reason.
 - Show original shipping snapshot beside the override.
 - Do not mutate the original `shippingSnapshot`.
-- Use the override only for fulfillment retries.
+- Before provider import, use the correction for the initial catalog import and corrected receipt.
+- After provider import but before verified release, update Merchize buyer details, regenerate the receipt, and rerun readiness.
+- If Merchize already reports `pushed`, fail closed; automatic address mutation is no longer safe.
+- Do not mutate the original `shippingSnapshot` or replay Django payment save.
 
 ### Clear Stale Post-Processing Lock
 

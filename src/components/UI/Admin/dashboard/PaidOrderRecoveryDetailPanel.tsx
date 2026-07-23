@@ -188,7 +188,7 @@ function RecoveryActionsPanel({
           orderToken={recovery.orderToken}
           isCompleted={recovery.status === 'completed'}
           needsProviderDetailSync={detail.needsProviderDetailSync}
-          requiresPushOverride={detail.requiresPushOverride}
+          requiresManualRelease={detail.requiresManualRelease}
           recoveryStatus={recovery.status}
         />
         <button
