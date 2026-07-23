@@ -12,6 +12,35 @@ export type MerchizeInDepthOrderDetailResponse = {
   data?: JsonRecord | null;
 };
 
+export type MerchizeExternalOrderFulfillmentCost = {
+  discount_amount?: number;
+  shipping_cost?: number;
+  fulfillment_cost?: number;
+  branding_cost?: number;
+  amount?: number;
+  currency?: string;
+  status?: string;
+  paid_at?: string;
+  created?: string;
+};
+
+export type MerchizeExternalOrderInvoiceRow = {
+  code?: string;
+  external_number?: string;
+  identifier?: string;
+  transaction_fee?: number;
+  // Merchize currently returns 0 before an invoice exists, despite documenting an object.
+  fulfillment_cost?: MerchizeExternalOrderFulfillmentCost | number | null;
+  fulfillment_refund?: unknown[];
+  fulfillment_charge?: unknown[];
+};
+
+export type MerchizeExternalOrderInvoiceResponse = {
+  success?: boolean;
+  message?: string;
+  data?: MerchizeExternalOrderInvoiceRow[] | null;
+};
+
 export type MerchizeFulfillmentRegistrationInput = {
   orderToken: string;
   paypalOrderId: string | null;

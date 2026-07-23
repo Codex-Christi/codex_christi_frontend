@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getMerchizeBuyerAddressMismatchFields } from './addressCorrectionVerification';
+import {
+  getMerchizeBuyerAddressExpectationFromLedger,
+  getMerchizeBuyerAddressMismatchFields,
+} from './addressCorrectionVerification';
 
 const expected = {
   address: '100 Test Avenue',
@@ -82,4 +85,30 @@ test('fails closed when the buyer-address shape is absent', () => {
     'postalCode',
     'countryCode',
   ]);
+});
+
+test('maps a saved ledger correction to a provider address expectation', () => {
+  assert.deepEqual(
+    getMerchizeBuyerAddressExpectationFromLedger({
+      shipping_address_line_1: '100 Test Avenue',
+      shipping_address_line_2: 'Suite 20',
+      shipping_city: 'Example City',
+      shipping_state: 'CA',
+      zip_code: '90210-1234',
+      shipping_country: 'USA',
+    }),
+    expected,
+  );
+});
+
+test('refuses an incomplete saved address expectation', () => {
+  assert.equal(
+    getMerchizeBuyerAddressExpectationFromLedger({
+      shipping_address_line_1: '100 Test Avenue',
+      shipping_city: 'Example City',
+      shipping_state: 'CA',
+      shipping_country: 'USA',
+    }),
+    null,
+  );
 });

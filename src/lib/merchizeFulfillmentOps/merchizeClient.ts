@@ -2,6 +2,7 @@ import 'server-only';
 
 import { redactText } from './redaction';
 import type {
+  MerchizeExternalOrderInvoiceResponse,
   MerchizeInDepthOrderDetailResponse,
   MerchizeOrderLookupResponse,
 } from './merchizeTypes';
@@ -110,8 +111,11 @@ function buildHeaders(config: ReturnType<typeof getMerchizeConfig>) {
     'Content-Type': 'application/json',
   };
 
-  if (config.apiKey) headers['X-API-KEY'] = config.apiKey;
-  if (config.accessToken) headers.Authorization = `Bearer ${config.accessToken}`;
+  if (config.apiKey) {
+    headers['X-API-KEY'] = config.apiKey;
+  } else if (config.accessToken) {
+    headers.Authorization = `Bearer ${config.accessToken}`;
+  }
   if (config.storeId) headers['x-store-id'] = config.storeId;
 
   return headers;
@@ -289,7 +293,7 @@ export async function getMerchizeExternalOrderTracking(reference: MerchizeExtern
 }
 
 export async function getMerchizeExternalOrderInvoice(reference: MerchizeExternalOrderReference) {
-  return merchizeRequest<MerchizeExternalOrderSnapshotResponse>(
+  return merchizeRequest<MerchizeExternalOrderInvoiceResponse>(
     `/order/external/orders/order-invoice?${buildExternalOrderQuery(reference)}`,
   );
 }
@@ -380,12 +384,6 @@ export async function markMerchizeAddressValid(merchizeOrderId: string, status: 
   return merchizeRequest<MerchizeExternalOrderMutationResponse>(
     `/order/orders/${encodeURIComponent(merchizeOrderId)}/mark-valid-address`,
     { method: 'POST', body: { status } },
-  );
-}
-
-export async function getMerchizeFulfillmentCostInvoice(merchizeOrderId: string) {
-  return merchizeRequest<unknown>(
-    `/order/orders/${encodeURIComponent(merchizeOrderId)}/fulfillment-cost-invoice`,
   );
 }
 

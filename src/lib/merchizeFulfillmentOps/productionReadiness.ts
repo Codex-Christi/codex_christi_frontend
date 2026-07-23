@@ -1,12 +1,5 @@
 export type MerchizeReadinessCategory =
-  | 'address'
-  | 'items'
-  | 'artwork'
-  | 'cost'
-  | 'attention'
-  | 'order'
-  | 'provider'
-  | 'age';
+  'address' | 'items' | 'artwork' | 'cost' | 'attention' | 'order' | 'provider' | 'age';
 
 export type MerchizeReadinessBlocker = {
   code: string;
@@ -16,6 +9,11 @@ export type MerchizeReadinessBlocker = {
 };
 
 export type MerchizeProviderPushState = 'not_pushed' | 'pending' | 'pushed' | 'failed';
+
+export type MerchizeAddressValidationEvidence = {
+  status: string;
+  markedValid: boolean;
+};
 
 export type MerchizeProductionReadiness = {
   ready: boolean;
@@ -37,7 +35,7 @@ type ReadinessPayloads = {
   detail: unknown;
   addressSuggestion: unknown;
   unfulfilledItems: unknown;
-  fulfillmentCost: unknown;
+  fulfillmentInvoice: unknown;
   requireAttention: unknown;
   sendToFulfillment: unknown;
   now?: Date;
@@ -64,8 +62,16 @@ const BUYER_CONFIRMABLE_ADDRESS_STATUSES = new Set([
   'fullname_undefined',
   'pending',
 ]);
-const FAILED_ITEM_STATUSES = new Set(['failed', 'unmapped', 'error', 'invalid', 'rejected']);
+const FAILED_ITEM_STATUSES = new Set([
+  'failed',
+  'unmapped',
+  'not_mapped',
+  'error',
+  'invalid',
+  'rejected',
+]);
 const STALE_ORDER_DAYS = 7;
+type ExternalInvoiceState = 'available' | 'paid' | 'placeholder' | 'provider_error';
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -85,34 +91,19 @@ function getDataRecord(payload: unknown) {
   return asRecord(asRecord(payload)?.data) ?? asRecord(payload);
 }
 
-function getResponseMessage(payload: unknown) {
-  return asString(asRecord(payload)?.message)?.toLowerCase() ?? '';
+export function getMerchizeAddressValidationEvidence(
+  detail: unknown,
+): MerchizeAddressValidationEvidence {
+  const detailData = getDataRecord(detail);
+
+  return {
+    status: asString(detailData?.validate_shipping_address)?.toLowerCase() ?? 'unknown',
+    markedValid: asBoolean(detailData?.mark_valid_address) === true,
+  };
 }
 
-function getEnvelopeData(payload: unknown) {
-  const record = asRecord(payload);
-  if (!record) return payload;
-  if ('data' in record || 'success' in record || 'message' in record) return record.data;
-  return payload;
-}
-
-function hasProviderEvidence(value: unknown) {
-  if (value === null || value === undefined) return false;
-  if (Array.isArray(value)) return value.length > 0;
-  const record = asRecord(value);
-  return record ? Object.keys(record).length > 0 : true;
-}
-
-function isTransientProviderMessage(message: string) {
-  return [
-    'being processed',
-    'processing',
-    'pending',
-    'not ready',
-    'please wait',
-    'calculating',
-    'generating',
-  ].some((phrase) => message.includes(phrase));
+export function canManuallyConfirmMerchizeAddressStatus(status: string) {
+  return BUYER_CONFIRMABLE_ADDRESS_STATUSES.has(status.toLowerCase());
 }
 
 function getDataArray(payload: unknown) {
@@ -133,28 +124,73 @@ function parseDate(value: unknown) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function addBlocker(
-  blockers: MerchizeReadinessBlocker[],
-  blocker: MerchizeReadinessBlocker,
-) {
+function addBlocker(blockers: MerchizeReadinessBlocker[], blocker: MerchizeReadinessBlocker) {
   if (!blockers.some((candidate) => candidate.code === blocker.code)) {
     blockers.push(blocker);
   }
 }
 
-function collectNestedRecords(value: unknown, depth = 0): Record<string, unknown>[] {
-  if (depth > 5 || value === null || value === undefined) return [];
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => collectNestedRecords(item, depth + 1));
+function getUnfulfilledItemRecords(payload: unknown) {
+  return getDataArray(payload)
+    .map(asRecord)
+    .filter((record): record is Record<string, unknown> => Boolean(record));
+}
+
+function hasFailedMappingStatus(record: Record<string, unknown>) {
+  return [record.mapping_status, record.ffm_map_item_status].some((value) => {
+    const status = asString(value)?.toLowerCase().replace(/\s+/g, '_');
+    return Boolean(status && FAILED_ITEM_STATUSES.has(status));
+  });
+}
+
+function hasResolvedCatalogVariant(item: Record<string, unknown>) {
+  const variant = asRecord(item.variant);
+  if (!variant || variant.is_deleted === true || variant.is_active === false) return false;
+
+  return Boolean(
+    item.catalogInfo ??
+    item.catalog_info ??
+    asString(item.ffm_mapped_catalog_sku) ??
+    asString(variant.sku),
+  );
+}
+
+function isDirectItemUnavailable(item: Record<string, unknown>) {
+  if (item.is_deleted === true || item.is_active === false) return true;
+
+  const variant = asRecord(item.variant);
+  if (variant) {
+    return variant.is_deleted === true || variant.is_active === false;
   }
 
-  const record = asRecord(value);
-  if (!record) return [];
+  const product = asRecord(item.product);
+  return product?.is_deleted === true || product?.is_active === false;
+}
 
-  return [
-    record,
-    ...Object.values(record).flatMap((item) => collectNestedRecords(item, depth + 1)),
-  ];
+function isDirectItemUnmapped(item: Record<string, unknown>) {
+  if (hasFailedMappingStatus(item)) return true;
+
+  const variant = asRecord(item.variant);
+  if (variant && hasFailedMappingStatus(variant)) return true;
+
+  const product = asRecord(item.product);
+  return Boolean(product && !hasResolvedCatalogVariant(item) && hasFailedMappingStatus(product));
+}
+
+function classifyExternalInvoice(payload: unknown): ExternalInvoiceState {
+  const root = asRecord(payload);
+  if (root?.success !== true || !Array.isArray(root.data)) return 'provider_error';
+
+  const row = asRecord(getDataArray(payload)[0]);
+  const fulfillmentCost = row?.fulfillment_cost;
+  if (typeof fulfillmentCost === 'number') {
+    return fulfillmentCost > 0 ? 'available' : 'placeholder';
+  }
+
+  const costRecord = asRecord(fulfillmentCost);
+  if (!costRecord || Object.keys(costRecord).length === 0) return 'placeholder';
+
+  return asString(costRecord.status)?.toLowerCase() === 'paid' ? 'paid' : 'available';
 }
 
 function classifyProviderPushState(detail: unknown, sendToFulfillment: unknown) {
@@ -181,7 +217,7 @@ export function classifyMerchizeProductionReadiness({
   detail,
   addressSuggestion,
   unfulfilledItems,
-  fulfillmentCost,
+  fulfillmentInvoice,
   requireAttention,
   sendToFulfillment,
   now = new Date(),
@@ -189,13 +225,17 @@ export function classifyMerchizeProductionReadiness({
 }: ReadinessPayloads): MerchizeProductionReadiness {
   const blockers: MerchizeReadinessBlocker[] = [];
   const detailData = getDataRecord(detail);
-  const validationStatus =
-    asString(detailData?.validate_shipping_address)?.toLowerCase() ?? 'unknown';
-  const markValidAddress = asBoolean(detailData?.mark_valid_address) === true;
+  const addressEvidence = getMerchizeAddressValidationEvidence(detail);
+  const validationStatus = addressEvidence.status;
+  const markValidAddress = addressEvidence.markedValid;
   const push = classifyProviderPushState(detail, sendToFulfillment);
 
   let addressReviewStatus = 'unknown';
-  if (validationStatus === 'valid' || validationStatus === 'ignored') {
+  if (
+    validationStatus === 'valid' ||
+    validationStatus === 'ignore' ||
+    validationStatus === 'ignored'
+  ) {
     addressReviewStatus = 'ready';
   } else if (markValidAddress && BUYER_CONFIRMABLE_ADDRESS_STATUSES.has(validationStatus)) {
     addressReviewStatus = 'buyer_confirmed';
@@ -240,18 +280,9 @@ export function classifyMerchizeProductionReadiness({
     });
   }
 
-  const itemRecords = collectNestedRecords(unfulfilledItems);
-  const hasUnavailableProduct = itemRecords.some(
-    (record) => record.is_deleted === true || record.is_active === false,
-  );
-  const hasUnmappedProduct = itemRecords.some((record) => {
-    const mappingStatus = asString(record.mapping_status)?.toLowerCase();
-    const itemStatus = asString(record.ffm_map_item_status)?.toLowerCase();
-    return (
-      (Boolean(mappingStatus) && FAILED_ITEM_STATUSES.has(mappingStatus as string)) ||
-      (Boolean(itemStatus) && FAILED_ITEM_STATUSES.has(itemStatus as string))
-    );
-  });
+  const itemRecords = getUnfulfilledItemRecords(unfulfilledItems);
+  const hasUnavailableProduct = itemRecords.some(isDirectItemUnavailable);
+  const hasUnmappedProduct = itemRecords.some(isDirectItemUnmapped);
 
   if (hasUnavailableProduct) {
     itemReviewStatus = 'blocked';
@@ -272,13 +303,32 @@ export function classifyMerchizeProductionReadiness({
     });
   }
 
+  const allProductsExplicitlySkipArtwork =
+    itemRecords.length > 0 &&
+    itemRecords.every((item) => {
+      const product = asRecord(item.product);
+      return product?.no_need_artworks === true || item.no_need_artworks === true;
+    });
+  const allItemsUseStoredCatalogVariants =
+    itemRecords.length > 0 && itemRecords.every(hasResolvedCatalogVariant);
   const artworkStatus = asString(detailData?.artwork_status)?.toLowerCase();
   let artworkReviewStatus = 'ready';
-  if (artworkStatus === 'missing' || artworkStatus === 'incomplete') {
+  if (
+    (artworkStatus === 'missing' || artworkStatus === 'incomplete') &&
+    allProductsExplicitlySkipArtwork
+  ) {
+    artworkReviewStatus = 'not_required';
+  } else if (
+    (artworkStatus === 'missing' || artworkStatus === 'incomplete') &&
+    allItemsUseStoredCatalogVariants
+  ) {
+    artworkReviewStatus = 'catalog_managed';
+  } else if (artworkStatus === 'missing' || artworkStatus === 'incomplete') {
     artworkReviewStatus = 'blocked';
     addBlocker(blockers, {
       code: 'MERCHIZE_ARTWORK_MISSING',
-      message: 'Merchize reports missing or incomplete production artwork.',
+      message:
+        'Merchize reports required production artwork is missing or incomplete for an item without a resolved stored catalog variant.',
       category: 'artwork',
       retryable: false,
     });
@@ -294,28 +344,18 @@ export function classifyMerchizeProductionReadiness({
     artworkReviewStatus = 'unknown';
   }
 
-  const costRoot = asRecord(fulfillmentCost);
-  const costData = getEnvelopeData(fulfillmentCost);
-  const costMessage = getResponseMessage(fulfillmentCost);
-  let costReviewStatus = 'ready';
-  if (costRoot?.success === false) {
-    const retryable = isTransientProviderMessage(costMessage);
-    costReviewStatus = retryable ? 'pending' : 'blocked';
+  const invoiceState = classifyExternalInvoice(fulfillmentInvoice);
+  const costReviewStatus =
+    invoiceState === 'placeholder'
+      ? push.state === 'pushed'
+        ? 'pending'
+        : 'awaiting_fulfillment'
+      : invoiceState;
+  if (invoiceState === 'provider_error') {
     addBlocker(blockers, {
-      code: retryable
-        ? 'MERCHIZE_FULFILLMENT_COST_PENDING'
-        : 'MERCHIZE_FULFILLMENT_COST_UNAVAILABLE',
-      message: retryable
-        ? 'Merchize is still calculating the fulfillment-cost invoice.'
-        : 'Merchize could not calculate a fulfillment-cost invoice for this order.',
-      category: 'cost',
-      retryable,
-    });
-  } else if (!hasProviderEvidence(costData)) {
-    costReviewStatus = 'pending';
-    addBlocker(blockers, {
-      code: 'MERCHIZE_FULFILLMENT_COST_PENDING',
-      message: 'Merchize has not returned fulfillment-cost evidence yet.',
+      code: 'MERCHIZE_INVOICE_LOOKUP_FAILED',
+      message:
+        'Merchize rejected the documented invoice-statistics request. Retry provider synchronization.',
       category: 'cost',
       retryable: true,
     });

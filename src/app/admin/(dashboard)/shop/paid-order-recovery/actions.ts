@@ -40,6 +40,8 @@ import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/l
 import { isMerchizeLookupPendingProviderProcessingError } from '@/lib/merchizeFulfillmentOps/lookupPending';
 import { CODEX_CHRISTI_FULFILLMENT_IDENTIFIER } from '@/lib/merchizeFulfillmentOps/fulfillmentIdentifier';
 import { applyMerchizeFulfillmentAddressCorrection } from '@/lib/merchizeFulfillmentOps/applyMerchizeFulfillmentAddressCorrection';
+import { markMerchizeFulfillmentAddressValid } from '@/lib/merchizeFulfillmentOps/markMerchizeFulfillmentAddressValid';
+import { getMerchizeBuyerAddressExpectationFromLedger } from '@/lib/merchizeFulfillmentOps/addressCorrectionVerification';
 import { resolveMerchizeFulfillmentAddressCorrectionTarget } from '@/lib/merchizeFulfillmentOps/resolveMerchizeFulfillmentAddressCorrectionTarget';
 import { runMerchizeProductionReadinessChecks } from '@/lib/merchizeFulfillmentOps/runMerchizeProductionReadinessChecks';
 import { MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS } from '@/lib/merchizeFulfillmentOps/status';
@@ -55,8 +57,7 @@ import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/
 import type { CartVariant } from '@/stores/shop_stores/cartStore';
 
 type AdminNotificationActionResult =
-  | { ok: true; message: string; tone?: 'success' | 'warning' }
-  | { ok: false; error: string };
+  { ok: true; message: string; tone?: 'success' | 'warning' } | { ok: false; error: string };
 
 const SCANNER_AUDIT_ACTIONS = [
   'shop.paid_order_recovery.scan_candidates',
@@ -841,10 +842,9 @@ export async function releaseMerchizeFulfillmentToProductionAction({
     if (
       existing.status !== PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED ||
       (!isManualReleaseGate &&
-        ![
-          'MERCHIZE_PUSH_DISABLED_BY_CONFIG',
-          'MERCHIZE_MANUAL_RELEASE_REQUIRED',
-        ].includes(existing.lastErrorCode ?? ''))
+        !['MERCHIZE_PUSH_DISABLED_BY_CONFIG', 'MERCHIZE_MANUAL_RELEASE_REQUIRED'].includes(
+          existing.lastErrorCode ?? '',
+        ))
     ) {
       return rejectAfterStepUp('This order is not waiting on a master-admin production release.');
     }
@@ -925,6 +925,193 @@ export async function releaseMerchizeFulfillmentToProductionAction({
     return {
       ok: false,
       error: getAdminActionErrorMessage(error, 'Production release failed.'),
+    };
+  }
+}
+
+export async function markPaidOrderFulfillmentAddressValidAction({
+  orderToken,
+  password,
+  reason,
+}: {
+  orderToken: string;
+  password: string;
+  reason: string;
+}): Promise<AdminNotificationActionResult> {
+  const action = 'shop.paid_order_recovery.mark_fulfillment_address_valid';
+  const confirmationReason = reason.trim();
+
+  if (!confirmationReason) {
+    return {
+      ok: false,
+      error: 'A confirmation reason is required.',
+    };
+  }
+
+  try {
+    const admin = await verifyMasterAdminPasswordStepUp({
+      password,
+      action,
+      targetId: orderToken,
+    });
+    const ledgerOrder = await paypalTxLedger.paypalIntent.findUnique({
+      where: { orderToken },
+      select: {
+        fulfillmentAddressOverride: true,
+        shippingSnapshot: true,
+      },
+    });
+    if (!ledgerOrder) {
+      throw new Error('Recovery row was not found.');
+    }
+
+    const expectedAddress = getMerchizeBuyerAddressExpectationFromLedger(
+      ledgerOrder.fulfillmentAddressOverride ?? ledgerOrder.shippingSnapshot,
+    );
+    if (!expectedAddress) {
+      throw new Error(
+        'The effective ledger address is incomplete and cannot be safely confirmed in Merchize.',
+      );
+    }
+
+    await Promise.all([
+      writeAdminAuditLog({
+        actor: admin,
+        action,
+        targetType: 'orderToken',
+        targetId: orderToken,
+        outcome: 'started',
+        metadata: { hasReason: true },
+      }),
+      writeMerchizeFulfillmentAdminAction({
+        orderToken,
+        action: 'provider_address_mark_valid',
+        actor: admin.userID,
+        reason: confirmationReason,
+        status: 'started',
+      }),
+    ]);
+
+    const result = await markMerchizeFulfillmentAddressValid({
+      orderToken,
+      expectedAddress,
+    });
+    if (!result.ok) {
+      await Promise.all([
+        writeAdminAuditLog({
+          actor: admin,
+          action,
+          targetType: 'orderToken',
+          targetId: orderToken,
+          outcome: 'failure',
+          metadata: { errorCode: result.errorCode },
+        }),
+        writeMerchizeFulfillmentAdminAction({
+          orderToken,
+          action: 'provider_address_mark_valid',
+          actor: admin.userID,
+          reason: confirmationReason,
+          status: 'failed',
+          errorMessage: result.errorMessage,
+          metadata: { errorCode: result.errorCode },
+        }),
+      ]);
+
+      await refreshPaidOrderRecoveryProjectionSafely(orderToken);
+      revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+
+      return { ok: false, error: result.errorMessage };
+    }
+
+    const readiness = await runMerchizeProductionReadinessChecks(orderToken);
+    const addressVerified =
+      readiness.ok &&
+      ['ready', 'buyer_confirmed'].includes(readiness.readiness.addressReviewStatus);
+
+    if (!readiness.ok || !addressVerified) {
+      const verificationMessage = readiness.ok
+        ? 'Merchize acknowledged the address confirmation, but its detail response has not verified it yet. Refresh provider state before release.'
+        : `Merchize acknowledged the address confirmation, but readiness verification did not complete: ${readiness.errorMessage}`;
+
+      await Promise.all([
+        writeAdminAuditLog({
+          actor: admin,
+          action,
+          targetType: 'orderToken',
+          targetId: orderToken,
+          outcome: 'failure',
+          metadata: {
+            providerAcknowledged: result.changed,
+            verificationPending: true,
+          },
+        }),
+        writeMerchizeFulfillmentAdminAction({
+          orderToken,
+          action: 'provider_address_mark_valid',
+          actor: admin.userID,
+          reason: confirmationReason,
+          status: 'partial_failure',
+          errorMessage: verificationMessage,
+          metadata: {
+            providerAcknowledged: result.changed,
+            validationStatus: result.validationStatus,
+          },
+        }),
+      ]);
+
+      revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+      revalidatePath('/admin/shop/paid-order-recovery');
+
+      return {
+        ok: true,
+        tone: 'warning',
+        message: verificationMessage,
+      };
+    }
+
+    const remainingBlocker = readiness.readiness.primaryBlocker;
+    await Promise.all([
+      writeAdminAuditLog({
+        actor: admin,
+        action,
+        targetType: 'orderToken',
+        targetId: orderToken,
+        outcome: 'success',
+        metadata: {
+          providerChanged: result.changed,
+          readinessStatus: readiness.readiness.status,
+          remainingBlockerCount: readiness.readiness.blockers.length,
+        },
+      }),
+      writeMerchizeFulfillmentAdminAction({
+        orderToken,
+        action: 'provider_address_mark_valid',
+        actor: admin.userID,
+        reason: confirmationReason,
+        status: 'succeeded',
+        metadata: {
+          providerChanged: result.changed,
+          validationStatus: result.validationStatus,
+          readinessStatus: readiness.readiness.status,
+          remainingBlockerCount: readiness.readiness.blockers.length,
+        },
+      }),
+    ]);
+
+    revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+    revalidatePath('/admin/shop/paid-order-recovery');
+
+    return {
+      ok: true,
+      tone: remainingBlocker ? 'warning' : 'success',
+      message: remainingBlocker
+        ? `The current address is confirmed in Merchize. The order remains blocked: ${remainingBlocker.message}`
+        : 'The current address is confirmed in Merchize. No production push was performed.',
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: getAdminActionErrorMessage(error, 'Address confirmation failed.'),
     };
   }
 }
@@ -1037,7 +1224,9 @@ export async function syncAdminMerchizeProviderDetailsAction({
 
     const [readiness, snapshots] = await Promise.all([
       runMerchizeProductionReadinessChecks(existing.orderToken),
-      syncMerchizeFulfillmentOperationalSnapshots(existing.orderToken),
+      syncMerchizeFulfillmentOperationalSnapshots(existing.orderToken, {
+        includeInvoice: false,
+      }),
     ]);
     const reopenedCompletedLedger = await reconcileCompletedLedgerWithProviderReadiness({
       orderToken: existing.orderToken,
@@ -1187,13 +1376,13 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
       status: 'started',
       metadata: { country: normalizedAddress.shipping_country },
     });
-    type ProviderCorrectionResult = Awaited<
-      ReturnType<typeof applyMerchizeFulfillmentAddressCorrection>
-    > | {
-      ok: true;
-      providerUpdated: false;
-      message: string;
-    };
+    type ProviderCorrectionResult =
+      | Awaited<ReturnType<typeof applyMerchizeFulfillmentAddressCorrection>>
+      | {
+          ok: true;
+          providerUpdated: false;
+          message: string;
+        };
     let providerCorrection: ProviderCorrectionResult;
     let providerIdentityBackfilled = false;
     let providerTargetErrorCode: string | null = null;

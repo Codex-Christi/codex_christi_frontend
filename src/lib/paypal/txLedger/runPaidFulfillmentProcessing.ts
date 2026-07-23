@@ -57,11 +57,7 @@ type RunPaidFulfillmentProcessingOptions = {
   allowStaleMerchizeOrderManualRelease?: boolean;
   triggerDetail?: string;
   triggerSource?:
-    | 'capture_route'
-    | 'manual_admin'
-    | 'payment_reconciliation'
-    | 'recovery_scanner'
-    | 'webhook';
+    'capture_route' | 'manual_admin' | 'payment_reconciliation' | 'recovery_scanner' | 'webhook';
 };
 
 function buildPaymentReceiptPayload(args: PaymentReceiptProps) {
@@ -405,8 +401,7 @@ export async function runPaidFulfillmentProcessing(
   try {
     const authData = row.authorizePayload as PaymentReceiptProps['authData'] | null;
     const finalCapturedOrder = row.capturePayload as
-      | PaymentSavingActionProps['finalCapturedOrder']
-      | null;
+      PaymentSavingActionProps['finalCapturedOrder'] | null;
 
     if (!authData || !finalCapturedOrder) {
       throw new Error('Missing authorize/capture payload in ledger');
@@ -769,7 +764,7 @@ export async function runPaidFulfillmentProcessing(
           errorMessage: pushVerification.errorMessage,
           issueSummary: [
             pushVerification.errorMessage,
-            'Review the provider address, catalog mapping, artwork, and fulfillment-cost evidence before retrying.',
+            'Review the provider address, explicit item/artwork evidence, provider attention, and push state before retrying.',
           ],
           requestPayload: fulfillmentRequestPayload,
           responsePayload: fulfillmentResponsePayload,

@@ -44,6 +44,10 @@ type SnapshotResult = {
   failed: Array<{ action: SnapshotAction; errorCode: string; errorMessage: string }>;
 };
 
+type SnapshotOptions = {
+  includeInvoice?: boolean;
+};
+
 function asString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
@@ -97,12 +101,6 @@ function summarizeDeliveryStatus(payload: unknown) {
   return null;
 }
 
-function summarizeCostReviewStatus(payload: unknown) {
-  const data = getFirstDataRecord(payload);
-  const fulfillmentCost = asRecord(data?.fulfillment_cost);
-  return asString(fulfillmentCost?.status);
-}
-
 function getSnapshotError(error: unknown) {
   if (error instanceof MerchizeApiError) {
     return {
@@ -139,6 +137,7 @@ function buildReference(order: {
 
 export async function syncMerchizeFulfillmentOperationalSnapshots(
   orderToken: string,
+  options: SnapshotOptions = {},
 ): Promise<SnapshotResult> {
   if (!isMerchizeFulfillmentOpsDatabaseConfigured()) {
     return {
@@ -251,6 +250,23 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
     }
   }
 
+  const invoiceSnapshot =
+    options.includeInvoice === false
+      ? null
+      : runSnapshot(
+          'external_order_invoice',
+          () => getMerchizeExternalOrderInvoice(reference),
+          async (payload) => {
+            await prisma.merchizeFulfillmentOrder.update({
+              where: { id: orderRow.id },
+              data: {
+                merchizeFulfillmentCostPayload: toOptionalPrismaJson(payload),
+                lastCostCheckAt: new Date(),
+              },
+            });
+          },
+        );
+
   await Promise.all([
     runSnapshot(
       'external_order_progress',
@@ -281,20 +297,6 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
       },
     ),
     runSnapshot(
-      'external_order_invoice',
-      () => getMerchizeExternalOrderInvoice(reference),
-      async (payload) => {
-        await prisma.merchizeFulfillmentOrder.update({
-          where: { id: orderRow.id },
-          data: {
-            merchizeFulfillmentCostPayload: toOptionalPrismaJson(payload),
-            costReviewStatus: summarizeCostReviewStatus(payload),
-            lastCostCheckAt: new Date(),
-          },
-        });
-      },
-    ),
-    runSnapshot(
       'external_order_tickets',
       () => listMerchizeExternalOrdersTickets([reference]),
       async (payload) => {
@@ -307,6 +309,7 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
         });
       },
     ),
+    ...(invoiceSnapshot ? [invoiceSnapshot] : []),
   ]);
 
   if (orderRow.merchizeOrderId) {

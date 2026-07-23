@@ -163,7 +163,7 @@ Readiness evidence:
 - Address
 - Products
 - Artwork
-- Cost
+- Invoice
 - Attention
 - Age Gate
 - Push Command acknowledgement
@@ -173,7 +173,7 @@ Operational evidence:
 
 - Progress
 - Tracking
-- Invoice/cost
+- Invoice statistics
 - Existing provider tickets
 
 This panel is a read model, not a provider-fetching widget. Page rendering selects normalized
@@ -187,6 +187,9 @@ The panel must distinguish:
 - push command acknowledgement from provider-verified push;
 - a stored ticket snapshot from proof that no tickets exist;
 - a tracking check with no tracking yet from a request that never ran;
+- an awaiting-fulfillment invoice placeholder from a rejected Invoice request;
+- operational invoice/ticket snapshots from Attention release gates;
+- catalog-managed artwork from an explicit artwork-set requirement;
 - manual age release from address/product/artwork/cost/attention readiness.
 
 Richer package, invoice, ticket, item-mismatch, and provider-history displays remain deferred until
@@ -208,12 +211,41 @@ The paid-order recovery detail page now exposes these bounded actions:
   submitted address field, regenerates the stable receipt object, and reruns readiness. A true
   pre-import correction may remain local-only. An accepted Django import must update Merchize or
   report an explicit partial failure; it must never be mislabeled as an initial-import save.
+- **Mark Current Address as Valid** is a master-admin-only provider confirmation for the exact
+  effective ledger address already stored in Merchize. It requires password step-up and a reason,
+  reads current buyer details, compares them to the saved correction (or original snapshot when no
+  correction exists), and fails closed with PII-safe field names if they differ. Only then does it
+  read the provider validation status, send that status to the mark-valid endpoint, and rerun
+  readiness for verification. The admin does not re-enter the corrected address. It does not edit
+  the address, replay Django, or push the order. Use it only after buyer/authoritative confirmation;
+  use **Correct Fulfillment Address** when any field must change.
 - **Regenerate Receipt** rebuilds the receipt from durable payment/cart evidence and the active
   address correction. The stable object URL remains the same and uses no-store cache policy.
 - **Verify and Release** is master-admin-only and requires password step-up, confirmation, and a
   reason. It bypasses only `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false` and the provider's seven-day
   manual-release gate. It cannot bypass invalid address, unavailable/unmapped product, missing
-  artwork, unavailable cost, or provider-attention blockers.
+  artwork on an explicit artwork-set order, a rejected invoice lookup, or provider-attention
+  blockers.
+
+Catalog-backed order evidence needs additional care:
+
+- A populated seller catalog variant and price do not prove that a fulfillment invoice was
+  generated. Invoice generation is accounting evidence, not a substitute for item readiness.
+- Seller-product inactive/deleted flags can describe stale source-product state. Do not label the
+  resolved variant unavailable when current variant/catalog evidence is present.
+- `artwork_status = missing` and empty seller upload slots do not independently block a resolved
+  catalog-template order. The separate artwork-set import flow applies only when the order actually
+  requires item-level artwork uploads.
+- Product readiness comes from direct current item/resolved-variant evidence. Never infer an
+  unmapped product or recommend **Re-select product** from invoice `message` text.
+- The runtime invoice source is documented
+  `GET /order/external/orders/order-invoice?external_number=...&identifier=...` with server API-key
+  auth. A successful pre-push row containing `fulfillment_cost: 0` or `null` is shown as
+  **Awaiting fulfillment**, not as a release blocker. A structured object is **Available** or
+  **Paid**. A `success: false` envelope is one generic retryable invoice-sync issue.
+- The public invoice documentation does not define stable provider error codes. Raw responses stay
+  server-only and redacted; admin copy must not reinterpret free-form messages as address, item, or
+  artwork state.
 
 Django payment save and accepted Django catalog import are not replayed. Django address columns are
 historical in this phase because no verified Django address-amendment endpoint exists; the receipt

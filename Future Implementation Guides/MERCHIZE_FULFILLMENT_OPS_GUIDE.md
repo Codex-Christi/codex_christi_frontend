@@ -1,6 +1,6 @@
 # Merchize Fulfillment Ops Guide
 
-Last updated: 2026-07-22
+Last updated: 2026-07-23
 
 This guide defines the Merchize side of Codex Christi paid order fulfillment processing. It is intentionally separate from the PayPal transaction ledger guide and the admin recovery tooling guide, but it is not merely a post-push sync guide.
 
@@ -50,6 +50,21 @@ accepted Django catalog import.
 
 ## Required synchronous endpoint chain
 
+Contract status matters:
+
+- `/order/external/orders/*`, `/order/import/artworks`, and `/product/catalog` are documented on
+  Merchize's public API Documents page.
+- `/order/orders/{merchizeOrderId}/*` seller-operation endpoints are used by the current seller
+  dashboard and accept the configured server credential, but their response schemas are not
+  documented on that public page. Treat their detailed fields as version-sensitive diagnostic
+  evidence: keep bounded parsing, retain raw snapshots server-side only, and fail closed when an
+  expected field disappears.
+- In particular, `ffm_map_item_status` and `ffm_mapped_catalog_sku` come from undocumented
+  seller-operation responses. The public contract independently supports the selected SKU through
+  `GET /order/external/orders/order-detail`, catalog import through
+  `POST /order/external/orders/catalog`, and catalog variant lookup through
+  `GET /product/catalog`. Do not infer item readiness from free-form invoice messages.
+
 | Stage | Endpoint | Runtime use |
 | --- | --- | --- |
 | Catalog-backed import | `POST /order/external/orders/catalog` | Called through Django `/orders/process/{djangoPaymentSaveCustomId}`. This project intentionally uses catalog import, not generic `POST /order/external/orders`. |
@@ -59,18 +74,51 @@ accepted Django catalog import.
 | Buyer details | `GET /order/orders/{merchizeOrderId}/buyerdetails` | Reads existing provider identity/contact fields before correction and verifies the persisted address after correction. |
 | Address correction | `POST /order/orders/{merchizeOrderId}/buyerdetails` | Requests an admin correction to the already imported provider order. Its success envelope is an acknowledgement, not persistence proof; a buyer-details read-back must match before receipt regeneration and readiness recheck. |
 | Buyer display status | `GET /order/orders/{merchizeOrderId}/buyerdetails/display-status` | Adapter is available for diagnostics; not required by the automatic release decision. |
-| Mark address valid | `POST /order/orders/{merchizeOrderId}/mark-valid-address` | Adapter exists, but automatic code does not use it to override provider validation. Buyer/admin confirmation semantics must remain explicit. |
-| Unfulfilled items | `GET /order/orders/{merchizeOrderId}/unfulfilled` | Blocks inactive/deleted/unmapped catalog products and captures item evidence. |
+| Mark address valid | `POST /order/orders/{merchizeOrderId}/mark-valid-address` | Master-admin recovery action only. Before mutation, the server reads buyer details and verifies that Merchize still stores the effective ledger address (saved correction first, original checkout snapshot otherwise). It then reads the current `validate_shipping_address` value, sends it as `{ status }`, and reruns readiness to verify `mark_valid_address`/valid state. A field mismatch fails closed without logging address values. It never pushes the order. |
+| Unfulfilled items | `GET /order/orders/{merchizeOrderId}/unfulfilled` | Captures current item, resolved variant, and catalog evidence. Stale seller-product `is_active`/`is_deleted` flags do not independently mean the resolved catalog variant is unavailable. |
 | Provider attention | `GET /order/orders/{merchizeOrderId}/require-attention` | Blocks unresolved provider attention requests. |
-| Fulfillment cost | `GET /order/orders/{merchizeOrderId}/fulfillment-cost-invoice` | Blocks real catalog/invoice failures; provider-processing responses remain retryable. |
+| Invoice statistics | `GET /order/external/orders/order-invoice` | Uses `external_number + identifier` and server API-key auth. The documented envelope is `success`, `message`, and `data[]`; each row can contain transaction fee, fulfillment cost, refunds, and charges. A runtime `fulfillment_cost` value of `0` or `null` before push is an awaiting-fulfillment placeholder, not a product/address/artwork failure and not a release blocker. |
 | Send/release state | `GET /order/orders/{merchizeOrderId}/send-to-fulfillment-date` | Detects pushed/failed state and participates in push verification. |
 | Push | `POST /order/external/orders/push` | Uses `external_number + identifier` by default. HTTP success is acknowledgment only. |
 | Push verification | in-depth detail + send state + history + internal progress | Bounded synchronous polling verifies `pushed`, `failed`, or still pending. |
 
 The provider's seven-day rule is enforced before push. Orders whose provider `paid_at` is more
 than seven days old require a master-admin production release. That step-up bypasses only the
-configuration/age gate; address, product mapping, artwork, cost, and provider-attention blockers
-remain non-bypassable.
+configuration/age gate; address, explicit current item evidence, explicit artwork-required state,
+provider-attention blockers, and a rejected invoice request remain non-bypassable.
+
+## Catalog template orders versus artwork-set orders
+
+The public API documents two separate contracts:
+
+- `POST /order/external/orders/catalog` requires `items[].merchize_sku` and
+  `items[].image`. The image is a preview. `design_front`, `design_back`, `design_sleeve`, and
+  `design_hood` are optional because a stored Merchize product/template can already carry the
+  production configuration.
+- `POST /order/import/artworks` targets an existing order item by `items[].id` and imports one or
+  more explicit artwork sets. This is a separate creation/repair mode, not a universal follow-up
+  requirement for catalog-backed orders.
+
+Current Codex Christi checkout uses the catalog-backed contract. Readiness therefore applies these
+rules:
+
+1. A generic order-level `artwork_status = missing` does not block when every unfulfilled item has
+   a resolved active catalog variant/template. Persist `artworkReviewStatus = catalog_managed`.
+2. Empty front/back/sleeve/hood upload slots in the seller UI do not prove that the stored catalog
+   template lacks production assets.
+3. Artwork blocks only when the item is not demonstrably catalog-backed or Merchize returns
+   explicit artwork-required evidence from the order/item, importer, attention, or push response.
+4. A displayed catalog SKU and catalog price prove that Merchize can render stored product
+   information; they do not prove that a current fulfillment invoice was generated.
+5. Product mapping blocks only on explicit direct item, resolved variant, or catalog evidence.
+   Free-form invoice `message` text must not create a product blocker or tell an operator to
+   reselect a product.
+6. The documented invoice endpoint is accounting evidence. Before push, a successful row with
+   `fulfillment_cost: 0` or `null` means `awaiting_fulfillment`; after push it remains `pending`
+   until a structured cost object appears. Refresh it after the push acknowledgement/verification.
+7. The public documentation provides a success example but no stable error-code taxonomy. Treat
+   `success: false` as the generic retryable `MERCHIZE_INVOICE_LOOKUP_FAILED`, retain the redacted
+   response server-side, and do not parse its message into unrelated readiness categories.
 
 ## Scheduled synchronous lifecycle reconciliation
 
@@ -86,7 +134,7 @@ provider-verified, non-delivered order, the fulfillment lifecycle pass refreshes
 | Evidence | Endpoint |
 | --- | --- |
 | Canonical order and normalized items | `GET /order/external/orders/order-detail`, then `GET /order/orders/{merchizeOrderId}` |
-| Address, item, artwork, cost, and attention health | the synchronous readiness endpoints listed above |
+| Address, item, artwork, invoice-envelope, and attention health | the synchronous readiness endpoints listed above |
 | External progress | `GET /order/external/orders/order-progress` |
 | Tracking/packages | `GET /order/external/orders/tracking` |
 | Invoice, fulfillment charges, refunds, and surcharges | `GET /order/external/orders/order-invoice` |
@@ -110,10 +158,11 @@ Implemented on 2026-07-22:
   PayPal-ledger query plus one Merchize Ops database query.
 - The query selects normalized status and freshness columns only. It does not select or serialize
   raw provider JSON payloads, customer addresses, package contents, invoice line items, or tickets.
-- The readiness section shows Address, Products, Artwork, Cost, Attention, Age Gate, Push Command,
+- The readiness section shows Address, Products, Artwork, Invoice, Attention, Age Gate, Push Command,
   and Push Verification.
 - The operational section shows the latest normalized Progress, Tracking, Invoice, and Ticket
-  snapshot state with its persisted synchronization time.
+  snapshot freshness. The pre-push invoice row is observational unless its envelope is rejected;
+  ticket retrieval does not inherit the Attention release-gate label.
 - A missing timestamp is shown as not synced/not checked. The UI must not infer provider success
   merely because no blocker payload is present.
 
@@ -163,9 +212,10 @@ Deferred evidence presentation and request optimizations:
   step-up are wired.
 - `POST /order/external/orders/cancel` has a server-only adapter but is outside automatic flow and
   must not be exposed without explicit scope approval.
-- `POST /order/import/artworks` can repair missing artwork using provider order-item IDs. It is not
-  automated in this phase because source asset ownership and item-to-side mapping require explicit
-  admin review. Missing artwork blocks release and directs the operator to Merchize.
+- `POST /order/import/artworks` can repair an explicit artwork-set order using provider order-item
+  IDs. It is not automated in this phase because source asset ownership and item-to-side mapping
+  require explicit admin review. Do not invoke it merely because a catalog-backed order reports a
+  generic missing-artwork status.
 - `GET /product/catalog` and `GET /product/products/{productId}/all-variants` can support future
   catalog repair diagnostics. Product replacement/remapping is deliberately deferred under the
   product-change scope boundary.
@@ -279,7 +329,7 @@ Merchize Fulfillment Ops owns the provider lifecycle inside paid order fulfillme
 - Merchize tracking sync.
 - Production readiness checks before release/open.
 - Address suggestion, address review, and buyer detail correction workflow.
-- Fulfillment cost, transaction fee, and availability checks.
+- Documented invoice-statistics capture plus supplemental transaction-fee diagnostics.
 - Order progress and order history sync.
 - Admin and customer notification triggers for provider-side blockers.
 - Future Merchize actions such as change product, change processing, hold, cancel, escalation, and manual Merchize order linking.
@@ -395,7 +445,7 @@ Essential first-party needs for Codex Christi:
 - Fetch the in-depth order detail snapshot.
 - See whether the order is pending, held, open, fulfilled, failed, or requires attention.
 - Check address validity and save address corrections when safe.
-- Check fulfillment cost/fee state before release.
+- Capture invoice state before release without requiring a generated pre-push invoice.
 - Hold or open/release production with admin reason and audit history.
 - Track progress/history enough to notify support and customers responsibly.
 
@@ -600,7 +650,6 @@ For a Next.js-side Merchize mock, set server-only values like these in a local-o
 ```bash
 MERCHIZE_BO_API_BASE_URL=http://127.0.0.1:8787
 MERCHIZE_API_KEY=dev-mock
-MERCHIZE_ACCESS_TOKEN=dev-mock
 ```
 
 The mock must return successful JSON for these current calls:
@@ -761,10 +810,23 @@ Implementation rule:
 
 ## Cost and fee endpoints
 
-These endpoints decide whether the order is financially and operationally safe to release:
+The documented external-order invoice endpoint is the runtime accounting source:
 
 ```txt
-GET /bo-api/order/orders/{merchizeOrderId}/fulfillment-cost-invoice
+GET /order/external/orders/order-invoice?external_number={externalNumber}&identifier={identifier}
+X-API-KEY: {serverApiKey}
+```
+
+The successful response is an envelope with `success`, optional `message`, and `data[]`. Each row
+can contain `code`, `external_number`, `identifier`, `transaction_fee`, `fulfillment_cost`,
+`fulfillment_refund`, and `fulfillment_charge`. Although the documentation models
+`fulfillment_cost` as an object, live pre-push responses have returned numeric `0` or `null`.
+Those values mean that no structured fulfillment invoice exists yet; they do not prove a variant,
+address, artwork, or financial failure.
+
+The seller-operation transaction-fee endpoint remains supplemental diagnostic evidence:
+
+```txt
 GET /bo-api/order/orders/{merchizeOrderId}/transaction-fee
 ```
 
@@ -777,8 +839,15 @@ GET /bo-api/order/orders/{merchizeOrderId}/ioss/display
 
 Implementation rule:
 
-- A failed fulfillment invoice means production should not auto-open.
-- A transaction-fee response that indicates unpaid/invalid state means production should not auto-open.
+- `success: false` from the documented invoice request creates a generic retryable invoice-sync
+  blocker. Do not branch on undocumented message strings.
+- Numeric `0`, `null`, an empty cost object, or a successful empty row before push is
+  `awaiting_fulfillment` and does not block release.
+- After push, refresh once through the operational snapshot path. A still-empty cost becomes
+  `pending` and can be reconciled by the lifecycle scanner without replaying push or payment.
+- A structured cost object is `available`; a structured object with `status = paid` is `paid`.
+- A transaction-fee response that indicates unpaid/invalid state is diagnostic until its
+  seller-operation contract is verified; it must not override the documented invoice result.
 - If cost changes after address correction, put the order in admin review before charging, refunding, or asking the customer for an extra payment.
 - IOSS/tax display data should be captured as a provider snapshot where relevant, but it should not be shown to customers until the output is understood and formatted safely.
 
@@ -1597,7 +1666,8 @@ The order has provider identity/details, but production readiness checks have no
 
 `production_gate_passed`
 
-Address, item, cost, and provider-state checks passed. The order is safe to open/release according to current rules.
+Address, explicit item/artwork, invoice-envelope, attention, and provider-state checks passed. A
+pre-push invoice placeholder is allowed.
 
 `production_gate_blocked`
 
@@ -1617,11 +1687,13 @@ Corrected buyer details were saved locally and pushed to Merchize.
 
 `cost_review_required`
 
-Fulfillment invoice, transaction fee, country change, tax/IOSS, or product availability needs admin review before production release.
+The documented invoice request was rejected, or a later structured accounting snapshot contains an
+explicit financial issue requiring admin review.
 
 `cost_check_passed`
 
-Cost and fee checks did not block production.
+The documented invoice request succeeded. This can include a non-blocking pre-push `0`/`null`
+placeholder.
 
 `paused_for_review`
 
@@ -1693,8 +1765,10 @@ export async function updateMerchizeBuyerDetails(merchizeOrderId: string, payloa
   // POST /bo-api/order/orders/{id}/buyerdetails
 }
 
-export async function getMerchizeFulfillmentCostInvoice(merchizeOrderId: string) {
-  // GET /bo-api/order/orders/{id}/fulfillment-cost-invoice
+export async function getMerchizeExternalOrderInvoice(
+  reference: MerchizeExternalOrderReference,
+) {
+  // GET /order/external/orders/order-invoice?external_number=...&identifier=...
 }
 
 export async function getMerchizeTransactionFee(merchizeOrderId: string) {
@@ -2109,8 +2183,8 @@ Suggested flow:
 flowchart TD
   A["Detail synced"] --> B["Compare expected cart/items"]
   B --> C["Check address suggestion"]
-  C --> D["Check fulfillment cost invoice"]
-  D --> E["Check transaction fee"]
+  C --> D["Fetch documented invoice statistics"]
+  D --> E["Check explicit attention and order state"]
   E --> F["Sync progress/history support signals"]
   F --> G{"All checks safe?"}
   G -->|"yes"| H["release_ready"]
@@ -2138,8 +2212,8 @@ Auto-pass only when all of these are true:
 - Cart/request/detail item comparison is acceptable.
 - Address suggestion endpoint returns no blocking issue.
 - Buyer detail display/status endpoint does not require review.
-- Fulfillment invoice/cost endpoint succeeds.
-- Transaction fee endpoint does not indicate unpaid/invalid state.
+- The documented invoice endpoint does not return `success: false`; `0`/`null` cost is allowed
+  before push.
 - Require-attention endpoint has no blocking issue.
 - Order is not cancelled, failed, deleted, or otherwise provider-blocked.
 
@@ -2150,8 +2224,8 @@ Block production when any of these occur:
 - Item count, SKU, product, currency, or quantity mismatch needs review.
 - Address suggestion exists and needs admin/customer choice.
 - Country/postal-code change may change cost.
-- Fulfillment invoice says product is unavailable or cannot calculate.
-- Transaction fee says unpaid/invalid.
+- The documented invoice request is rejected (`success: false`) and must be retried.
+- Direct item/resolved-variant evidence reports an unavailable or unmapped product.
 - Require-attention, tags, notes, or histories indicate provider support is needed.
 - Progress stays in a non-moving state longer than the configured threshold.
 
@@ -2205,23 +2279,27 @@ Admin email rules:
 
 ## Cost, invoice, and fee review flow
 
-Cost checks protect against silently releasing an order that cannot be produced or that now costs more than expected.
+Invoice checks capture current provider accounting evidence without inventing production blockers
+from a pre-push placeholder.
 
 Recommended flow:
 
 ```txt
 detail synced
--> GET fulfillment-cost-invoice
+-> GET /order/external/orders/order-invoice?external_number=...&identifier=...
 -> GET transaction-fee
 -> optionally GET fulfillment-invoice / IOSS display
 -> persist MerchizeFulfillmentCostSnapshot rows
--> compare against expected cart/currency/shipping assumptions
--> pass, block, or require admin review
+-> classify structured cost as available/paid, or 0/null as awaiting fulfillment
+-> refresh invoice after push and reconcile later lifecycle changes
 ```
 
 Rules:
 
-- If cost/fee check fails, set `costReviewStatus = review_required`.
+- If the documented invoice envelope has `success: false`, set
+  `costReviewStatus = provider_error` and retry synchronization.
+- Do not parse an invoice message into address, mapping, or artwork status.
+- Do not require a generated invoice before push; live `0`/`null` values are expected placeholders.
 - If a corrected address changes country, postal code, or shipping zone, rerun all cost checks.
 - Do not automatically charge extra, refund, or alter PayPal state from Merchize Ops.
 - Escalate payment/refund changes to the later PayPal post-sale ops workflow.
@@ -2478,13 +2556,14 @@ Before starting Merchize Fulfillment Ops DB implementation:
 1. Add `runMerchizeProductionReadinessChecks(...)`.
 2. Compare cart/request/detail item snapshots.
 3. Fetch address suggestion.
-4. Fetch fulfillment cost invoice.
-5. Fetch transaction fee.
-6. Fetch require-attention/support-view signals only when a stable server-side auth path exists.
-7. Persist address/cost/progress snapshots.
-8. Set `productionGateStatus`.
-9. Create admin notifications for blockers.
-10. Keep beta release/open as an explicit admin action unless all safety checks are proven stable.
+4. Fetch documented external-order invoice statistics by `external_number + identifier`.
+5. Treat pre-push `fulfillment_cost: 0`/`null` as non-blocking awaiting-fulfillment evidence.
+6. Keep transaction-fee retrieval as supplemental diagnostics rather than a release gate.
+7. Fetch require-attention/support-view signals only when a stable server-side auth path exists.
+8. Persist address/invoice/progress snapshots.
+9. Set `productionGateStatus`.
+10. Create admin notifications for blockers.
+11. Keep beta release/open as an explicit admin action unless all safety checks are proven stable.
 
 ## Phase 7 - Address review and buyer detail correction
 

@@ -145,6 +145,13 @@ function RecoveryActionsPanel({
   detail: PaidOrderRecoveryDetail;
   manualReleaseReadinessWarning: string | null;
 }) {
+  const addressReviewStatus = detail.merchizeFulfillmentOps?.addressReviewStatus;
+  const canConfirmProviderAddress =
+    Boolean(detail.merchizeFulfillmentOps?.merchizeOrderId) &&
+    ['blocked', 'pending', 'provider_update_pending_validation'].includes(
+      addressReviewStatus ?? '',
+    );
+
   return (
     <AdminGlassPanel className='overflow-hidden'>
       <div className='border-b border-white/10 px-4 py-4 sm:px-5'>
@@ -159,6 +166,7 @@ function RecoveryActionsPanel({
           isCompleted={recovery.status === 'completed'}
           needsProviderDetailSync={detail.needsProviderDetailSync}
           requiresManualRelease={detail.requiresManualRelease}
+          canConfirmProviderAddress={canConfirmProviderAddress}
           recoveryStatus={recovery.status}
           manualReleaseReadinessWarning={manualReleaseReadinessWarning}
         />

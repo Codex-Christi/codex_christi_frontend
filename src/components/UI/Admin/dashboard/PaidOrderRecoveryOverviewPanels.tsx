@@ -51,7 +51,7 @@ export function getPaidOrderReadinessChecks(
     { label: 'Address', value: summary.addressReviewStatus, category: 'address' },
     { label: 'Products', value: summary.itemReviewStatus, category: 'items' },
     { label: 'Artwork', value: summary.artworkReviewStatus, category: 'artwork' },
-    { label: 'Cost', value: summary.costReviewStatus, category: 'cost' },
+    { label: 'Invoice', value: summary.costReviewStatus, category: 'cost' },
     {
       label: 'Provider attention',
       value: summary.attentionReviewStatus,
@@ -116,7 +116,11 @@ export function getPaidOrderReadinessChecks(
     toReadinessCheck(
       check.label,
       check.value,
-      ['ready', ...(check.category === 'address' ? ['buyer_confirmed'] : [])],
+      [
+        'ready',
+        ...(check.category === 'address' ? ['buyer_confirmed'] : []),
+        ...(check.category === 'artwork' ? ['catalog_managed', 'not_required'] : []),
+      ],
       check.category,
     ),
   );

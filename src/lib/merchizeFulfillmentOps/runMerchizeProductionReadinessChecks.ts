@@ -2,12 +2,13 @@ import 'server-only';
 
 import {
   getMerchizeAddressSuggestion,
-  getMerchizeFulfillmentCostInvoice,
+  getMerchizeExternalOrderInvoice,
   getMerchizeInDepthOrderDetail,
   getMerchizeRequireAttention,
   getMerchizeSendToFulfillmentDate,
   getMerchizeUnfulfilledItems,
   MerchizeApiError,
+  type MerchizeExternalOrderReference,
 } from './merchizeClient';
 import {
   getMerchizeFulfillmentOpsPrisma,
@@ -97,6 +98,10 @@ export async function runMerchizeProductionReadinessChecks(
   const providerReleaseAlreadyVerified =
     order.productionGateStatus === MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFIED ||
     Boolean(order.pushVerifiedAt);
+  const invoiceReference = {
+    externalNumber: order.merchizeExternalOrderNumber,
+    identifier: order.merchizeIdentifier,
+  } satisfies MerchizeExternalOrderReference;
 
   const attempt = await prisma.merchizeFulfillmentSyncAttempt.create({
     data: {
@@ -106,6 +111,7 @@ export async function runMerchizeProductionReadinessChecks(
       status: MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.RUNNING,
       requestSummary: summarizeProviderRequest({
         merchizeOrderId: order.merchizeOrderId,
+        invoiceReference,
         allowStaleOrderManualRelease: options.allowStaleOrderManualRelease === true,
       }),
     },
@@ -128,14 +134,14 @@ export async function runMerchizeProductionReadinessChecks(
       detail,
       addressSuggestion,
       unfulfilledItems,
-      fulfillmentCost,
+      fulfillmentInvoice,
       requireAttention,
       sendToFulfillment,
     ] = await Promise.all([
       getMerchizeInDepthOrderDetail(order.merchizeOrderId),
       getMerchizeAddressSuggestion(order.merchizeOrderId),
       getMerchizeUnfulfilledItems(order.merchizeOrderId),
-      getMerchizeFulfillmentCostInvoice(order.merchizeOrderId),
+      getMerchizeExternalOrderInvoice(invoiceReference),
       getMerchizeRequireAttention(order.merchizeOrderId),
       getMerchizeSendToFulfillmentDate(order.merchizeOrderId),
     ]);
@@ -143,7 +149,7 @@ export async function runMerchizeProductionReadinessChecks(
       detail,
       addressSuggestion,
       unfulfilledItems,
-      fulfillmentCost,
+      fulfillmentInvoice,
       requireAttention,
       sendToFulfillment,
       allowStaleOrderManualRelease: options.allowStaleOrderManualRelease,
@@ -198,7 +204,7 @@ export async function runMerchizeProductionReadinessChecks(
           merchizeUnfulfilledItemsPayload: toOptionalPrismaJson(unfulfilledItems),
           merchizeRequireAttentionPayload: toOptionalPrismaJson(requireAttention),
           merchizeSendToFulfillmentPayload: toOptionalPrismaJson(sendToFulfillment),
-          merchizeFulfillmentCostPayload: toOptionalPrismaJson(fulfillmentCost),
+          merchizeFulfillmentCostPayload: toOptionalPrismaJson(fulfillmentInvoice),
           merchizeProductionReadinessPayload: toPrismaJson(readinessSummary),
           ...(readiness.status === 'already_pushed'
             ? {

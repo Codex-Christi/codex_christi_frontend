@@ -1,3 +1,5 @@
+import { normalizeCountryToIso2 } from '@/lib/utils/shop/checkout/normalizeCountryToIso3';
+
 type JsonRecord = Record<string, unknown>;
 
 export type MerchizeBuyerAddressExpectation = {
@@ -10,9 +12,7 @@ export type MerchizeBuyerAddressExpectation = {
 };
 
 function asRecord(value: unknown): JsonRecord | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as JsonRecord)
-    : null;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : null;
 }
 
 function asString(value: unknown) {
@@ -37,11 +37,36 @@ function normalizeText(value: unknown) {
 }
 
 function normalizePostalCode(value: unknown) {
-  return asString(value).replace(/[\s-]+/g, '').toUpperCase();
+  return asString(value)
+    .replace(/[\s-]+/g, '')
+    .toUpperCase();
 }
 
 function normalizeCountryCode(value: unknown) {
   return asString(value).toUpperCase();
+}
+
+export function getMerchizeBuyerAddressExpectationFromLedger(value: unknown) {
+  const address = asRecord(value);
+  if (!address) return null;
+
+  const line1 = asString(address.shipping_address_line_1);
+  const line2 = asString(address.shipping_address_line_2);
+  const city = asString(address.shipping_city);
+  const state = asString(address.shipping_state);
+  const postalCode = asString(address.zip_code);
+  const countryCode = normalizeCountryToIso2(asString(address.shipping_country));
+
+  if (!line1 || !city || !state || !postalCode || !countryCode) return null;
+
+  return {
+    address: line1,
+    address2: line2,
+    city,
+    state,
+    postal_code: postalCode,
+    country_code: countryCode,
+  } satisfies MerchizeBuyerAddressExpectation;
 }
 
 export function getMerchizeBuyerAddressMismatchFields(
@@ -72,9 +97,7 @@ export function getMerchizeBuyerAddressMismatchFields(
   ) {
     mismatches.push('postalCode');
   }
-  if (
-    normalizeCountryCode(address.country_code) !== normalizeCountryCode(expected.country_code)
-  ) {
+  if (normalizeCountryCode(address.country_code) !== normalizeCountryCode(expected.country_code)) {
     mismatches.push('countryCode');
   }
 

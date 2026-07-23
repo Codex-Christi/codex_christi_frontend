@@ -52,8 +52,7 @@ async function notifyRepeatedLifecycleFailure(args: {
   });
   if (!row) return false;
 
-  const errorMessage =
-    'Merchize operational snapshots failed repeatedly after production release.';
+  const errorMessage = 'Merchize operational snapshots failed repeatedly after production release.';
   await enqueueAdminRecoveryNotification({
     orderToken: args.orderToken,
     paypalOrderId: row.paypalOrderId,
@@ -109,11 +108,13 @@ async function notifyLifecycleAttention(args: {
   return true;
 }
 
-export async function runMerchizeFulfillmentLifecycleScanner(args: {
-  dryRun?: boolean;
-  batchSize?: number;
-  minAgeMinutes?: number;
-} = {}) {
+export async function runMerchizeFulfillmentLifecycleScanner(
+  args: {
+    dryRun?: boolean;
+    batchSize?: number;
+    minAgeMinutes?: number;
+  } = {},
+) {
   const dryRun = args.dryRun ?? false;
   const batchSize = Math.min(Math.max(Math.floor(args.batchSize ?? 10), 1), MAX_BATCH_SIZE);
   const minAgeMinutes = Math.max(Math.floor(args.minAgeMinutes ?? 15), 1);
@@ -172,7 +173,9 @@ export async function runMerchizeFulfillmentLifecycleScanner(args: {
       try {
         const detailSync = await syncMerchizeFulfillmentOrder(candidate.orderToken);
         const readiness = await runMerchizeProductionReadinessChecks(candidate.orderToken);
-        const snapshots = await syncMerchizeFulfillmentOperationalSnapshots(candidate.orderToken);
+        const snapshots = await syncMerchizeFulfillmentOperationalSnapshots(candidate.orderToken, {
+          includeInvoice: false,
+        });
         const snapshotFailedActions = snapshots.failed.map((failure) => failure.action);
         const failedActions = [
           ...(!detailSync.ok ? ['canonical_order_detail'] : []),

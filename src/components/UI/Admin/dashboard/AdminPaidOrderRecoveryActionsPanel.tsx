@@ -2,7 +2,14 @@
 
 import { useRouter } from 'next/navigation';
 import { useId, useRef, useState, useTransition, type ReactNode } from 'react';
-import { ClipboardList, KeyRound, Loader2, RefreshCw, SearchCheck } from 'lucide-react';
+import {
+  ClipboardList,
+  KeyRound,
+  Loader2,
+  MapPinCheck,
+  RefreshCw,
+  SearchCheck,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import errorToast from '@/lib/error-toast';
 import loadingToast from '@/lib/loading-toast';
@@ -19,6 +26,7 @@ import {
   AlertDialogTitle,
 } from '@/components/UI/primitives/alert-dialog';
 import {
+  markPaidOrderFulfillmentAddressValidAction,
   regeneratePaidOrderReceiptAction,
   releaseMerchizeFulfillmentToProductionAction,
   retryAdminPaidOrderRecoveryAction,
@@ -31,18 +39,24 @@ type AdminRecoveryActionsPanelProps = {
   isCompleted: boolean;
   needsProviderDetailSync: boolean;
   requiresManualRelease: boolean;
+  canConfirmProviderAddress: boolean;
   recoveryStatus: 'failed' | 'recovery' | 'pending' | 'completed' | 'sync' | 'attention';
   manualReleaseReadinessWarning?: string | null;
 };
 
 type PendingAction =
-  'refresh-merchize' | 'retry-recovery' | 'release-production' | 'regenerate-receipt';
+  | 'refresh-merchize'
+  | 'retry-recovery'
+  | 'release-production'
+  | 'confirm-address'
+  | 'regenerate-receipt';
 
 export default function AdminPaidOrderRecoveryActionsPanel({
   orderToken,
   isCompleted,
   needsProviderDetailSync,
   requiresManualRelease,
+  canConfirmProviderAddress,
   recoveryStatus,
   manualReleaseReadinessWarning = null,
 }: AdminRecoveryActionsPanelProps) {
@@ -54,6 +68,9 @@ export default function AdminPaidOrderRecoveryActionsPanel({
   const [overrideReason, setOverrideReason] = useState('');
   const [releaseFormOpen, setReleaseFormOpen] = useState(false);
   const [releaseConfirmOpen, setReleaseConfirmOpen] = useState(false);
+  const [addressConfirmOpen, setAddressConfirmOpen] = useState(false);
+  const [addressConfirmPassword, setAddressConfirmPassword] = useState('');
+  const [addressConfirmReason, setAddressConfirmReason] = useState('');
   const resumesFullPostPaymentFlow = recoveryStatus === 'recovery';
   const isAnyActionPending = pendingAction !== null;
   const releaseDisabledReason = isCompleted
@@ -271,6 +288,72 @@ export default function AdminPaidOrderRecoveryActionsPanel({
     });
   };
 
+  const handleAddressConfirmation = () => {
+    if (!addressConfirmPassword.trim() || !addressConfirmReason.trim()) {
+      errorToast({
+        header: 'Confirmation needs details',
+        message: 'Enter the master admin password and how the current address was confirmed.',
+      });
+      return;
+    }
+
+    setAddressConfirmOpen(false);
+    runAction('confirm-address', async () => {
+      const toastId = loadingToast({
+        header: 'Confirming current address',
+        message: 'Requesting Merchize confirmation and verifying the resulting readiness state.',
+      });
+
+      try {
+        const result = await markPaidOrderFulfillmentAddressValidAction({
+          orderToken,
+          password: addressConfirmPassword,
+          reason: addressConfirmReason,
+        });
+        toast.dismiss(toastId);
+
+        if (!result.ok) {
+          setAddressConfirmPassword('');
+          errorToast({
+            header: 'Address was not confirmed',
+            message: result.error,
+          });
+          router.refresh();
+          return;
+        }
+
+        setAddressConfirmPassword('');
+        setAddressConfirmReason('');
+        if (result.tone === 'warning') {
+          toast.warning('Address confirmation recorded', {
+            description: result.message,
+          });
+        } else {
+          successToast({
+            header: 'Address confirmed',
+            message: result.message,
+          });
+        }
+        router.refresh();
+      } catch (error) {
+        toast.dismiss(toastId);
+        setAddressConfirmPassword('');
+        errorToast({
+          header: 'Address was not confirmed',
+          message: error instanceof Error ? error.message : 'Address confirmation failed.',
+        });
+      }
+    });
+  };
+
+  const handleAddressConfirmOpenChange = (nextOpen: boolean) => {
+    setAddressConfirmOpen(nextOpen);
+    if (!nextOpen && pendingAction !== 'confirm-address') {
+      setAddressConfirmPassword('');
+      setAddressConfirmReason('');
+    }
+  };
+
   const handleCancelRelease = () => {
     if (pendingAction === 'release-production') return;
 
@@ -413,6 +496,23 @@ export default function AdminPaidOrderRecoveryActionsPanel({
               : retryActionLabel}
         </ActionButton>
 
+        {canConfirmProviderAddress ? (
+          <ActionButton
+            icon={MapPinCheck}
+            tone='amber'
+            busy={pendingAction === 'confirm-address'}
+            disabled={isAnyActionPending || isCompleted}
+            disabledReason={
+              isCompleted ? 'The provider order is already verified as released.' : null
+            }
+            onClick={() => setAddressConfirmOpen(true)}
+          >
+            {pendingAction === 'confirm-address'
+              ? 'Confirming current address...'
+              : 'Mark current address as valid'}
+          </ActionButton>
+        ) : null}
+
         <ActionButton
           icon={ClipboardList}
           busy={pendingAction === 'regenerate-receipt'}
@@ -477,6 +577,72 @@ export default function AdminPaidOrderRecoveryActionsPanel({
           </AlertDialogContent>
         </AlertDialog>
       ) : null}
+
+      {canConfirmProviderAddress ? (
+        <AlertDialog open={addressConfirmOpen} onOpenChange={handleAddressConfirmOpenChange}>
+          <AlertDialogContent className='w-[min(94vw,560px)] rounded-xl border border-amber-300/20 bg-slate-950/95 p-5 text-slate-50 shadow-2xl shadow-black/70 backdrop-blur-xl sm:p-6'>
+            <AlertDialogHeader>
+              <AlertDialogTitle className='text-white'>
+                Mark the current Merchize address as valid?
+              </AlertDialogTitle>
+              <AlertDialogDescription className='text-slate-300'>
+                Use this only after the buyer or an authoritative source confirmed the corrected
+                address. The server will verify that Merchize still stores the effective ledger
+                address before marking it valid.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <div className='grid gap-3'>
+              <label className='grid gap-1.5 text-xs font-medium text-amber-50/90'>
+                Master admin password
+                <input
+                  type='password'
+                  value={addressConfirmPassword}
+                  onChange={(event) => setAddressConfirmPassword(event.target.value)}
+                  autoComplete='current-password'
+                  className='h-10 rounded-lg border border-white/10 bg-black/20 px-3 text-sm font-normal text-white outline-none transition focus:border-amber-200/40'
+                />
+              </label>
+              <label className='grid gap-1.5 text-xs font-medium text-amber-50/90'>
+                Confirmation reason
+                <textarea
+                  value={addressConfirmReason}
+                  onChange={(event) => setAddressConfirmReason(event.target.value)}
+                  placeholder='Example: Buyer confirmed the current address by email.'
+                  rows={3}
+                  className='resize-none rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm font-normal text-white outline-none transition placeholder:text-slate-500 focus:border-amber-200/40'
+                />
+              </label>
+              <p className='rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs leading-5 text-slate-300'>
+                You do not need to enter the address again. This confirms the provider copy already
+                saved by the correction flow and reruns readiness checks. It does not push the
+                order.
+              </p>
+            </div>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel className='border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08] hover:text-white'>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={isAnyActionPending || isCompleted}
+                onClick={(event) => {
+                  if (!addressConfirmPassword.trim() || !addressConfirmReason.trim()) {
+                    event.preventDefault();
+                    handleAddressConfirmation();
+                    return;
+                  }
+                  handleAddressConfirmation();
+                }}
+                className='inline-flex items-center gap-2 border border-amber-300/35 bg-amber-300 text-slate-950 hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50'
+              >
+                <MapPinCheck size={16} />
+                Confirm current address
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : null}
     </>
   );
 }
@@ -535,6 +701,7 @@ function getPendingActionStatus(action: PendingAction) {
     'refresh-merchize': 'Refreshing the latest Merchize order and operational snapshots.',
     'retry-recovery': 'Running the selected post-payment recovery step.',
     'release-production': 'Verifying readiness and requesting Merchize production release.',
+    'confirm-address': 'Confirming the current address and rerunning provider readiness checks.',
     'regenerate-receipt': 'Regenerating the receipt from the paid ledger.',
   };
 

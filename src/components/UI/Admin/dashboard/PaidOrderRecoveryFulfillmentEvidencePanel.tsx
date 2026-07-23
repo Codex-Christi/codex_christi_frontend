@@ -91,6 +91,10 @@ function humanizeStatus(value: string | null | undefined, fallback = 'Not checke
 function getEvidenceTone(value: string | null | undefined): EvidenceTone {
   const normalized = value?.toLowerCase() ?? '';
 
+  if (normalized === 'catalog_managed' || normalized === 'not_required') {
+    return 'good';
+  }
+
   if (
     ['blocked', 'failed', 'invalid', 'unavailable', 'cancelled', 'rejected'].some((status) =>
       normalized.includes(status),
@@ -354,21 +358,18 @@ function buildReadinessItems(summary: MerchizeFulfillmentOpsAdminSummary): Evide
       ...getReadinessDialogCopy(
         summary,
         'artwork',
-        'Required production artwork passed provider readiness checks.',
+        summary.artworkReviewStatus === 'catalog_managed'
+          ? 'This order uses a resolved stored Merchize catalog variant, so the order-level missing-artwork flag does not require a separate artwork-set import.'
+          : 'No separate production-artwork repair is required by the current provider evidence.',
         'Attach or repair the required production artwork in Merchize, then refresh provider state.',
       ),
     },
     {
-      label: 'Cost',
+      label: 'Invoice',
       value: humanizeStatus(summary.costReviewStatus),
       detail: summary.lastCostCheckAt ?? 'No fulfillment-cost evidence stored',
       icon: CircleDollarSign,
-      ...getReadinessDialogCopy(
-        summary,
-        'cost',
-        'Merchize returned usable fulfillment-cost evidence.',
-        'Resolve the fulfillment-cost issue in Merchize, then refresh provider state.',
-      ),
+      ...getCostDialogCopy(summary),
     },
     {
       label: 'Attention',
@@ -440,6 +441,47 @@ function getReadinessDialogCopy(
       };
 }
 
+function getCostDialogCopy(
+  summary: MerchizeFulfillmentOpsAdminSummary,
+): Pick<EvidenceItem, 'meaning' | 'nextStep'> {
+  const status = summary.costReviewStatus?.toLowerCase();
+
+  if (status === 'awaiting_fulfillment') {
+    return {
+      meaning:
+        'Merchize accepted the invoice-statistics request but has not generated a fulfillment-cost record yet. A numeric zero is a pre-fulfillment placeholder, not a product error.',
+      nextStep:
+        'Resolve the independent release checks and continue fulfillment. Refresh invoice evidence after the push.',
+    };
+  }
+  if (status === 'pending') {
+    return {
+      meaning:
+        'The order is pushed, but Merchize has not returned a structured fulfillment-cost record yet.',
+      nextStep: 'Allow the lifecycle scanner to refresh the invoice, or verify provider state.',
+    };
+  }
+  if (status === 'paid') {
+    return {
+      meaning: 'Merchize returned a structured fulfillment-cost record marked as paid.',
+      nextStep: 'No invoice action is required. Continue lifecycle monitoring.',
+    };
+  }
+  if (status === 'available') {
+    return {
+      meaning: 'Merchize returned a structured fulfillment-cost record.',
+      nextStep: 'Review its payment status during normal lifecycle monitoring.',
+    };
+  }
+
+  return getReadinessDialogCopy(
+    summary,
+    'cost',
+    'No invoice error is currently recorded.',
+    'Retry the documented invoice-statistics request, then refresh provider state.',
+  );
+}
+
 function buildOperationalItems(summary: MerchizeFulfillmentOpsAdminSummary): EvidenceItem[] {
   return [
     {
@@ -475,40 +517,27 @@ function buildOperationalItems(summary: MerchizeFulfillmentOpsAdminSummary): Evi
     },
     {
       label: 'Invoice',
-      value: humanizeStatus(
-        summary.costReviewStatus,
-        summary.lastCostCheckAt ? 'Snapshot stored' : 'Not synced',
-      ),
+      value: summary.lastCostCheckAt ? 'Snapshot stored' : 'Not synced',
       detail: summary.lastCostCheckAt ?? 'No invoice snapshot stored',
       icon: ReceiptText,
-      ...getReadinessDialogCopy(
-        summary,
-        'cost',
-        'Merchize returned usable fulfillment-cost evidence.',
-        'Resolve the fulfillment-cost issue in Merchize, then refresh provider state.',
-      ),
+      tone: 'neutral',
+      meaning: summary.lastCostCheckAt
+        ? 'The latest accounting snapshot was stored. Invoice, charge, and refund data are operational evidence; their mere presence does not independently approve or block release.'
+        : 'No accounting snapshot has been stored.',
+      nextStep:
+        'Use Invoice above for the current request state. Refresh Merchize state when newer accounting evidence is needed.',
     },
     {
       label: 'Tickets',
-      value: summary.lastTicketSyncAt
-        ? summary.attentionReviewStatus === 'blocked'
-          ? 'Attention required'
-          : 'Snapshot stored'
-        : 'Not synced',
+      value: summary.lastTicketSyncAt ? 'Snapshot stored' : 'Not synced',
       detail: summary.lastTicketSyncAt ?? 'No ticket snapshot stored',
       icon: TicketCheck,
-      tone:
-        summary.attentionReviewStatus === 'blocked'
-          ? 'blocked'
-          : summary.lastTicketSyncAt
-            ? 'good'
-            : 'neutral',
-      ...getReadinessDialogCopy(
-        summary,
-        'attention',
-        'No unresolved provider attention requests were returned.',
-        'Resolve the provider attention request in Merchize, then refresh provider state.',
-      ),
+      tone: 'neutral',
+      meaning: summary.lastTicketSyncAt
+        ? 'The existing provider-ticket snapshot was stored for support context. Tickets do not automatically block production readiness.'
+        : 'No provider-ticket snapshot has been stored.',
+      nextStep:
+        'Use Attention above for the release gate. Review tickets separately when support context is needed.',
     },
   ];
 }
