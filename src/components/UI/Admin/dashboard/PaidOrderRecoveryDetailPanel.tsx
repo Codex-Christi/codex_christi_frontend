@@ -5,6 +5,7 @@ import AdminNotificationHistoryPanel from './AdminNotificationHistoryPanel';
 import AdminPaidOrderRecoveryActionsPanel from './AdminPaidOrderRecoveryActionsPanel';
 import { AdminPaidOrderRecoveryStatusBadge } from './AdminStatusBadge';
 import CustomerNotificationHistoryPanel from './CustomerNotificationHistoryPanel';
+import PaidOrderRecoveryFulfillmentEvidencePanel from './PaidOrderRecoveryFulfillmentEvidencePanel';
 import {
   PaidOrderRecoveryActivitySection,
   PaidOrderRecoveryPrimaryContextSections,
@@ -102,6 +103,7 @@ export default function PaidOrderRecoveryDetailPanel({
         </section>
 
         <PaidOrderRecoveryWebhookScannerSummary detail={detail} />
+        <PaidOrderRecoveryFulfillmentEvidencePanel summary={detail.merchizeFulfillmentOps} />
 
         <div className='grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]'>
           <div className='space-y-4'>

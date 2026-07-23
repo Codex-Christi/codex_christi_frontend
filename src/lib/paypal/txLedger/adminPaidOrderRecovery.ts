@@ -543,10 +543,14 @@ function mapMerchizeFulfillmentOpsSummary(row: {
   pushVerifiedAt: Date | null;
   providerAddressUpdatedAt: Date | null;
   lastReadinessCheckAt: Date | null;
+  lastAddressCheckAt: Date | null;
+  lastCostCheckAt: Date | null;
   lastLookupAt: Date | null;
   lastDetailSyncAt: Date | null;
   lastProgressSyncAt: Date | null;
   lastTrackingSyncAt: Date | null;
+  lastHistorySyncAt: Date | null;
+  lastTicketSyncAt: Date | null;
   lastSyncErrorCode: string | null;
   lastSyncErrorMessage: string | null;
 }): MerchizeFulfillmentOpsAdminSummary {
@@ -577,10 +581,14 @@ function mapMerchizeFulfillmentOpsSummary(row: {
     lastReadinessCheckAt: row.lastReadinessCheckAt
       ? formatLongDate(row.lastReadinessCheckAt)
       : null,
+    lastAddressCheckAt: row.lastAddressCheckAt ? formatLongDate(row.lastAddressCheckAt) : null,
+    lastCostCheckAt: row.lastCostCheckAt ? formatLongDate(row.lastCostCheckAt) : null,
     lastLookupAt: row.lastLookupAt ? formatLongDate(row.lastLookupAt) : null,
     lastDetailSyncAt: row.lastDetailSyncAt ? formatLongDate(row.lastDetailSyncAt) : null,
     lastProgressSyncAt: row.lastProgressSyncAt ? formatLongDate(row.lastProgressSyncAt) : null,
     lastTrackingSyncAt: row.lastTrackingSyncAt ? formatLongDate(row.lastTrackingSyncAt) : null,
+    lastHistorySyncAt: row.lastHistorySyncAt ? formatLongDate(row.lastHistorySyncAt) : null,
+    lastTicketSyncAt: row.lastTicketSyncAt ? formatLongDate(row.lastTicketSyncAt) : null,
     lastSyncErrorCode: row.lastSyncErrorCode,
     lastSyncErrorMessage: row.lastSyncErrorMessage,
   };
@@ -619,10 +627,14 @@ async function getMerchizeFulfillmentOpsSummaries(orderTokens: string[]) {
         pushVerifiedAt: true,
         providerAddressUpdatedAt: true,
         lastReadinessCheckAt: true,
+        lastAddressCheckAt: true,
+        lastCostCheckAt: true,
         lastLookupAt: true,
         lastDetailSyncAt: true,
         lastProgressSyncAt: true,
         lastTrackingSyncAt: true,
+        lastHistorySyncAt: true,
+        lastTicketSyncAt: true,
         lastSyncErrorCode: true,
         lastSyncErrorMessage: true,
       },

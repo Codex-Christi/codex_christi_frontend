@@ -138,10 +138,14 @@ export type MerchizeFulfillmentOpsAdminSummary = {
   pushVerifiedAt: string | null;
   providerAddressUpdatedAt: string | null;
   lastReadinessCheckAt: string | null;
+  lastAddressCheckAt: string | null;
+  lastCostCheckAt: string | null;
   lastLookupAt: string | null;
   lastDetailSyncAt: string | null;
   lastProgressSyncAt: string | null;
   lastTrackingSyncAt: string | null;
+  lastHistorySyncAt: string | null;
+  lastTicketSyncAt: string | null;
   lastSyncErrorCode: string | null;
   lastSyncErrorMessage: string | null;
 };

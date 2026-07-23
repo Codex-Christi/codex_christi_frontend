@@ -1,6 +1,6 @@
 # Merchize Fulfillment Ops Guide
 
-Last updated: 2026-07-21
+Last updated: 2026-07-22
 
 This guide defines the Merchize side of Codex Christi paid order fulfillment processing. It is intentionally separate from the PayPal transaction ledger guide and the admin recovery tooling guide, but it is not merely a post-push sync guide.
 
@@ -99,6 +99,56 @@ provider-verified, non-delivered order, the fulfillment lifecycle pass refreshes
 Polling stops after a terminal delivery/cancellation state. A non-retryable health issue creates a
 deduplicated admin warning. The same snapshot action failing three times creates a separate
 reconciliation warning. Neither path rolls back payment or replays production release.
+
+## Admin evidence read model and request budget
+
+Implemented on 2026-07-22:
+
+- The paid-order recovery detail page renders one **Fulfillment Evidence** panel from the persisted
+  `MerchizeFulfillmentOrder` row.
+- Opening or reloading the admin detail page does not call Merchize. It performs the existing
+  PayPal-ledger query plus one Merchize Ops database query.
+- The query selects normalized status and freshness columns only. It does not select or serialize
+  raw provider JSON payloads, customer addresses, package contents, invoice line items, or tickets.
+- The readiness section shows Address, Products, Artwork, Cost, Attention, Age Gate, Push Command,
+  and Push Verification.
+- The operational section shows the latest normalized Progress, Tracking, Invoice, and Ticket
+  snapshot state with its persisted synchronization time.
+- A missing timestamp is shown as not synced/not checked. The UI must not infer provider success
+  merely because no blocker payload is present.
+
+Provider I/O remains confined to:
+
+1. The paid fulfillment runner while an order is moving toward production.
+2. The explicit **Verify Provider State** admin action.
+3. The existing authenticated lifecycle scanner.
+
+There is no client polling, route prefetch side effect, React page-load fetch to Merchize, or
+per-tile provider request. Readiness calls execute concurrently, and operational snapshot calls
+execute concurrently within their existing groups. The low-volume scanner retains single-order
+calls for correlation and failure isolation; the documented list endpoints remain the future batch
+optimization when order volume justifies it.
+
+All adapter calls use the shared server-only header builder. When configured,
+`MERCHIZE_API_KEY` is sent as `X-API-KEY`; `x-store-id` and Bearer authorization are additive.
+No `x-refresh-token` is used. API-key-only access should be verified against every seller-detail
+endpoint during deployment preflight before removing the existing optional Bearer credential.
+
+Deferred evidence presentation and request optimizations:
+
+- Do not load raw snapshot JSON into the default detail page. Normalize package counts, tracking
+  numbers, invoice totals, ticket counts, and provider-history milestones into bounded columns or
+  dedicated child tables before adding richer displays.
+- Do not add automatic browser polling. Use explicit refresh or the scheduled scanner, then
+  revalidate the server-rendered page.
+- Do not switch the lifecycle scanner to list/batch endpoints until batching preserves
+  `external_number + identifier` correlation and per-order failure isolation.
+- Do not add separate calls for each visual tile. A new tile must use persisted evidence or be
+  folded into an existing provider request.
+- Do not expose product replacement, artwork upload, ticket mutation, hold/resume, or cancellation
+  merely to make the evidence panel actionable. Those mutations require their own authorization,
+  confirmation, audit, and rollback contracts.
+- Do not add webhook-driven freshness in this phase. Webhook ingestion remains deferred below.
 
 ## Public API endpoints indexed but not automatic
 

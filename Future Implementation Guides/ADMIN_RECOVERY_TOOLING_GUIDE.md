@@ -1,6 +1,6 @@
 # Admin And Recovery Tooling Guide
 
-Last updated: 2026-07-21
+Last updated: 2026-07-22
 
 This guide isolates the admin and checkout recovery work from the broader PayPal TX ledger guide. Use it as the source of truth for the next implementation phase: admin visibility, support recovery, retry operations, and maintenance tooling.
 
@@ -154,6 +154,45 @@ Current runtime status:
 - On manual release success, Merchize Ops records acknowledgment and then verifies provider state. Only `push_verified` sets `releasedToProductionAt`, completes the PayPal ledger, and sends customer/admin success notifications.
 - On manual release failure, the order remains recoverable, provider push failure state is persisted where available, and the internal recovery notification/email path remains active.
 
+### Current Fulfillment Evidence Panel
+
+The paid-order recovery detail page now contains one compact **Fulfillment Evidence** panel.
+
+Readiness evidence:
+
+- Address
+- Products
+- Artwork
+- Cost
+- Attention
+- Age Gate
+- Push Command acknowledgement
+- Push Verification
+
+Operational evidence:
+
+- Progress
+- Tracking
+- Invoice/cost
+- Existing provider tickets
+
+This panel is a read model, not a provider-fetching widget. Page rendering selects normalized
+status fields and freshness timestamps from the existing Merchize Fulfillment Ops row. It does not
+call Merchize, start client polling, or load raw provider payloads. The explicit **Verify Provider
+State** action and the scheduled lifecycle scanner remain the only admin/maintenance refresh paths.
+
+The panel must distinguish:
+
+- unknown/not checked from ready;
+- push command acknowledgement from provider-verified push;
+- a stored ticket snapshot from proof that no tickets exist;
+- a tracking check with no tracking yet from a request that never ran;
+- manual age release from address/product/artwork/cost/attention readiness.
+
+Richer package, invoice, ticket, item-mismatch, and provider-history displays remain deferred until
+their data is normalized into bounded admin-safe fields. The default detail page must not parse or
+send complete raw snapshot payloads merely to populate those displays.
+
 ### Current Provider Recovery Actions
 
 The paid-order recovery detail page now exposes these bounded actions:
@@ -199,11 +238,27 @@ Use the full current runbook in `MERCHIZE_FULFILLMENT_OPS_GUIDE.md` for checkout
 1. Open `/admin/shop/paid-order-recovery`.
 2. Search by the copied `orderToken`, PayPal order ID, or customer email only in the secured admin UI.
 3. Open `/admin/shop/paid-order-recovery/[orderToken]`.
-4. Confirm the detail page shows the PayPal ledger stage, receipt state, Django payment-save custom ID, Merchize external order number when known, Merchize Ops sync status, production gate status, and notification history.
-5. For successful provider release, confirm the detail page shows `push_verified`/`push_to_fulfillment_verified`, `pushAcknowledgedAt`, `pushVerifiedAt`, admin notification history, and customer notification history.
-6. For `MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING`, confirm the row stays customer-safe and scanner-resumable, the admin list/detail page shows provider sync pending, and no critical recovery email is sent for the initial provider-indexing lag. After repeated pending attempts or the grace window, confirm the row escalates to `MERCHIZE_LOOKUP_NOT_FOUND` and creates the normal recovery alert.
-7. For failure or blocked states, confirm a notification outbox row exists and that resend/suppress actions work without changing the PayPal ledger stage.
-8. For `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false`, confirm the row shows `fulfillment_attention_required`, the manual release form appears, the master-admin password/reason are required, and release resumes through `runPaidFulfillmentProcessing(orderToken, { overrideMerchizeFulfillmentPushDisabled: true })` without replaying PayPal capture, receipt upload, Django payment save, or an already accepted Django process response.
+4. Confirm the detail page shows the PayPal ledger stage, receipt state, Django payment-save custom
+   ID, Merchize external order number when known, Merchize Ops sync status, production gate status,
+   notification history, and the Fulfillment Evidence panel.
+5. Confirm opening and reloading the detail page does not create new
+   `MerchizeFulfillmentSyncAttempt` rows. Provider requests should occur only after **Verify
+   Provider State** or the scheduled scanner runs.
+6. For successful provider release, confirm the panel distinguishes Push Command `Acknowledged`
+   from Push Verification `Verified` and shows the persisted synchronization times.
+7. For `MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING`, confirm the row stays customer-safe and
+   scanner-resumable, the admin list/detail page shows provider sync pending, and no critical
+   recovery email is sent for the initial provider-indexing lag. After repeated pending attempts or
+   the grace window, confirm the row escalates to `MERCHIZE_LOOKUP_NOT_FOUND` and creates the normal
+   recovery alert.
+8. For failure or blocked states, confirm a notification outbox row exists and that
+   resend/suppress actions work without changing the PayPal ledger stage.
+9. For `MERCHIZE_FULFILLMENT_PUSH_ENABLED=false`, confirm the row shows
+   `fulfillment_attention_required`, the manual release form appears, the master-admin
+   password/reason are required, and release resumes through
+   `runPaidFulfillmentProcessing(orderToken, { overrideMerchizeFulfillmentPushDisabled: true })`
+   without replaying PayPal capture, receipt upload, Django payment save, or an already accepted
+   Django process response.
 
 Current expected notification behavior:
 
@@ -1897,10 +1952,18 @@ Security:
 
 Continue from the current checkpoint:
 
-1. Keep the existing `/admin/shop` hub and `/admin/shop/paid-order-recovery` routes aligned with the visual system.
-2. Add the Merchize provider-detail sync layer from `MERCHIZE_FULFILLMENT_OPS_GUIDE.md`.
-3. Add `syncMerchizeProviderDetailsAction` for accepted fulfillment rows.
-4. Keep full retry disabled for rows whose Django process response was already accepted.
-5. Add expired checkout recovery OTP cleanup to the admin hub when maintenance tooling resumes.
-
-After that, add provider detail snapshots, item comparison, tracking/status sync, and production admin auth/audit hardening.
+1. Add orchestration integration tests for the accepted Django `201` contract, provider indexing
+   lag, push acknowledgement without verification, duplicate runners, address correction, scanner
+   resumption, and notification deduplication.
+2. Verify the Fulfillment Evidence panel against dev data and confirm page loads create no provider
+   sync attempts.
+3. Apply the committed Merchize Fulfillment Ops migrations to production only after dev/staging E2E
+   passes.
+4. Run one controlled live-provider canary with deliberate awareness that production release can
+   charge the Merchize balance.
+5. Normalize richer tracking/package, invoice, ticket, item-mismatch, and history summaries before
+   displaying them. Do not load raw provider payloads into the default admin page.
+6. Keep full retry disabled for rows whose Django process response was already accepted.
+7. Keep product/artwork/ticket mutations, hold/resume/cancel, webhooks, refunds, and disputes in
+   their documented separate scopes.
+8. Add expired checkout recovery OTP cleanup to the admin hub when maintenance tooling resumes.
