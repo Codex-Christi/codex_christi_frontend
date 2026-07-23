@@ -89,7 +89,7 @@ export default function CustomerNotificationHistoryPanel({
                   </div>
                   <span
                     className={cn(
-                      'rounded-md border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em]',
+                      'shrink-0 whitespace-nowrap rounded-md border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em]',
                       notification.status === 'sent' &&
                         'border-emerald-300/15 bg-emerald-300/8 text-emerald-200',
                       notification.status === 'failed' &&

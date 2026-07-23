@@ -69,14 +69,14 @@ export default function PaidOrderRecoveryDetailPanel({
 
       <div className='min-h-0 flex-1 space-y-4 overflow-visible p-4 sm:p-5'>
         <section className='grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]'>
-          <div className='rounded-xl border border-white/10 bg-white/[0.025] p-4'>
+          <div className='min-w-0 rounded-xl border border-white/10 bg-white/[0.025] p-4'>
             <div className='flex flex-wrap items-start justify-between gap-3'>
-              <div>
+              <div className='min-w-0'>
                 <p className='text-xs uppercase tracking-[0.12em] text-slate-500'>
                   Support reference
                 </p>
                 <h2 className='mt-2 text-2xl font-semibold text-white'>{recovery.supportRef}</h2>
-                <p className='mt-2 text-sm text-slate-400'>{detail.customerEmail}</p>
+                <p className='mt-2 break-all text-sm text-slate-400'>{detail.customerEmail}</p>
               </div>
               <AdminPaidOrderRecoveryStatusBadge status={recovery.status} />
             </div>
@@ -88,12 +88,12 @@ export default function PaidOrderRecoveryDetailPanel({
             </div>
           </div>
 
-          <div className='rounded-xl border border-rose-300/12 bg-rose-300/[0.035] p-4'>
+          <div className='min-w-0 rounded-xl border border-rose-300/12 bg-rose-300/[0.035] p-4'>
             <p className='text-xs uppercase tracking-[0.12em] text-rose-200'>Last error</p>
             <div className='mt-3 flex items-start gap-2'>
-              <span className='mt-1.5 h-2 w-2 rounded-full bg-rose-400' />
-              <div>
-                <p className='text-sm font-medium text-slate-100'>{recovery.error}</p>
+              <span className='mt-1.5 h-2 w-2 shrink-0 rounded-full bg-rose-400' />
+              <div className='min-w-0'>
+                <p className='break-words text-sm font-medium text-slate-100'>{recovery.error}</p>
                 <p className='mt-2 text-xs leading-5 text-slate-500'>
                   Review the order context before retrying this paid order.
                 </p>
@@ -105,8 +105,8 @@ export default function PaidOrderRecoveryDetailPanel({
         <PaidOrderRecoveryWebhookScannerSummary detail={detail} />
         <PaidOrderRecoveryFulfillmentEvidencePanel summary={detail.merchizeFulfillmentOps} />
 
-        <div className='grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]'>
-          <div className='space-y-4'>
+        <div className='grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.8fr)]'>
+          <div className='min-w-0 space-y-4'>
             <TimelinePanel timeline={timeline} />
             <PaidOrderRecoveryPrimaryContextSections
               detail={detail}
@@ -120,7 +120,7 @@ export default function PaidOrderRecoveryDetailPanel({
             />
           </div>
 
-          <div className='space-y-4'>
+          <div className='min-w-0 space-y-4'>
             <RecoveryActionsPanel recovery={recovery} detail={detail} />
             <PaidOrderRecoverySecondaryContextSections detail={detail} />
           </div>
@@ -207,10 +207,10 @@ function RecoveryActionsPanel({
 
 function TimelineRow({ item }: { item: TimelineItem }) {
   return (
-    <div className='grid grid-cols-[18px_minmax(0,1fr)_auto] gap-3 text-sm'>
+    <div className='grid grid-cols-[18px_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm sm:grid-cols-[18px_minmax(0,1fr)_auto]'>
       <span
         className={cn(
-          'mt-1 grid h-3.5 w-3.5 place-items-center rounded-full',
+          'row-span-2 mt-1 grid h-3.5 w-3.5 place-items-center rounded-full sm:row-span-1',
           item.state === 'done' && 'bg-emerald-500',
           item.state === 'failed' && 'bg-rose-500',
           item.state === 'pending' && 'bg-slate-500',
@@ -221,7 +221,9 @@ function TimelineRow({ item }: { item: TimelineItem }) {
       <span className={cn(item.state === 'failed' ? 'text-rose-300' : 'text-slate-200')}>
         {item.label}
       </span>
-      <span className='text-xs text-slate-500'>{item.time}</span>
+      <span className='col-start-2 text-xs text-slate-500 sm:col-start-3 sm:row-start-1'>
+        {item.time}
+      </span>
     </div>
   );
 }

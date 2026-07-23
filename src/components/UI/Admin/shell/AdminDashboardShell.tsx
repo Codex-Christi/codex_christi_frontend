@@ -34,7 +34,7 @@ export default function AdminDashboardShell({
         onOpenChange={setMobileNavigationOpen}
       />
 
-      <div className='relative z-10 col-start-1 row-start-1 min-h-dvh xl:pl-[250px]'>
+      <div className='relative z-10 col-start-1 row-start-1 min-h-dvh min-w-0 xl:pl-[250px]'>
         <AdminDashboardSidebar
           activeSection={pageConfig.section}
           identity={identity}

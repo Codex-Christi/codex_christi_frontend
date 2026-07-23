@@ -45,8 +45,8 @@ export function PaidOrderRecoveryActivitySection({ detail }: { detail: PaidOrder
 function OrderContextPanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
   return (
     <AdminGlassPanel className='overflow-hidden'>
-      <div className='flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-5'>
-        <div>
+      <div className='flex flex-col items-start gap-3 border-b border-white/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5'>
+        <div className='min-w-0'>
           <h3 className='text-sm font-semibold text-white'>Order Context</h3>
           <p className='mt-1 text-xs text-slate-500'>Customer, items, and receipt context.</p>
         </div>
@@ -64,8 +64,8 @@ function OrderContextPanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
         ) : null}
       </div>
 
-      <div className='grid gap-4 p-4 sm:p-5'>
-        <div className='grid gap-3 sm:grid-cols-3'>
+      <div className='grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 p-4 sm:p-5'>
+        <div className='grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 sm:grid-cols-3'>
           <MiniInfo
             icon={UserRound}
             label='Customer'
@@ -92,7 +92,7 @@ function OrderContextPanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
               detail.items.map((item) => (
                 <div
                   key={item.id}
-                  className='flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3'
+                  className='grid min-w-0 grid-cols-[56px_minmax(0,1fr)] items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3 sm:flex'
                 >
                   <div className='relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-white/10 bg-slate-900'>
                     {item.image ? (
@@ -113,9 +113,9 @@ function OrderContextPanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
                     <p className='truncate text-sm font-medium text-slate-100'>{item.title}</p>
                     <p className='mt-1 truncate text-xs text-slate-500'>{item.variant}</p>
                   </div>
-                  <div className='shrink-0 text-right'>
+                  <div className='col-start-2 flex items-center justify-between gap-3 text-left sm:block sm:shrink-0 sm:text-right'>
                     <p className='text-sm font-medium text-slate-100'>{item.unitPrice}</p>
-                    <p className='mt-1 text-xs text-slate-500'>Qty {item.quantity}</p>
+                    <p className='text-xs text-slate-500 sm:mt-1'>Qty {item.quantity}</p>
                   </div>
                 </div>
               ))
@@ -156,8 +156,8 @@ function DeliveryContextPanel({
         ) : null}
       </div>
 
-      <div className='grid gap-4 p-4 sm:p-5'>
-        <div className='grid gap-4 md:grid-cols-2'>
+      <div className='grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 p-4 sm:p-5'>
+        <div className='grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2'>
           <AddressBlock
             label={
               detail.hasAddressOverride
@@ -180,7 +180,7 @@ function DeliveryContextPanel({
         </div>
 
         {detail.hasAddressOverride ? (
-          <div className='grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(240px,0.72fr)]'>
+          <div className='grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-[minmax(0,1fr)_minmax(240px,0.72fr)]'>
             <div className='rounded-lg border border-amber-300/14 bg-amber-300/[0.04] p-3'>
               <p className='text-xs uppercase tracking-[0.08em] text-amber-200'>Override note</p>
               <p className='mt-2 text-sm text-slate-200'>
@@ -206,8 +206,8 @@ function DeliveryContextPanel({
 function ReferencePanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
   return (
     <AdminGlassPanel className='overflow-hidden'>
-      <div className='flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-5'>
-        <div>
+      <div className='flex flex-col items-start gap-3 border-b border-white/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5'>
+        <div className='min-w-0'>
           <h3 className='text-sm font-semibold text-white'>References</h3>
           <p className='mt-1 text-xs text-slate-500'>
             Cross-system identifiers for escalation and support.
@@ -302,10 +302,12 @@ function AddressBlock({
 
 function ReferenceRow({ reference }: { reference: PaidOrderRecoveryReference }) {
   return (
-    <div className='grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-3 px-4 py-3 text-sm sm:px-5'>
+    <div className='grid grid-cols-[minmax(0,1fr)] gap-1.5 px-4 py-3 text-sm sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] sm:gap-3 sm:px-5'>
       <p className='text-slate-500'>{reference.label}</p>
-      <div className='flex min-w-0 items-center justify-end gap-2 text-right'>
-        <p className='truncate font-mono text-[11px] text-slate-200'>{reference.value ?? '—'}</p>
+      <div className='flex min-w-0 items-start justify-start gap-2 text-left sm:justify-end sm:text-right'>
+        <p className='min-w-0 break-all font-mono text-[11px] text-slate-200 sm:truncate'>
+          {reference.value ?? '—'}
+        </p>
         {reference.value ? <Copy size={12} className='shrink-0 text-slate-600' /> : null}
       </div>
     </div>

@@ -36,7 +36,7 @@ export default function PaidOrderRecoveryWebhookScannerSummary({
         </span>
       </div>
 
-      <div className='grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]'>
+      <div className='grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]'>
         <StatusTile
           icon={Radar}
           label='Recovery scanner'
@@ -66,7 +66,7 @@ export default function PaidOrderRecoveryWebhookScannerSummary({
                     : ''}
                 </p>
                 {latestWebhook.matchedWebhookId ? (
-                  <p className='mt-1 font-mono text-[11px] text-cyan-100'>
+                  <p className='mt-1 break-all font-mono text-[11px] text-cyan-100'>
                     {latestWebhook.matchedWebhookId}
                   </p>
                 ) : null}
