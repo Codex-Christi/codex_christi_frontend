@@ -127,6 +127,21 @@ function DeliveryContextPanel({
   detail: PaidOrderRecoveryDetail;
   orderToken: string;
 }) {
+  const provider = detail.merchizeFulfillmentOps;
+  const readbackStatus = provider?.addressReadbackStatus;
+  const addressBadge =
+    readbackStatus === 'matched'
+      ? { label: 'Provider address matches', tone: 'emerald' }
+      : readbackStatus === 'mismatch'
+        ? { label: 'Provider address differs', tone: 'rose' }
+        : detail.addressCorrectionProviderApplied
+          ? { label: 'Verified when saved', tone: 'amber' }
+          : { label: 'Local correction saved', tone: 'amber' };
+  const validationLabel = getAddressValidationLabel(
+    provider?.addressValidationStatus,
+    provider?.addressMarkedValid ?? false,
+  );
+
   return (
     <AdminGlassPanel className='overflow-hidden'>
       <div className='flex flex-wrap items-start justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5'>
@@ -137,10 +152,17 @@ function DeliveryContextPanel({
           </p>
         </div>
         {detail.hasAddressOverride ? (
-          <span className='rounded-md border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.08em] text-amber-200'>
-            {detail.addressCorrectionProviderApplied
-              ? 'Provider correction applied'
-              : 'Local correction saved'}
+          <span
+            className={cn(
+              'rounded-md border px-2.5 py-1 text-[10px] uppercase tracking-[0.08em]',
+              addressBadge.tone === 'emerald'
+                ? 'border-emerald-300/20 bg-emerald-300/10 text-emerald-200'
+                : addressBadge.tone === 'rose'
+                  ? 'border-rose-300/25 bg-rose-300/10 text-rose-200'
+                  : 'border-amber-300/20 bg-amber-300/10 text-amber-200',
+            )}
+          >
+            {addressBadge.label}
           </span>
         ) : null}
       </div>
@@ -168,6 +190,41 @@ function DeliveryContextPanel({
           )}
         </div>
 
+        {provider ? (
+          <div className='grid min-w-0 gap-3 rounded-lg border border-white/10 bg-white/[0.025] p-3 sm:grid-cols-2'>
+            <div>
+              <p className='text-xs uppercase tracking-[0.08em] text-slate-500'>
+                Provider read-back
+              </p>
+              <p className='mt-1 text-sm font-medium text-slate-100'>
+                {getAddressReadbackLabel(readbackStatus, detail.addressCorrectionProviderApplied)}
+              </p>
+              <p className='mt-1 text-xs leading-5 text-slate-400'>
+                {provider.lastAddressCheckAt
+                  ? `Last address check ${provider.lastAddressCheckAt}`
+                  : 'No provider address check is recorded.'}
+              </p>
+              {provider.addressReadbackMismatchFields.length ? (
+                <p className='mt-1 text-xs leading-5 text-rose-200'>
+                  Different fields: {provider.addressReadbackMismatchFields.join(', ')}
+                </p>
+              ) : null}
+            </div>
+            <div>
+              <p className='text-xs uppercase tracking-[0.08em] text-slate-500'>
+                Merchize validation
+              </p>
+              <p className='mt-1 text-sm font-medium text-slate-100'>{validationLabel}</p>
+              {provider.addressValidationStatus ? (
+                <p className='mt-1 text-xs leading-5 text-slate-400'>
+                  Provider status:{' '}
+                  <code className='text-slate-300'>{provider.addressValidationStatus}</code>
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
         {detail.hasAddressOverride ? (
           <div className='grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-[minmax(0,1fr)_minmax(240px,0.72fr)]'>
             <div className='rounded-lg border border-amber-300/14 bg-amber-300/[0.04] p-3'>
@@ -190,6 +247,32 @@ function DeliveryContextPanel({
       </div>
     </AdminGlassPanel>
   );
+}
+
+function getAddressReadbackLabel(
+  status: string | null | undefined,
+  verifiedWhenSaved: boolean,
+) {
+  if (status === 'matched') return 'Matches the effective ledger address';
+  if (status === 'mismatch') return 'Does not match the effective ledger address';
+  if (verifiedWhenSaved) return 'Matched when the correction was saved; refresh for a current check';
+  return 'Not checked against the effective ledger address';
+}
+
+function getAddressValidationLabel(status: string | null | undefined, markedValid: boolean) {
+  if (markedValid) return 'Manually confirmed in Merchize';
+  if (status === 'valid') return 'US address valid';
+  if (status === 'other' || status === 'others') {
+    return 'Non-US address; US validation does not apply';
+  }
+  if (status === 'street_undefined') return 'Street could not be validated';
+  if (status === 'zipcode_undefined') return 'Postal code could not be validated';
+  if (status === 'missing_secondary') return 'Secondary address information may be missing';
+  if (status === 'inactive') return 'Address reported inactive';
+  if (status === 'vacant') return 'Address reported vacant';
+  if (status === 'pending') return 'Validation pending';
+  if (status === 'invalid') return 'Address invalid';
+  return status ? 'Provider review required' : 'Validation status unavailable';
 }
 
 function ReferencePanel({ detail }: { detail: PaidOrderRecoveryDetail }) {

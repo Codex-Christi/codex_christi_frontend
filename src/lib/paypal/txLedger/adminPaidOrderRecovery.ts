@@ -525,6 +525,13 @@ function formatLongDate(date: Date | null | undefined) {
 
 function getStoredReadinessSummary(payload: unknown) {
   const record = asRecord(payload);
+  const addressReadbackMismatchFields = Array.isArray(record?.addressReadbackMismatchFields)
+    ? record.addressReadbackMismatchFields.filter(
+        (value): value is string =>
+          typeof value === 'string' &&
+          ['line1', 'line2', 'city', 'state', 'postalCode', 'countryCode'].includes(value),
+      )
+    : [];
   const blockers = Array.isArray(record?.blockers)
     ? record.blockers.flatMap((value) => {
         const blocker = asRecord(value);
@@ -548,6 +555,10 @@ function getStoredReadinessSummary(payload: unknown) {
   return {
     status: asString(record?.status),
     blockers,
+    addressValidationStatus: asString(record?.addressValidationStatus),
+    addressMarkedValid: record?.addressMarkedValid === true,
+    addressReadbackStatus: asString(record?.addressReadbackStatus),
+    addressReadbackMismatchFields,
   };
 }
 
@@ -594,6 +605,10 @@ function mapMerchizeFulfillmentOpsSummary(row: {
     merchizeExternalOrderNumber: row.merchizeExternalOrderNumber,
     merchizeOrderId: row.merchizeOrderId,
     merchizeStatus: row.merchizeStatus,
+    addressValidationStatus: readiness.addressValidationStatus,
+    addressMarkedValid: readiness.addressMarkedValid,
+    addressReadbackStatus: readiness.addressReadbackStatus,
+    addressReadbackMismatchFields: readiness.addressReadbackMismatchFields,
     addressReviewStatus: row.addressReviewStatus,
     itemReviewStatus: row.itemReviewStatus,
     artworkReviewStatus: row.artworkReviewStatus,

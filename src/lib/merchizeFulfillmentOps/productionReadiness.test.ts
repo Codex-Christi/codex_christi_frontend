@@ -57,6 +57,8 @@ test('allows a current order only when explicit provider readiness evidence pass
 
   assert.equal(readiness.status, 'ready');
   assert.equal(readiness.ready, true);
+  assert.equal(readiness.addressValidationStatus, 'valid');
+  assert.equal(readiness.addressReadbackStatus, 'not_checked');
   assert.deepEqual(readiness.blockers, []);
 });
 
@@ -79,6 +81,56 @@ test('does not treat an empty suggestion list as proof that an invalid address i
   assert.equal(readiness.ready, false);
   assert.equal(readiness.addressReviewStatus, 'blocked');
   assert.equal(readiness.primaryBlocker?.code, 'MERCHIZE_ADDRESS_INVALID');
+});
+
+test('accepts the provider non-US address status without pretending it was US-validated', () => {
+  const readiness = classifyMerchizeProductionReadiness(
+    readyPayloads({
+      detail: {
+        success: true,
+        data: {
+          validate_shipping_address: 'others',
+          mark_valid_address: false,
+          artwork_status: 'ready',
+          order_status: 'open',
+          paid_at: '2026-07-20T12:00:00.000Z',
+        },
+      },
+    }),
+  );
+
+  assert.equal(readiness.ready, true);
+  assert.equal(readiness.addressReviewStatus, 'ready');
+  assert.equal(readiness.addressValidationStatus, 'others');
+});
+
+test('blocks release when buyer-details read-back differs from the effective ledger address', () => {
+  const readiness = classifyMerchizeProductionReadiness(
+    readyPayloads({
+      buyerAddressMismatchFields: ['line1', 'postalCode', 'unexpected'],
+    }),
+  );
+
+  assert.equal(readiness.ready, false);
+  assert.equal(readiness.addressReviewStatus, 'blocked');
+  assert.equal(readiness.addressReadbackStatus, 'mismatch');
+  assert.deepEqual(readiness.addressReadbackMismatchFields, ['line1', 'postalCode']);
+  assert.equal(
+    readiness.blockers.some((blocker) => blocker.code === 'MERCHIZE_PROVIDER_ADDRESS_MISMATCH'),
+    true,
+  );
+});
+
+test('records a successful buyer-details read-back separately from provider validation', () => {
+  const readiness = classifyMerchizeProductionReadiness(
+    readyPayloads({
+      buyerAddressMismatchFields: [],
+    }),
+  );
+
+  assert.equal(readiness.ready, true);
+  assert.equal(readiness.addressReadbackStatus, 'matched');
+  assert.deepEqual(readiness.addressReadbackMismatchFields, []);
 });
 
 test('honors an explicit provider buyer-confirmed address marker', () => {
@@ -407,6 +459,23 @@ test('recognizes provider push evidence instead of requiring another push comman
           order_status: 'open',
           paid_at: '2026-07-20T12:00:00.000Z',
           push_to_fulfillment_progress: 'pushed',
+        },
+      },
+    }),
+  );
+
+  assert.equal(readiness.status, 'already_pushed');
+  assert.equal(readiness.providerPushState, 'pushed');
+});
+
+test('recognizes the delivered-order is_pushed send-state shape', () => {
+  const readiness = classifyMerchizeProductionReadiness(
+    readyPayloads({
+      sendToFulfillment: {
+        success: true,
+        data: {
+          is_failed: false,
+          is_pushed: true,
         },
       },
     }),

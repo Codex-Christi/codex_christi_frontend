@@ -1023,7 +1023,9 @@ export async function markPaidOrderFulfillmentAddressValidAction({
       return { ok: false, error: result.errorMessage };
     }
 
-    const readiness = await runMerchizeProductionReadinessChecks(orderToken);
+    const readiness = await runMerchizeProductionReadinessChecks(orderToken, {
+      expectedBuyerAddress: expectedAddress,
+    });
     const addressVerified =
       readiness.ok &&
       ['ready', 'buyer_confirmed'].includes(readiness.readiness.addressReviewStatus);
@@ -1223,7 +1225,11 @@ export async function syncAdminMerchizeProviderDetailsAction({
     }
 
     const [readiness, snapshots] = await Promise.all([
-      runMerchizeProductionReadinessChecks(existing.orderToken),
+      runMerchizeProductionReadinessChecks(existing.orderToken, {
+        expectedBuyerAddress: getMerchizeBuyerAddressExpectationFromLedger(
+          existing.fulfillmentAddressOverride ?? existing.shippingSnapshot,
+        ),
+      }),
       syncMerchizeFulfillmentOperationalSnapshots(existing.orderToken, {
         includeInvoice: false,
       }),
@@ -1502,7 +1508,10 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
       };
     }
     const readiness = providerCorrection.providerUpdated
-      ? await runMerchizeProductionReadinessChecks(orderToken)
+      ? await runMerchizeProductionReadinessChecks(orderToken, {
+          expectedBuyerAddress:
+            getMerchizeBuyerAddressExpectationFromLedger(normalizedAddress),
+        })
       : null;
 
     await writeMerchizeFulfillmentAdminAction({

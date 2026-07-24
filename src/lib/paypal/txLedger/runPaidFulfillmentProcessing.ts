@@ -32,6 +32,7 @@ import { syncMerchizeFulfillmentOperationalSnapshots } from '@/lib/merchizeFulfi
 import { runMerchizeProductionReadinessChecks } from '@/lib/merchizeFulfillmentOps/runMerchizeProductionReadinessChecks';
 import { verifyMerchizeFulfillmentPush } from '@/lib/merchizeFulfillmentOps/verifyMerchizeFulfillmentPush';
 import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/lib/merchizeFulfillmentOps/merchizeMapper';
+import { getMerchizeBuyerAddressExpectationFromLedger } from '@/lib/merchizeFulfillmentOps/addressCorrectionVerification';
 import {
   enqueueAdminFulfillmentPushVerifiedNotification,
   enqueueAdminRecoveryNotification,
@@ -606,6 +607,7 @@ export async function runPaidFulfillmentProcessing(
 
       const readinessCheck = await runMerchizeProductionReadinessChecks(orderToken, {
         allowStaleOrderManualRelease: options.allowStaleMerchizeOrderManualRelease,
+        expectedBuyerAddress: getMerchizeBuyerAddressExpectationFromLedger(fulfillmentAddress),
       });
       if (!readinessCheck.ok) {
         await markFulfillmentProviderPendingForAutomaticRetry({

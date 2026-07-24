@@ -73,7 +73,11 @@ function classifyEvidence(detail: unknown, sendToFulfillment: unknown, history: 
   const sendData = getDataRecord(sendToFulfillment);
   const progress = asString(detailData?.push_to_fulfillment_progress)?.toLowerCase() ?? null;
 
-  if (progress === 'pushed' || asBoolean(sendData?.pushed) === true) {
+  if (
+    progress === 'pushed' ||
+    asBoolean(sendData?.pushed) === true ||
+    asBoolean(sendData?.is_pushed) === true
+  ) {
     return { state: 'verified' as const, progress: progress ?? 'pushed' };
   }
   if (

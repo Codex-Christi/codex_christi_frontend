@@ -20,6 +20,10 @@ export type MerchizeProductionReadiness = {
   status: 'ready' | 'pending' | 'blocked' | 'manual_release_required' | 'already_pushed';
   blockers: MerchizeReadinessBlocker[];
   primaryBlocker: MerchizeReadinessBlocker | null;
+  addressValidationStatus: string;
+  addressMarkedValid: boolean;
+  addressReadbackStatus: 'matched' | 'mismatch' | 'not_checked';
+  addressReadbackMismatchFields: string[];
   addressReviewStatus: string;
   itemReviewStatus: string;
   artworkReviewStatus: string;
@@ -38,6 +42,7 @@ type ReadinessPayloads = {
   fulfillmentInvoice: unknown;
   requireAttention: unknown;
   sendToFulfillment: unknown;
+  buyerAddressMismatchFields?: string[] | null;
   now?: Date;
   allowStaleOrderManualRelease?: boolean;
 };
@@ -62,6 +67,15 @@ const BUYER_CONFIRMABLE_ADDRESS_STATUSES = new Set([
   'spelling',
   'fullname_undefined',
   'pending',
+]);
+const NON_US_ADDRESS_STATUSES = new Set(['other', 'others']);
+const BUYER_ADDRESS_FIELD_NAMES = new Set([
+  'line1',
+  'line2',
+  'city',
+  'state',
+  'postalCode',
+  'countryCode',
 ]);
 const FAILED_ITEM_STATUSES = new Set([
   'failed',
@@ -198,10 +212,11 @@ function classifyProviderPushState(detail: unknown, sendToFulfillment: unknown) 
   const detailData = getDataRecord(detail);
   const sendData = getDataRecord(sendToFulfillment);
   const progress = asString(detailData?.push_to_fulfillment_progress)?.toLowerCase() ?? null;
-  const sent = asBoolean(sendData?.pushed);
+  const sent =
+    asBoolean(sendData?.pushed) === true || asBoolean(sendData?.is_pushed) === true;
   const sendFailed = asBoolean(sendData?.is_failed);
 
-  if (progress === 'pushed' || sent === true) {
+  if (progress === 'pushed' || sent) {
     return { progress: progress ?? 'pushed', state: 'pushed' as const };
   }
   if (progress === 'failed' || sendFailed === true) {
@@ -221,6 +236,7 @@ export function classifyMerchizeProductionReadiness({
   fulfillmentInvoice,
   requireAttention,
   sendToFulfillment,
+  buyerAddressMismatchFields,
   now = new Date(),
   allowStaleOrderManualRelease = false,
 }: ReadinessPayloads): MerchizeProductionReadiness {
@@ -235,7 +251,8 @@ export function classifyMerchizeProductionReadiness({
   if (
     validationStatus === 'valid' ||
     validationStatus === 'ignore' ||
-    validationStatus === 'ignored'
+    validationStatus === 'ignored' ||
+    NON_US_ADDRESS_STATUSES.has(validationStatus)
   ) {
     addressReviewStatus = 'ready';
   } else if (markValidAddress && BUYER_CONFIRMABLE_ADDRESS_STATUSES.has(validationStatus)) {
@@ -266,6 +283,31 @@ export function classifyMerchizeProductionReadiness({
           : 'Merchize did not return an explicit valid shipping-address state.',
       category: 'address',
       retryable: true,
+    });
+  }
+
+  const addressReadbackMismatchFields =
+    buyerAddressMismatchFields === undefined || buyerAddressMismatchFields === null
+      ? []
+      : [
+          ...new Set(
+            buyerAddressMismatchFields.filter((field) => BUYER_ADDRESS_FIELD_NAMES.has(field)),
+          ),
+        ];
+  const addressReadbackStatus =
+    buyerAddressMismatchFields === undefined || buyerAddressMismatchFields === null
+      ? 'not_checked'
+      : addressReadbackMismatchFields.length > 0
+        ? 'mismatch'
+        : 'matched';
+
+  if (addressReadbackStatus === 'mismatch') {
+    addressReviewStatus = 'blocked';
+    addBlocker(blockers, {
+      code: 'MERCHIZE_PROVIDER_ADDRESS_MISMATCH',
+      message: `Merchize buyer details do not match the effective fulfillment address (${addressReadbackMismatchFields.join(', ')}).`,
+      category: 'address',
+      retryable: false,
     });
   }
 
@@ -421,6 +463,10 @@ export function classifyMerchizeProductionReadiness({
     status,
     blockers,
     primaryBlocker,
+    addressValidationStatus: validationStatus,
+    addressMarkedValid: markValidAddress,
+    addressReadbackStatus,
+    addressReadbackMismatchFields,
     addressReviewStatus,
     itemReviewStatus,
     artworkReviewStatus,

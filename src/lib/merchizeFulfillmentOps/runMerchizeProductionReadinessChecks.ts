@@ -2,6 +2,7 @@ import 'server-only';
 
 import {
   getMerchizeAddressSuggestion,
+  getMerchizeBuyerDetails,
   getMerchizeExternalOrderInvoice,
   getMerchizeInDepthOrderDetail,
   getMerchizeRequireAttention,
@@ -28,9 +29,14 @@ import {
   MERCHIZE_FULFILLMENT_SYNC_STATUS,
 } from './status';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
+import {
+  getMerchizeBuyerAddressMismatchFields,
+  type MerchizeBuyerAddressExpectation,
+} from './addressCorrectionVerification';
 
 type ReadinessOptions = {
   allowStaleOrderManualRelease?: boolean;
+  expectedBuyerAddress?: MerchizeBuyerAddressExpectation | null;
 };
 
 export type MerchizeProductionReadinessCheckResult =
@@ -113,6 +119,7 @@ export async function runMerchizeProductionReadinessChecks(
         merchizeOrderId: order.merchizeOrderId,
         invoiceReference,
         allowStaleOrderManualRelease: options.allowStaleOrderManualRelease === true,
+        buyerAddressReadbackRequired: Boolean(options.expectedBuyerAddress),
       }),
     },
   });
@@ -137,6 +144,7 @@ export async function runMerchizeProductionReadinessChecks(
       fulfillmentInvoice,
       requireAttention,
       sendToFulfillment,
+      buyerDetails,
     ] = await Promise.all([
       getMerchizeInDepthOrderDetail(order.merchizeOrderId),
       getMerchizeAddressSuggestion(order.merchizeOrderId),
@@ -144,7 +152,13 @@ export async function runMerchizeProductionReadinessChecks(
       getMerchizeExternalOrderInvoice(invoiceReference),
       getMerchizeRequireAttention(order.merchizeOrderId),
       getMerchizeSendToFulfillmentDate(order.merchizeOrderId),
+      options.expectedBuyerAddress
+        ? getMerchizeBuyerDetails(order.merchizeOrderId)
+        : Promise.resolve(null),
     ]);
+    const buyerAddressMismatchFields = options.expectedBuyerAddress
+      ? getMerchizeBuyerAddressMismatchFields(buyerDetails, options.expectedBuyerAddress)
+      : null;
     const readiness = classifyMerchizeProductionReadiness({
       detail,
       addressSuggestion,
@@ -152,6 +166,7 @@ export async function runMerchizeProductionReadinessChecks(
       fulfillmentInvoice,
       requireAttention,
       sendToFulfillment,
+      buyerAddressMismatchFields,
       allowStaleOrderManualRelease: options.allowStaleOrderManualRelease,
     });
     const checkedAt = new Date();
@@ -171,6 +186,10 @@ export async function runMerchizeProductionReadinessChecks(
     const readinessSummary = {
       status: readiness.status,
       blockers: readiness.blockers,
+      addressValidationStatus: readiness.addressValidationStatus,
+      addressMarkedValid: readiness.addressMarkedValid,
+      addressReadbackStatus: readiness.addressReadbackStatus,
+      addressReadbackMismatchFields: readiness.addressReadbackMismatchFields,
       addressReviewStatus: readiness.addressReviewStatus,
       itemReviewStatus: readiness.itemReviewStatus,
       artworkReviewStatus: readiness.artworkReviewStatus,

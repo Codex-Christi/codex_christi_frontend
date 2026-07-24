@@ -329,14 +329,13 @@ function buildReadinessItems(summary: MerchizeFulfillmentOpsAdminSummary): Evide
     {
       label: 'Address',
       value: humanizeStatus(summary.addressReviewStatus),
-      detail: summary.lastAddressCheckAt ?? 'No address evidence stored',
+      detail:
+        summary.addressValidationStatus || summary.addressReadbackStatus
+          ? `Validation ${humanizeStatus(summary.addressValidationStatus)} · Read-back ${humanizeStatus(summary.addressReadbackStatus)}`
+          : summary.lastAddressCheckAt ?? 'No address evidence stored',
       icon: MapPin,
-      ...getReadinessDialogCopy(
-        summary,
-        'address',
-        'The latest provider address validation passed.',
-        'Correct or confirm the fulfillment address in Merchize, then refresh provider state.',
-      ),
+      tone: getAddressEvidenceTone(summary),
+      ...getAddressDialogCopy(summary),
     },
     {
       label: 'Products',
@@ -439,6 +438,49 @@ function getReadinessDialogCopy(
         meaning: clearMeaning,
         nextStep: 'No corrective action is required. Continue monitoring normal processing.',
       };
+}
+
+function getAddressDialogCopy(
+  summary: MerchizeFulfillmentOpsAdminSummary,
+): Pick<EvidenceItem, 'meaning' | 'nextStep'> {
+  const blocker = summary.readinessBlockers.find((item) => item.category === 'address');
+  if (blocker) {
+    return {
+      meaning: blocker.message,
+      nextStep: blocker.retryable
+        ? 'Refresh Merchize state to request newer provider evidence.'
+        : 'Correct or explicitly confirm the address in Merchize, then refresh provider state.',
+    };
+  }
+
+  if (summary.addressReadbackStatus === 'matched') {
+    return {
+      meaning:
+        summary.addressValidationStatus === 'other' ||
+        summary.addressValidationStatus === 'others'
+          ? 'The provider address fields match the effective ledger address. Merchize classifies the destination outside its US address-validation scope.'
+          : 'The provider address fields match the effective ledger address, and no address-validation blocker is stored.',
+      nextStep: 'No address correction is required. Continue with the remaining release checks.',
+    };
+  }
+
+  if (summary.readinessStatus) {
+    return {
+      meaning:
+        'Provider validation evidence is stored, but an exact buyer-details comparison was not included in this readiness snapshot.',
+      nextStep: 'Refresh Merchize state before releasing the order.',
+    };
+  }
+
+  return {};
+}
+
+function getAddressEvidenceTone(summary: MerchizeFulfillmentOpsAdminSummary): EvidenceTone {
+  const reviewTone = getEvidenceTone(summary.addressReviewStatus);
+  if (reviewTone === 'blocked') return 'blocked';
+  if (summary.addressReadbackStatus === 'mismatch') return 'blocked';
+  if (summary.addressReadbackStatus === 'matched') return reviewTone;
+  return summary.readinessStatus ? 'pending' : 'neutral';
 }
 
 function getCostDialogCopy(

@@ -137,6 +137,10 @@ export type MerchizeFulfillmentOpsAdminSummary = {
   merchizeExternalOrderNumber: string;
   merchizeOrderId: string | null;
   merchizeStatus: string | null;
+  addressValidationStatus: string | null;
+  addressMarkedValid: boolean;
+  addressReadbackStatus: string | null;
+  addressReadbackMismatchFields: string[];
   addressReviewStatus: string | null;
   itemReviewStatus: string | null;
   artworkReviewStatus: string | null;
