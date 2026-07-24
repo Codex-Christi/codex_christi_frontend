@@ -218,7 +218,8 @@ The paid-order recovery detail page now exposes these bounded actions:
   effective ledger address already stored in Merchize. It requires password step-up and a reason,
   reads current buyer details, compares them to the saved correction (or original snapshot when no
   correction exists), and fails closed with PII-safe field names if they differ. Only then does it
-  read the provider validation status, send that status to the mark-valid endpoint, and rerun
+  read the provider validation status, including the literal `invalid` state, send that status to
+  the mark-valid endpoint, and rerun
   readiness for verification. The admin does not re-enter the corrected address. It does not edit
   the address, replay Django, or push the order. Use it only after buyer/authoritative confirmation;
   use **Correct Fulfillment Address** when any field must change.

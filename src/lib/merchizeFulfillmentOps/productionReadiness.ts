@@ -53,6 +53,7 @@ const INVALID_ADDRESS_STATUSES = new Set([
   'fullname_undefined',
 ]);
 const BUYER_CONFIRMABLE_ADDRESS_STATUSES = new Set([
+  'invalid',
   'street_undefined',
   'zipcode_undefined',
   'inactive',

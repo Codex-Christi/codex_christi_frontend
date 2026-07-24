@@ -104,7 +104,7 @@ test('honors an explicit provider buyer-confirmed address marker', () => {
 test('limits manual address confirmation to provider-confirmable statuses', () => {
   assert.equal(canManuallyConfirmMerchizeAddressStatus('street_undefined'), true);
   assert.equal(canManuallyConfirmMerchizeAddressStatus('pending'), true);
-  assert.equal(canManuallyConfirmMerchizeAddressStatus('invalid'), false);
+  assert.equal(canManuallyConfirmMerchizeAddressStatus('invalid'), true);
   assert.equal(canManuallyConfirmMerchizeAddressStatus('valid'), false);
   assert.deepEqual(
     getMerchizeAddressValidationEvidence({
