@@ -205,6 +205,9 @@ The paid-order recovery detail page now exposes these bounded actions:
   available even on old `completed` rows. If the ledger was completed from command acknowledgment
   but Merchize does not report `pushed`, the action reopens the row as
   `fulfillment_attention_required` and creates an internal warning.
+- The recovery list/detail **Current blocker** uses the latest persisted Merchize readiness issue
+  when it is newer than a Merchize-origin PayPal ledger error. The original ledger error remains
+  unchanged in activity history. Payment-side errors and newer push/config errors retain precedence.
 - **Correct Fulfillment Address** saves an audited ledger correction. For an imported order it also
   resolves/backfills the Fulfillment Ops row and actionable `merchizeOrderId` when necessary, reads
   current buyer details, updates Merchize buyer details, reads the buyer details back to verify every

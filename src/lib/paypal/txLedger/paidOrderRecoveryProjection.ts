@@ -16,6 +16,7 @@ import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/l
 import { MERCHIZE_FULFILLMENT_SYNC_STATUS } from '@/lib/merchizeFulfillmentOps/status';
 import { isMerchizeLookupPendingProviderProcessingError } from '@/lib/merchizeFulfillmentOps/lookupPending';
 import { safeLogErrorMessage } from '@/lib/merchizeFulfillmentOps/redaction';
+import { resolvePaidOrderRecoveryIssue } from '@/lib/paypal/txLedger/recoveryIssuePrecedence';
 import type { Prisma } from '@/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger/client';
 
 const ADMIN_RECOVERY_LEDGER_STATUSES = [
@@ -425,6 +426,21 @@ function buildProjectionData({
       ledgerRow.merchizeFulfillmentResponsePayload,
       ledgerRow.djangoOrderIntentOrderId,
     );
+  const currentIssue = resolvePaidOrderRecoveryIssue({
+    ledgerIssue: {
+      code: ledgerRow.lastErrorCode,
+      message: ledgerRow.lastErrorMessage,
+    },
+    providerIssue: merchizeOpsRow
+      ? {
+          code: merchizeOpsRow.lastSyncErrorCode,
+          message: merchizeOpsRow.lastSyncErrorMessage,
+        }
+      : null,
+    providerIssueIsCurrent: Boolean(
+      merchizeOpsRow && merchizeOpsRow.updatedAt.getTime() >= ledgerRow.updatedAt.getTime(),
+    ),
+  });
 
   return {
     orderToken: ledgerRow.orderToken,
@@ -476,12 +492,12 @@ function buildProjectionData({
     latestWebhookSourceLabel,
     latestWebhookEventType: webhookRow?.eventType ?? null,
     latestWebhookProcessingStatus: webhookRow?.processingStatus ?? null,
-    lastErrorCode: ledgerRow.lastErrorCode ?? merchizeOpsRow?.lastSyncErrorCode ?? null,
-    lastErrorMessage: ledgerRow.lastErrorMessage ?? merchizeOpsRow?.lastSyncErrorMessage ?? null,
+    lastErrorCode: currentIssue.code,
+    lastErrorMessage: currentIssue.message,
     recoveryReason: getRecoveryReason({
       adminRecoveryStatus,
-      lastErrorCode: ledgerRow.lastErrorCode,
-      lastErrorMessage: ledgerRow.lastErrorMessage,
+      lastErrorCode: currentIssue.code,
+      lastErrorMessage: currentIssue.message,
       merchizeOpsSyncStatus: merchizeOpsRow?.syncStatus,
       merchizeOpsLastSyncErrorCode: merchizeOpsRow?.lastSyncErrorCode,
     }),

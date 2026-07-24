@@ -24,6 +24,7 @@ import {
 import { isMerchizeLookupPendingProviderProcessingError } from '@/lib/merchizeFulfillmentOps/lookupPending';
 import { safeLogErrorMessage } from '@/lib/merchizeFulfillmentOps/redaction';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
+import { resolvePaidOrderRecoveryIssue } from '@/lib/paypal/txLedger/recoveryIssuePrecedence';
 import type { Prisma } from '@/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger/client';
 import type {
   MerchizeFulfillmentOpsAdminSummary,
@@ -304,6 +305,10 @@ function mapLedgerRowToPaidOrderRecoveryRow(row: {
   merchizeFulfillmentResponsePayload: unknown;
   merchizeFulfillmentOpsSyncStatus?: string | null;
   merchizeFulfillmentOpsLastSyncErrorCode?: string | null;
+  merchizeFulfillmentOpsPrimaryBlocker?: {
+    code: string;
+    message: string;
+  } | null;
   latestWebhookSourceLabel?: string | null;
   lastErrorCode: string | null;
   lastErrorMessage: string | null;
@@ -325,6 +330,14 @@ function mapLedgerRowToPaidOrderRecoveryRow(row: {
       ledgerStatus: row.status,
     }) ?? undefined,
   );
+  const currentIssue = resolvePaidOrderRecoveryIssue({
+    ledgerIssue: {
+      code: row.lastErrorCode,
+      message: row.lastErrorMessage,
+    },
+    providerIssue: row.merchizeFulfillmentOpsPrimaryBlocker ?? null,
+    providerIssueIsCurrent: true,
+  });
 
   return {
     orderToken: row.orderToken,
@@ -337,7 +350,7 @@ function mapLedgerRowToPaidOrderRecoveryRow(row: {
           syncStatus: row.merchizeFulfillmentOpsSyncStatus,
           lastSyncErrorCode: row.merchizeFulfillmentOpsLastSyncErrorCode,
         })
-      : getErrorLabel(row.lastErrorCode, row.lastErrorMessage),
+      : getErrorLabel(currentIssue.code, currentIssue.message),
     processingSourceLabel: processingSource.label,
     processingSourceTone: processingSource.tone,
     supportRef: row.orderToken.slice(0, 8).toUpperCase(),
@@ -1222,6 +1235,8 @@ export async function getAdminPaidOrderRecoveryDetail(orderToken: string) {
     row: mapLedgerRowToPaidOrderRecoveryRow({
       ...row,
       merchizeFulfillmentOpsSyncStatus: merchizeOpsSummary?.syncStatus,
+      merchizeFulfillmentOpsLastSyncErrorCode: merchizeOpsSummary?.lastSyncErrorCode,
+      merchizeFulfillmentOpsPrimaryBlocker: merchizeOpsSummary?.readinessBlockers[0] ?? null,
     }),
     detail: buildDetail({
       ...row,
