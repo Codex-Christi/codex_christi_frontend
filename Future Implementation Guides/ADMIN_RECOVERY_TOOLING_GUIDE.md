@@ -1,6 +1,6 @@
 # Admin And Recovery Tooling Guide
 
-Last updated: 2026-07-22
+Last updated: 2026-07-23
 
 This guide isolates the admin and checkout recovery work from the broader PayPal TX ledger guide. Use it as the source of truth for the next implementation phase: admin visibility, support recovery, retry operations, and maintenance tooling.
 
@@ -139,6 +139,31 @@ Remaining follow-up work:
 - Escalate repeated progress/tracking/invoice snapshot failures into admin-visible reconciliation states.
 - Add customer tracking/update emails only after tracking data is present and customer-safe.
 - Add admin pause/resume/cancel controls only with reason capture, audit logging, confirmation, and step-up auth.
+
+### Imminent Fulfillment Intervention And Job Health Work
+
+The canonical scope and execution order now live in
+`MERCHIZE_FULFILLMENT_OPS_GUIDE.md`, under **Imminent Next Implementation: Address Intervention And
+Lifecycle Hardening**. When asked what comes next, use that section rather than the older broad phase
+lists later in this guide.
+
+Admin/recovery ownership in that imminent phase:
+
+- Persist and send the existing admin warning plus a customer-safe action request for explicit
+  invalid-address and provider-address-mismatch blockers.
+- Add stage-aware escalation for retryable provider states instead of sending a generic
+  payment-stage scanner warning.
+- Guarantee a durable internal alert for unexpected `POST_PROCESSING_FAILED` transitions.
+- Add scheduled, bounded retry for failed admin/customer outbox delivery while preserving manual
+  resend and audit history.
+- Show scheduler/outbox health, including last successful run, so "no candidates" is distinguishable
+  from "the job did not run."
+- Add an audited and verified fulfillment-contact email override without rewriting immutable payment
+  identity or replaying Django payment save.
+- Keep `mark-valid-address`, stale-order release, and configuration override behind master-admin
+  step-up. A customer confirmation is evidence for admin review, not automatic mutation authority.
+- Keep product changes, cancellation automation, refunds, disputes, and full provider-dashboard
+  parity outside this imminent scope.
 
 ### Push-Disabled Semi-Real Test Contract
 

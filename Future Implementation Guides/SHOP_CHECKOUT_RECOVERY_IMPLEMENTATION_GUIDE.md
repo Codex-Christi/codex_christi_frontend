@@ -1,6 +1,6 @@
 # Shop Checkout Recovery Implementation Guide
 
-Last updated: 2026-06-25
+Last updated: 2026-07-23
 
 This guide summarizes the customer-side checkout recovery architecture around Django order-intent OTP, Next.js-owned paid checkout recovery OTP, and the PayPal transaction ledger.
 
@@ -22,6 +22,31 @@ The customer-facing problem:
 - Customer may revisit checkout and accidentally place another order.
 - Confirmation page must not spin forever.
 - Admin needs tools to recover the transaction.
+
+## Imminent Checkout Address And Contact Recovery Work
+
+The authoritative implementation order is documented in
+`MERCHIZE_FULFILLMENT_OPS_GUIDE.md`, under **Imminent Next Implementation: Address Intervention And
+Lifecycle Hardening**.
+
+Checkout/recovery ownership in that phase:
+
+- Move the address-responsibility notice before PayPal controls and require explicit confirmation of
+  the rendered delivery address before payment can begin.
+- Persist the policy version, acceptance timestamp, checkout surface, and a PII-safe fingerprint of
+  the acknowledged address on the server-owned paid-order record.
+- Add an OTP-protected customer action path for an explicit Merchize invalid-address result or a
+  verified provider/ledger address mismatch.
+- Do not expose raw provider messages or promise that an address is deliverable. Merchize automated
+  validation is US-only; non-US `other` / `others` means not provider-validated.
+- Keep the original verified checkout/payment email immutable. A later
+  `fulfillmentContactEmailOverride` is a separately verified operational contact for future
+  fulfillment messages.
+- A customer-submitted correction may resume automatically only after provider read-back matches and
+  Merchize returns `valid`. A still-invalid address that the customer confirms requires
+  master-admin `mark-valid-address` and release.
+- Never replay PayPal capture, receipt upload, Django payment save, or accepted Django catalog import
+  from the customer correction path.
 
 ## Important Naming Decisions
 

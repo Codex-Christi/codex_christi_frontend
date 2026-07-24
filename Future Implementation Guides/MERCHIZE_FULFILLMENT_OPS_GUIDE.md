@@ -20,6 +20,276 @@ Related source docs:
 
 ---
 
+# Imminent Next Implementation: Address Intervention And Lifecycle Hardening
+
+Status: **IMMINENT**. This is the canonical next implementation queue after commit `8e9a3bf`.
+It is documented but not yet implemented. When asked "what's next?", start with this section and
+preserve the order below unless new production evidence changes the priority.
+
+The next phase must make automatic production release safe for customer-actionable address problems,
+make scanner and email delivery health observable, and finish the minimum useful post-push lifecycle.
+It must not broaden into product replacement, refunds, disputes, cancellation automation, or full
+Merchize dashboard parity.
+
+## Current runtime truth at this checkpoint
+
+- Capture-route continuation and the PayPal recovery scanner both call
+  `runPaidFulfillmentProcessing(orderToken)`. The same pre-push readiness checks therefore run
+  regardless of which automatic trigger owns the attempt.
+- The PayPal-ledger processing lease prevents overlapping capture, webhook, scanner, and admin
+  attempts from owning the same paid-order side effects at the same time.
+- `MERCHIZE_ADDRESS_INVALID` and `MERCHIZE_PROVIDER_ADDRESS_MISMATCH` are non-retryable production
+  blockers. The runner does not call `POST /order/external/orders/push`; it moves the PayPal row to
+  `fulfillment_attention_required`, creates a durable admin outbox row, and attempts the configured
+  admin email.
+- `MERCHIZE_ADDRESS_VALIDATION_PENDING`, unknown validation evidence, provider indexing lag, and
+  other retryable readiness states leave the PayPal row at `payment_saved` so the scheduled recovery
+  scanner can retry without replaying capture, receipt upload, Django payment save, or accepted
+  Django catalog import.
+- Customer email currently exists only for verified production release. There is no customer
+  address-review email or secure customer correction flow.
+- The current checkout policy notice is passive and rendered after the PayPal component. It is not
+  an address-confirmation gate and its acceptance is not persisted.
+- The current `customerEmail` is the immutable checkout/payment recipient identity. The admin
+  address-correction flow preserves the existing Merchize buyer email and does not expose an email
+  correction.
+- The authenticated cron route runs payment recovery and post-push Merchize lifecycle reconciliation,
+  but it does not persist a scheduler heartbeat. Repository code alone therefore cannot prove that
+  the external scheduler is currently invoking it successfully.
+- Existing rows already stopped as `fulfillment_attention_required` with
+  `MERCHIZE_PUSH_DISABLED_BY_CONFIG` must not auto-release merely because
+  `MERCHIZE_FULFILLMENT_PUSH_ENABLED` later changes to `true`. They require an audited admin
+  continuation.
+
+## Provider address-validation boundary
+
+Merchize's [Verify US Shipping Address](https://merchize.com/helpdesk/verify-us-shipping-address/)
+guide says its automated verifier is for US addresses. The implementation must preserve this
+distinction:
+
+- `valid` means Merchize validated a US address.
+- An explicit invalid value such as `invalid`, `street_undefined`, `zipcode_undefined`, `inactive`,
+  `missing_secondary`, `vacant`, `spelling`, or `fullname_undefined` is customer/admin actionable.
+- `other` or `others` means the destination is outside the provider's US validation scope. It may
+  proceed, but the customer and admin UI must never describe it as provider-validated.
+- Exact buyer-details read-back applies to every country. It proves only that Merchize stored the
+  same address as the effective ledger address; it does not prove deliverability.
+
+## Imminent intervention policy
+
+| Evidence | Automatic action | Admin communication | Customer communication | Resume rule |
+| --- | --- | --- | --- | --- |
+| US address `valid` and exact read-back matched | Continue remaining gates | None unless another blocker exists | None | Automatic |
+| Non-US `other` / `others` and exact read-back matched | Continue remaining gates | None unless another blocker exists | None | Automatic, while labeled not provider-validated |
+| Address validation `pending` | Pause before push and retry after bounded delay | Alert only after grace/attempt threshold | None while transient | Automatic after `valid`; otherwise escalate |
+| Address validation unknown or provider request unavailable | Pause before push and retry | Alert after bounded repeated failure | Generic delay notice only if the customer wait becomes material | Automatic only after explicit safe evidence |
+| Explicit invalid US address | Pause before push | Immediate durable warning and email | Immediate safe correction/confirmation request | See corrected-address and buyer-confirmed rules below |
+| Buyer-details read-back mismatch | Pause before push | Immediate durable warning and email | Immediate correction request when customer action can help | Resume only after provider read-back matches |
+| Product, catalog mapping, required artwork, provider attention, or closed-order blocker | Pause before push | Immediate durable warning and email | Do not expose provider jargon; send a generic delay update only after a customer-impact threshold | Admin resolution |
+| Seven-day manual-release gate | Pause before push | Immediate admin action item | None | Master-admin release; all other gates still apply |
+| Push disabled by configuration | Pause before push | Immediate admin action item | None | Explicit master-admin continuation |
+| Push request or verification failure | Do not replay payment/import; verify or retry only the provider stage | Immediate failure alert | Generic delay update only when unresolved beyond threshold | Existing idempotent provider recovery |
+| Push verified | Mark completed and start lifecycle reconciliation | Existing optional success email | Existing "preparing your order" email | No replay |
+
+## Implementation sequence
+
+### 1. Centralize blocker disposition and close runner notification gaps
+
+Create one server-only policy that maps a readiness/provider error to:
+
+- `retryable_pending`;
+- `customer_action_required`;
+- `admin_action_required`;
+- `terminal_provider_failure`; or
+- `verified_success`.
+
+The runner, recovery scanner, admin projection, and notification enqueue code must consume the same
+classification. Do not independently reinterpret error codes in each surface.
+
+Required fixes:
+
+- Honor `MerchizeProductionReadinessCheckResult.retryable` when `ok = false`. A non-retryable
+  readiness infrastructure/configuration failure must not loop forever as `payment_saved`.
+- Enqueue an admin alert for unexpected `POST_PROCESSING_FAILED` errors after the durable ledger
+  transition. The current generic catch stores the error but does not guarantee an internal email.
+- Replace the generic payment-stage scanner-candidate message with a stage-aware reason derived from
+  the persisted error code.
+- Add a bounded attempt/grace rule for retryable pre-push provider states. Escalate repeated failures
+  without turning transient provider lag into immediate customer alarm.
+- Use a stable blocker fingerprint or incident/episode identifier so scanner retries dedupe the same
+  issue while a genuinely new occurrence can create a new notification.
+
+### 2. Add customer-safe address intervention email
+
+Add a customer outbox type with a semantic name such as
+`paid_order_fulfillment_address_action_required`.
+
+Rules:
+
+- Enqueue the customer row in the same PayPal-ledger transaction that persists the actionable
+  address blocker. Enqueue the existing admin alert in that transaction as well.
+- Send only for explicit invalid-address evidence or a verified provider/ledger address mismatch.
+  Do not send it for an initial `pending`, unknown, timeout, or indexing-lag result.
+- Include the customer name, support reference, a safe order summary, what action is needed, and a
+  secure correction/contact CTA.
+- Do not include raw Merchize payloads, full payment details, admin-only error text, or an address in
+  an email subject.
+- Keep deterministic delivery records, attempts, last error, sent time, and admin resend support.
+- If customer delivery exhausts the bounded retry policy, create a deduplicated admin action item so
+  support can contact the customer through another verified channel.
+- A later push-success email remains a separate event and proves that the corrected order actually
+  entered fulfillment.
+
+### 3. Add the secure correction and confirmation path
+
+Recommended default:
+
+- The email CTA opens a short-lived, purpose-bound OTP flow before showing any order or address data.
+- A customer can submit a corrected address or confirm that the currently displayed address is
+  accurate.
+- A correction saves the audited ledger override, updates Merchize buyer details only while release
+  has not started, verifies the provider read-back, and reruns readiness.
+- If Merchize then returns automated `valid`, the scanner may resume automatically when every other
+  gate passes.
+- If Merchize still reports an explicit invalid status and the customer confirms the address,
+  `mark-valid-address` remains a master-admin action. Buyer confirmation alone must not silently call
+  the provider mutation or push the order.
+- The customer flow must never call PayPal capture, receipt upload, Django payment save, or accepted
+  Django process/import again.
+
+### 4. Require address acknowledgment before payment
+
+Move the policy notice before the PayPal payment controls and make it part of payment readiness.
+
+The customer must:
+
+- review a compact rendering of the exact delivery address;
+- explicitly confirm that it is complete and correct; and
+- acknowledge that correction, replacement, or refund may not be possible once made-to-order
+  production starts.
+
+Persist server-side evidence on the paid-order ledger:
+
+- policy identifier/version;
+- accepted timestamp;
+- checkout surface provenance already captured by the ledger; and
+- a PII-safe fingerprint of the acknowledged address rather than another uncontrolled address copy.
+
+Do not use absolute "we are not responsible" language without legal review. The acknowledgment
+supports operational clarity but does not replace applicable consumer law.
+
+### 5. Add an audited fulfillment-contact email override
+
+Do not overwrite `PaypalIntent.customerEmail`, PayPal payer data, prior notification recipients, or
+the original Django payment identity.
+
+Add a separate semantic correction record/fields:
+
+```txt
+fulfillmentContactEmailOverride
+fulfillmentContactEmailOverrideReason
+fulfillmentContactEmailOverriddenBy
+fulfillmentContactEmailOverriddenAt
+fulfillmentContactEmailVerifiedAt
+```
+
+Rules:
+
+- Validate and normalize the address server-side.
+- Require verification of the new email before it becomes the recipient for future customer
+  fulfillment notifications. Master-admin emergency override, if allowed at all, requires step-up,
+  reason, audit, and an explicit unverified warning.
+- Update the pre-push Merchize buyer email through the buyer-details mutation and verify it by
+  read-back before reporting success.
+- Do not mutate an already pushed provider order automatically.
+- Do not replay Django payment save. If Django must expose the corrected operational contact, add a
+  dedicated signed and idempotent recipient-update endpoint keyed by
+  `djangoPaymentSaveCustomId`; keep that backend contract separate from payment truth.
+- Existing sent outbox rows remain immutable. Pending rows for the superseded email must be
+  suppressed or replaced through an audited action.
+
+### 6. Make scanner and outbox health observable
+
+Extend the authenticated cron path with:
+
+- a persisted job-run heartbeat keyed by the semantic job name;
+- started, completed, failed, and last-success timestamps;
+- candidate/result counts and a redacted error summary;
+- a per-order lifecycle synchronization lease so overlapping cron requests do not duplicate provider
+  fetches;
+- bounded dispatch of pending/failed admin and customer outbox rows;
+- exponential or stepped retry backoff, maximum attempts, and a visible exhausted/dead-letter state;
+  and
+- an admin health indicator for last successful payment-recovery, fulfillment-lifecycle, and email
+  dispatch runs.
+
+The cron health record must not store raw provider payloads or customer addresses.
+
+### 7. Finish the minimum post-push lifecycle
+
+The existing lifecycle scanner already stores progress, tracking, history, ticket, invoice, and
+provider-attention snapshots. The imminent extension must derive durable, idempotent milestones:
+
+- production started;
+- tracking available;
+- shipment started;
+- delivered;
+- provider hold/attention;
+- delivery exception; and
+- progress stuck beyond a product/service-aware threshold.
+
+Use state-aware request profiles:
+
+- Before push: use only identity/readiness endpoints needed for the release decision.
+- Pushed but awaiting production: prioritize progress, attention, and invoice maturity.
+- In production: prioritize progress and tracking; fetch history/tickets only on exception or
+  explicit admin refresh.
+- Tracking available/shipping: prioritize package tracking at a slower bounded cadence.
+- Delivered/cancelled: perform one terminal reconciliation and stop routine polling.
+
+Normalize multi-package tracking into bounded rows before adding customer shipping emails. Send each
+meaningful customer milestone once. Confirm whether Merchize already emails API-imported buyers and
+choose one sender before enabling Codex Christi tracking emails; duplicate provider/shop email is not
+acceptable.
+
+## Acceptance criteria for this imminent phase
+
+- No readiness blocker can reach `POST /order/external/orders/push`.
+- Explicit invalid address and provider-address mismatch each produce one deduplicated admin alert
+  and one customer action request.
+- Pending/unknown validation does not prematurely email the customer.
+- A corrected address is persisted locally, read back from Merchize, revalidated, and reflected in
+  the stable receipt before automatic continuation.
+- Customer confirmation of a still-provider-invalid address cannot bypass master-admin
+  `mark-valid-address`.
+- Editing fulfillment contact email preserves immutable payment identity and requires verification.
+- Every unexpected paid-order processing failure creates an admin-visible durable alert.
+- Failed admin/customer email delivery is retried by the scheduled dispatcher and remains manually
+  resendable.
+- Admin can see the last successful scanner/outbox run and distinguish "no candidates" from "job did
+  not run."
+- Lifecycle polling is state-aware, idempotent, bounded, and stops at a terminal state.
+- Tests cover the disposition matrix, notification dedupe, outbox retry exhaustion, automatic versus
+  admin resume, contact-email verification, cron overlap, and multi-package milestone dedupe.
+
+## Decisions to confirm before implementation
+
+Recommended defaults are recorded so the phase remains actionable in a later chat:
+
+1. Use an OTP-protected self-service address correction/confirmation page rather than a
+   contact-support-only email.
+2. Auto-resume only after a corrected address receives provider `valid`; keep provider-invalid
+   buyer-confirmed release behind master-admin step-up.
+3. Treat `fulfillmentContactEmailOverride` as an operational contact only and preserve original
+   payment/Django identity.
+4. Make Codex Christi the lifecycle-email sender only after confirming or disabling overlapping
+   Merchize buyer emails.
+
+If these defaults are not explicitly changed, present them for confirmation before editing schema or
+customer-facing behavior.
+
+---
+
 # 0) 2026-07-21 Authoritative Synchronous Flow
 
 This section supersedes older statements in this guide that equate an HTTP push response with
@@ -71,7 +341,7 @@ Contract status matters:
 | Canonical lookup | `GET /order/external/orders/order-detail` | Query with `merchizeExternalOrderNumber + fulfillmentIdentifier`; only `data._id` becomes `merchizeOrderId`. |
 | In-depth detail | `GET /order/orders/{merchizeOrderId}` | Persists current order/item state and supplies provider address, artwork, order, and push evidence. |
 | Address suggestion | `GET /order/orders/{merchizeOrderId}/address-suggestion` | Readiness evidence only. An empty suggestion list is not proof of validity. |
-| Buyer details | `GET /order/orders/{merchizeOrderId}/buyerdetails` | Reads existing provider identity/contact fields before correction and verifies the persisted address after correction. |
+| Buyer details | `GET /order/orders/{merchizeOrderId}/buyerdetails` | Reads existing provider identity/contact fields before correction, verifies persistence after correction, and performs a PII-safe exact-address comparison during pre-push readiness. |
 | Address correction | `POST /order/orders/{merchizeOrderId}/buyerdetails` | Requests an admin correction to the already imported provider order. Its success envelope is an acknowledgement, not persistence proof; a buyer-details read-back must match before receipt regeneration and readiness recheck. |
 | Buyer display status | `GET /order/orders/{merchizeOrderId}/buyerdetails/display-status` | Adapter is available for diagnostics; not required by the automatic release decision. |
 | Mark address valid | `POST /order/orders/{merchizeOrderId}/mark-valid-address` | Master-admin recovery action only. Before mutation, the server reads buyer details and verifies that Merchize still stores the effective ledger address (saved correction first, original checkout snapshot otherwise). It then reads the current `validate_shipping_address` value, including the literal `invalid` state, sends it as `{ status }`, and reruns readiness to verify `mark_valid_address`/valid state. A field mismatch fails closed without logging address values. It never pushes the order. |
@@ -81,6 +351,70 @@ Contract status matters:
 | Send/release state | `GET /order/orders/{merchizeOrderId}/send-to-fulfillment-date` | Detects pushed/failed state and participates in push verification. |
 | Push | `POST /order/external/orders/push` | Uses `external_number + identifier` by default. HTTP success is acknowledgment only. |
 | Push verification | in-depth detail + send state + history + internal progress | Bounded synchronous polling verifies `pushed`, `failed`, or still pending. |
+
+### Address storage and validation are separate evidence
+
+`GET /order/orders/{merchizeOrderId}/buyerdetails` answers whether Merchize currently stores the
+same address fields as the effective PayPal-ledger address. It does not answer whether Merchize's
+address-verification provider considers that address deliverable.
+
+`GET /order/orders/{merchizeOrderId}` supplies the separate validation evidence:
+
+- `validate_shipping_address = valid`: Merchize validated the US address.
+- `validate_shipping_address = street_undefined`: treat this as an invalid-address result whose
+  street could not be validated. Do not infer the exact typo or silently reinterpret it as valid.
+- `mark_valid_address = true`: the seller explicitly confirmed the address in Merchize. This is
+  distinct from an automated `valid` result.
+- `validate_shipping_address = other` or `others`: the destination is outside Merchize's US-only
+  verification scope. It may proceed as a non-US address, but the UI must not label it "US valid."
+
+Merchize's [Verify US Shipping Address](https://merchize.com/helpdesk/verify-us-shipping-address/)
+guide says the feature uses SmartyStreets for US addresses, lists invalid street/city/state among
+US-invalid causes, and says non-US addresses are not supported by that check and become "Others."
+
+Every pre-push readiness run with an effective ledger address now performs the buyer-details GET in
+the same parallel request batch as the other readiness reads. It compares line 1, line 2, city,
+state, postal code, and ISO-2 country code. Only these PII-safe results are persisted:
+
+- `addressReadbackStatus = matched | mismatch | not_checked`
+- `addressReadbackMismatchFields`
+- the check timestamp
+
+A mismatch adds `MERCHIZE_PROVIDER_ADDRESS_MISMATCH` and blocks release even if
+`validate_shipping_address` says `valid`. Conversely, a field match does not erase
+`street_undefined` or another provider validation blocker.
+
+### Delivered-order diagnostic baseline
+
+The server-safe API-key reads below were compared on July 23, 2026 against delivered Merchize order
+`68226190b15db3b9f938b481`. This order is a diagnostic reference, not a fixture or runtime
+dependency. Never hardcode it into workers, release decisions, or customer flows. Re-run the
+comparison when Merchize changes a response shape.
+
+| Endpoint | Delivered reference evidence | Pre-push contrast | Runtime interpretation |
+| --- | --- | --- | --- |
+| `GET /order/orders/{id}` | `validate_shipping_address=valid`, `mark_valid_address=false`, `push_to_fulfillment_progress=pushed`, payment `paid` | A current imported order can also be `valid` and `paid` while progress remains `validating` | Address/payment readiness does not prove production release. |
+| `GET /order/orders/{id}/address-suggestion` | Empty list | Empty list was also observed before push | Never use an empty suggestion list as validity proof. |
+| `GET /order/orders/{id}/buyerdetails` | Successful buyer object | Same shape before push | Compare normalized address fields; never persist or log the raw PII response. |
+| `GET /order/orders/{id}/buyerdetails/display-status` | Successful boolean response | Same response family before push | Display evidence only; not a release gate by itself. |
+| `GET /order/orders/{id}/unfulfilled` | Empty list | One current item before push | Empty after fulfillment is expected; pre-push rows supply current product/variant evidence. |
+| `GET /order/orders/{id}/require-attention` | Empty list | Empty list can also occur before push | Empty attention is necessary but not sufficient for release. |
+| `GET /order/orders/{id}/send-to-fulfillment-date` | `is_failed=false`, `is_pushed=true` | Newer pre-push shape returned `is_failed=false`, `pushed=false` | Normalize both `pushed` and `is_pushed`; either true is release evidence. |
+| `GET /order/get-order-progress/{id}` | Six progress nodes, all `done` | Mixed `done` and `pending` nodes | Use for lifecycle verification, not initial address validity. |
+| `GET /order/orders/{id}/histories` | Fulfillment-created and tracking-updated events | Address-update/import events without fulfillment completion | Corroborating lifecycle evidence; do not replay mutations from history. |
+| `GET /order/orders/{id}/transaction-fee` | `success=false` was still observed | Same before push | This undocumented seller endpoint is not a readiness gate. |
+| `GET /order/external/orders/order-progress?code=...` | One result with all nodes `done` | One result with mixed `done`/`pending` | Documented external lifecycle read; prefer it for portable progress checks. |
+| `GET /order/external/orders/tracking?code=...` | `success=true`, package `fulfilled`, `has_tracking=true` | `success=false` before a package exists | Absence before shipment is expected, not a production blocker. |
+| `GET /order/external/orders/order-invoice?code=...` | One paid USD fulfillment-cost row | A pre-push row can exist without a paid cost status | Refresh after push; do not infer mapping/artwork errors from placeholder cost. |
+| `POST /order/external/orders/list-orders-detail` | Reference and pre-push orders both returned | Same batch | Batch equivalent for scanner efficiency. |
+| `POST /order/external/orders/list-orders-tracking` | Delivered package evidence present | No package evidence for the pre-push order | Prefer batching for lifecycle scanners. |
+| `POST /order/external/orders/list-orders-invoice` | Paid reference row plus pre-push row | Different cost maturity in one response | Classify each row independently by correlation key. |
+| `POST /order/external/orders/list-orders-ticket` | Successful per-order response wrappers | No blocking ticket was observed | Ticket reads are support evidence, not automatic mutation authority. |
+
+When comparing a recovery order with this baseline, record the observation time. Provider state is
+mutable: a previously captured `street_undefined` response can later become `valid` after a
+correction or verification cycle. The admin UI must show the latest persisted check time and must
+not present the effective ledger address itself as a live provider read-back.
 
 The provider's seven-day rule is enforced before push. Orders whose provider `paid_at` is more
 than seven days old require a master-admin production release. That step-up bypasses only the
