@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import AdminCopyValueButton from './AdminCopyValueButton';
-import AdminGlassPanel from './AdminGlassPanel';
+import { getAdminGlassPanelClassName, default as AdminGlassPanel } from './AdminGlassPanel';
 import PaidOrderRecoveryFulfillmentEvidencePanel from './PaidOrderRecoveryFulfillmentEvidencePanel';
 import { AdminPaidOrderRecoveryStatusBadge } from './AdminStatusBadge';
 import type {
@@ -475,24 +475,43 @@ export function PaidOrderRecoveryPostPaymentPipeline({
             <PipelineRow key={item.label} item={item} isLast={index === timeline.length - 1} />
           ))}
         </ol>
-
-        <details className='group mt-5 border-t border-white/10 pt-4'>
-          <summary className='flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/60'>
-            <span>All readiness checks and provider snapshots</span>
-            <ChevronDown
-              size={16}
-              className='shrink-0 text-slate-400 transition group-open:rotate-180'
-            />
-          </summary>
-          <div className='mt-3'>
-            <PaidOrderRecoveryFulfillmentEvidencePanel
-              summary={detail.merchizeFulfillmentOps}
-              embedded
-            />
-          </div>
-        </details>
       </div>
     </AdminGlassPanel>
+  );
+}
+
+export function PaidOrderRecoveryFulfillmentEvidenceDisclosure({
+  detail,
+}: {
+  detail: PaidOrderRecoveryDetail;
+}) {
+  return (
+    <details className='group'>
+      <summary
+        className={getAdminGlassPanelClassName(
+          'flex cursor-pointer list-none items-start justify-between gap-4 px-4 py-4 transition hover:border-cyan-300/20 hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/60 sm:px-5',
+        )}
+      >
+        <div>
+          <p className='text-xs font-semibold uppercase tracking-[0.1em] text-cyan-100'>
+            Provider evidence
+          </p>
+          <h3 className='mt-1 text-base font-semibold text-white'>
+            All readiness checks and provider snapshots
+          </h3>
+          <p className='mt-1 text-sm leading-6 text-slate-300'>
+            Open the complete readiness, release, and lifecycle evidence grid.
+          </p>
+        </div>
+        <ChevronDown
+          size={18}
+          className='mt-1 shrink-0 text-slate-300 transition group-open:rotate-180'
+        />
+      </summary>
+      <div className='mt-4'>
+        <PaidOrderRecoveryFulfillmentEvidencePanel summary={detail.merchizeFulfillmentOps} />
+      </div>
+    </details>
   );
 }
 

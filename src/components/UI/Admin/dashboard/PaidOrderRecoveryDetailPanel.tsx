@@ -13,6 +13,7 @@ import {
   getManualReleaseReadinessWarning,
   PaidOrderRecoveryBlockerPanel,
   PaidOrderRecoveryCaseSummary,
+  PaidOrderRecoveryFulfillmentEvidenceDisclosure,
   PaidOrderRecoveryPaymentEvidencePanel,
   PaidOrderRecoveryPostPaymentPipeline,
 } from './PaidOrderRecoveryOverviewPanels';
@@ -86,6 +87,21 @@ export default function PaidOrderRecoveryDetailPanel({
             <section aria-label='Post-payment pipeline' className='order-4 min-w-0'>
               <PaidOrderRecoveryPostPaymentPipeline timeline={timeline} detail={detail} />
             </section>
+            <section
+              aria-labelledby='order-fulfillment-heading'
+              className='order-6 min-w-0 space-y-4'
+            >
+              <SectionHeading
+                id='order-fulfillment-heading'
+                eyebrow='Order & fulfillment'
+                title='Customer, items, and delivery context'
+                description='Review the order information that recovery actions are allowed to mutate.'
+              />
+              <PaidOrderRecoveryPrimaryContextSections
+                detail={detail}
+                orderToken={recovery.orderToken}
+              />
+            </section>
           </div>
 
           <div className='contents xl:block xl:space-y-4'>
@@ -103,20 +119,14 @@ export default function PaidOrderRecoveryDetailPanel({
               </div>
             </aside>
           </div>
-        </div>
 
-        <section aria-labelledby='order-fulfillment-heading' className='min-w-0 space-y-4'>
-          <SectionHeading
-            id='order-fulfillment-heading'
-            eyebrow='Order & fulfillment'
-            title='Customer, items, and delivery context'
-            description='Review the order information that recovery actions are allowed to mutate.'
-          />
-          <PaidOrderRecoveryPrimaryContextSections
-            detail={detail}
-            orderToken={recovery.orderToken}
-          />
-        </section>
+          <section
+            aria-label='Provider readiness evidence'
+            className='order-5 min-w-0 xl:col-span-2'
+          >
+            <PaidOrderRecoveryFulfillmentEvidenceDisclosure detail={detail} />
+          </section>
+        </div>
 
         <section
           aria-label='Changes and communications'
