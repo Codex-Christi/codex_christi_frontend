@@ -9,11 +9,12 @@ import {
   PaidOrderRecoveryPrimaryContextSections,
   PaidOrderRecoverySecondaryContextSections,
 } from './PaidOrderRecoveryDetailSections';
+import PaidOrderRecoveryHistoryDialog from './PaidOrderRecoveryHistoryDialog';
 import {
   getManualReleaseReadinessWarning,
   PaidOrderRecoveryBlockerPanel,
   PaidOrderRecoveryCaseSummary,
-  PaidOrderRecoveryFulfillmentEvidenceDisclosure,
+  PaidOrderRecoveryFulfillmentEvidenceSection,
   PaidOrderRecoveryPaymentEvidencePanel,
   PaidOrderRecoveryPostPaymentPipeline,
 } from './PaidOrderRecoveryOverviewPanels';
@@ -124,13 +125,13 @@ export default function PaidOrderRecoveryDetailPanel({
             aria-label='Provider readiness evidence'
             className='order-5 min-w-0 xl:col-span-2'
           >
-            <PaidOrderRecoveryFulfillmentEvidenceDisclosure detail={detail} />
+            <PaidOrderRecoveryFulfillmentEvidenceSection detail={detail} />
           </section>
         </div>
 
         <section
           aria-label='Changes and communications'
-          className='grid min-w-0 gap-4 xl:grid-cols-2'
+          className='grid min-w-0 items-start gap-4 xl:grid-cols-2'
         >
           <PaidOrderRecoveryActivitySection detail={detail} />
           <CommunicationsPanel
@@ -194,42 +195,66 @@ function CommunicationsPanel({
   customerNotifications: CustomerNotificationHistoryItem[];
   orderToken: string;
 }) {
+  const totalCount = notifications.length + customerNotifications.length;
   const failedCount = [...notifications, ...customerNotifications].filter(
     (notification) => notification.status === 'failed',
   ).length;
 
   return (
     <AdminGlassPanel className='overflow-hidden'>
-      <details className='group' open={failedCount > 0}>
-        <summary className='flex cursor-pointer list-none items-start justify-between gap-4 px-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-200/60 sm:px-5'>
-          <div>
-            <p className='text-xs font-semibold uppercase tracking-[0.1em] text-cyan-100'>
-              Communications
-            </p>
-            <h3 className='mt-1 text-base font-semibold text-white'>
-              Admin and customer notifications
-            </h3>
-            <p className='mt-1 text-sm leading-6 text-slate-300'>
-              {failedCount
-                ? `${failedCount} failed notification${failedCount === 1 ? '' : 's'} needs attention.`
-                : `${notifications.length + customerNotifications.length} notification${
-                    notifications.length + customerNotifications.length === 1 ? '' : 's'
-                  } recorded. Successful history is collapsed.`}
-            </p>
-          </div>
-          <ChevronDown
-            size={17}
-            className='mt-1 shrink-0 text-slate-300 transition group-open:rotate-180'
+      <div className='px-4 py-4 sm:px-5'>
+        <p className='text-xs font-semibold uppercase tracking-[0.1em] text-cyan-100'>
+          Communications
+        </p>
+        <h3 className='mt-1 text-base font-semibold text-white'>
+          Admin and customer notifications
+        </h3>
+        <p className='mt-1 text-sm leading-6 text-slate-300'>
+          {failedCount
+            ? `${formatCount(failedCount, 'failed notification')} ${
+                failedCount === 1 ? 'needs' : 'need'
+              } attention.`
+            : totalCount
+              ? 'Delivery status and retry actions are available in the notification history.'
+              : 'No notification history has been recorded for this order.'}
+        </p>
+
+        <div className='mt-3 flex flex-wrap gap-2'>
+          <SummaryBadge label={formatCount(notifications.length, 'admin notification')} />
+          <SummaryBadge
+            label={formatCount(customerNotifications.length, 'customer notification')}
           />
-        </summary>
-        <div className='border-t border-white/10 p-4 sm:p-5'>
-          <AdminNotificationHistoryPanel notifications={notifications} orderToken={orderToken} />
-          <CustomerNotificationHistoryPanel
-            notifications={customerNotifications}
-            orderToken={orderToken}
-          />
+          {failedCount ? <SummaryBadge label={`${failedCount} failed`} tone='rose' /> : null}
         </div>
-      </details>
+
+        {failedCount ? (
+          <p className='mt-4 rounded-lg border border-rose-300/20 bg-rose-300/[0.07] px-3 py-2.5 text-sm leading-5 text-rose-100'>
+            Review the failure reason before retrying or suppressing a notification.
+          </p>
+        ) : null}
+
+        {totalCount ? (
+          <div className='mt-4 flex justify-end'>
+            <PaidOrderRecoveryHistoryDialog
+              triggerLabel={`View ${formatCount(totalCount, 'notification')}`}
+              title='Notification history'
+              description='Delivery status, recipients, failure details, and available retry actions.'
+            >
+              <section>
+                <h4 className='mb-3 text-sm font-semibold text-slate-200'>Admin notifications</h4>
+                <AdminNotificationHistoryPanel
+                  notifications={notifications}
+                  orderToken={orderToken}
+                />
+              </section>
+              <CustomerNotificationHistoryPanel
+                notifications={customerNotifications}
+                orderToken={orderToken}
+              />
+            </PaidOrderRecoveryHistoryDialog>
+          </div>
+        ) : null}
+      </div>
     </AdminGlassPanel>
   );
 }
@@ -238,8 +263,8 @@ function TechnicalDiagnostics({ detail }: { detail: PaidOrderRecoveryDetail }) {
   return (
     <AdminGlassPanel className='overflow-hidden'>
       <details className='group'>
-        <summary className='flex cursor-pointer list-none items-start justify-between gap-4 px-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-200/60 sm:px-5'>
-          <div>
+        <summary className='flex cursor-pointer list-none flex-col gap-4 px-4 py-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-200/60 sm:flex-row sm:items-start sm:justify-between sm:px-5'>
+          <div className='min-w-0'>
             <p className='text-xs font-semibold uppercase tracking-[0.1em] text-slate-300'>
               Advanced
             </p>
@@ -247,11 +272,24 @@ function TechnicalDiagnostics({ detail }: { detail: PaidOrderRecoveryDetail }) {
             <p className='mt-1 text-sm leading-6 text-slate-300'>
               Webhook delivery, scanner eligibility, system identifiers, and raw ledger data.
             </p>
+            <div className='mt-3 flex flex-wrap gap-2'>
+              <SummaryBadge label={formatCount(detail.webhookEvents.length, 'webhook event')} />
+              <SummaryBadge label={formatCount(detail.references.length, 'reference')} />
+              <SummaryBadge
+                label={detail.scannerState.eligible ? 'Scanner candidate' : 'Not a candidate'}
+                tone={detail.scannerState.eligible ? 'amber' : 'slate'}
+              />
+            </div>
           </div>
-          <ChevronDown
-            size={17}
-            className='mt-1 shrink-0 text-slate-300 transition group-open:rotate-180'
-          />
+          <span className='inline-flex shrink-0 items-center gap-2 self-start rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-200 transition group-hover:border-white/20 group-hover:bg-white/[0.07]'>
+            <span className='group-open:hidden'>Show diagnostics</span>
+            <span className='hidden group-open:inline'>Hide diagnostics</span>
+            <ChevronDown
+              size={15}
+              aria-hidden='true'
+              className='transition group-open:rotate-180'
+            />
+          </span>
         </summary>
         <div className='space-y-4 border-t border-white/10 p-4 sm:p-5'>
           <PaidOrderRecoveryWebhookScannerSummary detail={detail} embedded />
@@ -260,6 +298,31 @@ function TechnicalDiagnostics({ detail }: { detail: PaidOrderRecoveryDetail }) {
       </details>
     </AdminGlassPanel>
   );
+}
+
+function SummaryBadge({
+  label,
+  tone = 'slate',
+}: {
+  label: string;
+  tone?: 'slate' | 'amber' | 'rose';
+}) {
+  return (
+    <span
+      className={cn(
+        'rounded-full border px-2.5 py-1 text-xs font-medium',
+        tone === 'slate' && 'border-white/10 bg-white/[0.035] text-slate-300',
+        tone === 'amber' && 'border-amber-300/25 bg-amber-300/[0.1] text-amber-100',
+        tone === 'rose' && 'border-rose-300/25 bg-rose-300/[0.1] text-rose-100',
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+function formatCount(count: number, singular: string) {
+  return `${count} ${singular}${count === 1 ? '' : 's'}`;
 }
 
 function SectionHeading({

@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronDown,
   CircleDollarSign,
   Clock3,
   ExternalLink,
@@ -12,7 +11,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import AdminCopyValueButton from './AdminCopyValueButton';
-import { getAdminGlassPanelClassName, default as AdminGlassPanel } from './AdminGlassPanel';
+import AdminGlassPanel from './AdminGlassPanel';
 import PaidOrderRecoveryFulfillmentEvidencePanel from './PaidOrderRecoveryFulfillmentEvidencePanel';
 import { AdminPaidOrderRecoveryStatusBadge } from './AdminStatusBadge';
 import type {
@@ -480,39 +479,12 @@ export function PaidOrderRecoveryPostPaymentPipeline({
   );
 }
 
-export function PaidOrderRecoveryFulfillmentEvidenceDisclosure({
+export function PaidOrderRecoveryFulfillmentEvidenceSection({
   detail,
 }: {
   detail: PaidOrderRecoveryDetail;
 }) {
-  return (
-    <details className='group'>
-      <summary
-        className={getAdminGlassPanelClassName(
-          'flex cursor-pointer list-none items-start justify-between gap-4 px-4 py-4 transition hover:border-cyan-300/20 hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/60 sm:px-5',
-        )}
-      >
-        <div>
-          <p className='text-xs font-semibold uppercase tracking-[0.1em] text-cyan-100'>
-            Provider evidence
-          </p>
-          <h3 className='mt-1 text-base font-semibold text-white'>
-            All readiness checks and provider snapshots
-          </h3>
-          <p className='mt-1 text-sm leading-6 text-slate-300'>
-            Open the complete readiness, release, and lifecycle evidence grid.
-          </p>
-        </div>
-        <ChevronDown
-          size={18}
-          className='mt-1 shrink-0 text-slate-300 transition group-open:rotate-180'
-        />
-      </summary>
-      <div className='mt-4'>
-        <PaidOrderRecoveryFulfillmentEvidencePanel summary={detail.merchizeFulfillmentOps} />
-      </div>
-    </details>
-  );
+  return <PaidOrderRecoveryFulfillmentEvidencePanel summary={detail.merchizeFulfillmentOps} />;
 }
 
 function PipelineRow({ item, isLast }: { item: TimelineItem; isLast: boolean }) {

@@ -337,27 +337,29 @@ function ActivityPanel({ activity }: { activity: PaidOrderRecoveryActivityItem[]
           )}
         </section>
 
-        <details
-          className='group rounded-lg border border-white/10 bg-white/[0.02]'
-          open={operatorActivity.length === 0}
-        >
-          <summary className='flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60'>
-            <span>
-              <span className='block text-sm font-semibold text-slate-100'>
-                Automated system history
-              </span>
-              <span className='mt-0.5 block text-sm text-slate-400'>
+        <section className='rounded-lg border border-white/10 bg-white/[0.02] p-3'>
+          <div className='flex flex-wrap items-start justify-between gap-3'>
+            <div>
+              <h4 className='text-sm font-semibold text-slate-100'>Automated system history</h4>
+              <p className='mt-0.5 text-sm text-slate-400'>
                 Webhooks, saves, recovery attempts, and fulfillment events
-              </span>
-            </span>
+              </p>
+            </div>
             <span className='rounded-full border border-white/10 px-2 py-0.5 text-xs text-slate-300'>
               {systemActivity.length}
             </span>
-          </summary>
-          <div className='border-t border-white/10 px-3 py-4'>
-            <ActivityList activity={systemActivity} />
           </div>
-        </details>
+
+          {systemActivity.length ? (
+            <div className='mt-3 border-t border-white/10 pt-3'>
+              <ActivityList activity={systemActivity} />
+            </div>
+          ) : (
+            <p className='mt-3 text-sm text-slate-400'>
+              No automated processing events have been recorded.
+            </p>
+          )}
+        </section>
       </div>
     </AdminGlassPanel>
   );
