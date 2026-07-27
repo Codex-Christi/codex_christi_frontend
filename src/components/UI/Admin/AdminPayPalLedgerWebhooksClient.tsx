@@ -102,7 +102,7 @@ export default function AdminPayPalLedgerWebhooksClient({
     {
       label: 'Branch source',
       value: formatDatabaseSelectionSource(dashboard.databaseTarget.selectionSource),
-      tone: dashboard.databaseTarget.selectionSource === 'fallback' ? 'amber' : 'slate',
+      tone: dashboard.databaseTarget.selectionSource === 'legacy_aligned' ? 'amber' : 'slate',
     },
     {
       label: 'DB fingerprint',

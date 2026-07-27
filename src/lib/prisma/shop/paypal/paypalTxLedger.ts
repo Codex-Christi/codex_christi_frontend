@@ -3,14 +3,12 @@ import 'server-only';
 import { createHash } from 'crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { normalizePostgresSslMode } from '@/lib/prisma/postgresSslMode';
+import { getShopOpsDataTargetStatus } from '@/lib/prisma/shop/shopOpsDataTarget';
 import { PrismaClient } from './txLedger/generated/paypalTxLedger/client';
 
 export type PaypalTxLedgerBranch = 'dev' | 'prod';
 export type PaypalTxLedgerBranchSelectionSource =
-  | 'explicit'
-  | 'fallback'
-  | 'node_env_default'
-  | 'unconfigured';
+  'canonical' | 'explicit' | 'legacy_aligned' | 'unconfigured';
 
 export type PaypalTxLedgerDatabaseStatus = {
   configured: boolean;
@@ -25,18 +23,13 @@ export type PaypalTxLedgerDatabaseStatus = {
   selectedBranch: PaypalTxLedgerBranch | null;
   selectedUrlFingerprint: string | null;
   selectionSource: PaypalTxLedgerBranchSelectionSource;
+  shopOpsConfigurationError: string | null;
 };
 
 type PaypalTxLedgerConnectionResolution = {
   connectionString: string | null;
   status: PaypalTxLedgerDatabaseStatus;
 };
-
-function normalizePaypalTxLedgerBranch(value: string | undefined): PaypalTxLedgerBranch | null {
-  const normalizedValue = value?.trim().toLowerCase();
-
-  return normalizedValue === 'prod' || normalizedValue === 'dev' ? normalizedValue : null;
-}
 
 function normalizeComparableConnectionString(value: string | undefined) {
   return value?.trim() ? normalizePostgresSslMode(value).trim() : null;
@@ -49,7 +42,8 @@ function fingerprintConnectionString(value: string | null) {
 }
 
 function resolvePaypalLedgerConnection(): PaypalTxLedgerConnectionResolution {
-  const explicitBranch = normalizePaypalTxLedgerBranch(process.env.PAYPAL_TX_LEDGER_NEON_BRANCH);
+  const shopOpsTarget = getShopOpsDataTargetStatus();
+  const explicitBranch = shopOpsTarget.paypalLegacyTarget;
   const invalidExplicitBranchConfigured = Boolean(
     process.env.PAYPAL_TX_LEDGER_NEON_BRANCH?.trim() && !explicitBranch,
   );
@@ -68,69 +62,40 @@ function resolvePaypalLedgerConnection(): PaypalTxLedgerConnectionResolution {
     ),
     prodUrlFingerprint: fingerprintConnectionString(normalizedProdUrl),
     prodUrlConfigured: Boolean(normalizedProdUrl),
+    shopOpsConfigurationError: shopOpsTarget.configurationError,
   };
+  const selectedBranch = shopOpsTarget.aligned ? shopOpsTarget.target : null;
+  const selectedUrl =
+    selectedBranch === 'prod'
+      ? normalizedProdUrl
+        ? prodUrl
+        : null
+      : selectedBranch === 'dev'
+        ? normalizedDevUrl
+          ? devUrl
+          : null
+        : null;
+  const normalizedSelectedUrl =
+    selectedBranch === 'prod'
+      ? normalizedProdUrl
+      : selectedBranch === 'dev'
+        ? normalizedDevUrl
+        : null;
 
-  if (explicitBranch === 'prod') {
+  if (selectedBranch && selectedUrl && normalizedSelectedUrl) {
     return {
-      connectionString: normalizedProdUrl ? prodUrl! : null,
-      status: {
-        ...baseStatus,
-        configured: Boolean(normalizedProdUrl),
-        selectedBranch: normalizedProdUrl ? 'prod' : null,
-        selectedUrlFingerprint: fingerprintConnectionString(normalizedProdUrl),
-        selectionSource: normalizedProdUrl ? 'explicit' : 'unconfigured',
-      },
-    };
-  }
-
-  if (explicitBranch === 'dev') {
-    return {
-      connectionString: normalizedDevUrl ? devUrl! : null,
-      status: {
-        ...baseStatus,
-        configured: Boolean(normalizedDevUrl),
-        selectedBranch: normalizedDevUrl ? 'dev' : null,
-        selectedUrlFingerprint: fingerprintConnectionString(normalizedDevUrl),
-        selectionSource: normalizedDevUrl ? 'explicit' : 'unconfigured',
-      },
-    };
-  }
-
-  if (process.env.NODE_ENV !== 'production' && normalizedDevUrl) {
-    return {
-      connectionString: devUrl ?? null,
+      connectionString: selectedUrl,
       status: {
         ...baseStatus,
         configured: true,
-        selectedBranch: 'dev',
-        selectedUrlFingerprint: fingerprintConnectionString(normalizedDevUrl),
-        selectionSource: 'node_env_default',
-      },
-    };
-  }
-
-  if (normalizedProdUrl) {
-    return {
-      connectionString: prodUrl ?? null,
-      status: {
-        ...baseStatus,
-        configured: true,
-        selectedBranch: 'prod',
-        selectedUrlFingerprint: fingerprintConnectionString(normalizedProdUrl),
-        selectionSource: process.env.NODE_ENV === 'production' ? 'node_env_default' : 'fallback',
-      },
-    };
-  }
-
-  if (normalizedDevUrl) {
-    return {
-      connectionString: devUrl ?? null,
-      status: {
-        ...baseStatus,
-        configured: true,
-        selectedBranch: 'dev',
-        selectedUrlFingerprint: fingerprintConnectionString(normalizedDevUrl),
-        selectionSource: 'fallback',
+        selectedBranch,
+        selectedUrlFingerprint: fingerprintConnectionString(normalizedSelectedUrl),
+        selectionSource:
+          shopOpsTarget.source === 'canonical'
+            ? 'canonical'
+            : shopOpsTarget.source === 'legacy_aligned'
+              ? 'legacy_aligned'
+              : 'explicit',
       },
     };
   }
@@ -140,7 +105,7 @@ function resolvePaypalLedgerConnection(): PaypalTxLedgerConnectionResolution {
     status: {
       ...baseStatus,
       configured: false,
-      selectedBranch: null,
+      selectedBranch,
       selectedUrlFingerprint: null,
       selectionSource: 'unconfigured',
     },

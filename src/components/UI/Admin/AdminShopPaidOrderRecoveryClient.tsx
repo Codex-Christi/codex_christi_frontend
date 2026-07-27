@@ -6,15 +6,19 @@ import AdminPaidOrderRecoveryScannerPanel from './dashboard/AdminPaidOrderRecove
 import PaidOrderRecoveryQueuePanel from './dashboard/PaidOrderRecoveryQueuePanel';
 import type { PaidOrderRecoveryListResult } from './dashboard/adminShopDashboardTypes';
 import type { AdminRecoveryScannerActionResult } from '@/app/admin/(dashboard)/shop/paid-order-recovery/actions';
+import type { ShopOpsDataTargetView } from '@/lib/prisma/shop/shopOpsDataTarget';
+import ShopOpsDataTargetBadge from './dashboard/ShopOpsDataTargetBadge';
 
 type AdminShopPaidOrderRecoveryClientProps = {
   recoveryList: PaidOrderRecoveryListResult;
   latestScannerRun: AdminRecoveryScannerActionResult['scan'] | null;
+  shopOpsDataTarget: ShopOpsDataTargetView;
 };
 
 export default function AdminShopPaidOrderRecoveryClient({
   recoveryList,
   latestScannerRun,
+  shopOpsDataTarget,
 }: AdminShopPaidOrderRecoveryClientProps) {
   return (
     <div className='px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
@@ -26,6 +30,8 @@ export default function AdminShopPaidOrderRecoveryClient({
           <ArrowLeft size={16} />
           Shop dashboard
         </Link>
+
+        <ShopOpsDataTargetBadge status={shopOpsDataTarget} />
 
         <AdminPaidOrderRecoveryScannerPanel initialScan={latestScannerRun} />
 

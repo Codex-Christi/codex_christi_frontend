@@ -7,6 +7,8 @@ Date verified against codebase: 2026-06-17
 
 Runtime checkpoint for paid order fulfillment processing naming and push-to-fulfillment scope: 2026-06-20
 
+Shop Ops runtime-target and scoped recovery hardening checkpoint: 2026-07-24
+
 Implemented in the current code checkpoint:
 
 - The Django fulfillment process endpoint is no longer treated as successful from HTTP 2xx alone.
@@ -309,7 +311,15 @@ Notes:
 - Do **not** reuse `SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY` for webhook/server post-processing. Keep a separate server-only secret for those actions.
 - Admin Ops ledger `AdminNotificationRecipientGroup` routing now resolves paid-order fulfillment alert recipients for the existing PayPal `AdminNotificationOutbox`. `ORDER_RECOVERY_ADMIN_EMAILS` is a bootstrap/fallback list only. Email delivery must be driven from a durable outbox row, not from an untracked fire-and-forget side effect.
 - This guide intentionally avoids requiring a second Prisma config file for the ledger.
-- Runtime code uses the pooled PayPal ledger URLs. Prisma CLI commands use the non-pooled URLs selected by `PAYPAL_TX_LEDGER_NEON_BRANCH`.
+- Runtime code uses the pooled PayPal ledger URL selected by the shared
+  `SHOP_OPS_DATA_TARGET=dev|prod` boundary. The same target selects Merchize Fulfillment Ops, and
+  cross-ledger recovery mutations fail closed when either selected pooled URL is missing.
+- Prisma CLI commands continue to use the non-pooled URLs selected by
+  `PAYPAL_TX_LEDGER_NEON_BRANCH`; that variable is a migration/generation selector once the
+  canonical runtime target is configured.
+- A local process targeting production is mutation-locked unless
+  `SHOP_OPS_ALLOW_LOCAL_PRODUCTION_MUTATIONS=true`, and supported recovery mutations still require
+  master-admin step-up.
 
 ---
 

@@ -8,6 +8,7 @@ import {
   normalizePaidOrderRecoveryFilters,
 } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
 import { getLatestAdminPaidOrderRecoveryScannerRun } from './actions';
+import { getShopOpsDataTargetView } from '@/lib/prisma/shop/shopOpsDataTarget';
 
 type AdminPaidOrderRecoveryPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -52,6 +53,7 @@ export default async function AdminPaidOrderRecoveryPage({
     <AdminShopPaidOrderRecoveryClient
       recoveryList={recoveryList}
       latestScannerRun={latestScannerRun}
+      shopOpsDataTarget={getShopOpsDataTargetView()}
     />
   );
 }

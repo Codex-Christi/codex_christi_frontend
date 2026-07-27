@@ -11,11 +11,13 @@ import { savePaidOrderFulfillmentAddressOverrideAction } from '@/app/admin/(dash
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/UI/primitives/popover';
 import { cn } from '@/lib/utils';
 import type { PaidOrderRecoveryAddress } from './adminShopDashboardTypes';
+import type { ShopOpsDataTargetView } from '@/lib/prisma/shop/shopOpsDataTarget';
 
 type PaidOrderRecoveryAddressOverrideFormProps = {
   orderToken: string;
   initialAddress: PaidOrderRecoveryAddress | null;
   hasExistingOverride: boolean;
+  shopOpsDataTarget: ShopOpsDataTargetView;
   className?: string;
 };
 
@@ -23,6 +25,7 @@ export default function PaidOrderRecoveryAddressOverrideForm({
   orderToken,
   initialAddress,
   hasExistingOverride,
+  shopOpsDataTarget,
   className,
 }: PaidOrderRecoveryAddressOverrideFormProps) {
   const router = useRouter();
@@ -37,6 +40,7 @@ export default function PaidOrderRecoveryAddressOverrideForm({
       postalCode: initialAddress?.postalCode ?? '',
       country: initialAddress?.country ?? '',
       reason: '',
+      password: '',
     }),
     [initialAddress],
   );
@@ -48,7 +52,8 @@ export default function PaidOrderRecoveryAddressOverrideForm({
     form.state !== initialForm.state ||
     form.postalCode !== initialForm.postalCode ||
     form.country !== initialForm.country ||
-    form.reason !== initialForm.reason;
+    form.reason !== initialForm.reason ||
+    form.password !== initialForm.password;
 
   const requestClose = () => {
     const message = isSaving
@@ -78,6 +83,14 @@ export default function PaidOrderRecoveryAddressOverrideForm({
       return;
     }
 
+    if (shopOpsDataTarget.isLocalProductionTarget && !form.password.trim()) {
+      errorToast({
+        header: 'Master confirmation required',
+        message: 'Enter the master admin password before changing a production order.',
+      });
+      return;
+    }
+
     setIsSaving(true);
     const toastId = loadingToast({
       header: 'Applying address correction',
@@ -96,6 +109,7 @@ export default function PaidOrderRecoveryAddressOverrideForm({
           country: form.country,
         },
         reason: form.reason,
+        password: form.password || undefined,
       });
 
       toast.dismiss(toastId);
@@ -138,8 +152,22 @@ export default function PaidOrderRecoveryAddressOverrideForm({
       <PopoverTrigger asChild>
         <button
           type='button'
+          disabled={
+            !shopOpsDataTarget.aligned ||
+            (shopOpsDataTarget.isLocalProductionTarget &&
+              !shopOpsDataTarget.localProductionMutationsEnabled)
+          }
+          title={
+            !shopOpsDataTarget.aligned
+              ? (shopOpsDataTarget.configurationError ?? 'Shop Ops data target is unavailable.')
+              : shopOpsDataTarget.isLocalProductionTarget &&
+                  !shopOpsDataTarget.localProductionMutationsEnabled
+                ? 'Local production mutations are locked by configuration.'
+                : undefined
+          }
           className={cn(
             'group flex h-full min-h-[132px] w-full items-start gap-3 rounded-lg border border-cyan-300/18 bg-cyan-300/[0.045] p-3 text-left transition hover:border-cyan-200/35 hover:bg-cyan-300/[0.07]',
+            'disabled:cursor-not-allowed disabled:opacity-45',
             className,
           )}
         >
@@ -241,6 +269,21 @@ export default function PaidOrderRecoveryAddressOverrideForm({
               className='resize-none rounded-lg border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-300/35'
             />
           </label>
+          {shopOpsDataTarget.isLocalProductionTarget ? (
+            <label className='grid gap-1.5 rounded-lg border border-rose-300/20 bg-rose-300/[0.06] p-3'>
+              <span className='text-xs font-medium text-rose-50'>Master admin password</span>
+              <span className='text-xs leading-5 text-rose-100/65'>
+                Required because this localhost session is modifying production order data.
+              </span>
+              <input
+                type='password'
+                value={form.password}
+                onChange={(event) => updateField('password', event.target.value)}
+                autoComplete='current-password'
+                className='h-10 rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white outline-none transition focus:border-rose-200/45'
+              />
+            </label>
+          ) : null}
           <div className='flex flex-wrap justify-end gap-2 pt-1'>
             <button
               type='button'

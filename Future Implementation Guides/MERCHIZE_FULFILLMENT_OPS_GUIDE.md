@@ -1,6 +1,6 @@
 # Merchize Fulfillment Ops Guide
 
-Last updated: 2026-07-23
+Last updated: 2026-07-24
 
 This guide defines the Merchize side of Codex Christi paid order fulfillment processing. It is intentionally separate from the PayPal transaction ledger guide and the admin recovery tooling guide, but it is not merely a post-push sync guide.
 
@@ -19,6 +19,72 @@ Related source docs:
 - `PAYPAL_WEBHOOK_REGISTRATION_AND_RECOVERY_GUIDE.md`
 
 ---
+
+## 2026-07-24 Implemented: Shop Ops Data Target And Recovery Scope Hardening
+
+Runtime PayPal TX Ledger and Merchize Fulfillment Ops access now shares one canonical target:
+
+```bash
+SHOP_OPS_DATA_TARGET=dev # or prod
+```
+
+Required pooled URLs for the selected runtime target:
+
+```bash
+# Development target
+PAYPAL_TX_LEDGER_NEON_POOLED_DB_DEV_STRING=...
+MERCHIZE_FULFILLMENT_OPS_NEON_POOLED_DB_DEV_STRING=...
+
+# Production target
+PAYPAL_TX_LEDGER_NEON_POOLED_DB_STRING=...
+MERCHIZE_FULFILLMENT_OPS_NEON_POOLED_DB_STRING=...
+```
+
+The legacy `PAYPAL_TX_LEDGER_NEON_BRANCH` and
+`MERCHIZE_FULFILLMENT_OPS_NEON_BRANCH` selectors remain supported as an aligned runtime fallback
+while deployments migrate, but when `SHOP_OPS_DATA_TARGET` is present it is authoritative. Keep the
+legacy selectors for the existing Prisma CLI generation/migration scripts; runtime no longer needs
+them to choose separate branches.
+
+Runtime safety contract:
+
+- A target is usable only when both selected pooled URLs exist. Cross-ledger actions fail before
+  mutation when the target is absent, invalid, or only one database URL is configured.
+- Paid-order recovery pages visibly identify `Development data` or `Production data`.
+- A non-production process targeting production is read-capable but mutation-locked by default.
+- An intentional localhost production recovery additionally requires:
+
+  ```bash
+  SHOP_OPS_DATA_TARGET=prod
+  SHOP_OPS_ALLOW_LOCAL_PRODUCTION_MUTATIONS=true
+  ```
+
+- The dev server must be restarted after changing target configuration. Use a separate port/process
+  for an intentional production support session.
+- Localhost production retry, manual release, mark-valid, and address correction require
+  master-admin password confirmation plus a recorded reason.
+- Localhost production scanner execution, provider refresh, and receipt regeneration remain blocked
+  because those controls do not have a dedicated production step-up flow. Use the production admin
+  deployment for them.
+- Automated capture, webhook, and scanner runners cannot mutate production from a local runtime by
+  merely enabling the env switch; the processing call must carry explicit master-confirmed
+  authorization.
+
+Retry scope is now explicit:
+
+- `Resume post-payment processing` may continue missing receipt generation, Django payment save,
+  Django fulfillment handoff, and subsequent provider stages from durable checkpoints.
+- `Retry Merchize fulfillment` is fulfillment-only. It refuses to run unless completed capture,
+  persisted receipt, `djangoPaymentSaveCustomId`, an accepted Django fulfillment response, and
+  `merchizeExternalOrderNumber` are already present.
+- Fulfillment-only retry never replays capture, receipt generation, Django payment save, or the
+  accepted Django handoff.
+- Retry audit entries record data target, target source, runtime environment, execution scope,
+  resulting status, error code, and failed stage.
+- Unexpected runner errors now persist and return stage-specific codes such as
+  `DJANGO_PAYMENT_SAVE_FAILED`, `PAYMENT_RECEIPT_GENERATION_FAILED`, or
+  `MERCHIZE_ORDER_REGISTRATION_FAILED` instead of collapsing every failure to
+  `POST_PROCESSING_FAILED`.
 
 # Imminent Next Implementation: Address Intervention And Lifecycle Hardening
 
@@ -964,12 +1030,26 @@ Local env switches for a UI-led run:
 ```bash
 PAYPAL_PAYMENT_MODE=sandbox
 NEXT_PUBLIC_PAYPAL_PAYMENT_MODE=sandbox
-PAYPAL_TX_LEDGER_NEON_BRANCH=dev
-MERCHIZE_FULFILLMENT_OPS_NEON_BRANCH=dev
+SHOP_OPS_DATA_TARGET=dev
+SHOP_OPS_ALLOW_LOCAL_PRODUCTION_MUTATIONS=false
 PAYPAL_TX_LEDGER_ENABLE_CAPTURE_ROUTE_RUNNER=true
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 MERCHIZE_FULFILLMENT_PUSH_ENABLED=false # semi-real no-push test
 ```
+
+The per-schema `*_NEON_BRANCH` variables shown in the Prisma preflight commands select migration
+targets only. Do not use them as independent runtime switches once `SHOP_OPS_DATA_TARGET` is set.
+
+For an exceptional supervised production recovery from localhost, start a separate process:
+
+```bash
+SHOP_OPS_DATA_TARGET=prod \
+SHOP_OPS_ALLOW_LOCAL_PRODUCTION_MUTATIONS=true \
+yarn dev --port 3001
+```
+
+The production pooled URLs must already be configured. The admin UI must show `Production data`
+before the action, and each supported mutation still requires master-admin password confirmation.
 
 The confirmation status route is read-only. With webhooks/ngrok off, post-capture work is triggered by the capture route runner or by the scheduled recovery scanner/cron.
 

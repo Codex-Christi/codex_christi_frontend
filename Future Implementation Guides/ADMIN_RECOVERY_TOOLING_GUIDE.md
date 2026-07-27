@@ -1,6 +1,6 @@
 # Admin And Recovery Tooling Guide
 
-Last updated: 2026-07-23
+Last updated: 2026-07-24
 
 This guide isolates the admin and checkout recovery work from the broader PayPal TX ledger guide. Use it as the source of truth for the next implementation phase: admin visibility, support recovery, retry operations, and maintenance tooling.
 
@@ -28,6 +28,26 @@ runPaidFulfillmentProcessing(orderToken)
 ```
 
 Do not keep `runPostProcessing(orderToken)` as an alias-only fallback. Callers should use `runPaidFulfillmentProcessing`, the real parent orchestrator that runs the paid order fulfillment stages.
+
+Implemented 2026-07-24 recovery safety boundary:
+
+- `SHOP_OPS_DATA_TARGET=dev|prod` is the canonical runtime target shared by the PayPal TX Ledger and
+  Merchize Fulfillment Ops clients.
+- Recovery pages show the active data target before operational controls.
+- Missing or unaligned runtime database configuration fails before cross-ledger recovery mutation.
+- Localhost production mutation is disabled unless
+  `SHOP_OPS_ALLOW_LOCAL_PRODUCTION_MUTATIONS=true`.
+- Supported localhost production mutations require master-admin password step-up and an audited
+  reason. Controls without that dedicated step-up remain disabled in a localhost production
+  session.
+- Admin retry is no longer inferred only from the ledger presentation status. The detail projection
+  classifies it as `resume_post_payment`, `retry_merchize_fulfillment`, or `none` from durable
+  checkpoints.
+- Fulfillment-only retry requires receipt persistence, Django payment save, accepted Django
+  fulfillment handoff, and the Merchize external order number before it can invoke provider
+  registration, lookup, readiness, or push.
+- Retry audits include target and execution scope, and retry failures return the persisted stage and
+  provider-safe error instead of a generic `POST_PROCESSING_FAILED` toast.
 
 Implemented before the dashboard revamp continues:
 

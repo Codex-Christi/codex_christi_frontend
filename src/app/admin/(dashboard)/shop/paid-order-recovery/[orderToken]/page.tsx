@@ -6,6 +6,7 @@ import PaidOrderRecoveryDetailPanel from '@/components/UI/Admin/dashboard/PaidOr
 import { formatAdminSystemTimestamp } from '@/lib/admin/formatAdminSystemTimestamp';
 import { requireAdminPage } from '@/lib/admin/require-admin';
 import { getAdminPaidOrderRecoveryDetail } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
+import { getShopOpsDataTargetView } from '@/lib/prisma/shop/shopOpsDataTarget';
 
 type PaidOrderRecoveryDetailPageProps = {
   params: Promise<{ orderToken: string }>;
@@ -26,6 +27,7 @@ export default async function AdminPaidOrderRecoveryDetailPage({
   });
 
   const recovery = await getAdminPaidOrderRecoveryDetail(orderToken);
+  const shopOpsDataTarget = getShopOpsDataTargetView();
 
   if (!recovery) {
     notFound();
@@ -66,6 +68,7 @@ export default async function AdminPaidOrderRecoveryDetailPage({
             sentAt: formatAdminSystemTimestamp(notification.sentAt),
             lastErrorMessage: notification.lastErrorMessage,
           }))}
+          shopOpsDataTarget={shopOpsDataTarget}
           variant='page'
         />
       </section>

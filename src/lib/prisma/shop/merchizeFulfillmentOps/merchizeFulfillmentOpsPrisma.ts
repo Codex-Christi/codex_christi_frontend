@@ -2,22 +2,24 @@ import 'server-only';
 
 import { PrismaPg } from '@prisma/adapter-pg';
 import { normalizePostgresSslMode } from '@/lib/prisma/postgresSslMode';
+import { getShopOpsDataTargetStatus } from '@/lib/prisma/shop/shopOpsDataTarget';
 import { PrismaClient } from './generated/merchizeFulfillmentOps/client';
 
 function resolveMerchizeFulfillmentOpsConnectionString(): string | null {
-  const explicitTarget = process.env.MERCHIZE_FULFILLMENT_OPS_NEON_BRANCH;
+  const targetStatus = getShopOpsDataTargetStatus();
+  if (!targetStatus.aligned) return null;
+
+  const target = targetStatus.target;
   const prodUrl =
-    process.env.MERCHIZE_FULFILLMENT_OPS_NEON_POOLED_DB_STRING ??
-    process.env.MERCHIZE_FULFILLMENT_OPS_DATABASE_URL;
+    process.env.MERCHIZE_FULFILLMENT_OPS_NEON_POOLED_DB_STRING?.trim() ||
+    process.env.MERCHIZE_FULFILLMENT_OPS_DATABASE_URL?.trim();
   const devUrl =
-    process.env.MERCHIZE_FULFILLMENT_OPS_NEON_POOLED_DB_DEV_STRING ??
-    process.env.MERCHIZE_FULFILLMENT_OPS_DATABASE_DEV_URL;
+    process.env.MERCHIZE_FULFILLMENT_OPS_NEON_POOLED_DB_DEV_STRING?.trim() ||
+    process.env.MERCHIZE_FULFILLMENT_OPS_DATABASE_DEV_URL?.trim();
 
-  if (explicitTarget === 'prod') return prodUrl ?? null;
-  if (explicitTarget === 'dev') return devUrl ?? null;
-  if (process.env.NODE_ENV !== 'production' && devUrl) return devUrl;
-
-  return prodUrl ?? devUrl ?? null;
+  if (target === 'prod') return prodUrl ?? null;
+  if (target === 'dev') return devUrl ?? null;
+  return null;
 }
 
 export function isMerchizeFulfillmentOpsDatabaseConfigured() {

@@ -26,11 +26,7 @@ import {
 } from './adminNotificationOutbox';
 
 export type PayPalLedgerWebhookSyncStatus =
-  | 'db_missing'
-  | 'drift'
-  | 'env_missing'
-  | 'in_sync'
-  | 'missing_both';
+  'db_missing' | 'drift' | 'env_missing' | 'in_sync' | 'missing_both';
 
 export type PayPalLedgerWebhookDashboardBinding = {
   activatedAt: string | null;
@@ -103,7 +99,8 @@ export type PayPalLedgerWebhookDatabaseTargetWarning = {
     | 'invalid_branch_env'
     | 'missing_ledger_database'
     | 'prod_dev_urls_match'
-    | 'production_using_dev_branch';
+    | 'production_using_dev_branch'
+    | 'shop_ops_target_mismatch';
   message: string;
   severity: 'critical' | 'warning';
 };
@@ -354,6 +351,14 @@ function getPayPalLedgerWebhookDatabaseTargetStatus(): PayPalLedgerWebhookDataba
       code: 'invalid_branch_env',
       message: 'PAYPAL_TX_LEDGER_NEON_BRANCH is set but is not "prod" or "dev".',
       severity: 'warning',
+    });
+  }
+
+  if (status.shopOpsConfigurationError) {
+    warnings.push({
+      code: 'shop_ops_target_mismatch',
+      message: status.shopOpsConfigurationError,
+      severity: 'critical',
     });
   }
 

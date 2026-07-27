@@ -12,6 +12,7 @@ import {
   getAdminActionErrorMessage,
   requireAdminAction,
   requireMasterAdminAction,
+  type AdminAuthContext,
 } from '@/lib/admin/require-admin';
 import {
   ADMIN_NOTIFICATION_SEVERITY,
@@ -27,8 +28,12 @@ import {
   type PayPalRecoveryScannerRunResult,
 } from '@/lib/paypal/txLedger/recoveryScanner';
 import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
-import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
+import {
+  PaidFulfillmentProcessingError,
+  runPaidFulfillmentProcessing,
+} from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
+import { getMerchizeFulfillmentRetryEligibility } from '@/lib/paypal/txLedger/fulfillmentRetryPolicy';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
@@ -50,6 +55,12 @@ import {
   isMerchizeFulfillmentOpsDatabaseConfigured,
 } from '@/lib/prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOpsPrisma';
 import {
+  assertAlignedShopOpsDataTarget,
+  assertShopOpsMutationAllowed,
+  getShopOpsAuditMetadata,
+  type ShopOpsDataTargetStatus,
+} from '@/lib/prisma/shop/shopOpsDataTarget';
+import {
   savePaymentReceiptToCloud,
   type PaymentReceiptProps,
 } from '@/actions/shop/paypal/processAndUploadCompletedTx/savePaymentReceiptToCloud';
@@ -57,7 +68,13 @@ import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/
 import type { CartVariant } from '@/stores/shop_stores/cartStore';
 
 type AdminNotificationActionResult =
-  { ok: true; message: string; tone?: 'success' | 'warning' } | { ok: false; error: string };
+  | { ok: true; message: string; tone?: 'success' | 'warning' }
+  | {
+      ok: false;
+      error: string;
+      errorCode?: string;
+      stage?: string;
+    };
 
 const SCANNER_AUDIT_ACTIONS = [
   'shop.paid_order_recovery.scan_candidates',
@@ -220,6 +237,59 @@ async function verifyMasterAdminPasswordStepUp({
   }
 
   return admin;
+}
+
+async function authorizeShopOpsRecoveryMutation({
+  action,
+  orderToken,
+  password,
+  reason,
+}: {
+  action: string;
+  orderToken: string;
+  password?: string;
+  reason?: string;
+}) {
+  const baseAdmin = await requireAdminAction('shop.recovery.run');
+  const targetStatus = assertAlignedShopOpsDataTarget();
+
+  if (!targetStatus.isLocalProductionTarget) {
+    assertShopOpsMutationAllowed();
+    return { admin: baseAdmin, targetStatus };
+  }
+
+  if (!targetStatus.localProductionMutationsEnabled) {
+    assertShopOpsMutationAllowed();
+  }
+
+  if (!reason?.trim()) {
+    throw new Error(
+      'A reason is required when localhost is operating on production Shop Ops data.',
+    );
+  }
+
+  const admin = await verifyMasterAdminPasswordStepUp({
+    password: password ?? '',
+    action,
+    targetId: orderToken,
+  });
+  assertShopOpsMutationAllowed({ localProductionMasterConfirmed: true });
+
+  return { admin, targetStatus };
+}
+
+function getProcessingActionFailure(error: unknown, fallback: string) {
+  if (error instanceof PaidFulfillmentProcessingError) {
+    return {
+      error: error.message,
+      errorCode: error.code,
+      stage: error.stage,
+    };
+  }
+
+  return {
+    error: getAdminActionErrorMessage(error, fallback),
+  };
 }
 
 async function writeMerchizeFulfillmentAdminAction(args: {
@@ -407,10 +477,12 @@ export async function getLatestAdminPaidOrderRecoveryScannerRun(): Promise<PayPa
 export async function scanAdminPaidOrderRecoveryCandidatesAction(): Promise<AdminRecoveryScannerActionResult> {
   try {
     const admin = await requireAdminAction('shop.recovery.run');
+    const targetMetadata = getShopOpsAuditMetadata(assertAlignedShopOpsDataTarget());
     await writeAdminAuditLog({
       actor: admin,
       action: 'shop.paid_order_recovery.scan_candidates',
       outcome: 'started',
+      metadata: targetMetadata,
     });
 
     const scan = await runPayPalRecoveryScanner({ dryRun: true });
@@ -420,7 +492,10 @@ export async function scanAdminPaidOrderRecoveryCandidatesAction(): Promise<Admi
       actor: admin,
       action: 'shop.paid_order_recovery.scan_candidates',
       outcome: 'success',
-      metadata: toScannerAuditMetadata(scan),
+      metadata: {
+        ...targetMetadata,
+        ...toScannerAuditMetadata(scan),
+      },
     });
 
     return {
@@ -445,12 +520,16 @@ export async function runSelectedAdminPaidOrderRecoveryAction({
 }): Promise<AdminRecoveryScannerActionResult> {
   try {
     const admin = await requireAdminAction('shop.recovery.run');
+    const targetMetadata = getShopOpsAuditMetadata(assertShopOpsMutationAllowed());
     await writeAdminAuditLog({
       actor: admin,
       action: 'shop.paid_order_recovery.run_selected',
       targetType: 'orderTokenBatch',
       outcome: 'started',
-      metadata: { count: orderTokens.length },
+      metadata: {
+        ...targetMetadata,
+        count: orderTokens.length,
+      },
     });
 
     if (!orderTokens.length) {
@@ -475,6 +554,7 @@ export async function runSelectedAdminPaidOrderRecoveryAction({
       targetType: 'orderTokenBatch',
       outcome: scan.ok ? 'success' : 'failure',
       metadata: {
+        ...targetMetadata,
         requestedCount: orderTokens.length,
         completedCount,
         ...toScannerAuditMetadata(scan),
@@ -643,18 +723,59 @@ export async function resendCustomerNotificationAction({
 
 export async function retryAdminPaidOrderRecoveryAction({
   orderToken,
+  password,
+  reason,
 }: {
   orderToken: string;
+  password?: string;
+  reason?: string;
 }): Promise<AdminNotificationActionResult> {
+  const action = 'shop.paid_order_recovery.retry_post_payment';
+  let auditContext: {
+    admin: AdminAuthContext;
+    targetStatus: ShopOpsDataTargetStatus;
+  } | null = null;
+
   try {
-    const admin = await requireAdminAction('shop.recovery.run');
+    auditContext = await authorizeShopOpsRecoveryMutation({
+      action,
+      orderToken,
+      password,
+      reason,
+    });
+    const { admin, targetStatus } = auditContext;
+    const targetMetadata = getShopOpsAuditMetadata(targetStatus);
+
     await writeAdminAuditLog({
       actor: admin,
-      action: 'shop.paid_order_recovery.retry',
+      action,
       targetType: 'orderToken',
       targetId: orderToken,
       outcome: 'started',
+      metadata: {
+        ...targetMetadata,
+        executionScope: 'full_post_payment',
+        hasReason: Boolean(reason?.trim()),
+      },
     });
+
+    const reject = async (error: string, errorCode?: string, stage?: string) => {
+      await writeAdminAuditLog({
+        actor: admin,
+        action,
+        targetType: 'orderToken',
+        targetId: orderToken,
+        outcome: 'failure',
+        metadata: {
+          ...targetMetadata,
+          error,
+          errorCode: errorCode ?? null,
+          executionScope: 'full_post_payment',
+          stage: stage ?? null,
+        },
+      });
+      return { ok: false as const, error, errorCode, stage };
+    };
 
     const existing = await paypalTxLedger.paypalIntent.findUnique({
       where: { orderToken },
@@ -668,35 +789,29 @@ export async function retryAdminPaidOrderRecoveryAction({
     });
 
     if (!existing) {
-      return {
-        ok: false,
-        error: 'Recovery row was not found.',
-      };
+      return reject('Recovery row was not found.');
     }
 
     if (existing.processingCompletedAt) {
-      return {
-        ok: false,
-        error: 'This order is already completed.',
-      };
+      return reject('This order is already completed.');
     }
 
     if (existing.postProcessingLockExpiresAt && existing.postProcessingLockExpiresAt > new Date()) {
-      return {
-        ok: false,
-        error: 'This order is already being processed.',
-      };
+      return reject('This order is already being processed.');
     }
 
     const captureCompletion = getPayPalCaptureCompletion(existing.capturePayload);
     if (!captureCompletion.ok) {
-      return {
-        ok: false,
-        error: captureCompletion.reason,
-      };
+      return reject(
+        captureCompletion.reason,
+        'PAYPAL_CAPTURE_VALIDATION_FAILED',
+        'capture_validation',
+      );
     }
 
     await runPaidFulfillmentProcessing(orderToken, {
+      executionScope: 'full_post_payment',
+      localProductionMasterConfirmed: targetStatus.isLocalProductionTarget,
       triggerDetail: 'admin_retry_paid_order_recovery',
       triggerSource: 'manual_admin',
     });
@@ -709,32 +824,234 @@ export async function retryAdminPaidOrderRecoveryAction({
       select: {
         status: true,
         processingCompletedAt: true,
+        lastErrorCode: true,
         lastErrorMessage: true,
       },
     });
 
     if (!updated) {
-      return {
-        ok: false,
-        error: 'Recovery row could not be reloaded after retry.',
-      };
+      return reject('Recovery row could not be reloaded after retry.');
     }
 
     if (updated.processingCompletedAt) {
+      await writeAdminAuditLog({
+        actor: admin,
+        action,
+        targetType: 'orderToken',
+        targetId: orderToken,
+        outcome: 'success',
+        metadata: {
+          ...targetMetadata,
+          executionScope: 'full_post_payment',
+          resultingStatus: updated.status,
+        },
+      });
       return {
         ok: true,
         message: 'Order completed after retry.',
       };
     }
 
+    return reject(
+      updated.lastErrorMessage ?? `Retry ended in ${updated.status}.`,
+      updated.lastErrorCode ?? undefined,
+      'post_payment_resume',
+    );
+  } catch (error) {
+    const failure = getProcessingActionFailure(error, 'Post-payment recovery failed.');
+    if (auditContext) {
+      await writeAdminAuditLog({
+        actor: auditContext.admin,
+        action,
+        targetType: 'orderToken',
+        targetId: orderToken,
+        outcome: 'failure',
+        metadata: {
+          ...getShopOpsAuditMetadata(auditContext.targetStatus),
+          error: failure.error,
+          errorCode: failure.errorCode ?? null,
+          executionScope: 'full_post_payment',
+          stage: failure.stage ?? null,
+        },
+      }).catch(() => undefined);
+    }
+
     return {
       ok: false,
-      error: updated.lastErrorMessage ?? `Retry ended in ${updated.status}.`,
+      ...failure,
+    };
+  }
+}
+
+export async function retryAdminMerchizeFulfillmentAction({
+  orderToken,
+  password,
+  reason,
+}: {
+  orderToken: string;
+  password?: string;
+  reason?: string;
+}): Promise<AdminNotificationActionResult> {
+  const action = 'shop.paid_order_recovery.retry_merchize_fulfillment';
+  let auditContext: {
+    admin: AdminAuthContext;
+    targetStatus: ShopOpsDataTargetStatus;
+  } | null = null;
+
+  try {
+    auditContext = await authorizeShopOpsRecoveryMutation({
+      action,
+      orderToken,
+      password,
+      reason,
+    });
+    const { admin, targetStatus } = auditContext;
+    const targetMetadata = getShopOpsAuditMetadata(targetStatus);
+
+    await writeAdminAuditLog({
+      actor: admin,
+      action,
+      targetType: 'orderToken',
+      targetId: orderToken,
+      outcome: 'started',
+      metadata: {
+        ...targetMetadata,
+        executionScope: 'merchize_fulfillment_only',
+        hasReason: Boolean(reason?.trim()),
+      },
+    });
+
+    const reject = async (error: string, errorCode?: string, stage?: string) => {
+      await writeAdminAuditLog({
+        actor: admin,
+        action,
+        targetType: 'orderToken',
+        targetId: orderToken,
+        outcome: 'failure',
+        metadata: {
+          ...targetMetadata,
+          error,
+          errorCode: errorCode ?? null,
+          executionScope: 'merchize_fulfillment_only',
+          stage: stage ?? null,
+        },
+      });
+      return { ok: false as const, error, errorCode, stage };
+    };
+
+    const existing = await paypalTxLedger.paypalIntent.findUnique({
+      where: { orderToken },
+      select: {
+        capturePayload: true,
+        djangoPaymentSaveCustomId: true,
+        merchizeFulfillmentResponsePayload: true,
+        postProcessingLockExpiresAt: true,
+        processingCompletedAt: true,
+        receiptFile: true,
+        receiptLink: true,
+      },
+    });
+
+    if (!existing) return reject('Recovery row was not found.');
+    if (existing.processingCompletedAt) return reject('This order is already completed.');
+    if (existing.postProcessingLockExpiresAt && existing.postProcessingLockExpiresAt > new Date()) {
+      return reject('This order is already being processed.');
+    }
+
+    const captureCompletion = getPayPalCaptureCompletion(existing.capturePayload);
+    const acceptedDjangoHandoff = isAcceptedDjangoFulfillmentProcessResponse(
+      existing.merchizeFulfillmentResponsePayload,
+    );
+    const merchizeExternalOrderNumber = acceptedDjangoHandoff
+      ? extractMerchizeExternalOrderNumberFromDjangoProcessResponse(
+          existing.merchizeFulfillmentResponsePayload,
+        )
+      : null;
+    const eligibility = getMerchizeFulfillmentRetryEligibility({
+      captureComplete: captureCompletion.ok,
+      hasAcceptedDjangoFulfillmentHandoff: acceptedDjangoHandoff,
+      hasDjangoPaymentSaveCustomId: Boolean(existing.djangoPaymentSaveCustomId),
+      hasMerchizeExternalOrderNumber: Boolean(merchizeExternalOrderNumber),
+      hasPersistedReceipt: Boolean(existing.receiptLink && existing.receiptFile),
+    });
+
+    if (!eligibility.eligible) {
+      return reject(
+        `${eligibility.message} Use Resume post-payment processing instead.`,
+        eligibility.code,
+        eligibility.missingCheckpoint,
+      );
+    }
+
+    await runPaidFulfillmentProcessing(orderToken, {
+      executionScope: 'merchize_fulfillment_only',
+      localProductionMasterConfirmed: targetStatus.isLocalProductionTarget,
+      triggerDetail: 'admin_retry_merchize_fulfillment',
+      triggerSource: 'manual_admin',
+    });
+
+    revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+    revalidatePath('/admin/shop/paid-order-recovery');
+
+    const updated = await paypalTxLedger.paypalIntent.findUnique({
+      where: { orderToken },
+      select: {
+        lastErrorCode: true,
+        lastErrorMessage: true,
+        processingCompletedAt: true,
+        status: true,
+      },
+    });
+
+    if (!updated) return reject('Recovery row could not be reloaded after fulfillment retry.');
+
+    if (!updated.processingCompletedAt) {
+      return reject(
+        updated.lastErrorMessage ?? `Fulfillment retry ended in ${updated.status}.`,
+        updated.lastErrorCode ?? undefined,
+        'merchize_fulfillment',
+      );
+    }
+
+    await writeAdminAuditLog({
+      actor: admin,
+      action,
+      targetType: 'orderToken',
+      targetId: orderToken,
+      outcome: 'success',
+      metadata: {
+        ...targetMetadata,
+        executionScope: 'merchize_fulfillment_only',
+        resultingStatus: updated.status,
+      },
+    });
+
+    return {
+      ok: true,
+      message: 'Merchize fulfillment completed after retry.',
     };
   } catch (error) {
+    const failure = getProcessingActionFailure(error, 'Merchize fulfillment retry failed.');
+    if (auditContext) {
+      await writeAdminAuditLog({
+        actor: auditContext.admin,
+        action,
+        targetType: 'orderToken',
+        targetId: orderToken,
+        outcome: 'failure',
+        metadata: {
+          ...getShopOpsAuditMetadata(auditContext.targetStatus),
+          error: failure.error,
+          errorCode: failure.errorCode ?? null,
+          executionScope: 'merchize_fulfillment_only',
+          stage: failure.stage ?? null,
+        },
+      }).catch(() => undefined);
+    }
+
     return {
       ok: false,
-      error: getAdminActionErrorMessage(error, 'Retry failed.'),
+      ...failure,
     };
   }
 }
@@ -760,11 +1077,21 @@ export async function releaseMerchizeFulfillmentToProductionAction({
       };
     }
 
+    await requireAdminAction('shop.recovery.run');
+    const targetStatus = assertAlignedShopOpsDataTarget();
+    if (targetStatus.isLocalProductionTarget && !targetStatus.localProductionMutationsEnabled) {
+      assertShopOpsMutationAllowed();
+    }
+
     const admin = await verifyMasterAdminPasswordStepUp({
       password,
       action,
       targetId: orderToken,
     });
+    assertShopOpsMutationAllowed({
+      localProductionMasterConfirmed: targetStatus.isLocalProductionTarget,
+    });
+    const targetMetadata = getShopOpsAuditMetadata(targetStatus);
 
     await writeAdminAuditLog({
       actor: admin,
@@ -772,7 +1099,7 @@ export async function releaseMerchizeFulfillmentToProductionAction({
       targetType: 'orderToken',
       targetId: orderToken,
       outcome: 'started',
-      metadata: { hasReason: true },
+      metadata: { ...targetMetadata, hasReason: true },
     });
 
     const rejectAfterStepUp = async (error: string) => {
@@ -783,6 +1110,7 @@ export async function releaseMerchizeFulfillmentToProductionAction({
         reason: releaseReason,
         status: 'failed',
         errorMessage: error,
+        metadata: targetMetadata,
       });
       await writeAdminAuditLog({
         actor: admin,
@@ -790,7 +1118,7 @@ export async function releaseMerchizeFulfillmentToProductionAction({
         targetType: 'orderToken',
         targetId: orderToken,
         outcome: 'failure',
-        metadata: { error },
+        metadata: { ...targetMetadata, error },
       });
 
       return {
@@ -805,6 +1133,7 @@ export async function releaseMerchizeFulfillmentToProductionAction({
       actor: admin.userID,
       reason: releaseReason,
       status: 'started',
+      metadata: targetMetadata,
     });
 
     const existing = await paypalTxLedger.paypalIntent.findUnique({
@@ -861,6 +1190,8 @@ export async function releaseMerchizeFulfillmentToProductionAction({
     await runPaidFulfillmentProcessing(orderToken, {
       overrideMerchizeFulfillmentPushDisabled: true,
       allowStaleMerchizeOrderManualRelease: true,
+      executionScope: 'merchize_fulfillment_only',
+      localProductionMasterConfirmed: targetStatus.isLocalProductionTarget,
       triggerDetail: 'admin_manual_production_release',
       triggerSource: 'manual_admin',
     });
@@ -884,6 +1215,7 @@ export async function releaseMerchizeFulfillmentToProductionAction({
         actor: admin.userID,
         reason: releaseReason,
         status: 'succeeded',
+        metadata: targetMetadata,
       });
       await writeAdminAuditLog({
         actor: admin,
@@ -891,6 +1223,7 @@ export async function releaseMerchizeFulfillmentToProductionAction({
         targetType: 'orderToken',
         targetId: orderToken,
         outcome: 'success',
+        metadata: targetMetadata,
       });
 
       return {
@@ -907,6 +1240,7 @@ export async function releaseMerchizeFulfillmentToProductionAction({
       reason: releaseReason,
       status: 'failed',
       errorMessage: error,
+      metadata: targetMetadata,
     });
     await writeAdminAuditLog({
       actor: admin,
@@ -914,7 +1248,7 @@ export async function releaseMerchizeFulfillmentToProductionAction({
       targetType: 'orderToken',
       targetId: orderToken,
       outcome: 'failure',
-      metadata: { error },
+      metadata: { ...targetMetadata, error },
     });
 
     return {
@@ -949,10 +1283,19 @@ export async function markPaidOrderFulfillmentAddressValidAction({
   }
 
   try {
+    await requireAdminAction('shop.recovery.run');
+    const targetStatus = assertAlignedShopOpsDataTarget();
+    if (targetStatus.isLocalProductionTarget && !targetStatus.localProductionMutationsEnabled) {
+      assertShopOpsMutationAllowed();
+    }
+
     const admin = await verifyMasterAdminPasswordStepUp({
       password,
       action,
       targetId: orderToken,
+    });
+    assertShopOpsMutationAllowed({
+      localProductionMasterConfirmed: targetStatus.isLocalProductionTarget,
     });
     const ledgerOrder = await paypalTxLedger.paypalIntent.findUnique({
       where: { orderToken },
@@ -1125,6 +1468,7 @@ export async function syncAdminMerchizeProviderDetailsAction({
 }): Promise<AdminNotificationActionResult> {
   try {
     const admin = await requireAdminAction('shop.recovery.run');
+    assertShopOpsMutationAllowed();
     await writeAdminAuditLog({
       actor: admin,
       action: 'shop.paid_order_recovery.sync_merchize_provider_details',
@@ -1291,6 +1635,7 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
   orderToken,
   address,
   reason,
+  password,
 }: {
   orderToken: string;
   address: {
@@ -1302,17 +1647,28 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
     country: string;
   };
   reason: string;
+  password?: string;
 }): Promise<AdminNotificationActionResult> {
   const auditAction = 'shop.paid_order_recovery.address_correction_save';
   try {
-    const admin = await requireAdminAction('shop.recovery.run');
+    const { admin, targetStatus } = await authorizeShopOpsRecoveryMutation({
+      action: auditAction,
+      orderToken,
+      password,
+      reason,
+    });
+    const targetMetadata = getShopOpsAuditMetadata(targetStatus);
     await writeAdminAuditLog({
       actor: admin,
       action: auditAction,
       targetType: 'orderToken',
       targetId: orderToken,
       outcome: 'started',
-      metadata: { hasReason: Boolean(reason.trim()), country: address.country.trim() },
+      metadata: {
+        ...targetMetadata,
+        hasReason: Boolean(reason.trim()),
+        country: address.country.trim(),
+      },
     });
 
     if (!reason.trim()) {
@@ -1509,8 +1865,7 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
     }
     const readiness = providerCorrection.providerUpdated
       ? await runMerchizeProductionReadinessChecks(orderToken, {
-          expectedBuyerAddress:
-            getMerchizeBuyerAddressExpectationFromLedger(normalizedAddress),
+          expectedBuyerAddress: getMerchizeBuyerAddressExpectationFromLedger(normalizedAddress),
         })
       : null;
 
@@ -1569,6 +1924,7 @@ export async function regeneratePaidOrderReceiptAction({
   const action = 'shop.paid_order_recovery.receipt_regenerate';
   try {
     const admin = await requireAdminAction('shop.recovery.run');
+    assertShopOpsMutationAllowed();
     await writeAdminAuditLog({
       actor: admin,
       action,

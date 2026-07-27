@@ -16,6 +16,10 @@ import {
   enqueueAdminRecoveryNotification,
   sendPendingAdminRecoveryNotificationsForOrder,
 } from '@/lib/paypal/txLedger/adminNotificationOutbox';
+import {
+  assertAlignedShopOpsDataTarget,
+  assertShopOpsMutationAllowed,
+} from '@/lib/prisma/shop/shopOpsDataTarget';
 
 const AUTOMATIC_RECOVERY_STATUSES = [
   PAYPAL_LEDGER_STATUS.CAPTURED,
@@ -182,6 +186,12 @@ export async function runPayPalRecoveryScanner(args?: {
   minAgeMinutes?: number;
 }) {
   const enabled = isRecoveryScannerEnabled();
+  if (args?.dryRun || !enabled) {
+    assertAlignedShopOpsDataTarget();
+  } else {
+    assertShopOpsMutationAllowed();
+  }
+
   const minAgeMinutes = args?.minAgeMinutes ?? getRecoveryScannerMinAgeMinutes();
   const batchSize = clampBatchSize(args?.batchSize ?? getRecoveryScannerBatchSize());
   const scannedAt = new Date();
@@ -254,6 +264,13 @@ export async function runSelectedPayPalRecoveryScanner(args: {
   orderTokens: string[];
   dryRun?: boolean;
 }) {
+  const enabled = isRecoveryScannerEnabled();
+  if (args.dryRun || !enabled) {
+    assertAlignedShopOpsDataTarget();
+  } else {
+    assertShopOpsMutationAllowed();
+  }
+
   const selectedOrderTokens = [...new Set(args.orderTokens.map((token) => token.trim()))].filter(
     Boolean,
   );
@@ -269,7 +286,7 @@ export async function runSelectedPayPalRecoveryScanner(args: {
   const candidateTokens = new Set(candidates.map((candidate) => candidate.orderToken));
   const result: PayPalRecoveryScannerRunResult = {
     ok: true,
-    enabled: isRecoveryScannerEnabled(),
+    enabled,
     dryRun: args.dryRun ?? false,
     minAgeMinutes,
     batchSize,

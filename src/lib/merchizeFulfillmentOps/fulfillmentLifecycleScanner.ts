@@ -15,6 +15,10 @@ import {
   enqueueAdminRecoveryNotification,
   sendPendingAdminRecoveryNotificationsForOrder,
 } from '@/lib/paypal/txLedger/adminNotificationOutbox';
+import {
+  assertAlignedShopOpsDataTarget,
+  assertShopOpsMutationAllowed,
+} from '@/lib/prisma/shop/shopOpsDataTarget';
 
 const MAX_BATCH_SIZE = 25;
 const REPEATED_FAILURE_THRESHOLD = 3;
@@ -116,6 +120,12 @@ export async function runMerchizeFulfillmentLifecycleScanner(
   } = {},
 ) {
   const dryRun = args.dryRun ?? false;
+  if (dryRun) {
+    assertAlignedShopOpsDataTarget();
+  } else {
+    assertShopOpsMutationAllowed();
+  }
+
   const batchSize = Math.min(Math.max(Math.floor(args.batchSize ?? 10), 1), MAX_BATCH_SIZE);
   const minAgeMinutes = Math.max(Math.floor(args.minAgeMinutes ?? 15), 1);
   const scannedAt = new Date();

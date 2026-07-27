@@ -24,7 +24,9 @@ import {
 import { isMerchizeLookupPendingProviderProcessingError } from '@/lib/merchizeFulfillmentOps/lookupPending';
 import { safeLogErrorMessage } from '@/lib/merchizeFulfillmentOps/redaction';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
+import { getMerchizeFulfillmentRetryEligibility } from '@/lib/paypal/txLedger/fulfillmentRetryPolicy';
 import { resolvePaidOrderRecoveryIssue } from '@/lib/paypal/txLedger/recoveryIssuePrecedence';
+import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/lib/merchizeFulfillmentOps/merchizeMapper';
 import type { Prisma } from '@/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger/client';
 import type {
   MerchizeFulfillmentOpsAdminSummary,
@@ -403,6 +405,7 @@ function buildTimeline(row: {
   updatedAt: Date;
   processingCompletedAt: Date | null;
   receiptLink: string | null;
+  receiptFile: string | null;
   djangoPaymentSaveCustomId: string | null;
   lastErrorCode: string | null;
   merchizeFulfillmentResponsePayload: unknown;
@@ -971,6 +974,7 @@ function buildDetail(row: {
   createdAt: Date;
   updatedAt: Date;
   receiptLink: string | null;
+  receiptFile: string | null;
   capturePayload: unknown;
   shippingSnapshot: unknown;
   fulfillmentAddressOverride: unknown;
@@ -1009,6 +1013,14 @@ function buildDetail(row: {
   const merchizeExternalOrderNumber =
     row.merchizeProviderOrderCode ??
     getMerchizeOrderCodeFromFulfillmentResponse(row.merchizeFulfillmentResponsePayload);
+  const acceptedDjangoHandoff = isAcceptedDjangoFulfillmentProcessResponse(
+    row.merchizeFulfillmentResponsePayload,
+  );
+  const acceptedMerchizeExternalOrderNumber = acceptedDjangoHandoff
+    ? extractMerchizeExternalOrderNumberFromDjangoProcessResponse(
+        row.merchizeFulfillmentResponsePayload,
+      )
+    : null;
   const providerDetailSyncNeeded = needsProviderDetailSync(
     row.merchizeFulfillmentResponsePayload,
     row.merchizeFulfillmentOps?.syncStatus,
@@ -1022,6 +1034,13 @@ function buildDetail(row: {
       row.merchizeFulfillmentOps?.productionGateStatus ===
         MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.MANUAL_RELEASE_REQUIRED);
   const captureCompletion = getPayPalCaptureCompletion(row.capturePayload);
+  const fulfillmentRetryEligibility = getMerchizeFulfillmentRetryEligibility({
+    captureComplete: captureCompletion.ok,
+    hasAcceptedDjangoFulfillmentHandoff: acceptedDjangoHandoff,
+    hasDjangoPaymentSaveCustomId: Boolean(row.djangoPaymentSaveCustomId),
+    hasMerchizeExternalOrderNumber: Boolean(acceptedMerchizeExternalOrderNumber),
+    hasPersistedReceipt: Boolean(row.receiptLink && row.receiptFile),
+  });
   const captureAmount = asNumber(captureCompletion.amount?.value);
   const inferredProcessingSource = getPayPalLedgerInferredProcessingSourceDisplay({
     checkoutSurfaceLabel: row.checkoutSurfaceLabel,
@@ -1135,6 +1154,7 @@ function buildDetail(row: {
     },
     webhookEvents: row.webhookEvents,
     scannerState: getScannerState(row),
+    retryMode: row.processingCompletedAt ? 'none' : fulfillmentRetryEligibility.mode,
     merchizeFulfillmentOps: row.merchizeFulfillmentOps,
     needsProviderDetailSync: providerDetailSyncNeeded,
     requiresManualRelease,
@@ -1155,6 +1175,8 @@ function buildDetail(row: {
       merchizeFulfillmentOps: row.merchizeFulfillmentOps,
       needsProviderDetailSync: providerDetailSyncNeeded,
       requiresManualRelease,
+      retryMode: row.processingCompletedAt ? 'none' : fulfillmentRetryEligibility.mode,
+      fulfillmentRetryEligibility,
       captureCompletion,
       scannerState: getScannerState(row),
       webhookEvents: row.webhookEvents,

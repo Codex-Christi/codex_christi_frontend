@@ -11,18 +11,25 @@ import type {
   PaidOrderRecoveryDetail,
   PaidOrderRecoveryReference,
 } from './adminShopDashboardTypes';
+import type { ShopOpsDataTargetView } from '@/lib/prisma/shop/shopOpsDataTarget';
 
 export function PaidOrderRecoveryPrimaryContextSections({
   detail,
   orderToken,
+  shopOpsDataTarget,
 }: {
   detail: PaidOrderRecoveryDetail;
   orderToken: string;
+  shopOpsDataTarget: ShopOpsDataTargetView;
 }) {
   return (
     <div className='space-y-4'>
       <OrderContextPanel detail={detail} />
-      <DeliveryContextPanel detail={detail} orderToken={orderToken} />
+      <DeliveryContextPanel
+        detail={detail}
+        orderToken={orderToken}
+        shopOpsDataTarget={shopOpsDataTarget}
+      />
     </div>
   );
 }
@@ -123,9 +130,11 @@ function OrderContextPanel({ detail }: { detail: PaidOrderRecoveryDetail }) {
 function DeliveryContextPanel({
   detail,
   orderToken,
+  shopOpsDataTarget,
 }: {
   detail: PaidOrderRecoveryDetail;
   orderToken: string;
+  shopOpsDataTarget: ShopOpsDataTargetView;
 }) {
   const provider = detail.merchizeFulfillmentOps;
   const readbackStatus = provider?.addressReadbackStatus;
@@ -186,6 +195,7 @@ function DeliveryContextPanel({
               orderToken={orderToken}
               initialAddress={detail.activeAddress ?? detail.originalAddress}
               hasExistingOverride={detail.hasAddressOverride}
+              shopOpsDataTarget={shopOpsDataTarget}
             />
           )}
         </div>
@@ -241,6 +251,7 @@ function DeliveryContextPanel({
               orderToken={orderToken}
               initialAddress={detail.activeAddress ?? detail.originalAddress}
               hasExistingOverride={detail.hasAddressOverride}
+              shopOpsDataTarget={shopOpsDataTarget}
             />
           </div>
         ) : null}
@@ -249,13 +260,11 @@ function DeliveryContextPanel({
   );
 }
 
-function getAddressReadbackLabel(
-  status: string | null | undefined,
-  verifiedWhenSaved: boolean,
-) {
+function getAddressReadbackLabel(status: string | null | undefined, verifiedWhenSaved: boolean) {
   if (status === 'matched') return 'Matches the effective ledger address';
   if (status === 'mismatch') return 'Does not match the effective ledger address';
-  if (verifiedWhenSaved) return 'Matched when the correction was saved; refresh for a current check';
+  if (verifiedWhenSaved)
+    return 'Matched when the correction was saved; refresh for a current check';
   return 'Not checked against the effective ledger address';
 }
 

@@ -29,10 +29,13 @@ import {
   markPaidOrderFulfillmentAddressValidAction,
   regeneratePaidOrderReceiptAction,
   releaseMerchizeFulfillmentToProductionAction,
+  retryAdminMerchizeFulfillmentAction,
   retryAdminPaidOrderRecoveryAction,
   syncAdminMerchizeProviderDetailsAction,
 } from '@/app/admin/(dashboard)/shop/paid-order-recovery/actions';
 import type { AdminIcon } from './adminShopDashboardTypes';
+import type { PaidOrderRetryMode } from '@/lib/paypal/txLedger/fulfillmentRetryPolicy';
+import type { ShopOpsDataTargetView } from '@/lib/prisma/shop/shopOpsDataTarget';
 
 type AdminRecoveryActionsPanelProps = {
   orderToken: string;
@@ -40,7 +43,8 @@ type AdminRecoveryActionsPanelProps = {
   needsProviderDetailSync: boolean;
   requiresManualRelease: boolean;
   canConfirmProviderAddress: boolean;
-  recoveryStatus: 'failed' | 'recovery' | 'pending' | 'completed' | 'sync' | 'attention';
+  retryMode: PaidOrderRetryMode;
+  shopOpsDataTarget: ShopOpsDataTargetView;
   manualReleaseReadinessWarning?: string | null;
 };
 
@@ -57,7 +61,8 @@ export default function AdminPaidOrderRecoveryActionsPanel({
   needsProviderDetailSync,
   requiresManualRelease,
   canConfirmProviderAddress,
-  recoveryStatus,
+  retryMode,
+  shopOpsDataTarget,
   manualReleaseReadinessWarning = null,
 }: AdminRecoveryActionsPanelProps) {
   const router = useRouter();
@@ -71,16 +76,30 @@ export default function AdminPaidOrderRecoveryActionsPanel({
   const [addressConfirmOpen, setAddressConfirmOpen] = useState(false);
   const [addressConfirmPassword, setAddressConfirmPassword] = useState('');
   const [addressConfirmReason, setAddressConfirmReason] = useState('');
-  const resumesFullPostPaymentFlow = recoveryStatus === 'recovery';
+  const [productionRetryOpen, setProductionRetryOpen] = useState(false);
+  const [productionRetryPassword, setProductionRetryPassword] = useState('');
+  const [productionRetryReason, setProductionRetryReason] = useState('');
+  const resumesFullPostPaymentFlow = retryMode === 'resume_post_payment';
+  const retriesMerchizeFulfillment = retryMode === 'retry_merchize_fulfillment';
+  const requiresLocalProductionConfirmation = shopOpsDataTarget.isLocalProductionTarget;
   const isAnyActionPending = pendingAction !== null;
+  const shopOpsConfigurationDisabledReason = !shopOpsDataTarget.aligned
+    ? (shopOpsDataTarget.configurationError ?? 'Shop Ops data target is not aligned.')
+    : undefined;
+  const localProductionLockedReason =
+    shopOpsDataTarget.isLocalProductionTarget && !shopOpsDataTarget.localProductionMutationsEnabled
+      ? 'Local production mutations are locked by configuration.'
+      : undefined;
   const releaseDisabledReason = isCompleted
     ? 'Post-payment processing is already complete.'
-    : undefined;
+    : (shopOpsConfigurationDisabledReason ?? localProductionLockedReason);
   const retryActionLabel = needsProviderDetailSync
     ? 'Continue Merchize fulfillment'
     : resumesFullPostPaymentFlow
       ? 'Resume post-payment processing'
-      : 'Retry Merchize fulfillment';
+      : retriesMerchizeFulfillment
+        ? 'Retry Merchize fulfillment'
+        : 'No recovery action required';
   const retryPendingLabel = needsProviderDetailSync
     ? 'Continuing Merchize fulfillment...'
     : resumesFullPostPaymentFlow
@@ -143,7 +162,13 @@ export default function AdminPaidOrderRecoveryActionsPanel({
     });
   };
 
-  const handleRetry = () => {
+  const executeRetry = ({
+    password,
+    reason,
+  }: {
+    password?: string;
+    reason?: string;
+  } = {}) => {
     runAction('retry-recovery', async () => {
       const toastId = loadingToast({
         header: resumesFullPostPaymentFlow
@@ -155,18 +180,33 @@ export default function AdminPaidOrderRecoveryActionsPanel({
       });
 
       try {
-        const result = await retryAdminPaidOrderRecoveryAction({ orderToken });
+        const result = retriesMerchizeFulfillment
+          ? await retryAdminMerchizeFulfillmentAction({
+              orderToken,
+              password,
+              reason,
+            })
+          : await retryAdminPaidOrderRecoveryAction({
+              orderToken,
+              password,
+              reason,
+            });
         toast.dismiss(toastId);
 
         if (!result.ok) {
           errorToast({
-            header: 'Retry did not complete',
+            header: result.stage
+              ? `Retry stopped at ${result.stage.replaceAll('_', ' ')}`
+              : 'Retry did not complete',
             message: result.error,
           });
           router.refresh();
           return;
         }
 
+        setProductionRetryOpen(false);
+        setProductionRetryPassword('');
+        setProductionRetryReason('');
         successToast({
           header: 'Recovery completed',
           message: result.message,
@@ -179,6 +219,46 @@ export default function AdminPaidOrderRecoveryActionsPanel({
           message: error instanceof Error ? error.message : 'Retry failed.',
         });
       }
+    });
+  };
+
+  const handleRetry = () => {
+    if (shopOpsConfigurationDisabledReason || localProductionLockedReason) {
+      errorToast({
+        header: 'Recovery action unavailable',
+        message: shopOpsConfigurationDisabledReason ?? localProductionLockedReason ?? '',
+      });
+      return;
+    }
+
+    if (retryMode === 'none') {
+      errorToast({
+        header: 'Recovery action unavailable',
+        message: 'This order does not require another recovery action.',
+      });
+      return;
+    }
+
+    if (requiresLocalProductionConfirmation) {
+      setProductionRetryOpen(true);
+      return;
+    }
+
+    executeRetry();
+  };
+
+  const handleConfirmedProductionRetry = () => {
+    if (!productionRetryPassword.trim() || !productionRetryReason.trim()) {
+      errorToast({
+        header: 'Production confirmation needs details',
+        message: 'Enter the master admin password and a reason for using localhost.',
+      });
+      return;
+    }
+
+    executeRetry({
+      password: productionRetryPassword,
+      reason: productionRetryReason,
     });
   };
 
@@ -471,7 +551,17 @@ export default function AdminPaidOrderRecoveryActionsPanel({
           icon={SearchCheck}
           tone='cyan'
           busy={pendingAction === 'refresh-merchize'}
-          disabled={isAnyActionPending}
+          disabled={
+            isAnyActionPending ||
+            Boolean(shopOpsConfigurationDisabledReason) ||
+            requiresLocalProductionConfirmation
+          }
+          disabledReason={
+            shopOpsConfigurationDisabledReason ??
+            (requiresLocalProductionConfirmation
+              ? 'Refresh is disabled from a localhost production-data session; use the production admin deployment.'
+              : null)
+          }
           onClick={handleProviderDetailSync}
         >
           {pendingAction === 'refresh-merchize'
@@ -483,9 +573,18 @@ export default function AdminPaidOrderRecoveryActionsPanel({
           icon={RefreshCw}
           tone='cyan'
           busy={pendingAction === 'retry-recovery'}
-          disabled={isAnyActionPending || isCompleted}
+          disabled={
+            isAnyActionPending ||
+            isCompleted ||
+            retryMode === 'none' ||
+            Boolean(shopOpsConfigurationDisabledReason || localProductionLockedReason)
+          }
           disabledReason={
-            isCompleted ? 'Post-payment processing is already complete; no retry is needed.' : null
+            isCompleted
+              ? 'Post-payment processing is already complete; no retry is needed.'
+              : retryMode === 'none'
+                ? 'This row does not require another recovery action.'
+                : (shopOpsConfigurationDisabledReason ?? localProductionLockedReason)
           }
           onClick={handleRetry}
         >
@@ -501,9 +600,15 @@ export default function AdminPaidOrderRecoveryActionsPanel({
             icon={MapPinCheck}
             tone='amber'
             busy={pendingAction === 'confirm-address'}
-            disabled={isAnyActionPending || isCompleted}
+            disabled={
+              isAnyActionPending ||
+              isCompleted ||
+              Boolean(shopOpsConfigurationDisabledReason || localProductionLockedReason)
+            }
             disabledReason={
-              isCompleted ? 'The provider order is already verified as released.' : null
+              isCompleted
+                ? 'The provider order is already verified as released.'
+                : (shopOpsConfigurationDisabledReason ?? localProductionLockedReason)
             }
             onClick={() => setAddressConfirmOpen(true)}
           >
@@ -516,7 +621,17 @@ export default function AdminPaidOrderRecoveryActionsPanel({
         <ActionButton
           icon={ClipboardList}
           busy={pendingAction === 'regenerate-receipt'}
-          disabled={isAnyActionPending}
+          disabled={
+            isAnyActionPending ||
+            Boolean(shopOpsConfigurationDisabledReason) ||
+            requiresLocalProductionConfirmation
+          }
+          disabledReason={
+            shopOpsConfigurationDisabledReason ??
+            (requiresLocalProductionConfirmation
+              ? 'Receipt mutation is disabled from a localhost production-data session.'
+              : null)
+          }
           onClick={handleReceiptRegeneration}
         >
           {pendingAction === 'regenerate-receipt'
@@ -532,6 +647,82 @@ export default function AdminPaidOrderRecoveryActionsPanel({
           </p>
         ) : null}
       </div>
+
+      {requiresLocalProductionConfirmation ? (
+        <AlertDialog
+          open={productionRetryOpen}
+          onOpenChange={(open) => {
+            if (pendingAction === 'retry-recovery') return;
+            setProductionRetryOpen(open);
+            if (!open) {
+              setProductionRetryPassword('');
+              setProductionRetryReason('');
+            }
+          }}
+        >
+          <AlertDialogContent className='w-[min(94vw,560px)] rounded-xl border border-rose-300/25 bg-slate-950/95 p-5 text-slate-50 shadow-2xl shadow-black/70 backdrop-blur-xl sm:p-6'>
+            <AlertDialogHeader>
+              <AlertDialogTitle className='text-white'>
+                Run this recovery against production data?
+              </AlertDialogTitle>
+              <AlertDialogDescription className='text-slate-300'>
+                This localhost process is connected to the production PayPal and Merchize Ops
+                ledgers. The action can make live provider changes.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <div className='grid gap-3'>
+              <div className='rounded-lg border border-rose-300/20 bg-rose-300/[0.07] px-3 py-2 text-xs leading-5 text-rose-50'>
+                Scope:{' '}
+                <span className='font-semibold'>
+                  {retriesMerchizeFulfillment
+                    ? 'Merchize fulfillment only'
+                    : 'Full resumable post-payment processing'}
+                </span>
+              </div>
+              <label className='grid gap-1.5 text-xs font-medium text-rose-50/90'>
+                Master admin password
+                <input
+                  type='password'
+                  value={productionRetryPassword}
+                  onChange={(event) => setProductionRetryPassword(event.target.value)}
+                  autoComplete='current-password'
+                  className='h-10 rounded-lg border border-white/10 bg-black/20 px-3 text-sm font-normal text-white outline-none transition focus:border-rose-200/45'
+                />
+              </label>
+              <label className='grid gap-1.5 text-xs font-medium text-rose-50/90'>
+                Local production recovery reason
+                <textarea
+                  value={productionRetryReason}
+                  onChange={(event) => setProductionRetryReason(event.target.value)}
+                  placeholder='Example: Investigating and resuming production order support case.'
+                  rows={3}
+                  className='resize-none rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm font-normal text-white outline-none transition placeholder:text-slate-500 focus:border-rose-200/45'
+                />
+              </label>
+            </div>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel className='border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08] hover:text-white'>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={isAnyActionPending}
+                onClick={(event) => {
+                  if (!productionRetryPassword.trim() || !productionRetryReason.trim()) {
+                    event.preventDefault();
+                  }
+                  handleConfirmedProductionRetry();
+                }}
+                className='inline-flex items-center gap-2 border border-rose-200/35 bg-rose-300 text-slate-950 hover:bg-rose-200 disabled:cursor-not-allowed disabled:opacity-50'
+              >
+                <KeyRound size={16} />
+                Confirm production recovery
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : null}
 
       {requiresManualRelease ? (
         <AlertDialog open={releaseConfirmOpen} onOpenChange={setReleaseConfirmOpen}>

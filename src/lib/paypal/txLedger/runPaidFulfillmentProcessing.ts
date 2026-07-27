@@ -47,7 +47,9 @@ import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedge
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
+import { getMerchizeFulfillmentRetryEligibility } from '@/lib/paypal/txLedger/fulfillmentRetryPolicy';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+import { assertShopOpsMutationAllowed } from '@/lib/prisma/shop/shopOpsDataTarget';
 import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
 import type { CartVariant } from '@/stores/shop_stores/cartStore';
 
@@ -56,10 +58,107 @@ const POST_PROCESSING_LEASE_MS = 5 * 60_000;
 type RunPaidFulfillmentProcessingOptions = {
   overrideMerchizeFulfillmentPushDisabled?: boolean;
   allowStaleMerchizeOrderManualRelease?: boolean;
+  executionScope?: 'full_post_payment' | 'merchize_fulfillment_only';
+  localProductionMasterConfirmed?: boolean;
   triggerDetail?: string;
   triggerSource?:
     'capture_route' | 'manual_admin' | 'payment_reconciliation' | 'recovery_scanner' | 'webhook';
 };
+
+export type PaidFulfillmentProcessingStage =
+  | 'capture_validation'
+  | 'completion'
+  | 'django_fulfillment_handoff'
+  | 'django_payment_save'
+  | 'ledger_validation'
+  | 'merchize_order_registration'
+  | 'merchize_order_sync'
+  | 'merchize_production_push'
+  | 'merchize_push_verification'
+  | 'merchize_readiness'
+  | 'receipt_generation';
+
+const PROCESSING_STAGE_DETAILS: Record<
+  PaidFulfillmentProcessingStage,
+  { code: string; label: string }
+> = {
+  capture_validation: {
+    code: 'PAYPAL_CAPTURE_VALIDATION_FAILED',
+    label: 'PayPal capture validation failed',
+  },
+  completion: {
+    code: 'FULFILLMENT_COMPLETION_PERSISTENCE_FAILED',
+    label: 'Fulfillment completion persistence failed',
+  },
+  django_fulfillment_handoff: {
+    code: 'DJANGO_FULFILLMENT_HANDOFF_FAILED',
+    label: 'Django fulfillment handoff failed',
+  },
+  django_payment_save: {
+    code: 'DJANGO_PAYMENT_SAVE_FAILED',
+    label: 'Django payment save failed',
+  },
+  ledger_validation: {
+    code: 'PAID_LEDGER_VALIDATION_FAILED',
+    label: 'Paid ledger validation failed',
+  },
+  merchize_order_registration: {
+    code: 'MERCHIZE_ORDER_REGISTRATION_FAILED',
+    label: 'Merchize Ops registration failed',
+  },
+  merchize_order_sync: {
+    code: 'MERCHIZE_ORDER_SYNC_FAILED',
+    label: 'Merchize order synchronization failed',
+  },
+  merchize_production_push: {
+    code: 'MERCHIZE_PUSH_FAILED',
+    label: 'Merchize production push failed',
+  },
+  merchize_push_verification: {
+    code: 'MERCHIZE_PUSH_VERIFICATION_FAILED',
+    label: 'Merchize push verification failed',
+  },
+  merchize_readiness: {
+    code: 'MERCHIZE_READINESS_CHECK_FAILED',
+    label: 'Merchize readiness check failed',
+  },
+  receipt_generation: {
+    code: 'PAYMENT_RECEIPT_GENERATION_FAILED',
+    label: 'Payment receipt generation failed',
+  },
+};
+
+export class PaidFulfillmentProcessingError extends Error {
+  readonly code: string;
+  readonly stage: PaidFulfillmentProcessingStage;
+
+  constructor({
+    code,
+    message,
+    stage,
+  }: {
+    code: string;
+    message: string;
+    stage: PaidFulfillmentProcessingStage;
+  }) {
+    super(message);
+    this.name = 'PaidFulfillmentProcessingError';
+    this.code = code;
+    this.stage = stage;
+  }
+}
+
+function toPaidFulfillmentProcessingError(error: unknown, stage: PaidFulfillmentProcessingStage) {
+  if (error instanceof PaidFulfillmentProcessingError) return error;
+
+  const detail = PROCESSING_STAGE_DETAILS[stage];
+  const providerMessage = error instanceof Error ? error.message : String(error);
+  return new PaidFulfillmentProcessingError({
+    code: detail.code,
+    message: `${detail.label}: ${providerMessage}`,
+    stage,
+  });
+}
 
 function buildPaymentReceiptPayload(args: PaymentReceiptProps) {
   return encryptForPostProcessingServerAction(JSON.stringify(args));
@@ -364,6 +463,10 @@ export async function runPaidFulfillmentProcessing(
   orderToken: string,
   options: RunPaidFulfillmentProcessingOptions = {},
 ) {
+  assertShopOpsMutationAllowed({
+    localProductionMasterConfirmed: options.localProductionMasterConfirmed === true,
+  });
+
   const now = new Date();
   const lockId = randomUUID();
   const leaseExpiresAt = new Date(now.getTime() + POST_PROCESSING_LEASE_MS);
@@ -399,6 +502,8 @@ export async function runPaidFulfillmentProcessing(
     return;
   }
 
+  let activeStage: PaidFulfillmentProcessingStage = 'ledger_validation';
+
   try {
     const authData = row.authorizePayload as PaymentReceiptProps['authData'] | null;
     const finalCapturedOrder = row.capturePayload as
@@ -408,6 +513,7 @@ export async function runPaidFulfillmentProcessing(
       throw new Error('Missing authorize/capture payload in ledger');
     }
 
+    activeStage = 'capture_validation';
     const captureCompletion = getPayPalCaptureCompletion(finalCapturedOrder);
     if (!captureCompletion.ok) {
       await updateLockedRow(orderToken, lockId, {
@@ -424,6 +530,39 @@ export async function runPaidFulfillmentProcessing(
       throw new Error(captureCompletion.reason);
     }
 
+    if (options.executionScope === 'merchize_fulfillment_only') {
+      const acceptedDjangoHandoff = isAcceptedDjangoFulfillmentProcessResponse(
+        row.merchizeFulfillmentResponsePayload,
+      );
+      const merchizeExternalOrderNumber = acceptedDjangoHandoff
+        ? extractMerchizeExternalOrderNumberFromDjangoProcessResponse(
+            row.merchizeFulfillmentResponsePayload,
+          )
+        : null;
+      const eligibility = getMerchizeFulfillmentRetryEligibility({
+        captureComplete: captureCompletion.ok,
+        hasAcceptedDjangoFulfillmentHandoff: acceptedDjangoHandoff,
+        hasDjangoPaymentSaveCustomId: Boolean(row.djangoPaymentSaveCustomId),
+        hasMerchizeExternalOrderNumber: Boolean(merchizeExternalOrderNumber),
+        hasPersistedReceipt: Boolean(row.receiptLink && row.receiptFile),
+      });
+
+      if (!eligibility.eligible) {
+        throw new PaidFulfillmentProcessingError({
+          code: eligibility.code,
+          message: eligibility.message,
+          stage:
+            eligibility.missingCheckpoint === 'receipt'
+              ? 'receipt_generation'
+              : eligibility.missingCheckpoint === 'django_payment_save'
+                ? 'django_payment_save'
+                : eligibility.missingCheckpoint === 'capture'
+                  ? 'capture_validation'
+                  : 'django_fulfillment_handoff',
+        });
+      }
+    }
+
     const customer = {
       name: row.customerName,
       email: row.customerEmail,
@@ -431,6 +570,7 @@ export async function runPaidFulfillmentProcessing(
     const ORD_string = row.djangoOrderIntentOrderId ?? row.orderToken;
 
     if (!row.receiptLink || !row.receiptFile) {
+      activeStage = 'receipt_generation';
       const receiptRes = await savePaymentReceiptToCloud(
         buildPaymentReceiptPayload({
           authData,
@@ -464,6 +604,7 @@ export async function runPaidFulfillmentProcessing(
     }
 
     if (!row.djangoPaymentSaveCustomId) {
+      activeStage = 'django_payment_save';
       const paymentSave = await savePaymentDataToBackend(
         buildPaymentSavePayload({
           authData,
@@ -498,6 +639,7 @@ export async function runPaidFulfillmentProcessing(
     }
 
     if (!row.djangoPaymentSaveCustomId) {
+      activeStage = 'django_payment_save';
       throw new Error('Missing Django payment save custom_id before fulfillment push');
     }
 
@@ -520,6 +662,7 @@ export async function runPaidFulfillmentProcessing(
       : null;
 
     if (!merchizeExternalOrderNumber) {
+      activeStage = 'django_fulfillment_handoff';
       const fulfillmentSend = await sendMerchizeFulfillmentOrder({
         cartSnapshot: row.cartSnapshot as CartVariant[],
         djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
@@ -558,6 +701,7 @@ export async function runPaidFulfillmentProcessing(
     }
 
     if (merchizeExternalOrderNumber) {
+      activeStage = 'merchize_order_registration';
       await registerAcceptedMerchizeFulfillmentProcess({
         orderToken,
         paypalOrderId: row.paypalOrderId,
@@ -575,6 +719,7 @@ export async function runPaidFulfillmentProcessing(
         cartSnapshot: row.cartSnapshot,
       });
 
+      activeStage = 'merchize_order_sync';
       const sync = await syncMerchizeFulfillmentOrder(orderToken);
       if (!sync.ok) {
         if (isMerchizeLookupPendingProviderProcessingError(sync.errorCode)) {
@@ -605,6 +750,7 @@ export async function runPaidFulfillmentProcessing(
         return;
       }
 
+      activeStage = 'merchize_readiness';
       const readinessCheck = await runMerchizeProductionReadinessChecks(orderToken, {
         allowStaleOrderManualRelease: options.allowStaleMerchizeOrderManualRelease,
         expectedBuyerAddress: getMerchizeBuyerAddressExpectationFromLedger(fulfillmentAddress),
@@ -662,10 +808,13 @@ export async function runPaidFulfillmentProcessing(
         return;
       }
 
-      let pushVerification =
-        readiness.providerPushState === 'pushed'
-          ? await verifyMerchizeFulfillmentPush(orderToken, { retryDelaysMs: [0] })
-          : null;
+      let pushVerification: Awaited<ReturnType<typeof verifyMerchizeFulfillmentPush>> | null = null;
+      if (readiness.providerPushState === 'pushed') {
+        activeStage = 'merchize_push_verification';
+        pushVerification = await verifyMerchizeFulfillmentPush(orderToken, {
+          retryDelaysMs: [0],
+        });
+      }
 
       if (
         !pushVerification &&
@@ -710,6 +859,7 @@ export async function runPaidFulfillmentProcessing(
 
         if (!shouldVerifyExistingPush) {
           try {
+            activeStage = 'merchize_production_push';
             await pushMerchizeFulfillmentOrderToProduction({
               orderToken,
               merchizeExternalOrderNumber,
@@ -740,6 +890,7 @@ export async function runPaidFulfillmentProcessing(
           }
         }
 
+        activeStage = 'merchize_push_verification';
         pushVerification = await verifyMerchizeFulfillmentPush(orderToken);
       }
 
@@ -777,6 +928,7 @@ export async function runPaidFulfillmentProcessing(
         return;
       }
 
+      activeStage = 'completion';
       await updateLockedRow(orderToken, lockId, {
         status: PAYPAL_LEDGER_STATUS.COMPLETED,
         merchizeFulfillmentRequestPayload: toLedgerJson(fulfillmentRequestPayload),
@@ -919,15 +1071,18 @@ export async function runPaidFulfillmentProcessing(
       return;
     }
 
+    const processingError = toPaidFulfillmentProcessingError(error, activeStage);
+    const prerequisiteFailure = processingError.code.startsWith('MERCHIZE_RETRY_');
+
     await updateLockedRow(orderToken, lockId, {
-      status: PAYPAL_LEDGER_STATUS.ERROR,
-      lastErrorCode: 'POST_PROCESSING_FAILED',
-      lastErrorMessage: message,
+      status: prerequisiteFailure ? row.status : PAYPAL_LEDGER_STATUS.ERROR,
+      lastErrorCode: processingError.code,
+      lastErrorMessage: processingError.message,
       postProcessingLockId: null,
       postProcessingLockedAt: null,
       postProcessingLockExpiresAt: null,
     });
 
-    throw error;
+    throw processingError;
   }
 }

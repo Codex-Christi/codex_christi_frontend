@@ -26,6 +26,8 @@ import type {
   PaidOrderRecoveryRow,
   TimelineItem,
 } from './adminShopDashboardTypes';
+import type { ShopOpsDataTargetView } from '@/lib/prisma/shop/shopOpsDataTarget';
+import ShopOpsDataTargetBadge from './ShopOpsDataTargetBadge';
 
 type PaidOrderRecoveryDetailPanelProps = {
   recovery: PaidOrderRecoveryRow;
@@ -33,6 +35,7 @@ type PaidOrderRecoveryDetailPanelProps = {
   timeline?: TimelineItem[];
   notifications?: AdminNotificationHistoryItem[];
   customerNotifications?: CustomerNotificationHistoryItem[];
+  shopOpsDataTarget: ShopOpsDataTargetView;
   onClose?: () => void;
   variant?: 'panel' | 'page';
 };
@@ -43,6 +46,7 @@ export default function PaidOrderRecoveryDetailPanel({
   timeline = [],
   notifications = [],
   customerNotifications = [],
+  shopOpsDataTarget,
   onClose,
   variant = 'panel',
 }: PaidOrderRecoveryDetailPanelProps) {
@@ -80,6 +84,8 @@ export default function PaidOrderRecoveryDetailPanel({
           variant === 'panel' && 'min-h-0 flex-1 overflow-y-auto p-4 sm:p-5',
         )}
       >
+        <ShopOpsDataTargetBadge status={shopOpsDataTarget} />
+
         <div className='flex min-w-0 flex-col gap-4 xl:grid xl:grid-cols-2 xl:items-start'>
           <div className='contents xl:block xl:space-y-4'>
             <section aria-label='Recovery case' className='order-1 min-w-0'>
@@ -101,6 +107,7 @@ export default function PaidOrderRecoveryDetailPanel({
               <PaidOrderRecoveryPrimaryContextSections
                 detail={detail}
                 orderToken={recovery.orderToken}
+                shopOpsDataTarget={shopOpsDataTarget}
               />
             </section>
           </div>
@@ -116,6 +123,7 @@ export default function PaidOrderRecoveryDetailPanel({
                   recovery={recovery}
                   detail={detail}
                   manualReleaseReadinessWarning={releaseReadinessWarning}
+                  shopOpsDataTarget={shopOpsDataTarget}
                 />
               </div>
             </aside>
@@ -151,10 +159,12 @@ function RecoveryActionsPanel({
   recovery,
   detail,
   manualReleaseReadinessWarning,
+  shopOpsDataTarget,
 }: {
   recovery: PaidOrderRecoveryRow;
   detail: PaidOrderRecoveryDetail;
   manualReleaseReadinessWarning: string | null;
+  shopOpsDataTarget: ShopOpsDataTargetView;
 }) {
   const addressReviewStatus = detail.merchizeFulfillmentOps?.addressReviewStatus;
   const canConfirmProviderAddress =
@@ -178,8 +188,9 @@ function RecoveryActionsPanel({
           needsProviderDetailSync={detail.needsProviderDetailSync}
           requiresManualRelease={detail.requiresManualRelease}
           canConfirmProviderAddress={canConfirmProviderAddress}
-          recoveryStatus={recovery.status}
           manualReleaseReadinessWarning={manualReleaseReadinessWarning}
+          retryMode={detail.retryMode}
+          shopOpsDataTarget={shopOpsDataTarget}
         />
       </div>
     </AdminGlassPanel>

@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from 'react';
 import type { PayPalLedgerSourceTone } from '@/lib/paypal/txLedger/paypalLedgerProvenance';
+import type { PaidOrderRetryMode } from '@/lib/paypal/txLedger/fulfillmentRetryPolicy';
 
 export type ToolTone = 'cyan' | 'emerald' | 'amber' | 'rose' | 'violet' | 'blue';
 export type ToolState =
@@ -192,6 +193,7 @@ export type PaidOrderRecoveryDetail = {
   paymentEvidence: PaidOrderRecoveryPaymentEvidence;
   webhookEvents: PaidOrderRecoveryWebhookEvent[];
   scannerState: PaidOrderRecoveryScannerState;
+  retryMode: PaidOrderRetryMode;
   merchizeFulfillmentOps: MerchizeFulfillmentOpsAdminSummary | null;
   rawDebug: Record<string, unknown>;
   needsProviderDetailSync: boolean;
