@@ -4,6 +4,7 @@ import type { ProductResult } from '@/lib/merchizeStorefront/productTypes';
 import { ProductDetailsProvider, ProductPurchasePanelContent } from '.';
 import { ProductImageGallery } from './ProductImageGallery';
 import styles from './ProductDetails.module.css';
+import type { ProductOptionLayoutGroup } from '@/lib/merchizeStorefront/productOptionLayout';
 
 const reviews = [
   'Very comfortable, fits perfectly and I think it is affordable for the above price.',
@@ -31,6 +32,7 @@ type ProductDetailsShellProps = {
   fetchedProductData: ProductResult;
   initialImageUrls: string[];
   descriptionSection: ReactNode;
+  optionLayoutHints: ProductOptionLayoutGroup[];
 };
 
 export default function ProductDetailsShell({
@@ -38,6 +40,7 @@ export default function ProductDetailsShell({
   fetchedProductData,
   initialImageUrls,
   descriptionSection,
+  optionLayoutHints,
 }: ProductDetailsShellProps) {
   return (
     <div className='grid min-w-0 gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-6 xl:grid-cols-3'>
@@ -46,6 +49,7 @@ export default function ProductDetailsShell({
         productId={productId}
         fetchedProductData={fetchedProductData}
         initialImageUrls={initialImageUrls}
+        optionLayoutHints={optionLayoutHints}
       >
         <div className='grid min-w-0 gap-4 lg:col-span-4 xl:col-span-2'>
           <ProductImageGallery

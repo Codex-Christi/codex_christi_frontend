@@ -7,6 +7,7 @@ import { extractProductMetaDescriptionFromHtml } from '@/lib/utils/extract-plain
 import {
   assertBasicStorefrontProductData,
   getBasicProductFromSnapshot,
+  getProductVariantsFromSnapshot,
 } from '@/lib/merchizeStorefront/snapshot';
 import { fetchMerchizeJson } from '@/lib/merchizeStorefront/providerErrors';
 import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
@@ -23,6 +24,7 @@ import {
   toMerchizeProductPreviewUrl,
   toMerchizeThumbnailUrl,
 } from '@/lib/merchizeStorefront/imageUrls';
+import { getProductOptionLayout } from '@/lib/merchizeStorefront/productOptionLayout';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -254,6 +256,9 @@ const ProductDetails = async ({ params }: PageProps) => {
     });
 
   const { description, title, retail_price } = productMetaData;
+  const optionLayoutHints = await getProductVariantsFromSnapshot(productID)
+    .then((variants) => getProductOptionLayout(variants ?? []))
+    .catch(() => []);
 
   const productData = {
     productMetaData,
@@ -295,6 +300,7 @@ const ProductDetails = async ({ params }: PageProps) => {
         productId={productID}
         fetchedProductData={{ ...productData, productMetaData: clientProductMetaData }}
         initialImageUrls={initialImageUrls}
+        optionLayoutHints={optionLayoutHints}
         descriptionSection={<ProductDescriptionSection description={description} />}
       />
       <ProductFeedbackSection />

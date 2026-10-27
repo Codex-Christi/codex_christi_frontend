@@ -16,9 +16,15 @@ interface RadioButtonGroupProps {
   onChange: (value: string | { name: string; value: string }) => void;
   /** Optional accessible name for the radio group */
   groupLabel?: string;
+  isLoading?: boolean;
 }
 
-const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({ props, onChange, groupLabel }) => {
+const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({
+  props,
+  onChange,
+  groupLabel,
+  isLoading = false,
+}) => {
   const [selectedValue, setSelectedValue] = React.useState<string | undefined>();
   const groupId = useId();
   const groupName = `radio-group-${groupId}`;
@@ -44,11 +50,13 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({ props, onChange, gr
     <div
       role='radiogroup'
       aria-label={groupLabel}
+      aria-hidden={isLoading || undefined}
+      inert={isLoading || undefined}
       className='flex py-3 gap-8 flex-wrap justify-start items-center'
     >
       {props.map((prop) => {
         const radioValue = typeof prop.value === 'string' ? prop.value : prop.value?.value;
-        const isSelected = displaySelectedValue === radioValue;
+        const isSelected = !isLoading && displaySelectedValue === radioValue;
         const isColorValue = radioValue
           ? radioValue.startsWith('#') && radioValue.length === 7
           : false;
@@ -69,8 +77,8 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({ props, onChange, gr
               checked={!!isSelected}
               onChange={() => handleSelect(prop, radioValue)}
               aria-labelledby={labelId}
-              disabled={isDisabled}
-              aria-disabled={isDisabled}
+              disabled={isDisabled || isLoading}
+              aria-disabled={isDisabled || isLoading}
             />
 
             {isColorValue ? (
@@ -83,6 +91,7 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({ props, onChange, gr
                   'focus:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-black',
                   isDisabled && 'opacity-40 cursor-not-allowed',
                   isSelected ? 'border-black ring-2 ring-black scale-150' : 'border-gray-300',
+                  isLoading && 'animate-pulse !border-transparent !bg-white/10 !text-transparent',
                 )}
                 style={{
                   backgroundColor: hexCode ?? '#fff',
@@ -114,6 +123,7 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({ props, onChange, gr
                   isSelected &&
                     `bg-gray-600 text-white border-[2.5px] font-extrabold border-gray-600 
                     hover:bg-gray-600 shadow-gray-200 shadow-md hover:text-white font-ocr`,
+                  isLoading && 'animate-pulse !border-transparent !bg-white/10 !text-transparent',
                 )}
               >
                 {prop.label}
@@ -124,6 +134,7 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({ props, onChange, gr
               <span
                 className={cn(
                   'mt-1 text-[.7rem] text-center',
+                  isLoading && 'invisible',
                   isSelected ? 'scale-125 font-semibold font-ocr' : '',
                 )}
               >

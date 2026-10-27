@@ -4,6 +4,7 @@ import { createContext, useContext, FC, ReactNode, useEffect, useMemo, useState 
 import dynamic from 'next/dynamic';
 import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore';
 import type { ProductUnavailabilityReason } from '@/lib/merchizeStorefront/destinationAvailability';
+import type { ProductOptionLayoutGroup } from '@/lib/merchizeStorefront/productOptionLayout';
 
 const ProductTitleAndSizesEtc = dynamic(() => import('./ProductTitleAndSizesEtc'));
 
@@ -14,6 +15,7 @@ export interface ProductDetailsProps {
   initialImageUrls: string[];
   descriptionSection?: ReactNode;
   children?: ReactNode;
+  optionLayoutHints?: ProductOptionLayoutGroup[];
 }
 
 export interface OptionalProductVariantProps {
@@ -24,6 +26,7 @@ export interface OptionalProductVariantProps {
 
 type VariantLoadState = 'loading' | 'ready' | 'error';
 const EMPTY_VARIANTS: ProductVariantsInterface['data'] = [];
+const EMPTY_OPTION_LAYOUT: ProductOptionLayoutGroup[] = [];
 type IdleWindow = Window & {
   requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
   cancelIdleCallback?: (handle: number) => void;
@@ -39,6 +42,7 @@ export type ProductDetailsContextValue = ProductResult & {
   deliveryCountry: string;
   deliveryCountryName: string;
   unavailabilityReason: ProductUnavailabilityReason;
+  optionLayoutHints: ProductOptionLayoutGroup[];
 };
 
 export const ProductDetailsContext = createContext<ProductDetailsContextValue | undefined>(
@@ -58,6 +62,7 @@ export const ProductDetailsProvider: FC<ProductDetailsProps> = ({
   fetchedProductData,
   initialImageUrls,
   children,
+  optionLayoutHints = EMPTY_OPTION_LAYOUT,
 }) => {
   const country = useCurrencyCookie((state) => state.iso3) || 'USA';
   const requestKey = `${productId}:${country}`;
@@ -179,6 +184,7 @@ export const ProductDetailsProvider: FC<ProductDetailsProps> = ({
       deliveryCountry: country,
       deliveryCountryName,
       unavailabilityReason,
+      optionLayoutHints,
     }),
     [
       fetchedProductData.productMetaData,
@@ -190,6 +196,7 @@ export const ProductDetailsProvider: FC<ProductDetailsProps> = ({
       country,
       deliveryCountryName,
       unavailabilityReason,
+      optionLayoutHints,
     ],
   );
 

@@ -808,9 +808,251 @@
   ],
   "remaining": [
     "Production deployment and a same-environment production rerun are required before claiming any score improvement.",
-    "Product desktop CLS remains around 0.036 when the variant panel replaces its smaller loading placeholder; mobile CLS is zero in accepted runs.",
     "The about hero still uses its original 1.29 MB SVG; it was not converted without a separate fidelity and responsive-cropping check.",
     "The variants endpoint now verifies per-destination availability and uses private, no-store; it must not receive the previously proposed blanket shared-cache policy.",
     "Cache Components and edge-cache ownership changes have not been applied. They need an updated design against the newer catalog verification flow and active VPS config."
-  ]
+  ],
+  "layoutStability": {
+    "method": "Isolated production builds; variant responses held until fonts loaded, then released; three products at five viewport widths, plus subset and two-attempt error states",
+    "layoutHints": "Snapshot labels provide geometry only. Destination-verified options remain authoritative. Missing hints use a generic skeleton; newly added options may still grow the layout.",
+    "cases": [
+      {
+        "width": 412,
+        "productId": "68b39ac590dbad697de11bbf",
+        "mode": "full",
+        "beforeCLS": 0,
+        "afterCLS": 0,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 412,
+        "productId": "68cf079c1581a310d9032c25",
+        "mode": "full",
+        "beforeCLS": 0.0014372257281553397,
+        "afterCLS": 0,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 412,
+        "productId": "69426154836110f3e6e856cf",
+        "mode": "full",
+        "beforeCLS": 0.0014372257281553397,
+        "afterCLS": 0,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 1024,
+        "productId": "68b39ac590dbad697de11bbf",
+        "mode": "full",
+        "beforeCLS": 0.08869194030761719,
+        "afterCLS": 0,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 1024,
+        "productId": "68cf079c1581a310d9032c25",
+        "mode": "full",
+        "beforeCLS": 0.025349121093749996,
+        "afterCLS": 0.00008914589881896973,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 1024,
+        "productId": "69426154836110f3e6e856cf",
+        "mode": "full",
+        "beforeCLS": 0.025349121093749996,
+        "afterCLS": 0.00008914589881896973,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 1280,
+        "productId": "68b39ac590dbad697de11bbf",
+        "mode": "full",
+        "beforeCLS": 0.0409953955078125,
+        "afterCLS": 0.00005705337524414063,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 1280,
+        "productId": "68cf079c1581a310d9032c25",
+        "mode": "full",
+        "beforeCLS": 0.0193087890625,
+        "afterCLS": 0.00005705337524414063,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 1280,
+        "productId": "69426154836110f3e6e856cf",
+        "mode": "full",
+        "beforeCLS": 0.0193087890625,
+        "afterCLS": 0.00005705337524414063,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 1440,
+        "productId": "68b39ac590dbad697de11bbf",
+        "mode": "full",
+        "beforeCLS": 0.03014699074074074,
+        "afterCLS": 0.000045079210069444444,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 1440,
+        "productId": "68b39ac590dbad697de11bbf",
+        "mode": "subset",
+        "beforeCLS": 0.015311975308641975,
+        "afterCLS": 0.000045079210069444444,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 1440,
+        "productId": "68b39ac590dbad697de11bbf",
+        "mode": "error",
+        "beforeCLS": 0.003437431957103588,
+        "afterCLS": 0.00007994249131944445,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 1440,
+        "productId": "68cf079c1581a310d9032c25",
+        "mode": "full",
+        "beforeCLS": 0.010565057870370369,
+        "afterCLS": 0.000045079210069444444,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 1440,
+        "productId": "69426154836110f3e6e856cf",
+        "mode": "full",
+        "beforeCLS": 0.010565057870370369,
+        "afterCLS": 0.000045079210069444444,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 1920,
+        "productId": "68b39ac590dbad697de11bbf",
+        "mode": "full",
+        "beforeCLS": 0.018495740017361113,
+        "afterCLS": 0.000025357055664062503,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 1920,
+        "productId": "68cf079c1581a310d9032c25",
+        "mode": "full",
+        "beforeCLS": 0.00866257595486111,
+        "afterCLS": 0.000025357055664062503,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      },
+      {
+        "width": 1920,
+        "productId": "69426154836110f3e6e856cf",
+        "mode": "full",
+        "beforeCLS": 0.00866257595486111,
+        "afterCLS": 0.000025357055664062503,
+        "buttonDeltaY": 0,
+        "overflow": false,
+        "selectable": true,
+        "runtimeErrors": []
+      }
+    ],
+    "lighthouse": [
+      {
+        "mode": "mobile",
+        "run": 1,
+        "performance": 89,
+        "lcpMs": 3556.0131499999998,
+        "tbtMs": 25.5,
+        "cls": 0
+      },
+      {
+        "mode": "mobile",
+        "run": 2,
+        "performance": 90,
+        "lcpMs": 3529.5719999999997,
+        "tbtMs": 12.5,
+        "cls": 0
+      },
+      {
+        "mode": "mobile",
+        "run": 3,
+        "performance": 93,
+        "lcpMs": 3080.0704499999997,
+        "tbtMs": 13.5,
+        "cls": 0
+      },
+      {
+        "mode": "desktop",
+        "run": 1,
+        "performance": 100,
+        "lcpMs": 723.61025,
+        "tbtMs": 0,
+        "cls": 0.00010017292706418002
+      },
+      {
+        "mode": "desktop",
+        "run": 2,
+        "performance": 100,
+        "lcpMs": 724.3144500000001,
+        "tbtMs": 0,
+        "cls": 0.00005456396112424482
+      },
+      {
+        "mode": "desktop",
+        "run": 3,
+        "performance": 100,
+        "lcpMs": 730.37615,
+        "tbtMs": 0,
+        "cls": 0.00005456396112424482
+      }
+    ]
+  }
 }

@@ -8,15 +8,18 @@ import {
   LabelAttribute,
 } from '@/lib/merchizeStorefront/productTypes';
 import { useCurrentVariant } from './currentVariantStore';
-import { sizeFormatArr } from './SizeSelector';
-
-type AttributeKind = 'size' | 'color' | 'label';
+import {
+  buildProductRadioOptions,
+  type ProductOptionKind,
+  type ProductOptionLayoutGroup,
+} from '@/lib/merchizeStorefront/productOptionLayout';
+import { Skeleton } from '../../primitives/skeleton';
 
 type AttributeOption = ProductVariantOptions[number]; // base trait: has .value, .name, .slug, .attribute?
 
 interface VariantAttributeSelectorProps<T extends AttributeOption> {
   title: string;
-  attribute: AttributeKind;
+  attribute: ProductOptionKind;
   options: T[];
 }
 
@@ -27,30 +30,10 @@ const VariantAttributeSelector = <T extends AttributeOption>({
 }: VariantAttributeSelectorProps<T>) => {
   const { setSize, setColor, setLabel } = useCurrentVariant();
 
-  const radioOptions = useMemo(() => {
-    if (!Array.isArray(options) || options.length === 0) return [];
-
-    const mapped = options
-      .map((opt) => {
-        const attrName = opt?.attribute?.name;
-        return {
-          label: opt.name ?? attrName ?? attribute,
-          value: opt.value,
-          key: opt.slug ?? `${opt.value}-${attrName ?? attribute}`,
-        };
-      })
-      .sort((elemA, elemB) =>
-        attribute === 'size'
-          ? sizeFormatArr.indexOf(elemA.label.toLowerCase()) -
-            sizeFormatArr.indexOf(elemB.label.toLowerCase())
-          : elemA.label.localeCompare(elemB.label),
-      );
-
-    // de-dupe by label+value
-    return [
-      ...new Map(mapped.map((obj) => [`${obj.label}:${obj.value}`.toLowerCase(), obj])).values(),
-    ];
-  }, [options, attribute]);
+  const radioOptions = useMemo(
+    () => buildProductRadioOptions(options, attribute),
+    [options, attribute],
+  );
 
   const onChange = useCallback(
     (value: string | { name: string; value: string }) => {
@@ -88,9 +71,22 @@ const VariantAttributeSelector = <T extends AttributeOption>({
   return (
     <div className='space-y-1'>
       <h4 className='text-xl'>{title}</h4>
-      <RadioButtonGroup props={radioOptions} onChange={onChange} />
+      <RadioButtonGroup props={radioOptions} onChange={onChange} groupLabel={title} />
     </div>
   );
 };
 
 export default VariantAttributeSelector;
+
+const ignorePlaceholderSelection = () => {};
+
+export function VariantAttributeSkeleton({ title, options }: ProductOptionLayoutGroup) {
+  return (
+    <div className='space-y-1'>
+      <Skeleton className='w-fit bg-white/10'>
+        <h4 className='invisible text-xl'>{title}</h4>
+      </Skeleton>
+      <RadioButtonGroup props={options} onChange={ignorePlaceholderSelection} isLoading />
+    </div>
+  );
+}
