@@ -11,20 +11,12 @@
   }
 }
 
-.spaceSmall > * + * {
-  margin-top: 0.5rem;
-}
-
 .spaceMedium > * + * {
   margin-top: 1rem;
 }
 
 .spaceLarge > * + * {
   margin-top: 1.5rem;
-}
-
-.spaceXL > * + * {
-  margin-top: 2rem;
 }
 
 .galleryPanel {
@@ -194,12 +186,6 @@
   .purchaseActions button {
     padding-inline: 1rem !important;
   }
-}
-
-.reviewLink {
-  border: 1px solid #fff;
-  border-radius: 0.375rem;
-  padding: 10px;
 }
 
 .descriptionPanel {

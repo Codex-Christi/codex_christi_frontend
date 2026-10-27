@@ -14,10 +14,7 @@ import {
   fetchMerchizeJson,
 } from '@/lib/merchizeStorefront/providerErrors';
 import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
-import {
-  ProductDescriptionSection,
-  ProductFeedbackSection,
-} from '@/components/UI/Shop/ProductDetails/ProductStaticSections';
+import { ProductDescriptionSection } from '@/components/UI/Shop/ProductDetails/ProductStaticSections';
 import { getShopSiteUrl } from '@/lib/siteBaseUrls';
 import { getPublishedShopProductPreview } from '@/lib/utils/shopHomePageProductsData';
 import { readProductSeoManifestEntry } from '@/lib/shop/seoManifest/read';
@@ -26,6 +23,7 @@ import { recordShopMetadataSource } from '@/lib/shop/seoManifest/metadataObserva
 import { resolveProductGalleryImages } from '@/lib/merchizeStorefront/imageUrls';
 import { getProductOptionLayout } from '@/lib/merchizeStorefront/productOptionLayout';
 import { STRICT_STOREFRONT_PROVIDER_TIMEOUT_MS } from '@/lib/merchizeStorefront/strictLiveProduct';
+import { getProductStructuredData } from '@/lib/merchizeStorefront/productStructuredData';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -255,7 +253,7 @@ const ProductDetails = async ({ params }: PageProps) => {
     getProductVariantsFromSnapshot(productID).catch(() => null),
   ]);
 
-  const { description, title, retail_price } = productMetaData;
+  const { description, title } = productMetaData;
   const optionLayoutHints = getProductOptionLayout(displayVariants ?? []);
 
   // Saved images are display hints only; purchase options still require live verification.
@@ -271,28 +269,15 @@ const ProductDetails = async ({ params }: PageProps) => {
   };
   const trimmedDescription = extractProductMetaDescriptionFromHtml(description, title);
 
-  const JSON_LD_Data = serialize({
-    '@context': 'https://schema.org/',
-    '@type': 'Product',
-    name: title,
-    ...(firstImageUrl ? { image: firstImageUrl } : {}),
-    description: trimmedDescription,
-    brand: {
-      '@type': 'Brand',
-      name: 'Codex Christi',
-    },
-    offers: {
-      '@type': 'Offer',
-      price: retail_price,
-      priceCurrency: 'USD',
-      availability: 'https://schema.org/InStock',
-      itemCondition: 'https://schema.org/NewCondition',
-      // Optional but nice-to-have:
-      // priceValidUntil: '2026-12-31',
-    },
-  });
+  const productStructuredData = serialize(
+    getProductStructuredData({
+      product: productMetaData,
+      description: trimmedDescription,
+      image: firstImageUrl,
+      url: getShopSiteUrl(`/product/${encodeURIComponent(productMetaData._id)}`),
+    }),
+  );
 
-  // Main JSX
   return (
     <>
       <ProductDetailsShell
@@ -302,8 +287,7 @@ const ProductDetails = async ({ params }: PageProps) => {
         optionLayoutHints={optionLayoutHints}
         descriptionSection={<ProductDescriptionSection description={description} />}
       />
-      <ProductFeedbackSection />
-      <script type='application/ld+json'>{JSON_LD_Data}</script>
+      <script type='application/ld+json'>{productStructuredData}</script>
     </>
   );
 };

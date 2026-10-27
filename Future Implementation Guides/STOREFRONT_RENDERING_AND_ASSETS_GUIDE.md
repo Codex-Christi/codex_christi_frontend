@@ -61,6 +61,15 @@ photos and usable API galleries come first. Known local artwork is only a last
 resort, never a replacement for usable Merchize model photos. Saved images are
 for display only and cannot enable purchases or authorize checkout.
 
+Product details use the supplier description, not example specifications or reviews.
+The delivery panel links to the existing shipping and made-to-order policy without
+promising fees, arrival dates, security certifications, or a fixed return period.
+`productStructuredData.ts` keeps product details and a valid listed price for published
+products. It does not claim stock status, ratings, delivery dates, or return terms.
+A published listing does not prove that its options are currently available to buy
+or ship. This adds no supplier calls or database reads; ISR and checkout checks stay
+unchanged.
+
 The About page stays a small composition of hero, content, navigation, and footer.
 `AboutHero` is a Server Component, not an extra client-side widget. Its flow height
 remains `20rem`; the taller desktop artwork is only a background layer. The

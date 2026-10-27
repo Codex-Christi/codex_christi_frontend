@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import DOMPurify from 'isomorphic-dompurify';
 import styles from './ProductDetails.module.css';
 
@@ -88,21 +87,4 @@ function wrapRemoteTables(html: string) {
       '<div class="product-size-table-scroll" role="region" aria-label="Product size chart" tabindex="0"><table$1>',
     )
     .replace(/<\/table>/gi, '</table></div>');
-}
-
-export function ProductFeedbackSection() {
-  return (
-    <div className='space-y-8 mt-4 lg:col-span-2'>
-      <div className='grid place-content-center gap-4'>
-        <p>Please tell us what you think.</p>
-
-        <Link
-          className='text-center bg-[#0066CC] px-4 py-3 rounded-lg text-white'
-          href='/shop/contact-us/'
-        >
-          Kindly give us a feedback!
-        </Link>
-      </div>
-    </div>
-  );
 }
