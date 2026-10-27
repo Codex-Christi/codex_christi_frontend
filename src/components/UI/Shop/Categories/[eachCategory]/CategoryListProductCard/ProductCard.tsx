@@ -9,11 +9,16 @@ import GlobalProductPrice, {
 import { Suspense } from 'react';
 import SizeAndColorSelectorPopover from './SizeAndColorSelectorPopover';
 
+export type CategoryProductCardData = Pick<
+  CategoryProductDetail,
+  '_id' | 'title' | 'slug' | 'image' | 'retail_price'
+>;
+
 export default function ProductCard({
   product,
   priority = false,
 }: {
-  product: CategoryProductDetail;
+  product: CategoryProductCardData;
   priority?: boolean;
 }) {
   const { title, _id, slug } = product;
@@ -43,7 +48,6 @@ export default function ProductCard({
             loading={priority ? undefined : 'lazy'}
             sizes='(max-width: 639px) min(306px, calc(100vw - 68px)), (max-width: 899px) min(306px, calc((100vw - 96px) / 2)), (max-width: 1279px) min(346px, calc((100vw - 124px) / 3)), min(346px, calc((100vw - 152px) / 4))'
             className='h-auto w-full object-cover object-top aspect-[16/18] md:aspect-[16/13]'
-            style={{ filter: isDayOrNight() === 'night' ? 'brightness(.9)' : 'none' }}
           />
         </div>
 
@@ -77,9 +81,4 @@ export default function ProductCard({
       </div>
     </div>
   );
-}
-
-function isDayOrNight() {
-  const h = new Date().getHours();
-  return h >= 6 && h < 20 ? 'day' : 'night';
 }

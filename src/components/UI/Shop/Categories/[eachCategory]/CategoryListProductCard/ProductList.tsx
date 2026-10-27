@@ -2,8 +2,7 @@
 
 import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import type { CategoryProductDetail } from '@/app/shop/category/[id]/categoryDetailsSSR';
-import ProductCard from './ProductCard';
+import ProductCard, { type CategoryProductCardData } from './ProductCard';
 import Skeleton from './Skeleton';
 import { Button } from '@/components/UI/primitives/button';
 
@@ -12,7 +11,7 @@ export default function ProductList({
   initialData,
 }: {
   count: number;
-  initialData: CategoryProductDetail[];
+  initialData: CategoryProductCardData[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();

@@ -13,6 +13,7 @@ import type { CategorySeoManifestEntry } from '@/lib/shop/seoManifest/types';
 import { recordShopMetadataSource } from '@/lib/shop/seoManifest/metadataObservability';
 import { coerceMerchizeProviderError } from '@/lib/merchizeStorefront/providerErrors';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
+import type { CategoryProductCardData } from '@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/ProductCard';
 
 const ProductList = dynamic(
   () =>
@@ -241,6 +242,11 @@ export default async function CategoryPageView({
   const { products, totalPages } = pageData.initialProductFetchResp;
   if (page > 1 && page > totalPages) notFound();
 
+  // Keep full supplier records on the server; only card fields belong in client props.
+  const cardProducts: CategoryProductCardData[] = products.map(
+    ({ _id, title, slug, image, retail_price }) => ({ _id, title, slug, image, retail_price }),
+  );
+
   return (
     <div className='min-h-[60vh]'>
       <header className='px-8 pt-10'>
@@ -251,7 +257,7 @@ export default async function CategoryPageView({
       <main className='px-8 pt-7 flex flex-col gap-16 mb-10'>
         {products.length > 0 ? (
           <>
-            <ProductList count={productLimit} initialData={products} />
+            <ProductList count={productLimit} initialData={cardProducts} />
             <PaginationControls currentPage={page} category={categoryName} totalPages={totalPages} />
           </>
         ) : (
