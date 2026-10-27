@@ -1,22 +1,13 @@
-// app/category/[id]/ProductCard.tsx
 'use client';
 
 import Image from 'next/image';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 import type { CategoryProductDetail } from '@/app/shop/category/[id]/categoryDetailsSSR';
-import dynamic from 'next/dynamic';
 import GlobalProductPrice, {
   PriceSkeleton,
 } from '../../../GlobalShopComponents/GlobalProductPrice';
 import { Suspense } from 'react';
-
-const SizeAndColorSelectorPopover = dynamic(
-  () =>
-    import(
-      '@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/SizeAndColorSelectorPopover'
-    ).then((mod) => mod.default),
-  { ssr: false },
-);
+import SizeAndColorSelectorPopover from './SizeAndColorSelectorPopover';
 
 export default function ProductCard({
   product,
