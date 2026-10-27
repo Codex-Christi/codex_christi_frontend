@@ -254,12 +254,14 @@ export default function StorefrontProductList({
                       </p>
                       {row.unsupportedCount > 0 && (
                         <p className='mt-1 text-xs text-slate-300'>
-                          {row.unsupportedCount} options have no delivery option for this country
+                          {row.unsupportedCount} {row.unsupportedCount === 1 ? 'option' : 'options'}
+                          {' cannot be delivered here'}
                         </p>
                       )}
                       {row.unverifiedCount > 0 && (
                         <p className='mt-1 text-xs text-slate-300'>
-                          {row.unverifiedCount} options could not be confirmed
+                          {row.unverifiedCount} {row.unverifiedCount === 1 ? 'option' : 'options'}
+                          {' could not be checked'}
                         </p>
                       )}
                       <p className='mt-1 text-xs text-slate-400'>

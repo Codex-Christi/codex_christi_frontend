@@ -1957,43 +1957,26 @@ Do not violate these during implementation:
 - Customer-facing messages should not expose provider internals.
 - Admin pages should never be publicly writable.
 
-## Verification Commands
+## Verification without creating orders
 
-Generate the PayPal ledger Prisma client for dev:
+The temporary recovery-demo seeder and its package commands have been removed. Keep the real
+regression tests and their in-memory fixtures; they verify recovery behavior without inserting
+synthetic paid orders into a configured ledger. Removing the seeder does not delete existing rows.
+Do not run database cleanup, migrations, order creation, payment, or fulfillment as part of these
+checks. P0.2 deployed E2E remains pending in the release guide.
 
-```bash
-yarn prisma:paypalTxLedger:generate:dev
-```
-
-Run dev migration:
-
-```bash
-yarn prisma:paypalTxLedger:migrate:dev
-```
-
-Create a demo unresolved paid checkout:
+Run the offline recovery and payment regression tests:
 
 ```bash
-yarn paypal-ledger:recovery-demo:create demo@example.com
+node --require next/dist/server/node-environment --conditions=react-server --import tsx \
+  --import 'data:text/javascript,globalThis.fetch=async()=>{throw new Error("Offline verification forbids live fetch");}' \
+  --test src/lib/paypal/txLedger/*.test.ts \
+  src/lib/shop/checkout/checkoutRecovery/mapRecoveryCheckoutSummary.test.ts
 ```
 
-List demo rows for an email:
-
-```bash
-yarn paypal-ledger:recovery-demo:list demo@example.com
-```
-
-Clean demo rows for one email:
-
-```bash
-yarn paypal-ledger:recovery-demo:cleanup demo@example.com
-```
-
-Clean all demo recovery rows:
-
-```bash
-yarn paypal-ledger:recovery-demo:cleanup-all
-```
+`yarn test:storefront` runs the ordinary storefront regressions and excludes
+`*.integration.test.ts`. The database-provisioning integration fixture is retained for separately
+authorized runs; it is not part of the no-migrations checks.
 
 Run type and lint checks:
 

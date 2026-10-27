@@ -93,12 +93,20 @@ export function calculateOrderPreviewTotals(
   };
 }
 
+const moneyFormatters = new Map<string, Intl.NumberFormat>();
+
 export function formatOrderMoney(amount: number, currency: string) {
-  const digits = currencyExponent(currency);
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  }).format(amount);
+  const code = currency.toUpperCase();
+  let formatter = moneyFormatters.get(code);
+  if (!formatter) {
+    const digits = currencyExponent(code);
+    formatter = new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: code,
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    });
+    moneyFormatters.set(code, formatter);
+  }
+  return formatter.format(amount);
 }

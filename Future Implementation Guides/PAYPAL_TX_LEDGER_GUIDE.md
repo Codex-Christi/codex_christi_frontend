@@ -126,7 +126,9 @@ the same currency-specific rule in both consumers. USD 15.25 × 0.92345 × 3 mus
 through preview, canonical lines, and PayPal payload. Preview line displays and SDK currency use
 the verified quote rather than redoing currency conversion in the browser. The unused pricing
 wrapper, hydration export, shipping-estimate route, and historical browser-cart templates are
-removed. The quantity-validation action has a matching filename and updated import.
+removed. Later offline-cart work removed the unused quantity action too; current edits save through
+shared cart commands, and checkout still verifies availability and prices. See
+[current cart behavior](../src/lib/cart/README.md).
 
 The cancellation correction settles the admin caller and closes its response when cancelled or
 timed out, suppressing late results and queued work. Shared supplier reads retain their own timeout
@@ -162,7 +164,9 @@ authorization, capture, receipt, or fulfillment was performed. The user confirme
 setup exists and instructed **do not perform order creation**. Do not create further PayPal/Django
 test intents/orders or run authorization, capture, or fulfillment/recovery in this verification
 run. Full E2E requires controlled downstream fixtures/staging and renewed direction to resume order
-creation. P0.3 follows as a read-only destination-behavior trace.
+creation. P0.2 deployed E2E remains pending. The user has authorized P0.3's read-only destination
+trace in parallel; its [recorded findings](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#p03-document-current-destination-behavior-without-changing-it)
+do not approve orders, migrations, tax charging, or a destination-policy change.
 
 The snapshot intentionally contains merchandise plus shipping only. The current PayPal account
 cannot charge tax, so there is no tax amount or tax line in the canonical snapshot, PayPal purchase

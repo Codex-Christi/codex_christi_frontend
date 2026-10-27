@@ -382,7 +382,8 @@ future deployment preparation with target-selected
 to date, stop: there is no pending PayPal migration to deploy. A newly pending migration requires a
 review of its exact SQL and target before deployment; this checkpoint authorizes no migration.
 
-Verify the offline correction before considering any later payment E2E. The inspected local configuration uses
+The offline correction is verified. Before any later payment E2E, review the configured targets.
+The last inspected local configuration uses
 development ledgers and PayPal sandbox, requires webhook signatures, selects `sandbox_ngrok` as
 webhook owner, disables the capture-route runner, enables the scanner, and sets provider push false.
 However, Django still targets `codexchristi.org` and Merchize is live. Sandbox capture can therefore
@@ -395,8 +396,9 @@ staging/mock setup exists and instructed **do not perform order creation**. Do n
 PayPal or Django test intents/orders, authorize, capture, or invoke order/fulfillment recovery in
 this verification run. Full receipt/handoff/recovery testing requires controlled downstream targets
 and renewed direction to resume order creation. Deployed sandbox/E2E evidence must pass
-before production rollout or any P0.2 release gate is checked. P0.3 then begins as a read-only
-destination-behavior trace.
+before production rollout or any P0.2 deployed release gate is checked. The user has now authorized
+P0.3's read-only trace in parallel with those pending checks. This does not close P0.2 or authorize
+orders, migrations, or a destination-policy change.
 
 ### Remaining verified alpha gaps
 
@@ -585,6 +587,11 @@ The following remains the acceptance contract.
 
 ### P0.3 Document current destination behavior without changing it
 
+Status, 2026-10-27: **read-only trace started; P0.2 deployed E2E pending**. The first static pass
+was anchored to `e69e694c`. Concurrent checkout/cart edits must be reconciled before treating the
+trace as final. Shipping rules, country data, provider settings, and tax policy are unchanged by
+this audit. Safe UI checks and source cleanup are recorded separately below.
+
 1. This is a non-authorizing audit item. It does not approve a destination-policy change.
 2. Keep the work read-only: document and trace current behavior; do not change application code,
    configuration, datasets, migrations, provider-account settings, or customer-facing policy.
@@ -597,6 +604,84 @@ The following remains the acceptance contract.
    customer copy, tests, and rollout planning outside P0.2. Tax support is outside this release
    guide and must not be implemented without explicit new direction after the required PayPal
    capability exists.
+
+#### What the current code does
+
+Choosing a country requests delivery there; it does not guarantee it. Each selected product option
+must have a current supplier identity and usable shipping evidence for that country. The cart can
+save selections offline, and checkout checks them again before payment.
+
+| Step                 | Current behavior                                                                                                                                                                                                                                                                          | Source                                                                                                                                                                                                                 |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Country choices      | Uses `country-data-list`, excluding deleted entries, entries without an emoji, and the existing `ioc === 'PRK'` UI filter. It does not use the local supplier-support boolean as its options list.                                                                                        | [country picker](../src/components/UI/primitives/country-dropdown.tsx)                                                                                                                                                 |
+| Selected destination | The floating picker updates currency-cookie and checkout country. Product pages use cookie country, then USA. Cart/checkout use cookie, saved checkout country, then USA.                                                                                                                 | [floating picker](../src/components/UI/Shop/Index/CountryDropDownClientFloating.tsx), [cart](../src/components/UI/Shop/Cart/CartMainComponent.tsx), [checkout](../src/components/UI/Shop/Checkout/ProductCheckout.tsx) |
+| Country metadata     | The JSON has 249 countries: 217 with `merchize=true`, 31 false, and one omitted flag (`DMA`). `getCountrySupport` returns the flag, but final-details and PayPal intent do not enforce it. Intent requires a known country with an ISO2 code. This is not an enforced delivery allowlist. | [metadata](../src/lib/datasetSearchers/shippingSupportMerchize.ts), [final details](../src/actions/shop/checkout/getOrderFinalDetails.ts), [intent](../src/app/api/paypal/tx-ledger/intent/route.ts)                   |
+| Option eligibility   | Exact current supplier identity comes first. The strict shipping calculator then tests each option. Complete evidence without a usable band means unavailable for that destination; missing or conflicting evidence means not verified.                                                   | [product verification](../src/lib/merchizeStorefront/productDestinationVerification.ts), [destination verdicts](../src/lib/merchizeStorefront/destinationAvailability.ts)                                              |
+| Shipping evidence    | Fresh scoped product evidence is cached in existing SQLite, normally for 48 hours (configured range 1–336 hours). Static normalized JSON supplies extras, not positive current supplier identity proof.                                                                                   | [supplier evidence](../src/lib/merchizeCatalog/currentEvidence.ts), [extras](../src/lib/datasetSearchers/merchize/shipping.data.ts)                                                                                    |
+| Currency             | Country metadata and the existing eurozone set select currency; USD rates have 24-hour revalidation. Missing/failed conversion or unsupported PayPal currency falls back to USD. Supported currencies remain available; HUF/JPY/TWD use zero digits.                                      | [FX](../src/actions/shop/general/currencyConvert.ts), [money rules](../src/lib/shop/checkout/orderMoney.ts)                                                                                                            |
+| Final payment data   | Normalize country, then resolve the canonical snapshot again. PayPal receives ISO2 country/address and canonical merchandise plus shipping. Preview state cannot authorize payment; no tax amount or tax line is generated.                                                               | [normalization](../src/lib/utils/shop/checkout/normalizeCountryToIso3.ts), [canonical data](../src/lib/paypal/orderSnapshot/merchizeResolver.ts), [PayPal payload](../src/lib/paypal/createPayPalOrderPayload.ts)      |
+
+#### Existing shipping calculation
+
+1. Map the country to its existing zone: USA → US; CAN → ROW; AUS → AU; GBR → GB;
+   the existing EU27 set → EU; all other countries → ROW.
+2. Within that zone, prefer exact ISO2 tokens in `to_country`, then a `rest…` rate, then a
+   missing/`all` country rate. Conflicting selected rates cannot verify delivery.
+3. If a valid regional first/additional rate pair is absent, use a valid ROW pair if present.
+   Missing both stops the quote; the former invented `$7/$5` fallback is rejected.
+4. Charge the first-item rate once per supplier SKU and additional-item rates for further units.
+   A valid saved US postal surcharge is added once per SKU on US-zone orders.
+5. Apply the existing USD 5-per-unit minimum to overall shipping, allocate shipping back to lines,
+   then use shared money rules to convert and round the display/payment quote.
+
+Sources: [zone mapping](../src/lib/datasetSearchers/merchize/dest-map.ts),
+[country-specific bands](../src/lib/merchizeCatalog/shippingBands.ts),
+[strict calculation](../src/lib/paypal/orderSnapshot/strictShipping.ts).
+
+#### Preservation and limitations
+
+- The same zone mapping, Canada-to-ROW mapping, regional-to-ROW fallback, US surcharge, and USD
+  5-per-unit minimum existed before P0.2 (`82c41dee^`). Old final-details also returned the support
+  boolean without enforcing it. Do not silently start using that boolean as a country block.
+- P0.2 changed proof: missing supplier/shipping data now stops checkout instead of inventing a
+  price. Effective option availability can change, without introducing a geographic allowlist.
+- State/region is stored and forwarded, but is not used to select shipping rates or limit the US
+  surcharge. An unused state-surcharge helper does not change this behavior.
+- Existing product copy still advertises a Nigeria-only fee, fixed October/November dates, and a
+  seven-day return statement. These are not quote sources and may disagree with checkout. Record
+  the gap; do not rewrite delivery/returns policy during this audit.
+- Current cart behavior allows offline selection/quantity saves, not a live supplier check on every
+  increment. [Cart documentation](../src/lib/cart/README.md) owns this contract. Checkout still
+  verifies availability and prices.
+- Static inspection does not establish current provider coverage, downstream address acceptance,
+  authorization/capture, receipts, webhooks, or fulfillment. P0.2 deployed E2E remains pending.
+
+#### Safe UI and source cleanup
+
+No checkout form was submitted, and no PayPal/Django order intent, authorization, capture, or
+migration was requested in this follow-up. Existing cart items/quantities were unchanged; the
+original USA selection was restored after country-picker checks. USD line totals 80 + 40 + 50
+matched subtotal 170, shipping 20, and total 190. A completed EUR quote was not established by this
+browser pass; EUR rounding is supported by the offline regressions, not a new browser acceptance
+claim.
+
+Delivery Checker showed progress after Refresh All. Stop Checks returned to paused results;
+Retry Remaining resumed checks, and the list returned to 34/34 checked with three needing another
+check. This verifies the controls, not successful delivery for every option.
+
+The recovery-demo seeder, four package commands, and obsolete admin-guide examples were removed
+without running them or deleting database rows. No demo files were staged at inspection. Genuine
+regression tests, required support modules, and performance reports remain. The ordinary storefront
+suite excludes its database-provisioning integration fixture. Shared money formatting reuses one
+formatter per currency; admin wording now says "option(s) cannot be delivered here" and "option(s)
+could not be checked." These small cleanups do not alter shipping or eligibility rules.
+
+Verification for this follow-up: 387 tracked offline regression tests passed with live `fetch`
+blocked, including the existing money and cancellation tests. The ordinary storefront selection
+also passed 96 tests without the database-provisioning fixture. Scoped ESLint, formatting, and diff
+checks passed. The final whole-workspace TypeScript check also passed after unrelated concurrent
+checkout-test edits settled. Those edits were not changed by this audit. No new production-build,
+deployment, or payment E2E acceptance is claimed by this follow-up.
 
 ### P0.4 Make final-order acknowledgement real
 

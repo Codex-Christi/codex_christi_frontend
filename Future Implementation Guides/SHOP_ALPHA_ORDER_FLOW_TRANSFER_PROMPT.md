@@ -25,8 +25,9 @@ fresh scoped supplier evidence, with storefront and supplier SKU namespaces kept
 All 13 PayPal migrations are applied in development and production. Local sandbox create-order
 previously succeeded, but authorization/capture and full deployed E2E remain unverified. The current
 rounding/caller-cancellation correction passed 244 offline repository tests plus type/lint/build
-verification. The user's no-orders and
-no-migrations constraints remain active; earlier test/build results do not certify these changes.
+verification in commit `7705be9d`. P0.3's read-only destination/shipping trace is now started in the
+release guide while P0.2 deployed E2E stays pending. The user's no-orders and no-migrations
+constraints remain active; earlier test/build results do not certify later changes.
 
 ## Product target
 
@@ -227,18 +228,18 @@ Remaining release gaps after that checkpoint include:
 
 ## Required first implementation order
 
-1. Finish offline revalidation of the shared money and caller-cancellation corrections, update the
-   canonical release checkpoint, and commit the scoped changes. Do not create orders or run
-   migrations. The last read-only database/schema checkpoint needs no deployment action for these
-   code-only fixes.
-2. Preserve the user's order-creation stop until renewed direction. Establish controlled
+1. Keep P0.2 marked **implementation/offline verification passed; deployed E2E pending**. The
+   rounding/cancellation corrections are already committed and verified; do not repeat that work as
+   a pending implementation task. No orders or migrations are authorized.
+2. Continue P0.3's [recorded read-only trace](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#p03-document-current-destination-behavior-without-changing-it).
+   It documents existing country selection, per-option shipping proof, currency fallback, and
+   limitations. It does not change eligibility, datasets, provider settings, tax behavior, or
+   customer-facing policy. Recheck the trace against later checkout/cart edits before closing it.
+3. Preserve the user's order-creation stop until renewed direction. Establish controlled
    Django/Merchize fixtures or staging before resuming the full deployed sandbox P0.2
    payment/receipt/handoff/recovery acceptance cases. Recheck production migration status read-only
    before any later rollout; deploy only genuinely pending reviewed changes through the normal
    approval flow. Keep release gates unchecked until their deployed evidence exists.
-3. Perform P0.3 as documentation and read-only code/data tracing only. Record existing destination
-   behavior and confirm P0.2 did not change coverage, currencies, or customer copy. Do not modify
-   destination eligibility, add geographic blocks, introduce a policy table, or add tax behavior.
 4. Persist final address and made-to-order selection acknowledgement.
 5. Add authenticated/guest confirmation authorization and customer-safe lifecycle projection.
 6. Centralize readiness disposition, US/non-US address policy, and address correction/read-back.
@@ -246,6 +247,11 @@ Remaining release gaps after that checkpoint include:
 8. Implement all six customer milestone outbox events and complete admin escalation.
 9. Add state-aware/batched lifecycle polling, global outbox dispatch, and scheduler heartbeat.
 10. Replace policy placeholders and execute the staged E2E acceptance program.
+
+Temporary recovery-demo seeding files/commands have been removed. Keep genuine regression tests
+and their required support modules. The ordinary `test:storefront` command excludes the
+database-provisioning `*.integration.test.ts` fixture; do not run schema tools or delete existing
+demo database rows as part of source cleanup.
 
 Do not jump to Merchize webhook implementation until the P0 gates in the release guide pass.
 
