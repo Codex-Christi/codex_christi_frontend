@@ -9,7 +9,6 @@ import type { ProductOptionLayoutGroup } from '@/lib/merchizeStorefront/productO
 const ProductTitleAndSizesEtc = dynamic(() => import('./ProductTitleAndSizesEtc'));
 
 export interface ProductDetailsProps {
-  // Define any props if needed
   productId: string;
   fetchedProductData: ProductResult;
   initialImageUrls: string[];
@@ -32,7 +31,6 @@ type IdleWindow = Window & {
   cancelIdleCallback?: (handle: number) => void;
 };
 
-// Use ProductResult directly as the context type
 export type ProductDetailsContextValue = ProductResult & {
   productId: string;
   initialImageUrls: string[];

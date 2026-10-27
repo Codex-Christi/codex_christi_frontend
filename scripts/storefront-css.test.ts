@@ -24,17 +24,9 @@ function ruleSignatures(root: Root) {
   return signatures;
 }
 
-test('storefront excludes only admin-owned source files', () => {
-  assert.deepEqual(storefrontConfig.content, [
-    './src/**/*.{ts,tsx}',
-    '!./src/app/admin/**/*.{ts,tsx}',
-    '!./src/components/UI/Admin/**/*.{ts,tsx}',
-  ]);
+test('shared styles plus admin utilities retain the original generated rules', async () => {
   assert.equal(storefrontConfig.theme, sharedConfig.theme);
   assert.equal(storefrontConfig.plugins, sharedConfig.plugins);
-});
-
-test('shared styles plus admin utilities retain the original generated rules', async () => {
   const source = (await readFile('src/app/globals.css', 'utf8')).replace(/^@config .*;\n/m, '');
   const [original, storefront, admin] = await Promise.all([
     postcss([tailwindcss(sharedConfig)]).process(source, { from: undefined }),

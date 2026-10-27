@@ -12,15 +12,12 @@ import {
 import styles from './ProductDetails.module.css';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import { getProductAttributeOptions } from '@/lib/merchizeStorefront/productOptionLayout';
-import { VariantAttributeSkeleton } from './VariantAttributeSelector';
+import VariantAttributeSelector, { VariantAttributeSkeleton } from './VariantAttributeSelector';
 
 const AddToCart = dynamic(() => import('./AddToCart').then((mod) => mod.AddToCart));
 const BuyNow = dynamic(() => import('./BuyNow').then((mod) => mod.BuyNow));
 const DeliveryandPaymentsBanner = dynamic(() =>
   import('./DeliveryandPaymentsBanner').then((mod) => mod.DeliveryandPaymentsBanner),
-);
-const VariantAttributeSelector = dynamic(() =>
-  import('./VariantAttributeSelector').then((mod) => mod.default),
 );
 const DeliveryCountryDropdown = dynamic(() => import('../Index/CountryDropDownClientFloating'));
 const GlobalProductPrice = dynamic(() =>
@@ -77,8 +74,6 @@ const ProductTitleAndSizesEtc = () => {
                   <GlobalProductPrice usdAmount={Number(retail_price)} />
                 </Suspense>
               </h3>
-
-              {/* Stars */}
             </div>
           </div>
         </div>

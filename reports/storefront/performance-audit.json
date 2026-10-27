@@ -19,7 +19,8 @@
     ],
     "savingGzipBytes": 2885,
     "savingPercent": 12.21,
-    "adminTradeoff": "Admin loads a separate full utility stylesheet in addition to shared styles to preserve existing and shared components; storefront routes do not request it."
+    "adminTradeoff": "Admin loads a separate full utility stylesheet in addition to shared styles to preserve existing and shared components; storefront routes do not request it.",
+    "measurementScope": "Recorded at the earlier CSS milestones, not a measurement of concurrent route-utilities work."
   },
   "images": {
     "originalSourceBytes": 29603552,
@@ -116,99 +117,9 @@
           "unusedCssBytes": 22141
         }
       ],
-      "runs": [
-        {
-          "file": "desktop-1.json",
-          "url": "https://codexchristi.shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T06:55:33.342Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "desktop",
-          "performance": 98,
-          "seo": 100,
-          "accessibility": 95,
-          "fcpMs": 641.367,
-          "lcpMs": 1088.6444999999999,
-          "tbtMs": 0,
-          "cls": 0.03639188862621487,
-          "unusedCssBytes": 22141
-        },
-        {
-          "file": "desktop-2.json",
-          "url": "https://codexchristi.shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T06:55:41.813Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "desktop",
-          "performance": 98,
-          "seo": 100,
-          "accessibility": 95,
-          "fcpMs": 679.316,
-          "lcpMs": 1142.8020000000004,
-          "tbtMs": 0,
-          "cls": 0.03640250032834253,
-          "unusedCssBytes": 22141
-        },
-        {
-          "file": "desktop-3.json",
-          "url": "https://codexchristi.shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T06:55:50.076Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "desktop",
-          "performance": 98,
-          "seo": 100,
-          "accessibility": 95,
-          "fcpMs": 612.8050000000001,
-          "lcpMs": 1071.4975000000004,
-          "tbtMs": 0,
-          "cls": 0.03640250032834253,
-          "unusedCssBytes": 22141
-        },
-        {
-          "file": "mobile-1.json",
-          "url": "https://codexchristi.shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T06:55:05.159Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 76,
-          "seo": 92,
-          "accessibility": 91,
-          "fcpMs": 2546.5720000000006,
-          "lcpMs": 5419.325999999999,
-          "tbtMs": 9,
-          "cls": 0,
-          "unusedCssBytes": 22743
-        },
-        {
-          "file": "mobile-2.json",
-          "url": "https://codexchristi.shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T06:55:15.214Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 84,
-          "seo": 100,
-          "accessibility": 95,
-          "fcpMs": 1899.711,
-          "lcpMs": 4254.633999999999,
-          "tbtMs": 14.5,
-          "cls": 0,
-          "unusedCssBytes": 22759
-        },
-        {
-          "file": "mobile-3.json",
-          "url": "https://codexchristi.shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T06:55:24.870Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 83,
-          "seo": 100,
-          "accessibility": 95,
-          "fcpMs": 1915.65,
-          "lcpMs": 4483.370000000001,
-          "tbtMs": 13,
-          "cls": 0,
-          "unusedCssBytes": 22759
-        }
-      ],
-      "excluded": []
+      "validRuns": 6,
+      "lighthouseVersion": "13.5.0",
+      "firstFetchTime": "2026-10-27T06:55:33.342Z"
     },
     {
       "phase": "admin-css-isolation",
@@ -235,99 +146,9 @@
           "unusedCssBytes": 18522
         }
       ],
-      "runs": [
-        {
-          "file": "desktop-1.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:05:18.184Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "desktop",
-          "performance": 100,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 365.862,
-          "lcpMs": 724.8620000000001,
-          "tbtMs": 0,
-          "cls": 0.03639188862621487,
-          "unusedCssBytes": 18522
-        },
-        {
-          "file": "desktop-2.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:05:26.758Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "desktop",
-          "performance": 100,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 369.14745,
-          "lcpMs": 629.1474499999999,
-          "tbtMs": 0,
-          "cls": 0.03640250032834253,
-          "unusedCssBytes": 18522
-        },
-        {
-          "file": "desktop-3.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:05:34.659Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "desktop",
-          "performance": 100,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 364.8585,
-          "lcpMs": 624.8585,
-          "tbtMs": 0,
-          "cls": 0.03640250032834253,
-          "unusedCssBytes": 18522
-        },
-        {
-          "file": "mobile-1.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:04:54.112Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 93,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 1355.6034,
-          "lcpMs": 3253.4051,
-          "tbtMs": 22.5,
-          "cls": 0,
-          "unusedCssBytes": 19138
-        },
-        {
-          "file": "mobile-2.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:05:02.044Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 90,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 1806.9656999999997,
-          "lcpMs": 3532.9656999999997,
-          "tbtMs": 13,
-          "cls": 0,
-          "unusedCssBytes": 19138
-        },
-        {
-          "file": "mobile-3.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:05:10.359Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 93,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 1806.522,
-          "lcpMs": 3081.522,
-          "tbtMs": 14.5,
-          "cls": 0,
-          "unusedCssBytes": 19138
-        }
-      ],
-      "excluded": []
+      "validRuns": 6,
+      "lighthouseVersion": "13.5.0",
+      "firstFetchTime": "2026-10-27T07:05:18.184Z"
     },
     {
       "phase": "component-css-ownership",
@@ -352,68 +173,6 @@
           "tbtMs": 0,
           "cls": 0.03640250032834253,
           "unusedCssBytes": 18325
-        }
-      ],
-      "runs": [
-        {
-          "file": "desktop-1.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:09:37.794Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "desktop",
-          "performance": 100,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 366.62444999999997,
-          "lcpMs": 626.62445,
-          "tbtMs": 0,
-          "cls": 0.03640250032834253,
-          "unusedCssBytes": 18325
-        },
-        {
-          "file": "mobile-1.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:09:10.978Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 90,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 1807.77585,
-          "lcpMs": 3533.77585,
-          "tbtMs": 13,
-          "cls": 0,
-          "unusedCssBytes": 18939
-        },
-        {
-          "file": "mobile-2.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:09:20.771Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 90,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 1805.35155,
-          "lcpMs": 3536.3515500000003,
-          "tbtMs": 15.5,
-          "cls": 0,
-          "unusedCssBytes": 18939
-        },
-        {
-          "file": "mobile-3.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:09:29.626Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 90,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 1805.0343000000003,
-          "lcpMs": 3534.0343000000003,
-          "tbtMs": 14.5,
-          "cls": 0,
-          "unusedCssBytes": 18939
         }
       ],
       "excluded": [
@@ -565,7 +324,10 @@
             }
           ]
         }
-      ]
+      ],
+      "validRuns": 4,
+      "lighthouseVersion": "13.5.0",
+      "firstFetchTime": "2026-10-27T07:09:37.794Z"
     },
     {
       "phase": "isolated-product-check",
@@ -592,99 +354,9 @@
           "unusedCssBytes": 18325
         }
       ],
-      "runs": [
-        {
-          "file": "desktop-1.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:14:19.494Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "desktop",
-          "performance": 100,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 365.5059,
-          "lcpMs": 726.5059000000001,
-          "tbtMs": 0,
-          "cls": 0.03639188862621487,
-          "unusedCssBytes": 18325
-        },
-        {
-          "file": "desktop-2.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:14:27.560Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "desktop",
-          "performance": 100,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 366.50475,
-          "lcpMs": 727.5047499999998,
-          "tbtMs": 0,
-          "cls": 0.03639188862621487,
-          "unusedCssBytes": 18325
-        },
-        {
-          "file": "desktop-3.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:14:35.618Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "desktop",
-          "performance": 100,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 367.3524,
-          "lcpMs": 726.3524,
-          "tbtMs": 0,
-          "cls": 0.03640250032834253,
-          "unusedCssBytes": 18325
-        },
-        {
-          "file": "mobile-1.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:13:55.320Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 90,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 1805.8915500000003,
-          "lcpMs": 3534.8915500000003,
-          "tbtMs": 14.5,
-          "cls": 0,
-          "unusedCssBytes": 18939
-        },
-        {
-          "file": "mobile-2.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:14:03.471Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 89,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 1810.0630500000002,
-          "lcpMs": 3544.0630500000007,
-          "tbtMs": 17,
-          "cls": 0,
-          "unusedCssBytes": 18939
-        },
-        {
-          "file": "mobile-3.json",
-          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
-          "fetchTime": "2026-10-27T07:14:11.448Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 89,
-          "seo": 91,
-          "accessibility": 91,
-          "fcpMs": 1817.2011,
-          "lcpMs": 3622.934799999999,
-          "tbtMs": 21,
-          "cls": 0,
-          "unusedCssBytes": 18939
-        }
-      ],
-      "excluded": []
+      "validRuns": 6,
+      "lighthouseVersion": "13.5.0",
+      "firstFetchTime": "2026-10-27T07:14:19.494Z"
     },
     {
       "phase": "responsive-portrait-check",
@@ -711,106 +383,16 @@
           "unusedCssBytes": 19002
         }
       ],
-      "runs": [
-        {
-          "file": "desktop-1.json",
-          "url": "http://127.0.0.1:3023/about-us",
-          "fetchTime": "2026-10-27T07:20:37.843Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "desktop",
-          "performance": 94,
-          "seo": 100,
-          "accessibility": 100,
-          "fcpMs": 325.23275,
-          "lcpMs": 1623.4885000000002,
-          "tbtMs": 0,
-          "cls": 0.01644673783490938,
-          "unusedCssBytes": 19002
-        },
-        {
-          "file": "desktop-2.json",
-          "url": "http://127.0.0.1:3023/about-us",
-          "fetchTime": "2026-10-27T07:21:30.255Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "desktop",
-          "performance": 94,
-          "seo": 100,
-          "accessibility": 100,
-          "fcpMs": 328.93385,
-          "lcpMs": 1625.9559000000004,
-          "tbtMs": 0,
-          "cls": 0.01644673783490938,
-          "unusedCssBytes": 19002
-        },
-        {
-          "file": "desktop-3.json",
-          "url": "http://127.0.0.1:3023/about-us",
-          "fetchTime": "2026-10-27T07:22:22.693Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "desktop",
-          "performance": 94,
-          "seo": 100,
-          "accessibility": 100,
-          "fcpMs": 326.55575,
-          "lcpMs": 1624.3705,
-          "tbtMs": 0,
-          "cls": 0.01644673783490938,
-          "unusedCssBytes": 19002
-        },
-        {
-          "file": "mobile-1.json",
-          "url": "http://127.0.0.1:3023/about-us",
-          "fetchTime": "2026-10-27T07:20:15.771Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 75,
-          "seo": 100,
-          "accessibility": 100,
-          "fcpMs": 1507.02675,
-          "lcpMs": 7804.6845,
-          "tbtMs": 39,
-          "cls": 0.003168356024141485,
-          "unusedCssBytes": 19533
-        },
-        {
-          "file": "mobile-2.json",
-          "url": "http://127.0.0.1:3023/about-us",
-          "fetchTime": "2026-10-27T07:20:23.510Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 75,
-          "seo": 100,
-          "accessibility": 100,
-          "fcpMs": 1505.9343000000001,
-          "lcpMs": 7803.9562,
-          "tbtMs": 27,
-          "cls": 0.003168356024141485,
-          "unusedCssBytes": 19533
-        },
-        {
-          "file": "mobile-3.json",
-          "url": "http://127.0.0.1:3023/about-us",
-          "fetchTime": "2026-10-27T07:20:30.659Z",
-          "lighthouseVersion": "13.5.0",
-          "formFactor": "mobile",
-          "performance": 75,
-          "seo": 100,
-          "accessibility": 100,
-          "fcpMs": 1505.2224,
-          "lcpMs": 7803.481600000001,
-          "tbtMs": 28,
-          "cls": 0.002967568905759139,
-          "unusedCssBytes": 19533
-        }
-      ],
-      "excluded": []
+      "validRuns": 6,
+      "lighthouseVersion": "13.5.0",
+      "firstFetchTime": "2026-10-27T07:20:37.843Z"
     }
   ],
   "remaining": [
     "Production deployment and a same-environment production rerun are required before claiming any score improvement.",
-    "The about hero still uses its original 1.29 MB SVG; it was not converted without a separate fidelity and responsive-cropping check.",
     "The variants endpoint now verifies per-destination availability and uses private, no-store; it must not receive the previously proposed blanket shared-cache policy.",
-    "Cache Components and edge-cache ownership changes have not been applied. They need an updated design against the newer catalog verification flow and active VPS config."
+    "Cache Components and edge-cache ownership changes have not been applied. They need an updated design against the newer catalog verification flow and active VPS config.",
+    "About body-font substitution still causes a small page-level shift (median CLS 0.01645 desktop / 0.00317 mobile). A throttled trace ties it to Inter replacing fallback text and changing paragraph wrapping, not to hero height or decoding. Global font behavior was not changed in these scoped product/hero/navbar milestones."
   ],
   "layoutStability": {
     "method": "Isolated production builds; variant responses held until fonts loaded, then released; three products at five viewport widths, plus subset and two-attempt error states",
@@ -1053,6 +635,88 @@
         "tbtMs": 0,
         "cls": 0.00005456396112424482
       }
-    ]
+    ],
+    "finalVerification": {
+      "cases": 17,
+      "maxOptionResponseCLS": 0.00008914589881896973,
+      "maxPurchaseButtonMovementPx": 0,
+      "allSelectable": true,
+      "runtimeErrors": 0,
+      "overflowCases": 0
+    }
+  },
+  "aboutHero": {
+    "evidence": "reports/storefront/about-hero-compression.json",
+    "comparison": "Two isolated copies of the same production build and catalog; only the served hero asset differs. Three Lighthouse 13.5.0 runs per device and asset, with no critical request failures. Local simulated-throttling results are not production measurements.",
+    "before": [
+      {
+        "mode": "mobile",
+        "validRuns": 3,
+        "performance": 75,
+        "lcpMs": 8403.556799999998,
+        "fcpMs": 1356.1808999999998,
+        "tbtMs": 40.999999999999545,
+        "cls": 0.003168356024141485,
+        "accessibility": 100,
+        "seo": 100
+      },
+      {
+        "mode": "desktop",
+        "validRuns": 3,
+        "performance": 95,
+        "lcpMs": 1524.9903,
+        "fcpMs": 326.2175,
+        "tbtMs": 0,
+        "cls": 0.01644673783490938,
+        "accessibility": 100,
+        "seo": 100
+      }
+    ],
+    "after": [
+      {
+        "mode": "mobile",
+        "validRuns": 3,
+        "performance": 79,
+        "lcpMs": 5554.1137,
+        "fcpMs": 1356.17055,
+        "tbtMs": 41,
+        "cls": 0.003168356024141485,
+        "accessibility": 100,
+        "seo": 100
+      },
+      {
+        "mode": "desktop",
+        "validRuns": 3,
+        "performance": 98,
+        "lcpMs": 1084.3334,
+        "fcpMs": 325.7183,
+        "tbtMs": 0,
+        "cls": 0.01644673783490938,
+        "accessibility": 100,
+        "seo": 100
+      }
+    ],
+    "finalCompositionCheck": {
+      "note": "One smoke audit per profile after the requested full desktop artwork and glass navbar. This reveals more artwork than the short-crop comparison above; these are not three-run medians.",
+      "runs": [
+        {
+          "mode": "mobile",
+          "performance": 79,
+          "lcpMs": 5478.6012,
+          "cls": 0.003168356024141485,
+          "accessibility": 100,
+          "seo": 100
+        },
+        {
+          "mode": "desktop",
+          "performance": 96,
+          "lcpMs": 1364.3378,
+          "cls": 0.01644673783490938,
+          "accessibility": 100,
+          "seo": 100
+        }
+      ],
+      "visualEvidence": "reports/storefront/about-hero-compression.json: desktopBackdrop"
+    }
   }
 }
