@@ -1,0 +1,4 @@
+@config '../../../tailwind.config.ts';
+
+/* Keep the full utility set available to admin and its shared components. */
+@tailwind utilities;

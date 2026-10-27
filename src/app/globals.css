@@ -1,3 +1,5 @@
+@config '../../tailwind.storefront.config.ts';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
