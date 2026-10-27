@@ -2,6 +2,7 @@ import Image from 'next/image';
 import { launchMerchProducts } from '@/lib/utils/shopHomePageProductsData';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import DealsScrollControls from './DealsScrollControls';
+import styles from './Deals.module.css';
 
 // Top-Page Deals Component
 const Deals = () => {
@@ -24,10 +25,10 @@ const Deals = () => {
       '
       >
         <div className=' -space-y-8 md:-space-y-2 flex flex-col items-center justify-center'>
-          <p className='outlined-text scale-[0.6] md:scale-100 text-7xl -tracking-widest text-center'>
+          <p className={`${styles.outlinedText} scale-[0.6] md:scale-100 text-7xl -tracking-widest text-center`}>
             Launch
           </p>
-          <p className='outlined-text scale-[0.6] md:scale-100 text-7xl -tracking-widest text-center'>
+          <p className={`${styles.outlinedText} scale-[0.6] md:scale-100 text-7xl -tracking-widest text-center`}>
             Merch
           </p>
         </div>

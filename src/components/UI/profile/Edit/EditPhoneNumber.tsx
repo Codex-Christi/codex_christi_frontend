@@ -2,6 +2,7 @@ import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import styles from './EditPhoneNumber.module.css';
 
 const EditPhoneNumber = ({
 	onChange,
@@ -42,7 +43,7 @@ const EditPhoneNumber = ({
 	};
 
 	return (
-		<div className="grid gap-2">
+		<div className={cn('grid gap-2', styles.phoneInput)}>
 			<button
 				className="flex items-center gap-4 justify-between py-1"
 				type="button"

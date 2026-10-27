@@ -1,0 +1,18 @@
+.phoneInput :global(.PhoneInputInput),
+.phoneInput :global(.PhoneInputCountrySelect) {
+  width: 100% !important;
+  max-width: 100% !important;
+  background-color: inherit !important;
+  color: inherit !important;
+}
+
+.phoneInput :global(.PhoneInputInput):focus,
+.phoneInput :global(.PhoneInputCountrySelect):focus {
+  border-style: none;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.phoneInput :global(.PhoneInputCountrySelect) {
+  background-color: #000 !important;
+}
