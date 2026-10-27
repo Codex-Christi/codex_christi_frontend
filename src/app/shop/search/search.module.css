@@ -1,0 +1,88 @@
+.page {
+  width: min(100%, 1200px);
+  min-height: 65vh;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+.page h1 {
+  font-family: var(--font-ocr), sans-serif;
+  font-size: 1.75rem;
+  margin-bottom: 1.5rem;
+}
+.page h2 {
+  font-size: 1.125rem;
+  margin-block: 1.5rem;
+}
+.search {
+  max-width: 36rem;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+.product {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #ffffff4d;
+  border-radius: 8px;
+  background: #ffffff14;
+  backdrop-filter: blur(12px);
+}
+.product:hover {
+  border-color: #fff;
+}
+.product:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 3px;
+}
+.product h3 {
+  padding: 0.75rem 0.75rem 0.25rem;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+.product > span {
+  display: block;
+  padding: 0.25rem 0.75rem 1rem;
+}
+.image {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 5;
+  background: #ffffff0d;
+}
+.image img {
+  object-fit: cover;
+}
+.empty {
+  padding-block: 2rem;
+}
+.empty a {
+  display: inline-block;
+  text-decoration: underline;
+  margin-top: 1rem;
+}
+.pagination,
+.pagination a {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.pagination {
+  justify-content: center;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

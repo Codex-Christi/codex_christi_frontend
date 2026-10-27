@@ -331,7 +331,14 @@ export async function upsertStorefrontCategoryPageSnapshot(input: CategoryPageSn
     select: { lastProductsFetchAt: true },
   });
 
-  if (!input.force && isFresh(existingCategory?.lastProductsFetchAt, now)) return;
+  if (!input.force && isFresh(existingCategory?.lastProductsFetchAt, now)) {
+    const savedPage = await getCategoryProductsSnapshotState({
+      category: categorySlug,
+      page: input.page,
+      page_size: input.pageSize,
+    });
+    if (savedPage?.isFresh) return;
+  }
 
   const category = await merchizeCatalogPrisma.storefrontCategorySnapshot.upsert({
     where: { categorySlug },
@@ -355,6 +362,7 @@ export async function upsertStorefrontCategoryPageSnapshot(input: CategoryPageSn
     },
   });
 
+  const savedProductIds: string[] = [];
   for (const [index, rawProduct] of input.products.entries()) {
     let product: BasicProductData;
     try {
@@ -374,6 +382,7 @@ export async function upsertStorefrontCategoryPageSnapshot(input: CategoryPageSn
       select: { id: true },
     });
     if (!productRecord) continue;
+    savedProductIds.push(productRecord.id);
 
     await merchizeCatalogPrisma.storefrontCategoryProduct.upsert({
       where: {
@@ -391,6 +400,21 @@ export async function upsertStorefrontCategoryPageSnapshot(input: CategoryPageSn
       update: {
         position: (input.page - 1) * input.pageSize + index,
         lastSeenAt: now,
+      },
+    });
+  }
+  if (savedProductIds.length === input.products.length) {
+    const start = (input.page - 1) * input.pageSize;
+    await merchizeCatalogPrisma.storefrontCategoryProduct.deleteMany({
+      where: {
+        categoryId: category.id,
+        OR: [
+          { position: { gte: input.total } },
+          {
+            position: { gte: start, lt: start + input.pageSize },
+            productId: { notIn: savedProductIds },
+          },
+        ],
       },
     });
   }
@@ -526,7 +550,7 @@ export async function getCategoryProductsSnapshotState({
     select: { id: true, totalProducts: true, lastProductsFetchAt: true },
   });
 
-  if (!snapshot) return null;
+  if (!snapshot?.lastProductsFetchAt) return null;
 
   const count =
     snapshot.totalProducts ??
@@ -535,14 +559,27 @@ export async function getCategoryProductsSnapshotState({
     }));
   const totalPages = Math.max(1, Math.ceil(count / page_size));
   const safePage = Math.min(Math.max(page, 1), totalPages);
+  if (safePage !== page) return null;
 
   const rows = await merchizeCatalogPrisma.storefrontCategoryProduct.findMany({
-    where: { categoryId: snapshot.id },
+    where: {
+      categoryId: snapshot.id,
+      position: { gte: (page - 1) * page_size, lt: page * page_size },
+    },
     include: { product: true },
     orderBy: [{ position: 'asc' }, { lastSeenAt: 'desc' }],
-    skip: (safePage - 1) * page_size,
-    take: page_size,
+    take: page_size + 1,
   });
+  // Category-level TTL does not prove that this particular page was saved in full.
+  const expectedCount = Math.min(page_size, Math.max(0, count - (page - 1) * page_size));
+  if (
+    rows.length !== expectedCount ||
+    rows.some((row, index) => row.position !== (page - 1) * page_size + index)
+  )
+    return null;
+  const pageFetchedAt = rows.length
+    ? new Date(Math.min(...rows.map((row) => row.lastSeenAt.getTime())))
+    : snapshot.lastProductsFetchAt;
 
   return {
     products: {
@@ -553,8 +590,8 @@ export async function getCategoryProductsSnapshotState({
       totalPages,
       count,
     },
-    isFresh: isFresh(snapshot.lastProductsFetchAt),
-    lastFetchedAt: snapshot.lastProductsFetchAt,
+    isFresh: isFresh(pageFetchedAt),
+    lastFetchedAt: pageFetchedAt,
   };
 }
 

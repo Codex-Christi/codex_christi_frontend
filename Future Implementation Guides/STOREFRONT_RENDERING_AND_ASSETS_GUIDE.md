@@ -1,7 +1,7 @@
 # Storefront Rendering and Images
 
-This guide covers product-option layout, About artwork, and the shared storefront
-styles. It does not change authentication, checkout, payments, or cache policy.
+This guide covers storefront search, saved category pages, product-option layout,
+About artwork, and shared styles. Display data never authorizes checkout or payments.
 
 ## How It Works
 
@@ -47,6 +47,9 @@ loaded after client navigation, so this mainly saves the first browsing download
 | Radio-button and loading-placeholder appearance | [RadioButtonGroupWithText.tsx](../src/components/UI/Shop/ProductDetails/RadioButtonGroupWithText.tsx) |
 | Product-gallery image settings | [galleryShared.tsx](../src/components/UI/Shop/ProductDetails/ProductImageGallery/galleryShared.tsx) |
 | Product image source and fallback order | [imageUrls.ts](../src/lib/merchizeStorefront/imageUrls.ts): `resolveProductGalleryImages()` |
+| Search suggestions and keyboard controls | [StorefrontSearchForm.tsx](../src/components/UI/Shop/Nav/StorefrontSearchForm.tsx) |
+| Local search projection and submitted supplier search | [searchCatalog.ts](../src/lib/merchizeStorefront/searchCatalog.ts) |
+| Category deadlines and payload checks | [categoryDetailsSSR.ts](../src/app/shop/category/[id]/categoryDetailsSSR.ts), [listingPayload.ts](../src/lib/merchizeStorefront/listingPayload.ts) |
 
 `getProductOptionGroups()` groups variant options in one pass for both product
 details and the category quick-selection popover. It preserves the original
@@ -71,6 +74,57 @@ or account changes during a save prevent an obsolete checkout navigation.
 Product pages show not-found only for confirmed supplier 404/410 responses.
 Temporary failures use a retry screen, or an existing snapshot when available.
 Supplier reads have a 15-second deadline; ISR remains unchanged.
+
+## Search and Category Reads
+
+Desktop search and the mobile search icon lead to `/shop/search`. Typing suggests
+products from the existing local SQLite storefront snapshots, not the supplier
+production-SKU catalog or metadata manifest. Prefix and typo matching use the
+already-installed `didyoumean2` library. The index and matching code load on first
+search-field interaction, not on initial page load. No supplier calls run per keystroke.
+
+Suggestions share one SWR key with 60-second request deduplication and focus
+throttling. The index response has a 60-second browser cache and no polling. It
+contains only product ID, title, image, and listed price, capped at 1,000 saved
+rows; truncated coverage is disclosed. Only explicitly published snapshots are
+included, and newer completed removal checks exclude products. Missing snapshots
+produce an unavailable response, not a claim that the remote catalog is empty.
+Normal product/category reads and admin refreshes update the same SQLite data.
+Suggestions cannot discover remote products that have never been saved locally.
+
+Enter or the search button submits a shareable query. Arrow keys and Enter can
+open a suggestion; Escape closes suggestions. Submitted search uses the existing
+Merchize `/product/products?title=...` endpoint with 15 products per page, a
+15-second request deadline, and Next's five-minute fetch cache. Queries are
+normalized and capped at 100 characters. Valid published results can populate
+the existing display snapshots through awaited writes, never background jobs.
+The supplier endpoint was verified against the live store; the public developer
+reference documents collection-name search and production-SKU lookup, not a
+dedicated customer autocomplete endpoint:
+[Merchize API reference](https://seller.merchize.com/a/api-documents).
+
+When submitted search fails temporarily, matching saved results carry an explicit
+notice. A confirmed empty supplier search may offer separately labeled similar
+products. Search pages are `noindex,follow`; query rendering is dynamic only on
+the search page. Product, shop-home, and category ISR settings are unchanged.
+Search results and listed prices are not proof of stock, delivery, or checkout price.
+
+Every category supplier hop now has a 15-second deadline, including collection-ID
+lookup, metadata, and product listing. A cold lookup followed by a detail read can
+therefore take up to two deadlines. Existing fetch revalidation intervals remain.
+Responses are checked before mapping products or saving snapshots. Temporary
+network/provider failures and malformed payloads may use saved data; confirmed
+404/410 or an empty collection search remain not-found. Forced admin refreshes
+still fail explicitly rather than silently using saved data.
+
+Saved category pages must have their exact expected positions and row count.
+Page freshness uses the oldest row's observation time; refreshing one page does
+not renew other pages. Missing pages fetch normally instead of appearing empty.
+Saving a page replaces obsolete members in that position range and prunes rows
+beyond the supplier total. A confirmed empty listing remains intentionally empty.
+No cron, `after()`, schema migration, or checkout-verification change is involved.
+
+## Product Images and Details
 
 One image resolver serves live data, snapshots, and the gallery. Saved variant
 photos and usable API galleries come first. Known local artwork is only a last
@@ -130,19 +184,33 @@ When changing an image:
 
 ## Check a Change
 
-Use Yarn and keep the normal Turbopack build:
+Use Yarn. These checks do not rebuild the app or restart the running dev server:
 
 ```sh
 yarn lint
-yarn tsc --noEmit --pretty false
+yarn tsc --noEmit --pretty false --incremental false
 yarn test:storefront
-yarn build
+node --require next/dist/server/node-environment --conditions=react-server --import tsx --test src/lib/merchizeStorefront/*.integration.test.ts src/lib/merchizeCatalog/*.integration.test.ts
 ```
+
+For a production check, run `yarn build` (Turbopack) in a clean or isolated checkout,
+not against the `.next` directory of a running dev server. Integration tests create
+and remove their own temporary SQLite databases; keep these regression tests,
+but remove disposable manual harnesses and demo routes after checking a change.
 
 The asset tests check current files against the recorded hashes and quality
 evidence. They do **not** launch a browser, remeasure SSIM, or prove today's CLS.
 The option tests check ordering, preserved selection data, and layout-only output.
 The CSS tests check source coverage, route imports, and the shared stylesheet size.
+
+Check `/shop/search` on desktop and mobile. Confirm typo suggestions, Arrow/Enter
+selection, Escape, and search-button submission. Two search fields should share
+one index request; typing must not trigger supplier searches. Verify shareable
+query/pagination URLs, similar-product labels, no-match and unavailable states,
+and API product photos. Search results must retain `noindex,follow`. Check a normal
+category and a missing category too. Use the isolated integration tests for timeouts,
+provider outages, malformed payloads, incomplete saved pages, and forced-refresh
+failures; do not simulate these by purging the working storefront database.
 
 With the browser cache disabled, check About at 412px and 1440px. Confirm one hero
 download per page, readable navigation, and unchanged card positions. On a product

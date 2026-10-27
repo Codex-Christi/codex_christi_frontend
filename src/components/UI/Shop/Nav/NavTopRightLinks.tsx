@@ -1,9 +1,8 @@
 'use client';
 
 import type { FC } from 'react';
-import { SearchButtonOnly } from './NavSearch';
 import { CartIcon } from './NavIcons';
-import { Heart } from 'lucide-react';
+import { Heart, Search } from 'lucide-react';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import ShopProfileAvatar from './ShopProfileAvatar';
 import { useAmIOnShopRoute } from '@/lib/hooks/shopHooks/useAmIOnShopRoute';
@@ -18,11 +17,14 @@ const NavTopRightLinks: FC = () => {
     <section className='flex min-w-0 items-center justify-between gap-3 min-[400px]:gap-6 sm:gap-8 md:gap-10 lg:gap-12'>
       <DeferredNavCountryDropdown disabled={amIOnShopHome} />
 
-      <SearchButtonOnly
-        name='Search Button'
-        type='button'
-        className='scale-125 relative block lg:!hidden'
-      />
+      <CustomShopLink
+        href='/shop/search'
+        ariaLabel='Search products'
+        prefetch={false}
+        className='block lg:!hidden'
+      >
+        <Search size={24} />
+      </CustomShopLink>
 
       {['account-overview', 'cart', 'my-wishlist'].map((str) => {
         const href = '/shop/' + str;
