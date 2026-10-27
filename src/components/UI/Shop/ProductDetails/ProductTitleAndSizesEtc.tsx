@@ -9,8 +9,9 @@ import CustomShopLink from '../HelperComponents/CustomShopLink';
 import { getProductOptionGroups } from '@/lib/merchizeStorefront/productOptionLayout';
 import VariantAttributeSelector, { VariantAttributeSkeleton } from './VariantAttributeSelector';
 
-const AddToCart = dynamic(() => import('./AddToCart').then((mod) => mod.AddToCart));
-const BuyNow = dynamic(() => import('./BuyNow').then((mod) => mod.BuyNow));
+const ProductPurchaseActions = dynamic(() =>
+  import('./ProductPurchaseActions').then((mod) => mod.ProductPurchaseActions),
+);
 const DeliveryandPaymentsBanner = dynamic(() =>
   import('./DeliveryandPaymentsBanner').then((mod) => mod.DeliveryandPaymentsBanner),
 );
@@ -127,12 +128,12 @@ const ProductTitleAndSizesEtc = () => {
 
         {/* Add to Cart and Buy Now buttons */}
         <div className={`${styles.purchaseActions} space-y-4`}>
-          <AddToCart
+          <ProductPurchaseActions
+            productId={productDetailsContext.productId}
             variants={productDetailsContext.productVariants}
+            productMetaData={metadata}
             isLoadingVariants={variantsAreLoading}
           />
-
-          <BuyNow />
         </div>
       </div>
 

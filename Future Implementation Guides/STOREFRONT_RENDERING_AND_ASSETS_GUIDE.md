@@ -42,6 +42,8 @@ loaded after client navigation, so this mainly saves the first browsing download
 | Which page uses glass | `navAppearance='glass'` in [the About page](../src/app/about-us/page.tsx); other pages default to transparent |
 | Size/colour/label groups and ordering | [productOptionLayout.ts](../src/lib/merchizeStorefront/productOptionLayout.ts): `OPTION_GROUPS` and `SIZE_ORDER` |
 | Option selection behavior | [VariantAttributeSelector.tsx](../src/components/UI/Shop/ProductDetails/VariantAttributeSelector.tsx) |
+| Country-aware option loading and retry | [useProductVariants.ts](../src/lib/hooks/shopHooks/products/variants/useProductVariants.ts) |
+| Add to Cart and Buy Now checks | [ProductPurchaseActions.tsx](../src/components/UI/Shop/ProductDetails/ProductPurchaseActions.tsx) |
 | Radio-button and loading-placeholder appearance | [RadioButtonGroupWithText.tsx](../src/components/UI/Shop/ProductDetails/RadioButtonGroupWithText.tsx) |
 | Product-gallery image settings | [galleryShared.tsx](../src/components/UI/Shop/ProductDetails/ProductImageGallery/galleryShared.tsx) |
 | Product image source and fallback order | [imageUrls.ts](../src/lib/merchizeStorefront/imageUrls.ts): `resolveProductGalleryImages()` |
@@ -51,6 +53,20 @@ details and the category quick-selection popover. It preserves the original
 selection objects, group order, and latest metadata for duplicate values.
 `getProductOptionLayout()` turns those groups into display labels for the
 server's loading layout. Neither function decides price or availability.
+
+Product details and category quick-add share `useProductVariants()`. Requests include
+the selected delivery country and bypass the browser's HTTP cache. Changing country
+immediately hides old options and selections; reopening quick-add checks again.
+There is no polling: transient failures get one delayed retry, followed by a visible
+retry action. Product details keep their deferred loading so options do not compete
+with the first image.
+
+`ProductPurchaseActions` owns the selection checks and submission lock for both
+buttons. Buy Now adds one selected item to the existing cart, then opens the normal
+checkout. Existing cart items remain included. It never submits a payment or treats
+browser price/availability as authoritative; checkout still verifies them on the server.
+Failed cart saves keep the selection and do not navigate. Selection, country, product,
+or account changes during a save prevent an obsolete checkout navigation.
 
 Product pages show not-found only for confirmed supplier 404/410 responses.
 Temporary failures use a retry screen, or an existing snapshot when available.
@@ -132,7 +148,14 @@ With the browser cache disabled, check About at 412px and 1440px. Confirm one he
 download per page, readable navigation, and unchanged card positions. On a product
 page, delay the options response and test success, an unavailable destination, and
 failure/retry. Check size/colour selection on both the product page and category
-popover. Do not submit a payment as part of these display checks.
+popover. Change the quick-add country, then close and reopen it: old selections
+must clear and options must load again for the selected country.
+
+In a disposable guest cart, confirm Buy Now stays disabled until all required
+options are selected. Double-click it and confirm one added unit, existing cart
+items retained, and navigation only after the save completes. A failed save must
+keep the selection and stay on the product page. Do not submit a payment during
+these checks or test cart mutations against a signed-in customer's cart.
 
 For performance comparisons, use the same environment and at least three runs per
 device. Reject runs with failed HTML, CSS, JavaScript, or hero-image requests.
