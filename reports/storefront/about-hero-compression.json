@@ -207,5 +207,183 @@
         "homeNavTransparent": true
       }
     ]
+  },
+  "desktopBackdrop": {
+    "outputPath": "public/media/img/about-hero.desktop.svg",
+    "outputBytes": 990916,
+    "outputGzipBytes": 750318,
+    "outputSha256": "ddca489646bb5f3018331833302db4a458d2a587f18178d50161d0fe2fa8f177",
+    "format": "avif",
+    "quality": 85,
+    "encoder": "sharp 0.35.3 / libvips 8.18.3; effort 7, 4:4:4, sRGB ICC",
+    "expandedViewBox": "0 0 832.624 468.351",
+    "bitmapSize": {
+      "width": 3840,
+      "height": 2160
+    },
+    "nativeSSIM": 0.9966675057473399,
+    "rejectedCandidate": {
+      "quality": 75,
+      "nativeSSIM": 0.9922935252085859,
+      "reason": "Below the 0.995 full-source similarity threshold"
+    },
+    "method": "Reveal the original embedded JPEG in a full-height SVG canvas with the original 180-degree rotation; no missing pixels synthesized. Desktop-only bottom-right positioning and a bottom fade extend through the open space above the staircase cards. Header flow height and all card rectangles are unchanged.",
+    "comparison": "Native SSIM compares the entire decoded photo against the original embedded JPEG. Rendered desktop SSIM compares the visible masked scene to an otherwise identical full-photo JPEG SVG; mobile SSIM compares the previous and current page screenshots.",
+    "rendering": [
+      {
+        "width": 375,
+        "deviceScaleFactor": 1,
+        "ssim": 1,
+        "layoutPreserved": true,
+        "heroFlowHeight": 320,
+        "backdropHeight": 320,
+        "lowestCardTop": 1328,
+        "objectPosition": "50% 50%",
+        "heroRequests": 1,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "failedCriticalResources": 0
+      },
+      {
+        "width": 412,
+        "deviceScaleFactor": 1.75,
+        "ssim": 1,
+        "layoutPreserved": true,
+        "heroFlowHeight": 320,
+        "backdropHeight": 320,
+        "lowestCardTop": 1232,
+        "objectPosition": "50% 50%",
+        "heroRequests": 1,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "failedCriticalResources": 0
+      },
+      {
+        "width": 768,
+        "deviceScaleFactor": 2,
+        "ssim": 1,
+        "layoutPreserved": true,
+        "heroFlowHeight": 320,
+        "backdropHeight": 320,
+        "lowestCardTop": 928,
+        "objectPosition": "50% 50%",
+        "heroRequests": 1,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "failedCriticalResources": 0
+      },
+      {
+        "width": 1024,
+        "deviceScaleFactor": 1,
+        "ssim": 0.9990352713745587,
+        "layoutPreserved": true,
+        "heroFlowHeight": 320,
+        "backdropHeight": 640,
+        "lowestCardTop": 600,
+        "objectPosition": "100% 100%",
+        "heroRequests": 1,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "failedCriticalResources": 0
+      },
+      {
+        "width": 1024,
+        "deviceScaleFactor": 2,
+        "ssim": 0.998493205946513,
+        "layoutPreserved": true,
+        "heroFlowHeight": 320,
+        "backdropHeight": 640,
+        "lowestCardTop": 600,
+        "objectPosition": "100% 100%",
+        "heroRequests": 1,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "failedCriticalResources": 0
+      },
+      {
+        "width": 1280,
+        "deviceScaleFactor": 1,
+        "ssim": 0.999049145693784,
+        "layoutPreserved": true,
+        "heroFlowHeight": 320,
+        "backdropHeight": 640,
+        "lowestCardTop": 552,
+        "objectPosition": "100% 100%",
+        "heroRequests": 1,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "failedCriticalResources": 0
+      },
+      {
+        "width": 1280,
+        "deviceScaleFactor": 2,
+        "ssim": 0.9985045481110484,
+        "layoutPreserved": true,
+        "heroFlowHeight": 320,
+        "backdropHeight": 640,
+        "lowestCardTop": 552,
+        "objectPosition": "100% 100%",
+        "heroRequests": 1,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "failedCriticalResources": 0
+      },
+      {
+        "width": 1440,
+        "deviceScaleFactor": 1,
+        "ssim": 0.9990189994139871,
+        "layoutPreserved": true,
+        "heroFlowHeight": 320,
+        "backdropHeight": 720,
+        "lowestCardTop": 504,
+        "objectPosition": "100% 100%",
+        "heroRequests": 1,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "failedCriticalResources": 0
+      },
+      {
+        "width": 1440,
+        "deviceScaleFactor": 2,
+        "ssim": 0.9987351232977696,
+        "layoutPreserved": true,
+        "heroFlowHeight": 320,
+        "backdropHeight": 720,
+        "lowestCardTop": 504,
+        "objectPosition": "100% 100%",
+        "heroRequests": 1,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "failedCriticalResources": 0
+      },
+      {
+        "width": 1920,
+        "deviceScaleFactor": 1,
+        "ssim": 0.9987980808439875,
+        "layoutPreserved": true,
+        "heroFlowHeight": 320,
+        "backdropHeight": 768,
+        "lowestCardTop": 456,
+        "objectPosition": "100% 100%",
+        "heroRequests": 1,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "failedCriticalResources": 0
+      },
+      {
+        "width": 1920,
+        "deviceScaleFactor": 2,
+        "ssim": 0.9986500389044253,
+        "layoutPreserved": true,
+        "heroFlowHeight": 320,
+        "backdropHeight": 768,
+        "lowestCardTop": 456,
+        "objectPosition": "100% 100%",
+        "heroRequests": 1,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "failedCriticalResources": 0
+      }
+    ]
   }
 }

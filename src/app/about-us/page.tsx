@@ -4,6 +4,7 @@ import CometsContainer from '@/components/UI/general/CometsContainer';
 import Image from 'next/image';
 import Footer from '@/components/UI/general/Footer';
 import { Metadata } from 'next/types';
+import styles from '@/components/UI/about/AboutHero.module.css';
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
@@ -20,15 +21,24 @@ const AboutUsPage = () => {
           About <br /> <span className='text-right ml-auto block w-full'>Us</span>
         </h1>
 
-        <Image
-          loading='eager'
-          fetchPriority='high'
-          alt='About Us'
-          fill
-          unoptimized
-          src='/media/img/about-hero.optimized.svg'
-          className='size-full object-cover object-center -z-50'
-        />
+        <div className={styles.backdrop}>
+          <picture className={styles.picture}>
+            <source
+              media='(min-width: 1024px)'
+              type='image/svg+xml'
+              srcSet='/media/img/about-hero.desktop.svg'
+            />
+            <Image
+              loading='eager'
+              fetchPriority='high'
+              alt='About Us'
+              fill
+              unoptimized
+              src='/media/img/about-hero.optimized.svg'
+              className={`size-full object-cover object-center ${styles.image}`}
+            />
+          </picture>
+        </div>
       </div>
 
       <CometsContainer />

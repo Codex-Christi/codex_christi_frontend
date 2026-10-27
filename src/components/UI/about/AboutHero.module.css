@@ -1,0 +1,24 @@
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -50;
+  pointer-events: none;
+}
+
+.picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@media (min-width: 1024px) {
+  .backdrop {
+    height: clamp(40rem, 50vw, 48rem);
+    -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+  }
+
+  .image {
+    object-position: right bottom;
+  }
+}

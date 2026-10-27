@@ -67,3 +67,28 @@ test('About hero preserves its drawing instructions and verified image quality',
   assert.ok(report.rendering.every((row: { ssim: number }) => row.ssim >= 0.995));
   assert.ok(report.selected.minRenderedSSIM >= 0.995);
 });
+
+test('desktop artwork reveals the full source without moving the cards or changing mobile', async () => {
+  const report = JSON.parse(await readFile('reports/storefront/about-hero-compression.json', 'utf8'));
+  const desktop = report.desktopBackdrop;
+  const output = await readFile(desktop.outputPath);
+  assert.equal(createHash('sha256').update(output).digest('hex'), desktop.outputSha256);
+  assert.equal(output.length, desktop.outputBytes);
+  assert.match(output.toString(), /viewBox="0 0 832\.624 468\.351"/);
+  assert.ok(desktop.nativeSSIM >= 0.995);
+  assert.equal(desktop.rendering.length, 11);
+  for (const row of desktop.rendering) {
+    assert.ok(row.ssim >= 0.995);
+    assert.ok(row.layoutPreserved);
+    assert.equal(row.heroFlowHeight, 320);
+    assert.equal(row.heroRequests, 1);
+    assert.equal(row.overflow, false);
+    assert.equal(row.runtimeErrors, 0);
+    assert.equal(row.failedCriticalResources, 0);
+    if (row.width < 1024) assert.equal(row.ssim, 1);
+    else {
+      assert.equal(row.objectPosition, '100% 100%');
+      assert.ok(row.backdropHeight >= row.lowestCardTop);
+    }
+  }
+});
