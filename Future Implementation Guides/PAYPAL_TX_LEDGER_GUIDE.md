@@ -67,9 +67,11 @@ ledger or creating a standalone order database:
 - individual provider reads time out after 15 seconds. PayPal creation uses only canonical lines,
   subtotal, shipping, currency, and total. Missing or unproven current supplier mapping/SKU data,
   catalog mismatch, an unsafe shipping fallback, an invalid quote, a provider timeout/outage, or
-  incomplete evidence fails closed. The same verdict is enforced at public variant display,
-  add-to-cart, cart hydration/revalidation, quantity increase, checkout entry, direct checkout, and
-  intent creation. A stale cart row remains visible/removable but cannot be increased or purchased;
+  incomplete evidence fails closed. This verdict gates public purchase controls, cart quote
+  revalidation, checkout entry, direct checkout, and intent creation. Cart commands save known
+  selections/quantities offline; the cart UI disables confirmed-unavailable increments, and
+  unavailable/unverified rows remain visible/removable but cannot be purchased. A cart save is
+  not supplier proof; see the [cart contract](../src/lib/cart/README.md);
 - PayPal items omit optional supplier image URLs. The canonical snapshot retains images for receipt,
   recovery, and fulfillment consumers. This restores the earlier working PayPal format after real
   Merchize transformation URLs caused `INVALID_PARAMETER_SYNTAX` at `items[0].image_url`;
@@ -153,20 +155,21 @@ and production reported up to date in read-only checks on 2026-08-28. Fresh chec
 deployment is needed. Review any genuinely new pending SQL and its exact target separately; no
 migration is authorized by this checkpoint.
 
-Full sandbox/E2E remains pending. Current local configuration uses development ledgers, sandbox
-PayPal, required webhook signatures, `sandbox_ngrok` webhook ownership, a disabled capture-route
-runner, an enabled scanner, and provider push disabled. Django still targets `codexchristi.org` and
-Merchize is live. A sandbox capture can trigger a real provider order through webhook/scanner
-processing even when push is disabled. Before the user's stop instruction, this run created sandbox
-order `5S9692836H3433644`; read-only ledger inspection confirms `intent_created`, canonical
-version/hash agreement, retained snapshot images, and USD 40.00 + 5.00 shipping = 45.00. No
-authorization, capture, receipt, or fulfillment was performed. The user confirmed no staging/mock
-setup exists and instructed **do not perform order creation**. Do not create further PayPal/Django
-test intents/orders or run authorization, capture, or fulfillment/recovery in this verification
-run. Full E2E requires controlled downstream fixtures/staging and renewed direction to resume order
-creation. P0.2 deployed E2E remains pending. The user has authorized P0.3's read-only destination
-trace in parallel; its [recorded findings](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#p03-document-current-destination-behavior-without-changing-it)
-do not approve orders, migrations, tax charging, or a destination-policy change.
+**P0.2 deployed E2E remains pending. Orders and migrations remain off-limits.** Sandbox capture
+can create a real provider order through the configured live Django/Merchize downstream even with
+push disabled. Controlled fixtures/staging and renewed direction are required before creating
+PayPal/Django intents or orders, authorizing/capturing, or invoking fulfillment/recovery. The
+[release checkpoint](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#3-current-codebase-checkpoint) retains
+the configured targets, historical create-only result, and verification evidence.
+
+P0.3's [completed static trace](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#p03-document-current-destination-behavior-without-changing-it)
+covers source through `eb9794b0`, including checkout commit `85160428`. The intent flow requires
+verified email/address/browser proof, exact reviewed totals, and a fingerprinted attempt. New
+attempts resolve canonical data; matching retries reuse the snapshot or existing PayPal order.
+Review version/time, quote, and fingerprint use existing ledger JSON. Payment/status ownership
+and purpose-bound grants are present, while full P0.4/P0.5 and deployed acceptance remain open.
+The trace owns the remaining destination, cache-freshness, and address-validation gaps; it does
+not approve new policy or replace deployed payment evidence.
 
 The snapshot intentionally contains merchandise plus shipping only. The current PayPal account
 cannot charge tax, so there is no tax amount or tax line in the canonical snapshot, PayPal purchase
@@ -2926,9 +2929,10 @@ Why this is safe:
 - Create intent from checkout.
 - Verify product/variant/quantity are selectors only and that browser title, SKU, price, currency,
   and shipping values cannot alter the sealed snapshot or PayPal payload.
-- Verify a stale storefront `all-variants` row absent from the current product line cannot be added
-  to cart, remains visible/removable when already in the cart but cannot be increased or checked out,
-  and cannot create a PayPal intent.
+- Verify a stale storefront `all-variants` row absent from the current product line is blocked by
+  public purchase controls and remains visible/removable in a saved cart. Confirmed-unavailable
+  cart increments are disabled; unavailable/unverified rows cannot check out or create a PayPal
+  intent. Offline cart saves do not bypass authoritative checkout verification.
 - Verify exact and unambiguous Product-line/full-option matching followed by exact supplier product
   ID, variant ID, and SKU agreement with the completed catalog; verify missing/mismatched catalog
   identity blocks cart admission. Also verify the no-Product completed-catalog exact-SKU path,

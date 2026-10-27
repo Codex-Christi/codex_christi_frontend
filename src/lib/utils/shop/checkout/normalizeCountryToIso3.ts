@@ -1,16 +1,17 @@
 import { countries } from 'country-data-list';
 
+const countryByAlias = new Map<string, (typeof countries.all)[number]>();
+for (const country of countries.all) {
+  for (const alias of [country.alpha2, country.alpha3, country.name]) {
+    const key = alias?.toUpperCase();
+    // Historical entries share codes; preserve the original first-match precedence.
+    if (key && !countryByAlias.has(key)) countryByAlias.set(key, country);
+  }
+}
+
 function findCountryMatch(value?: string | null) {
   const normalized = value?.trim().toUpperCase();
-  if (!normalized) return null;
-
-  return countries.all.find((country) => {
-    const alpha2 = country.alpha2?.toUpperCase();
-    const alpha3 = country.alpha3?.toUpperCase();
-    const name = country.name?.toUpperCase();
-
-    return alpha2 === normalized || alpha3 === normalized || name === normalized;
-  });
+  return normalized ? (countryByAlias.get(normalized) ?? null) : null;
 }
 
 export function normalizeCountryToIso3(value?: string | null): string | null {
