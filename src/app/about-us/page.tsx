@@ -14,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const AboutUsPage = () => {
   return (
-    <DefaultPageWrapper hasMainNav>
+    <DefaultPageWrapper hasMainNav navAppearance='glass'>
       <div className='relative h-[20rem]'>
         <h1 className='text-3xl leading-6 font-nico w-auto inline-block absolute top-1/3 z-50 mx-10 md:mx-20'>
           About <br /> <span className='text-right ml-auto block w-full'>Us</span>

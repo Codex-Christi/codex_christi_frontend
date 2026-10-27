@@ -6,11 +6,14 @@ import dynamic from 'next/dynamic';
 // import Link from "next/link";
 import Logo from '../Logo';
 import NavList from './NavList';
+import styles from './MainNav.module.css';
+
+export type MainNavAppearance = 'transparent' | 'glass';
 
 const SideDrawer = dynamic(() => import('./SideDrawer'), { ssr: false });
 
 // Main Nav Component
-const MainNav: FC = () => {
+const MainNav: FC<{ appearance?: MainNavAppearance }> = ({ appearance = 'transparent' }) => {
   // States
   const [isSideDrawerOpen, setIsSideDrawerOpen] = useState<boolean>(false);
 
@@ -19,7 +22,7 @@ const MainNav: FC = () => {
     <>
       <nav
         role='navigation'
-        className={`!z-[99] absolute top-[0] flex w-full pt-4 px-6 md:px-8 lg:py-2 justify-between lg:justify-around items-center !bg-transparent !text-white !select-none`}
+        className={`!z-[99] absolute top-[0] flex w-full pt-4 px-6 md:px-8 lg:py-2 justify-between lg:justify-around items-center !text-white !select-none ${appearance === 'glass' ? styles.glass : '!bg-transparent'}`}
       >
         <Logo />
 

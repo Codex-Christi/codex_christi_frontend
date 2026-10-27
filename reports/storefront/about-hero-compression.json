@@ -151,5 +151,61 @@
       "deviceScaleFactor": 2,
       "ssim": 0.9953063759200899
     }
-  ]
+  ],
+  "navigation": {
+    "appearance": "About-only dark glass; transparent remains the default",
+    "contrastMethod": "WCAG relative luminance after alpha-compositing the dimmest text over the glass plate and an all-white backdrop (the brightest possible underlying image).",
+    "minimumDesktopTextContrast": 5.825961929941913,
+    "mobileDrawerOpenAndEscapeTested": true,
+    "viewports": [
+      {
+        "width": 375,
+        "navTop": 0,
+        "navHeight": 59.0625,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "homeNavTransparent": true
+      },
+      {
+        "width": 412,
+        "navTop": 0,
+        "navHeight": 59.0625,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "homeNavTransparent": true
+      },
+      {
+        "width": 768,
+        "navTop": 0,
+        "navHeight": 59.0625,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "homeNavTransparent": true
+      },
+      {
+        "width": 1024,
+        "navTop": 0,
+        "navHeight": 64.78125,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "homeNavTransparent": true
+      },
+      {
+        "width": 1440,
+        "navTop": 0,
+        "navHeight": 64.78125,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "homeNavTransparent": true
+      },
+      {
+        "width": 1920,
+        "navTop": 0,
+        "navHeight": 64.78125,
+        "overflow": false,
+        "runtimeErrors": 0,
+        "homeNavTransparent": true
+      }
+    ]
+  }
 }
