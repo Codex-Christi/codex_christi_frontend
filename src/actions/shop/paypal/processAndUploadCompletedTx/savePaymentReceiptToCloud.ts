@@ -44,6 +44,7 @@ export const savePaymentReceiptToCloud = async (encodedProps: string) => {
       cart,
       shippingAddressOverride,
       canonicalOrderSnapshot,
+      customer,
     );
 
     // Upload to r2

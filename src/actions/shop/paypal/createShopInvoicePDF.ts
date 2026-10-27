@@ -124,6 +124,7 @@ export const createPaypalShopInvoicePDF = async (
   cart?: CartVariant[],
   shippingAddressOverride?: InvoiceShippingAddressOverride | null,
   canonicalOrderSnapshot?: CanonicalOrderSnapshot | null,
+  customer?: { name: string; email: string },
 ) => {
   ensureHelveticaAFM();
 
@@ -166,37 +167,50 @@ export const createPaypalShopInvoicePDF = async (
       .text(`Status: ${authData.status || ''}`, { align: 'right' })
       .moveDown(1);
 
+    const drawContactDetails = (label: string, lines: string[], x: number, width: number) => {
+      doc.fontSize(12).text(label, x, 150, { width });
+      let y = 165;
+      for (const line of lines.filter((line) => line.trim())) {
+        const height = doc.heightOfString(line, { width });
+        doc.text(line, x, y, { width });
+        y += Math.max(15, height + 2);
+      }
+      return y;
+    };
+    let contactBottom = 150;
+
     // Billing information
     const payer = authData.payer;
-    if (payer) {
-      doc
-        .fontSize(12)
-        .text('Bill To:', 50, 150)
-        .text(getPayerName(payer), 50, 165)
-        .text(getPayerEmail(payer), 50, 180)
-        .moveDown(2);
+    const billingName = getPayerName(payer) || customer?.name || '';
+    const billingEmail = getPayerEmail(payer) || customer?.email || '';
+    if (billingName || billingEmail) {
+      contactBottom = drawContactDetails('Bill To:', [billingName, billingEmail], 50, 300);
     }
 
     const purchaseUnit = getPurchaseUnit(authData);
 
     // Shipping information
-    const shipping = (purchaseUnit as {
-      shipping?: {
-        name?: { fullName?: string; full_name?: string };
-        address?: {
-          addressLine1?: string;
-          addressLine2?: string;
-          adminArea1?: string;
-          adminArea2?: string;
-          postalCode?: string;
-          address_line_1?: string;
-          address_line_2?: string;
-          admin_area_1?: string;
-          admin_area_2?: string;
-          postal_code?: string;
+    const shipping = (
+      purchaseUnit as {
+        shipping?: {
+          name?: { fullName?: string; full_name?: string };
+          address?: {
+            addressLine1?: string;
+            addressLine2?: string;
+            adminArea1?: string;
+            adminArea2?: string;
+            postalCode?: string;
+            countryCode?: string;
+            country_code?: string;
+            address_line_1?: string;
+            address_line_2?: string;
+            admin_area_1?: string;
+            admin_area_2?: string;
+            postal_code?: string;
+          };
         };
-      };
-    } | null)?.shipping;
+      } | null
+    )?.shipping;
     if (shipping || shippingAddressOverride) {
       const address = shipping?.address;
       const addressLine1 =
@@ -221,14 +235,27 @@ export const createPaypalShopInvoicePDF = async (
         '';
       const postalCode =
         shippingAddressOverride?.zip_code ?? address?.postalCode ?? address?.postal_code ?? '';
-      doc
-        .text('Ship To:', 400, 150)
-        .text(shipping?.name?.fullName ?? shipping?.name?.full_name ?? getPayerName(payer), 400, 165)
-        .text(addressLine1, 400, 180)
-        .text(addressLine2, 400, 195)
-        .text(`${city}, ${state} ${postalCode}`, 400, 210)
-        .text(shippingAddressOverride?.shipping_country ?? '', 400, 225)
-        .moveDown(1);
+      const locality = [[city, state].filter(Boolean).join(', '), postalCode]
+        .filter(Boolean)
+        .join(' ');
+      contactBottom = Math.max(
+        contactBottom,
+        drawContactDetails(
+          'Ship To:',
+          [
+            shipping?.name?.fullName ?? shipping?.name?.full_name ?? billingName,
+            addressLine1,
+            addressLine2,
+            locality,
+            shippingAddressOverride?.shipping_country ??
+              address?.countryCode ??
+              address?.country_code ??
+              '',
+          ],
+          400,
+          145,
+        ),
+      );
     }
 
     // Legacy rows retain their PayPal/cart fallback. New rows render only the sealed snapshot.
@@ -238,24 +265,40 @@ export const createPaypalShopInvoicePDF = async (
     const items: InvoiceLineItem[] =
       canonicalPricing?.items ??
       (paypalItems.length ? paypalItems : getCartLineItems(cart, currencyCode));
-    const startY = 270;
+    const startY = Math.max(270, contactBottom + 20);
 
-    // Table header
-    doc
-      .fontSize(10)
-      .fillColor('#333')
-      .text('Description', 50, startY)
-      .text('SKU', 210, startY)
-      .text('Qty', 350, startY, { width: 50, align: 'right' })
-      .text('Price', 400, startY, { width: 70, align: 'right' })
-      .text('Total', 470, startY, { width: 80, align: 'right' })
-      .moveTo(50, startY + 15)
-      .lineTo(550, startY + 15)
-      .stroke();
+    const contentBottom = 730;
+    const drawFooter = () => {
+      doc
+        .font('Helvetica')
+        .fontSize(10)
+        .fillColor('#333')
+        .text('Thank you for your purchase!', 50, 750, { align: 'center' })
+        .text('Questions? contact@codexchristi.shop', 50, 765, { align: 'center' });
+    };
+    const drawTableHeader = (top: number) => {
+      doc
+        .font('Helvetica')
+        .fontSize(10)
+        .fillColor('#333')
+        .text('Description', 50, top)
+        .text('SKU', 210, top)
+        .text('Qty', 350, top, { width: 50, align: 'right' })
+        .text('Price', 400, top, { width: 70, align: 'right' })
+        .text('Total', 470, top, { width: 80, align: 'right' })
+        .moveTo(50, top + 15)
+        .lineTo(550, top + 15)
+        .stroke();
+      return top + 25;
+    };
+    const nextPage = () => {
+      drawFooter();
+      doc.addPage();
+      return drawTableHeader(50);
+    };
 
-    // Table rows
-    let y = startY + 25;
-    items.forEach((item) => {
+    let y = drawTableHeader(startY);
+    for (const item of items) {
       const unitAmount = item.unitAmount;
       const itemCurrencyCode = unitAmount.currencyCode || currencyCode;
       const quantity = parseInt(item.quantity || '0');
@@ -265,17 +308,27 @@ export const createPaypalShopInvoicePDF = async (
       const totalText = canonicalPricing
         ? (item.lineAmount ?? '0')
         : (quantity * parseFloat(unitAmount?.value || '0')).toFixed(2);
+      const cells = [
+        { text: item.name || '', x: 50, width: 145 },
+        { text: item.sku || '', x: 210, width: 135 },
+        { text: quantity.toString(), x: 350, width: 50, align: 'right' as const },
+        { text: `${priceText} ${itemCurrencyCode}`, x: 400, width: 70, align: 'right' as const },
+        { text: `${totalText} ${itemCurrencyCode}`, x: 470, width: 80, align: 'right' as const },
+      ];
+      const rowHeight = Math.max(
+        30,
+        ...cells.map((cell) => doc.heightOfString(cell.text, cell) + 10),
+      );
+      if (rowHeight > contentBottom - 75) {
+        throw new Error('Receipt line is too long to fit on one page.');
+      }
+      if (y + rowHeight > contentBottom) y = nextPage();
 
-      doc
-        .fillColor('#333')
-        .text(item.name || '', 50, y, { width: 145, lineBreak: true })
-        .text(item.sku || '', 210, y, { width: 150, lineBreak: true })
-        .text(quantity.toString(), 350, y, { width: 50, align: 'right' })
-        .text(`${priceText} ${itemCurrencyCode}`, 400, y, { width: 70, align: 'right' })
-        .text(`${totalText} ${itemCurrencyCode}`, 470, y, { width: 80, align: 'right' });
-
-      y += 30;
-    });
+      for (const cell of cells) {
+        doc.fillColor('#333').text(cell.text, cell.x, y, cell);
+      }
+      y += rowHeight;
+    }
 
     // Summary
     const amount = (purchaseUnit as {
@@ -291,6 +344,7 @@ export const createPaypalShopInvoicePDF = async (
       };
     } | null)?.amount;
     if (amount || canonicalPricing) {
+      if (y + 100 > contentBottom) y = nextPage();
       const summaryCurrencyCode =
         canonicalPricing?.currencyCode ?? amount?.currencyCode ?? amount?.currency_code ?? '';
       const breakdown = amount?.breakdown;
@@ -330,11 +384,7 @@ export const createPaypalShopInvoicePDF = async (
         .font('Helvetica');
     }
 
-    // Footer
-    doc
-      .fontSize(10)
-      .text('Thank you for your purchase!', 50, 750, { align: 'center' })
-      .text('Questions? contact@codexchristi.shop', 50, 765, { align: 'center' });
+    drawFooter();
 
     doc.end();
   });

@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test:auth": "node --require next/dist/server/node-environment --conditions=react-server --import tsx --test src/lib/auth/*.test.ts src/lib/session/*.test.ts src/stores/shop_stores/use-wishlist.test.ts src/lib/wishlist/normalize.test.ts",
-    "test:checkout": "node --require next/dist/server/node-environment --conditions=react-server --import tsx --test $(rg --files src/lib/cart src/lib/shop/checkout src/stores/shop_stores/checkoutStore src/lib/hooks/shopHooks/checkout src/components/UI/Shop/Checkout -g '*.test.ts' -g '*.test.tsx') src/lib/paypal/txLedger/*.test.ts src/lib/paypal/createPayPalOrderPayload.test.ts src/lib/merchizeFulfillmentOps/pushPolicy.test.ts",
+    "test:checkout": "node --require next/dist/server/node-environment --conditions=react-server --import tsx --test $(rg --files src/lib/cart src/lib/shop/checkout src/stores/shop_stores/checkoutStore src/lib/hooks/shopHooks/checkout src/components/UI/Shop/Checkout -g '*.test.ts' -g '*.test.tsx') src/lib/paypal/txLedger/*.test.ts src/lib/paypal/createPayPalOrderPayload.test.ts src/lib/merchizeFulfillmentOps/pushPolicy.test.ts src/actions/shop/paypal/*.test.ts",
     "test:storefront": "node --require next/dist/server/node-environment --conditions=react-server --import tsx --test scripts/storefront-css.test.ts scripts/image-compression.test.ts $(rg --files src/lib/merchizeStorefront src/lib/merchizeCatalog -g '*.test.ts' -g '!*.integration.test.ts') src/lib/paypal/orderSnapshot/*.test.ts src/components/UI/Shop/ProductDetails/currentVariantStore.test.ts",
     "build-with-env": "next build --webpack",
     "build-with-env:webpack": "next build --webpack",

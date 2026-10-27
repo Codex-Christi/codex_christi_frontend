@@ -19,7 +19,6 @@ export type PayPalTxPaymentStatusResponse = {
 type ProcessingStep = {
   key: 'receiptUpload' | 'paymentSave' | 'orderPush';
   label: string;
-  description: string;
   status: 'idle' | 'pending' | 'success' | 'error';
   errorMessage?: string;
 };
@@ -43,19 +42,16 @@ const createSteps = (): ProcessingStep[] => [
   {
     key: 'receiptUpload',
     label: 'Payment Recorded',
-    description: 'Your transaction has been recorded in the payment ledger.',
     status: 'idle',
   },
   {
     key: 'paymentSave',
     label: 'Receipt Prepared',
-    description: 'We are preparing your receipt and internal payment record.',
     status: 'idle',
   },
   {
     key: 'orderPush',
     label: 'Order Sent to Fulfillment',
-    description: 'We are sending your confirmed purchase to fulfillment.',
     status: 'idle',
   },
 ];
@@ -70,7 +66,6 @@ function withStepStatus(
 }
 
 function buildErrorSteps(data: PayPalTxPaymentStatusResponse) {
-  let steps = createSteps();
   const isPaidUnresolved = data.customerRecoveryStatus === 'paid_unresolved';
   const isFulfillmentReview =
     data.status === 'fulfillment_blocked' ||
@@ -82,45 +77,18 @@ function buildErrorSteps(data: PayPalTxPaymentStatusResponse) {
     ? 'Our team is reviewing the fulfillment handoff before your order moves forward.'
     : (data.error?.message ?? 'Payment processing failed');
 
-  if (isPaidUnresolved) {
-    steps = withStepStatus(steps, 'receiptUpload', 'success');
+  const receiptReady = Boolean(
+    data.djangoPaymentSaveCustomId || (data.receiptLink && data.receiptFile),
+  );
+  const failedStepIndex = receiptReady ? 2 : isPaidUnresolved ? 1 : 0;
 
-    if (data.djangoPaymentSaveCustomId) {
-      steps = withStepStatus(steps, 'paymentSave', 'success');
-      steps = withStepStatus(steps, 'orderPush', 'error', message);
-      return steps;
-    }
-
-    if (data.receiptLink && data.receiptFile) {
-      steps = withStepStatus(steps, 'paymentSave', 'success');
-      steps = withStepStatus(steps, 'orderPush', 'error', message);
-      return steps;
-    }
-
-    steps = withStepStatus(steps, 'paymentSave', 'error', message);
-    return steps;
-  }
-
-  if (data.djangoPaymentSaveCustomId) {
-    steps = withStepStatus(steps, 'receiptUpload', 'success');
-    steps = withStepStatus(steps, 'paymentSave', 'success');
-    steps = withStepStatus(
-      steps,
-      'orderPush',
-      'error',
-      message,
-    );
-    return steps;
-  }
-
-  if (data.receiptLink && data.receiptFile) {
-    steps = withStepStatus(steps, 'receiptUpload', 'success');
-    steps = withStepStatus(steps, 'paymentSave', 'error', message);
-    return steps;
-  }
-
-  steps = withStepStatus(steps, 'receiptUpload', 'error', message);
-  return steps;
+  return createSteps().map(
+    (step, index): ProcessingStep => ({
+      ...step,
+      status: index < failedStepIndex ? 'success' : index === failedStepIndex ? 'error' : 'idle',
+      ...(index === failedStepIndex ? { errorMessage: message } : {}),
+    }),
+  );
 }
 
 export function mapLedgerToProcessingState(
@@ -157,6 +125,22 @@ export function mapLedgerToProcessingState(
     };
   }
 
+  if (
+    data.customerRecoveryStatus === 'paid_unresolved' ||
+    data.status === 'error' ||
+    data.status === 'refunded' ||
+    data.status === 'fulfillment_blocked' ||
+    data.status === 'fulfillment_failed' ||
+    data.status === 'fulfillment_attention_required' ||
+    data.error?.message
+  ) {
+    return {
+      ...shared,
+      flowStatus: 'error',
+      steps: buildErrorSteps(data),
+    };
+  }
+
   if (data.status === 'payment_saved') {
     let steps = createSteps();
     steps = withStepStatus(steps, 'receiptUpload', 'success');
@@ -173,28 +157,16 @@ export function mapLedgerToProcessingState(
   if (data.status === 'receipt_uploaded') {
     let steps = createSteps();
     steps = withStepStatus(steps, 'receiptUpload', 'success');
-    steps = withStepStatus(steps, 'paymentSave', 'pending');
+    steps = withStepStatus(
+      steps,
+      'paymentSave',
+      data.receiptLink && data.receiptFile ? 'success' : 'pending',
+    );
 
     return {
       ...shared,
       flowStatus: 'processing',
       steps,
-    };
-  }
-
-  if (
-    data.customerRecoveryStatus === 'paid_unresolved' ||
-    data.status === 'error' ||
-    data.status === 'refunded' ||
-    data.status === 'fulfillment_blocked' ||
-    data.status === 'fulfillment_failed' ||
-    data.status === 'fulfillment_attention_required' ||
-    data.error?.message
-  ) {
-    return {
-      ...shared,
-      flowStatus: 'error',
-      steps: buildErrorSteps(data),
     };
   }
 
