@@ -15,20 +15,6 @@ const OPTION_GROUPS = [
   ['label', 'Label:'],
 ] as const;
 
-function getProductAttributeOptions(
-  variants: ProductVariantsInterface['data'],
-  attribute: ProductOptionKind,
-) {
-  return [
-    ...new Map(
-      variants
-        .flatMap((variant) => variant.options)
-        .filter((option) => option?.attribute?.name.toLowerCase() === attribute)
-        .map((option) => [option.value, option]),
-    ).values(),
-  ];
-}
-
 export function buildProductRadioOptions(options: ProductOption[], attribute: ProductOptionKind) {
   const mapped = options
     .map((option) => {
@@ -53,8 +39,23 @@ export function buildProductRadioOptions(options: ProductOption[], attribute: Pr
 }
 
 export function getProductOptionGroups(variants: ProductVariantsInterface['data']) {
+  const groups: Record<ProductOptionKind, Map<string, ProductOption>> = {
+    size: new Map(),
+    color: new Map(),
+    label: new Map(),
+  };
+
+  for (const variant of variants) {
+    for (const option of variant.options) {
+      const attribute = option?.attribute?.name.toLowerCase();
+      if (attribute === 'size' || attribute === 'color' || attribute === 'label') {
+        groups[attribute].set(option.value, option);
+      }
+    }
+  }
+
   return OPTION_GROUPS.flatMap(([attribute, title]) => {
-    const options = getProductAttributeOptions(variants, attribute);
+    const options = [...groups[attribute].values()];
     return options.length ? [{ attribute, title, options }] : [];
   });
 }

@@ -70,3 +70,38 @@ test('layout serialization contains geometry labels only, not sellability or mon
 test('a missing variant snapshot does not invent product options', () => {
   assert.deepEqual(getProductOptionLayout([]), []);
 });
+
+test('grouping reads each variant once and preserves the original selection objects', () => {
+  const original = variant([
+    { name: 'White', value: '#ffffff', attribute: { name: 'Color', value_type: 'color' } },
+    { name: 'M', value: 'M', slug: 'm', attribute: { name: 'Size', value_type: 'size' } },
+    { name: 'Product', value: 'shirt', attribute: { name: 'Product', value_type: 'product' } },
+  ]);
+  let reads = 0;
+  const groups = getProductOptionGroups([{
+    ...original,
+    get options() {
+      reads += 1;
+      return original.options;
+    },
+  }]);
+
+  assert.equal(reads, 1);
+  assert.deepEqual(groups.map(group => group.attribute), ['size', 'color']);
+  assert.equal(groups[0].options[0], original.options[1]);
+  assert.equal(groups[1].options[0], original.options[0]);
+});
+
+test('duplicate values keep their first position and latest metadata', () => {
+  const original = variant([
+    { name: 'Black', value: '#000000', slug: 'old', attribute: { name: 'Color', value_type: 'color' } },
+    { name: 'White', value: '#ffffff', attribute: { name: 'Color', value_type: 'color' } },
+  ]);
+  const updated = variant([
+    { name: 'Jet black', value: '#000000', slug: 'updated', attribute: { name: 'Color', value_type: 'color' } },
+  ]);
+  const [colors] = getProductOptionGroups([original, updated]);
+
+  assert.deepEqual(colors.options, [updated.options[0], original.options[1]]);
+  assert.equal(original.options[0].slug, 'old');
+});

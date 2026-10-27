@@ -21,8 +21,7 @@ styles. It does not change authentication, checkout, payments, or cache policy.
 
 CSS builds a stylesheet from the files listed in `tailwind.storefront.config.ts`.
 CSS modules hold component-specific rules. Narrowing Tailwind's file list can
-save bytes, but missing a component can remove its styling. Route-CSS isolation
-was committed separately; this cleanup does not change its configuration.
+save bytes, but missing a component can remove its styling.
 
 - `globals.css` + `tailwind.storefront.config.ts`: shared UI and shop browsing.
 - `route-utilities.css` + `tailwind.route-utilities.config.ts`: extra styles for
@@ -46,14 +45,16 @@ loaded after client navigation, so this mainly saves the first browsing download
 | Radio-button and loading-placeholder appearance | [RadioButtonGroupWithText.tsx](../src/components/UI/Shop/ProductDetails/RadioButtonGroupWithText.tsx) |
 | Product-gallery image settings | [galleryShared.tsx](../src/components/UI/Shop/ProductDetails/ProductImageGallery/galleryShared.tsx) |
 
-`getProductOptionGroups()` supplies the same groups to product details and the
-category quick-selection popover. `getProductOptionLayout()` strips those groups
-down to display labels for the server's loading layout. Keep raw option metadata
-in the first function and price/availability decisions out of the second.
+`getProductOptionGroups()` groups variant options in one pass for both product
+details and the category quick-selection popover. It preserves the original
+selection objects, group order, and latest metadata for duplicate values.
+`getProductOptionLayout()` turns those groups into display labels for the
+server's loading layout. Neither function decides price or availability.
 
 The About page stays a small composition of hero, content, navigation, and footer.
 `AboutHero` is a Server Component, not an extra client-side widget. Its flow height
-remains `20rem`; the taller desktop artwork is only a background layer.
+remains `20rem`; the taller desktop artwork is only a background layer. The
+`<picture>` is positioned relatively so Next's fill image uses that same frame.
 Keep its framing in the CSS module: an additional `object-center` utility can
 override desktop bottom alignment when stylesheet order changes.
 
@@ -99,7 +100,7 @@ Use Yarn and keep the normal Turbopack build:
 ```sh
 yarn lint
 yarn tsc --noEmit --pretty false
-yarn node --import tsx --test scripts/image-compression.test.ts scripts/storefront-css.test.ts src/lib/merchizeStorefront/productOptionLayout.test.ts
+yarn test:storefront
 yarn build
 ```
 
