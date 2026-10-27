@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import RadioButtonGroup from './RadioButtonGroupWithText';
-import {
+import type {
   ColorAttribute,
   SizeAttribute,
   ProductOption,
@@ -25,7 +26,14 @@ const VariantAttributeSelector = ({
   attribute,
   options,
 }: VariantAttributeSelectorProps) => {
-  const { setSize, setColor, setLabel } = useCurrentVariant();
+  const { selectedValue, setSize, setColor, setLabel } = useCurrentVariant(
+    useShallow((state) => ({
+      selectedValue: state.currentVariantOptions[attribute],
+      setSize: state.setSize,
+      setColor: state.setColor,
+      setLabel: state.setLabel,
+    })),
+  );
 
   const radioOptions = useMemo(
     () => buildProductRadioOptions(options, attribute),
@@ -68,7 +76,12 @@ const VariantAttributeSelector = ({
   return (
     <div className='space-y-1'>
       <h4 className='text-xl'>{title}</h4>
-      <RadioButtonGroup options={radioOptions} onChange={onChange} groupLabel={title} />
+      <RadioButtonGroup
+        options={radioOptions}
+        selectedValue={selectedValue}
+        onChange={onChange}
+        groupLabel={title}
+      />
     </div>
   );
 };

@@ -1,7 +1,6 @@
-import React, { useId } from 'react';
+import { useId, type FC } from 'react';
 import { Input } from '../../primitives/input';
 import { cn } from '@/lib/utils';
-import { useCurrentVariant } from './currentVariantStore';
 
 interface RadioOption {
   value: string | { name: string; value: string } | null | undefined;
@@ -11,30 +10,24 @@ interface RadioOption {
 
 interface RadioButtonGroupProps {
   options: RadioOption[];
+  selectedValue?: string | null;
   onChange: (value: string | { name: string; value: string }) => void;
   groupLabel?: string;
   isLoading?: boolean;
 }
 
-const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({
+const RadioButtonGroup: FC<RadioButtonGroupProps> = ({
   options,
+  selectedValue,
   onChange,
   groupLabel,
   isLoading = false,
 }) => {
-  const [selectedValue, setSelectedValue] = React.useState<string | undefined>();
   const groupId = useId();
   const groupName = `radio-group-${groupId}`;
 
-  const { currentVariantOptions } = useCurrentVariant();
-  const hasAnySelection = Object.values(currentVariantOptions).some(
-    (value) => value !== null && value !== '',
-  );
-  const displaySelectedValue = hasAnySelection ? selectedValue : undefined;
-
   const handleSelect = (prop: RadioOption, radioValue: string | undefined) => {
     if (prop.value != null && radioValue != null) {
-      setSelectedValue(radioValue);
       onChange(prop.value);
     }
   };
@@ -49,11 +42,12 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({
     >
       {options.map((prop) => {
         const radioValue = typeof prop.value === 'string' ? prop.value : prop.value?.value;
-        const isSelected = !isLoading && displaySelectedValue === radioValue;
+        const isSelected = !isLoading && selectedValue === radioValue;
         const isColorValue = radioValue
           ? radioValue.startsWith('#') && radioValue.length === 7
           : false;
         const hexCode = isColorValue ? radioValue : null;
+        const contrastColor = hexCode && isLightHexColor(hexCode) ? 'black' : 'white';
         const inputId = `radio-${groupId}-${prop.key}`;
         const labelId = `radio-label-${groupId}-${prop.key}`;
         const isDisabled = prop.value == null || radioValue == null;
@@ -88,7 +82,7 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({
                 )}
                 style={{
                   backgroundColor: hexCode ?? '#fff',
-                  color: hex_is_light(hexCode ?? '#fff') ? 'black' : 'white',
+                  color: contrastColor,
                 }}
                 title={prop.label}
               >
@@ -97,7 +91,7 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({
                     style={{
                       fontSize: '1.2rem',
                       fontWeight: 'bold',
-                      color: hex_is_light(hexCode ?? '#fff') ? 'black' : 'white',
+                      color: contrastColor,
                     }}
                   >
                     ✓
@@ -141,12 +135,12 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({
   );
 };
 
-function hex_is_light(color: string) {
+function isLightHexColor(color: string) {
   const hex = color.replace('#', '');
-  const c_r = parseInt(hex.substring(0, 2), 16);
-  const c_g = parseInt(hex.substring(2, 4), 16);
-  const c_b = parseInt(hex.substring(4, 6), 16);
-  const brightness = (c_r * 299 + c_g * 587 + c_b * 114) / 1000;
+  const red = parseInt(hex.substring(0, 2), 16);
+  const green = parseInt(hex.substring(2, 4), 16);
+  const blue = parseInt(hex.substring(4, 6), 16);
+  const brightness = (red * 299 + green * 587 + blue * 114) / 1000;
   return brightness > 155;
 }
 
