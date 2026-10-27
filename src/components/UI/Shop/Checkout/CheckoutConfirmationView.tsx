@@ -1,5 +1,7 @@
 'use client';
 
+import { checkoutPanelClassName } from './checkoutStyles';
+
 import type { ReactNode } from 'react';
 import { Check, Copy, Download, Loader2, RefreshCw, TriangleAlert } from 'lucide-react';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
@@ -79,7 +81,7 @@ export default function CheckoutConfirmationView({
     <main className='mx-auto flex w-full min-w-0 max-w-2xl flex-col px-3 py-8 text-white sm:px-5 sm:py-12'>
       <section
         aria-labelledby='checkout-confirmation-title'
-        className='min-w-0 rounded-2xl bg-[#202020]/95 p-5 text-center sm:p-8'
+        className={`${checkoutPanelClassName} min-w-0 p-5 text-center sm:p-8`}
       >
         {storageNotice}
         <div

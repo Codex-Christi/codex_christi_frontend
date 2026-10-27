@@ -7,6 +7,7 @@ import { useCartStore, type CartVariant } from '@/stores/shop_stores/cartStore';
 import { MiniCartList } from '../Cart/MiniCartList';
 import OrderSummaryTotals from './OrderSummaryTotals';
 import { formatOrderMoney, type OrderPreviewTotals } from '@/lib/shop/checkout/orderMoney';
+import { checkoutPanelClassName } from './checkoutStyles';
 
 export default function CheckoutPageOrderSummary() {
   const details = useContext(ServerOrderDetailsContext);
@@ -29,7 +30,7 @@ export function CheckoutOrderSummaryView({
   return (
     <aside
       aria-label='Order summary'
-      className='order-1 min-w-0 rounded-2xl bg-[#222]/95 p-4 sm:p-6 lg:order-2 lg:p-7'
+      className={`${checkoutPanelClassName} order-1 min-w-0 p-4 sm:p-5 lg:order-2 lg:p-6`}
     >
       <button
         type='button'
@@ -65,33 +66,40 @@ export function CheckoutOrderSummaryView({
       </h2>
       <div
         id='checkout-order-summary'
-        className={`${expanded ? 'block' : 'hidden'} mt-5 space-y-6 border-t border-white/25 pt-5 lg:block`}
+        className={`${expanded ? 'block' : 'hidden'} mt-4 space-y-4 border-t border-white/25 pt-4 lg:block`}
       >
-        <MiniCartList
-          items={cartItems}
-          showQuantityControls={false}
-          showRemoveButton={false}
-          variant='compact'
-          confirmBeforeRemove
-          prices={prices}
-        />
+        <div
+          role='region'
+          aria-label='Items in your order'
+          tabIndex={0}
+          className='scrollbar max-h-64 overflow-x-hidden overflow-y-auto overscroll-contain pr-2 focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-white/60 lg:max-h-80'
+        >
+          <MiniCartList
+            items={cartItems}
+            showQuantityControls={false}
+            showRemoveButton={false}
+            variant='summary'
+            className='!space-y-2'
+            prices={prices}
+          />
+        </div>
         <div>
           <label htmlFor='checkout-discount-code' className='sr-only'>
             Discount code
           </label>
-          <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-3'>
+          <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2'>
             <input
               id='checkout-discount-code'
               type='text'
               disabled
               placeholder='Coupon or discount code'
               aria-describedby='checkout-discount-note'
-              className='min-h-11 w-full min-w-0 rounded-xl border border-white/35 bg-transparent px-3 text-sm placeholder:text-white/55 disabled:cursor-not-allowed'
+              className='min-h-11 w-full min-w-0 rounded-[10px] border border-white/35 bg-transparent px-3 text-sm placeholder:text-white/55 disabled:cursor-not-allowed'
             />
             <button
               type='button'
               disabled
-              className='min-h-11 rounded-xl bg-white/25 px-4 text-sm font-semibold text-white/60 disabled:cursor-not-allowed'
+              className='min-h-11 rounded-[10px] bg-white/25 px-4 text-sm font-semibold text-white/60 disabled:cursor-not-allowed'
             >
               Apply
             </button>

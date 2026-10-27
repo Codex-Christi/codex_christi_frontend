@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { createContext, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { createContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ArrowLeft, Check, Loader2, RefreshCw } from 'lucide-react';
 import { ServerOrderDetailsComponent } from './ServerOrderDetailsComponent';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
@@ -14,6 +14,9 @@ import CheckoutStorageNotice from './CheckoutStorageNotice';
 import { useAuthStore } from '@/stores/authStore';
 import { claimCurrentCheckout } from '@/lib/hooks/shopHooks/checkout/claimCurrentCheckout';
 import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
+import { checkoutPanelClassName } from './checkoutStyles';
+import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
+import { canResumeVerifiedCheckout } from '@/lib/hooks/shopHooks/checkout/canResumeVerifiedCheckout';
 
 const CheckoutPageOrderSummary = dynamic(() => import('./CheckoutPageOrderSummary'));
 const PaymentSection = dynamic(() => import('./PaymentSection'));
@@ -42,6 +45,7 @@ type QuoteState = {
 
 export default function CheckoutPage() {
   const [step, setStep] = useState<CheckoutStep>('basic-checkout-info');
+  const restoredStep = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
   const authenticatedOwner = useAuthStore((state) =>
     state.isAuthenticated ? state.accountOwnerId : null,
@@ -54,6 +58,11 @@ export default function CheckoutPage() {
   const checkoutHydrated = useSyncExternalStore(
     useShopCheckoutStore.persist.onFinishHydration,
     useShopCheckoutStore.persist.hasHydrated,
+    () => false,
+  );
+  const verificationHydrated = useSyncExternalStore(
+    useDjangoOrderIntentStore.persist.onFinishHydration,
+    useDjangoOrderIntentStore.persist.hasHydrated,
     () => false,
   );
   const checkoutCountry = useShopCheckoutStore((state) => state.delivery_address.shipping_country);
@@ -73,6 +82,24 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!useShopCheckoutStore.persist.hasHydrated()) void useShopCheckoutStore.persist.rehydrate();
   }, []);
+  useEffect(() => {
+    if (!checkoutHydrated || !verificationHydrated || restoredStep.current) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (!active || restoredStep.current) return;
+      restoredStep.current = true;
+      if (
+        canResumeVerifiedCheckout(
+          useShopCheckoutStore.getState(),
+          useDjangoOrderIntentStore.getState(),
+        )
+      )
+        setStep('payment-section');
+    });
+    return () => {
+      active = false;
+    };
+  }, [checkoutHydrated, verificationHydrated]);
   useEffect(() => {
     if (authenticatedOwner && activeOrderToken) void claimCurrentCheckout();
   }, [authenticatedOwner, activeOrderToken]);
@@ -127,13 +154,13 @@ export default function CheckoutPage() {
           {!hydrated ? (
             <p
               role='status'
-              className='flex min-h-48 items-center justify-center gap-3 rounded-2xl bg-[#1b1b1b]'
+              className={`${checkoutPanelClassName} flex min-h-48 items-center justify-center gap-3`}
             >
               <Loader2 className='animate-spin' size={20} aria-hidden='true' /> Loading your
               checkout…
             </p>
           ) : !cartVariants.length ? (
-            <section className='rounded-2xl bg-[#1b1b1b] p-6 text-center'>
+            <section className={`${checkoutPanelClassName} p-6 text-center`}>
               <h2 className='text-xl font-semibold'>Your cart is empty</h2>
               <p className='mt-2 text-sm text-white/70'>Add an item before checking out.</p>
               <CustomShopLink
@@ -146,7 +173,7 @@ export default function CheckoutPage() {
           ) : (
             <div className='grid min-w-0 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,1fr)] lg:gap-6'>
               <CheckoutPageOrderSummary />
-              <section className='order-2 min-w-0 rounded-2xl bg-[#1b1b1b]/95 p-4 sm:p-6 lg:order-1 lg:p-8'>
+              <section className={`${checkoutPanelClassName} order-2 min-w-0 p-4 sm:p-6 lg:order-1 lg:p-8`}>
                 <CheckoutStorageNotice />
                 {notice && (
                   <p
@@ -158,7 +185,7 @@ export default function CheckoutPage() {
                 )}
                 <ol
                   aria-label='Checkout steps'
-                  className='mb-7 grid grid-cols-2 gap-3 border-b border-white/20 pb-5 text-sm'
+                  className='mb-5 grid grid-cols-2 gap-3 border-b border-white/20 pb-4 text-sm'
                 >
                   {(['Contact & delivery', 'Review & pay'] as const).map((label, index) => (
                     <li

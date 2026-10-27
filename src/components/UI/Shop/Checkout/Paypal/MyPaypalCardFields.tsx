@@ -28,6 +28,22 @@ export interface MyPayPalCardFieldInterface {
   onApprove: (data: OnApproveData) => Promise<void>;
 }
 
+const cardFieldStyles = {
+  input: {
+    background: 'transparent',
+    border: '1px solid #fff',
+    'border-radius': '10px',
+    outline: 'none',
+    color: '#fff',
+    'font-size': '16px',
+    'font-family': 'Inter, Arial, sans-serif',
+    padding: '12px',
+  },
+  'input:focus': { outline: 'none', 'box-shadow': '0 0 0 1px #fff' },
+  'input::placeholder': { color: '#ccc' },
+  '.invalid': { color: '#fda4af' },
+};
+
 const billingFields = [
   { name: 'addressLine1', label: 'Street address', autoComplete: 'billing address-line1' },
   {
@@ -95,10 +111,7 @@ function CardFieldsSession({
             'We couldn’t complete this payment. Check the payment status above before trying again.',
           );
         }}
-        style={{
-          input: { color: '#fff', 'font-size': '16px', 'font-family': 'Inter', padding: '12px' },
-          '.invalid': { color: '#fda4af' },
-        }}
+        style={cardFieldStyles}
       >
         <CardPaymentForm onReady={onReady} ready={ready} />
       </PayPalCardFieldsProvider>
@@ -198,7 +211,7 @@ function CardPaymentForm({ onReady, ready }: { onReady: () => void; ready: boole
           </p>
           <PayPalNameField
             placeholder='Name on card'
-            className='min-h-12 rounded-xl border border-white/40'
+            className='min-h-12'
           />
         </div>
         <div className='col-span-2 min-w-0'>
@@ -207,21 +220,21 @@ function CardPaymentForm({ onReady, ready }: { onReady: () => void; ready: boole
           </p>
           <PayPalNumberField
             placeholder='Card number'
-            className='min-h-12 rounded-xl border border-white/40'
+            className='min-h-12'
           />
         </div>
         <div className='min-w-0'>
           <p className='mb-2 text-sm'>Expiry date</p>
           <PayPalExpiryField
             placeholder='MM / YY'
-            className='min-h-12 rounded-xl border border-white/40'
+            className='min-h-12'
           />
         </div>
         <div className='min-w-0'>
           <p className='mb-2 text-sm'>Security code</p>
           <PayPalCVVField
             placeholder='CVV'
-            className='min-h-12 rounded-xl border border-white/40'
+            className='min-h-12'
           />
         </div>
       </div>

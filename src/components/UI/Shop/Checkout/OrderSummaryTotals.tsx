@@ -25,7 +25,7 @@ export default function OrderSummaryTotals({
       <Skeleton aria-label='Updating price' className='ml-auto h-5 w-20 bg-white/10' />
     );
   return (
-    <dl className={`space-y-3 text-sm ${className ?? ''}`}>
+    <dl className={`space-y-2 text-sm text-[#F3F3F3] ${className ?? ''}`}>
       <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,auto)] items-baseline gap-3'>
         <dt>Subtotal</dt>
         <dd>{value(retailPriceTotalNum)}</dd>
@@ -34,7 +34,7 @@ export default function OrderSummaryTotals({
         <dt>Shipping / delivery</dt>
         <dd>{value(shippingPriceNum)}</dd>
       </div>
-      <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,auto)] items-baseline gap-3 border-t border-white/30 pt-5 text-lg font-semibold'>
+      <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,auto)] items-baseline gap-3 border-t border-white/30 pt-3 text-lg font-semibold'>
         <dt>
           Total
           {currency && <span className='ml-2 text-xs font-normal text-white/65'>{currency}</span>}

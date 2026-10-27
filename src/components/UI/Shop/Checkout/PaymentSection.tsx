@@ -4,7 +4,7 @@ import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { createContext, useContext, useState, type ContextType, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { ArrowLeft, CreditCard, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import PayPal from '@/assets/img/paypal.png';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import { CheckoutAccordionContext } from './ProductCheckout';
@@ -14,7 +14,6 @@ import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
 import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 import { formatOrderMoney } from '@/lib/shop/checkout/orderMoney';
-import { buildOptionSummary, toCartOptions } from '../Cart/cartOptionHelpers';
 import {
   checkoutReviewIdentity,
   createCheckoutReview,
@@ -117,6 +116,7 @@ export function CheckoutPaymentView({
   const reviewKey = prices ? checkoutReviewIdentity(cart, checkout, prices) : null;
   const acknowledged = Boolean(reviewKey && acceptedReview === reviewKey && canContinue);
   const address = checkout.delivery_address;
+  const quantity = cart.reduce((total, line) => total + line.quantity, 0);
   const countryName = details?.countrySupport.country?.country_name ?? address.shipping_country;
   const review = acknowledged && prices ? createCheckoutReview(prices) : null;
   const onPaymentError = (message: string, code?: string) => {
@@ -133,7 +133,7 @@ export function CheckoutPaymentView({
 
   return (
     <CheckoutPaymentReviewContext.Provider value={{ review, onPaymentError }}>
-      <div className='min-w-0 space-y-6'>
+      <div className='min-w-0 space-y-5'>
         <header className='flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-white/25 pb-4'>
           <h2 className='text-xl font-semibold'>Review & payment</h2>
           <button
@@ -154,10 +154,10 @@ export function CheckoutPaymentView({
         )}
         <section
           aria-labelledby='checkout-final-review'
-          className='min-w-0 rounded-xl border border-white/20 p-4'
+          className='min-w-0 border-b border-white/20 pb-4'
         >
           <h3 id='checkout-final-review' className='font-semibold'>
-            Check your order
+            Delivery details
           </h3>
           <div className='mt-3 text-sm leading-6 text-white/75 [overflow-wrap:anywhere]'>
             <p className='font-medium text-white'>
@@ -180,22 +180,9 @@ export function CheckoutPaymentView({
               {countryName}
             </address>
           </div>
-          <ul className='mt-4 space-y-3 border-t border-white/15 pt-4 text-sm'>
-            {cart.map((line) => (
-              <li
-                key={line.variantId}
-                className='grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-3'
-              >
-                <div className='min-w-0 [overflow-wrap:anywhere]'>
-                  <p className='font-medium'>{line.title}</p>
-                  <p className='mt-1 text-xs text-white/65'>
-                    {buildOptionSummary(toCartOptions(line.itemDetail.options)).summary}
-                  </p>
-                </div>
-                <span className='whitespace-nowrap text-white/80'>Qty: {line.quantity}</span>
-              </li>
-            ))}
-          </ul>
+          <p className='mt-3 text-sm text-white/75'>
+            {quantity} {quantity === 1 ? 'item' : 'items'} in your order
+          </p>
           <div className='mt-4 flex min-w-0 flex-wrap items-baseline justify-between gap-2 border-t border-white/20 pt-4'>
             <span className='font-semibold'>Total to pay</span>
             <strong className='text-lg [overflow-wrap:anywhere]'>
@@ -227,11 +214,11 @@ export function CheckoutPaymentView({
         </p>
         <fieldset className='min-w-0'>
           <legend className='mb-3 font-semibold'>Payment method</legend>
-          <div className='grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2'>
+          <div className='flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2'>
             {(['card', 'paypal_buttons'] as const).map((method) => (
               <label
                 key={method}
-                className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 ${payOption === method ? 'border-[#0085ff] bg-[#0085ff]/10' : 'border-white/30'}`}
+                className='inline-flex min-h-11 cursor-pointer items-center gap-2 py-2'
               >
                 <input
                   type='radio'
@@ -242,12 +229,9 @@ export function CheckoutPaymentView({
                   className='h-5 w-5 shrink-0 accent-[#0085ff]'
                 />
                 {method === 'card' ? (
-                  <>
-                    <CreditCard size={20} aria-hidden='true' />
-                    <span className='text-sm font-medium'>Credit / debit card</span>
-                  </>
+                  <span className='text-sm font-medium'>Credit / debit card</span>
                 ) : (
-                  <Image src={PayPal} alt='PayPal' className='h-auto w-16' />
+                  <Image src={PayPal} alt='PayPal' className='h-auto w-10' />
                 )}
               </label>
             ))}

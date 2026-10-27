@@ -26,7 +26,7 @@ type MiniCartListProps = {
   onRemove?: (variantId: string) => void | Promise<void>;
   className?: string;
   emptyState?: ReactNode;
-  variant?: 'default' | 'compact';
+  variant?: 'default' | 'compact' | 'summary';
   confirmBeforeRemove?: boolean;
   prices?: OrderPreviewTotals | null;
 };
@@ -44,7 +44,8 @@ export const MiniCartList: FC<MiniCartListProps> = ({
 }) => {
   const defaultRemove = useCartStore((state) => state.removeFromCart);
   const remove = onRemove ?? defaultRemove;
-  const isCompact = variant === 'compact';
+  const isSummary = variant === 'summary';
+  const isCompact = variant !== 'default';
   const [pendingRemoval, setPendingRemoval] = useState<CartVariant | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
@@ -87,18 +88,21 @@ export const MiniCartList: FC<MiniCartListProps> = ({
       const linePrice = prices?.linePricesByVariantId[variantId];
       const fallbackInitials = (title || 'Item').slice(0, 2).toUpperCase();
       const imageSize = isCompact ? 48 : 60;
-      const cardPadding = isCompact ? 'px-2 py-3' : 'px-3 py-4';
+      const cardPadding = isSummary ? 'px-2 py-2' : isCompact ? 'px-2 py-3' : 'px-3 py-4';
       const optionTextClass = isCompact ? 'text-[0.65rem]' : 'text-xs';
       const titleClass = isCompact ? 'text-sm' : 'text-base';
       const priceClass = isCompact ? 'text-sm' : 'text-base';
       const qtyTextClass = isCompact ? 'text-[0.65rem]' : 'text-xs';
+      const imageGridClass = isSummary
+        ? 'row-span-2 [@container(min-width:22rem)]:row-span-1'
+        : 'row-span-2';
       return (
         <div
           key={variantId}
-          className={`min-w-0 max-w-full rounded-2xl border border-white/10 bg-black/10 ${cardPadding} space-y-3`}
+          className={`min-w-0 max-w-full rounded-2xl border border-white/10 bg-black/10 ${cardPadding} space-y-3 ${isSummary ? '[container-type:inline-size]' : ''}`}
         >
           <div
-            className={`grid min-w-0 items-start gap-x-3 gap-y-2 ${isCompact ? 'grid-cols-[48px_minmax(0,1fr)]' : 'grid-cols-[60px_minmax(0,1fr)]'}`}
+            className={`grid min-w-0 items-start gap-x-3 gap-y-2 ${isCompact ? 'grid-cols-[48px_minmax(0,1fr)]' : 'grid-cols-[60px_minmax(0,1fr)]'} ${isSummary ? '[@container(min-width:22rem)]:grid-cols-[48px_minmax(0,1fr)_auto]' : ''}`}
           >
             {image ? (
               <Image
@@ -106,13 +110,13 @@ export const MiniCartList: FC<MiniCartListProps> = ({
                 alt={title}
                 width={imageSize}
                 height={imageSize}
-                className={`row-span-2 shrink-0 rounded-xl object-cover object-top border border-white/10 ${
+                className={`${imageGridClass} shrink-0 rounded-xl object-cover object-top border border-white/10 ${
                   isCompact ? 'h-12 w-12' : 'h-[60px] w-[60px]'
                 }`}
               />
             ) : (
               <div
-                className={`row-span-2 shrink-0 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center text-sm font-semibold text-white/70 ${
+                className={`${imageGridClass} shrink-0 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center text-sm font-semibold text-white/70 ${
                   isCompact ? 'h-12 w-12' : 'h-[60px] w-[60px]'
                 }`}
               >
@@ -122,7 +126,10 @@ export const MiniCartList: FC<MiniCartListProps> = ({
 
             <div className='min-w-0 text-[#F3F3F3] space-y-1'>
               <div className='flex min-w-0 items-start justify-between gap-2'>
-                <p className={`min-w-0 font-semibold [overflow-wrap:anywhere] ${titleClass}`}>
+                <p
+                  title={isSummary ? title : undefined}
+                  className={`min-w-0 font-semibold [overflow-wrap:anywhere] ${titleClass} ${isSummary ? 'line-clamp-2' : ''}`}
+                >
                   {title}
                 </p>
                 {showRemoveButton && (
@@ -144,7 +151,7 @@ export const MiniCartList: FC<MiniCartListProps> = ({
             </div>
 
             <div
-              className={`col-start-2 min-w-0 text-right font-semibold text-white [overflow-wrap:anywhere] ${priceClass}`}
+              className={`col-start-2 min-w-0 text-right font-semibold text-white [overflow-wrap:anywhere] ${priceClass} ${isSummary ? '[@container(min-width:22rem)]:col-start-3 [@container(min-width:22rem)]:row-start-1' : ''}`}
             >
               {linePrice ? (
                 formatOrderMoney(linePrice.lineTotalNum, prices!.currency)
@@ -166,6 +173,7 @@ export const MiniCartList: FC<MiniCartListProps> = ({
   }, [
     items,
     isCompact,
+    isSummary,
     showRemoveButton,
     showQuantityControls,
     confirmBeforeRemove,
