@@ -29,9 +29,10 @@ export type RefreshSessionResult =
       unavailable?: boolean;
     };
 
-async function writeAuthCookies(authCookies: AuthCookieDefinition[]) {
+async function writeAuthCookies(authCookies: AuthCookieDefinition[], assertActive?: () => void) {
   const cookieStore = await cookies();
-
+  // Logout may arrive during the await; guard both token writes together.
+  assertActive?.();
   for (const cookie of authCookies) {
     cookieStore.set(cookie.name, cookie.value, cookie.options);
   }
@@ -69,8 +70,9 @@ export async function refreshSession(): Promise<RefreshSessionResult> {
       ...refreshedTokens,
       requestHeaders: await headers(),
     });
-    assertSessionRefreshActive(currentRefreshToken);
-    await writeAuthCookies(built.cookies);
+    await writeAuthCookies(built.cookies, () =>
+      assertSessionRefreshActive(currentRefreshToken, refreshedTokens),
+    );
     const session = { userID: built.userID };
 
     return {

@@ -3,7 +3,8 @@
 ## Before Deployment
 
 Pull requests and pushes to `main` run lint, TypeScript, and the existing
-storefront regression suite. Deployment starts only after those pass.
+storefront, authentication and checkout regression suites. Deployment starts
+only after those pass.
 The production Docker build uses Turbopack.
 
 The deployment job waits for the VPS script instead of starting it in the
@@ -21,12 +22,23 @@ inspect its logs and restore the previous release manually when needed.
 ## Readiness
 
 `/next-api/health/ready` (also `/api/health/ready` inside Next) returns `200` only
-when the app can query its required local catalog tables. Otherwise it returns
-`503`, without exposing database details. Responses are not cached.
+when the app can query its required local catalog tables and its authentication
+configuration is valid. The Next container must have a `SESSION_SECRET` of at
+least 32 UTF-8 bytes, an HTTP(S) Django API base URL without credentials, query
+or fragment, and a valid `DJANGO_AUTH_REFRESH_PATH` if overriding the default
+`/auth/token/refresh`. Internal Docker HTTP URLs are allowed. The selected URL
+uses the same internal/public preference as real Django requests.
+
+Otherwise it returns `503` with a generic body. The handler logs only the failed
+check, not secrets, URLs or database details. Responses are not cached. These
+checks run at request time, so the image build does not need a session secret.
 
 The container probes this endpoint every 30 seconds. This is a local readiness
-probe, not a catalog refresh: it makes no Merchize, PayPal, or remote database
-requests, scans no products, and writes no data. It adds no cron or `after()` job.
+probe, not a catalog refresh: it makes no Django, Merchize, PayPal or remote
+database requests, scans no products, and writes no data. It adds no
+cron or `after()` job. A passing probe does not confirm that Django is reachable
+or accepts the configured refresh endpoint; verify that with a disposable
+account after deployment. See the [authentication guide](../Future%20Implementation%20Guides/nextjs-auth-shop-integration-hardening-plan.md#deployment-checklist).
 
 ## Run Checks Locally
 
@@ -36,5 +48,7 @@ yarn lint
 yarn next typegen
 yarn tsc --noEmit --incremental false --pretty false
 yarn test:storefront
+yarn test:auth
+yarn test:checkout
 yarn build
 ```

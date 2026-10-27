@@ -23,7 +23,7 @@ Constraints: keep both `codexchristi.org/shop` and `codexchristi.shop`, use exis
 | Persisted account details and late responses | Memory-only profile stores, account-generation checks and same-origin tab notices. |
 | Cookie/Proxy inconsistencies | Versioned token-kind cookies, production Secure flag, profile descendant guards and no page redirects for POST. |
 | Country/email/upload/Prisma problems | Country normalization, encoded query values, 900 KiB photo limit and production client reuse. |
-| Shop microcache/header gaps | Separate Nginx work remains; no production configuration was changed. |
+| Shop microcache/header gaps | Selective-cache changes are in the canonical guide. The user reports Nginx redeployed; Next deployment and production checks remain pending. |
 | Cross-domain automatic login | Existing-database option remains an evaluation, not an implemented feature. |
 
 ## Important Corrections

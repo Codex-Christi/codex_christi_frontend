@@ -5,7 +5,7 @@ Updated 2026-10-27. This is the canonical guide; the [original audit index](./au
 ## Scope And Decisions
 
 - Keep `codexchristi.org/shop` and `codexchristi.shop` working with one Next application.
-- Use the existing production Django APIs. No Django edits, database migrations, Redis or extra container are included. The proposed Nginx replacement below is not yet deployed.
+- Use the existing production Django APIs. No Django edits, database migrations, Redis or extra container are included. The user reports Nginx has been redeployed; the updated Next image has not. The exact deployed Nginx file and production behavior have not been independently verified.
 - Shop Register opens main-site signup: `https://codexchristi.org/auth/signup` in production and `/auth/signup` locally. Direct shop signup routes remain thin wrappers around the same forms, not the Register link destination.
 - Shop login/recovery use the corresponding shop routes. Verification/reset do not automatically create a login because the documented endpoints do not return login tokens.
 - Automatic sign-in between domains is evaluation only. Its eventual logout must affect this browser's linked login on both domains, not other devices.
@@ -37,6 +37,7 @@ Nginx maps public shop paths into Next's `/shop` subtree. The supplied file also
 | Minimal response shapes / multipart and country validation | `src/lib/auth/account-data.ts`, `account-validation.ts`, `profile-limits.ts` |
 | Bounded, uncached Django requests and response reading | `src/lib/django/request.ts`, `src/lib/auth/authenticated-django-fetch.ts` |
 | Cookie format, read-only session state and refresh | `src/lib/session/session-cookies.ts`, `server-session.ts`, `main-session.ts`, `session-refresh.ts` |
+| Shared runtime auth configuration / deployment readiness | `src/lib/session/session-config.ts`, `src/app/api/health/ready/route.ts`; `devScripts/README.md` |
 | Protected GET/HEAD routes and refresh-cookie forwarding | `src/proxy.ts`, `src/lib/middlewares/auth-middleware.ts`, `src/lib/session/session-redirect.ts` |
 | POST logout, origin validation and both admin-cookie Paths | `src/app/api/logout/route.ts`, `src/lib/auth/request-origin.ts`, `logout-cookies.ts` |
 | Client logout and private-state cleanup | `src/actions/logout.ts`, `src/lib/auth/client-session.ts` |
@@ -59,7 +60,7 @@ Nginx maps public shop paths into Next's `/shop` subtree. The supplied file also
 5. Authenticated actions/handlers can refresh once after genuine 401. Retry only reads or explicitly allowed profile/address/wishlist changes. Never use this retry policy for uncertain payment, registration, email delivery or fulfillment results.
 6. Confirmed invalid refresh clears cookies. Timeout, 429, 5xx, 403 and malformed refresh responses preserve the refresh cookie and return a retry state. A proactive-refresh outage does not discard still-valid access.
 7. `getUser()` and `fetchUserShopProfile()` are read-only rendering helpers. Only browser-invoked actions opt into cookie writes. Their account parsing/error handling is shared with the server actions.
-8. Concurrent refreshes share a bounded in-process promise cache. Logout cancels matching in-process refreshes; this does not coordinate multiple processes or eliminate every late Set-Cookie race.
+8. Concurrent refreshes share bounded process state across Node Proxy and handlers. Logout/reset also cancel work using a rotated token; cookie writes recheck after the last await. Timing, capacity and limits are documented below.
 9. A transient session-check failure schedules three additional automatic attempts, after 2, 5 and 15 seconds. Exhausting this budget stops retries; Retry or a throttled focus/resume check can start a new budget. There is no continuous polling. Still-valid access remains usable after a proactive-refresh failure, but its actual expiry independently hides private UI even if another check is pending.
 10. Only the protected `/profile` and shop account layouts bootstrap the browser from `getServerAuthSnapshot()`. The read-only projection includes identity, expiry and status, never tokens. It removes the redundant startup session action on a cold protected-page load. Public catalog/root layouts do not gain cookie reads. A stale prefetched snapshot cannot overwrite a known logout or different login, and rendering does not seed a shared server-side Zustand store.
 11. Both opening an account page and leaving one open through an outage offer Retry and Logout. When opening a page, Proxy uses a temporary, uncached redirect (307) and saves the validated destination in `next`; cookies stay intact. Retry returns there, with no automatic redirect loop. On an already-open page, Retry checks the session without discarding the hidden draft. Logout uses the existing POST endpoint even during a pending retry. The redirect is intentional: this Next version changes a rewritten page's 503 status to 200.
@@ -74,6 +75,15 @@ Nginx maps public shop paths into Next's `/shop` subtree. The supplied file also
 - `refreshAuthState()` is the store's session-check method. Obsolete persist-hydration stubs, an unused initializer and the empty refresh hook were removed. The avatar waits for confirmed identity instead of issuing another session check.
 - If a check fails temporarily, hide account details and keep unsaved edits in this tab. A successful check for the same person restores them. Confirmed logout or a different account discards them. `accountOwnerId` remembers whose hidden draft it is; it never grants access. Drafts do not survive a full reload.
 - Edit drawers and discard dialogs also hide during that outage, including those rendered outside the page container. Address forms fill saved values once per open, so a background reload cannot replace an unsaved draft. Explicit close discards the address draft. The avatar shows cached personal details only while sign-in is verified.
+
+### Refresh Cancellation And Readiness
+
+- Fixed a reproduced gap: refresh A could return rotated token B, then Logout with B would leave A's cached result usable. Successful results remain reusable for two seconds; old/new tokens share a cancellation group for 30 seconds, including successive rotations and cancellation before the new token is discovered. Tokens are indexed by hashes; completed results keep an internal cancellation guard without adding API response fields.
+- Tracking is capped at 256 token hashes, including reserved space for pending rotations. Full capacity refuses new refresh calls before contacting Django. If an unknown logout cannot be recorded, a temporary process-wide refresh pause prevents existing work from writing fresh cookies. This rare fallback preserves browser cookies for Retry rather than forcing every user to log out.
+- Expired result references cannot write cookies. Pending requests keep their cancellation links until settled; cleanup does not discard those links while awaiting Django. The existing five-second upstream timeout remains.
+- This is not lasting revocation. State is local to one Node process, resets on restart and does not coordinate other workers/containers or isolated runtimes. It cannot retract Set-Cookie headers already sent, erase a valid access token on another device, or replace Django's logout/password-reset policy. The single-process production HTTP check below covers the installed Node Proxy runtime, not every hosting model.
+- Readiness now checks the same 32-byte session-key rule used by cookie signing, the selected Django HTTP(S) URL and the optional refresh-path override, before the existing local SQL check. Missing/invalid configuration returns an uncached generic 503. Logs name only the failed check. Secret validation runs at request time, not during import/build. Internal Docker HTTP URLs still work.
+- The probe makes no Django call and proves neither backend reachability nor token revocation. It adds no database table, remote service or public-layout cookie read. Existing Docker/deploy readiness polling automatically uses these new checks. Details are in [deployment readiness](../devScripts/README.md#readiness).
 
 ### Forms, Address And Uploads
 
@@ -119,34 +129,40 @@ Current checks, 2026-10-27:
 
 | Check | Coverage / result |
 | --- | --- |
-| Auth regression tests | The auth-only copy passes 68 tests, including reset cookie expiry/client cleanup, unchanged sessions on failure, cold-load outage routing and the deployment test gate. The command discovers all auth/session tests automatically and includes existing wishlist checks. Tests use fake data, not a live database. |
-| TypeScript and targeted ESLint | Pass for the auth-only copy. The shared checkout has separate, concurrent checkout work; its validation results must be checked independently. |
-| Isolated production webpack build | Pass over the committed baseline with only the auth changes. Checked private session helpers are absent from its public action manifest. Public catalog pages remain static. |
+| Auth regression tests | The auth-only copy passes 71 existing tests, including reset cookie expiry/client cleanup, unchanged sessions on failure, cold-load outage routing and the deployment test gate. The command discovers all auth/session tests automatically and includes existing wishlist checks. Tests use fake data, not a live database. |
+| Refresh/readiness regressions | 17 temporary checks pass: rotation chains, cancellation before token discovery, two-second reuse versus longer tracking, delayed/expired results, separate-bundle sharing, final server/Proxy cookie guards, capacity, retry and runtime configuration/database failures. No live credentials or services. These extra test files are outside the repository and removed after validation, not committed, as requested. |
+| Production HTTP refresh/readiness checks | 11 checks pass against each isolated webpack/Turbopack Next server and fake Django API: actual Proxy/handler sharing, two parallel requests cancelled by Logout, old-token reuse blocked after rotated-token Logout/reset, four expiry headers, independent-browser refresh and readiness 200/503/revision. No real backend contact. |
+| Existing storefront/checkout suites | The auth-only copy passes 119 storefront and 209 checkout tests over the current committed baseline. No changes to those suites are included here. |
+| TypeScript and targeted ESLint | Pass for the auth-only build; the shared checkout also passes TypeScript and the changed runtime files pass targeted ESLint. Unrelated changes remain independently owned. |
+| Isolated production builds | Webpack and default Turbopack pass over committed baseline `5ea9dfc5` with only these auth changes and no SESSION_SECRET during build. Checked private session/config helpers are absent from both public action manifests; catalog pages retain static/ISR rendering. Turbopack's temporary filesystem root was widened for symlinked dependencies; repository config is unchanged. The webpack standalone tracing warning and shared dependencies mean these are not Docker packaging/VPS resource checks. |
 | Production-build browser checks | Account loading skips the extra startup session request. During a simulated refresh outage, expiry hides account details and edit drawers. Retry restores the same unsaved address; explicit close/reopen restores the saved address. No console errors/warnings. |
 | Reset and outage integration checks | The local fake API confirms successful reset expires four cookie headers and requires login; GET reset returns 405. Opening an account during an outage redirects to an uncached outage page. Browser Retry returns to the saved destination; Logout reaches login even when Django logout fails. |
 | Earlier form/login browser checks | Invalid submissions, return destinations, Register links and Logout passed. The user also confirmed their real account page loads. |
 
 The `verify` job in `.github/workflows/push-to-main.yml` now runs `yarn test:auth` before deployment. The deploy job depends on that job succeeding; no production credentials or backend/database access are needed by the auth tests. Keep this test step when changing the workflow.
 
-Keep the regression tests. Temporary browser fixtures and demo data are not application files and must not be committed. No real credentials, account creation, reset email or profile/address write were submitted by the agent.
+Keep the existing committed regression tests. No test files are staged or committed for this change. Temporary browser fixtures and demo data are not application files and must not be committed. No real credentials, account creation, reset email or profile/address write were submitted by the agent.
 
 Before committing, test the staged files in a separate copy and inspect the action manifest for exposed private helpers. Do not share a build directory with another running task. The copy reuses local dependencies; it is not a test of a self-contained container package. These checks do not prove production Nginx behavior or a measured speed increase. Keep the existing route CSS imports described in the [Storefront CSS guide](../README.md#storefront-css).
 
 ## Deployment Checklist
 
 - [ ] Make a strong SESSION_SECRET of at least 32 bytes available in the Next container; never use a test key.
+- [ ] Rebuild/redeploy Next through the existing verified workflow. Nginx alone is already redeployed according to the user; it does not deploy these auth/readiness fixes or Next's compiled cache headers. Do not repeat the Nginx replacement blindly.
+- [ ] Confirm `/next-api/health/ready` returns 200 and the expected release revision. A 503 log identifies either authentication configuration or the local catalog; correct that runtime configuration/schema instead of bypassing the probe. Docker becoming unhealthy does not automatically roll back the release.
 - [ ] Announce the one-time fresh sign-in: version-2 cookies deliberately reject old cookies from the previous unsafe helper boundary. Do not migrate by trusting their user ID.
 - [ ] Build with the real production public-site URL, and the intended internal Django URL. Development normally prefers the public API URL; internal preference is explicit or production-only.
 - [ ] Keep `/next-api` routed to Next on both hosts and preserve trusted public Host/protocol headers. Do not disable same-origin checks to work around proxy errors.
-- [ ] Validate the Nginx replacement below inside the actual container before applying it. Recreate only Nginx during a brief maintenance window to read the new file and clear its old HTML cache. Purge affected Cloudflare HTML entries separately if applicable.
+- [ ] Verify the already-deployed Nginx file matches the intended selective-cache policy and passes `nginx -t`. Use the replacement procedure below only if another configuration update is needed. Purge old Cloudflare HTML entries separately if applicable.
 - [ ] With disposable accounts behind HTTPS, verify both shop addresses, recovery, profile/address save past access expiry, invalid refresh, outages, two same-origin tabs and two independent devices.
 - [ ] During an outage, leave a dirty profile/address drawer open through access expiry: it must disappear while unverified and return unchanged after same-account recovery. Confirm actual logout and switching accounts discard the previous draft. Confirm hidden tabs do not retry continuously and exhausted retries require Retry or a later focus check.
 - [ ] Also open an expired session directly during an outage: confirm the temporary redirect preserves the requested destination, both responses prohibit caching, and Retry/Logout work on both shop addresses and the main profile. After a successful password reset, confirm the same browser lands on login, its other same-domain tabs clear private details, and its former admin unlock is gone. Failed resets must leave its current session intact.
 - [ ] Confirm actual Django lifetimes, refresh rotation, logout scope and password-reset revocation before claiming those behaviors. Verify parallel refresh in every deployed Next process/container.
+- [ ] With a disposable account, test Logout and successful reset just after a token refresh, plus Logout during a delayed refresh. The cancelled request must not set a new access/refresh cookie. Confirm another browser/device stays signed in. Repeat for both shop addresses and main profile; do not claim cross-domain logout before the bridge exists.
 
 ## Nginx Configuration
 
-The single proposed replacement is [production.conf](./nginx-auth-hardening/production.conf). It is a complete configuration, not a `conf.d` snippet. It keeps the original filename, certificates, Docker upstreams, ports, upload limit, cache sizes and shop URL mappings. The original `/Users/devsantorz/Desktop/devProjects/codex-nginx/nginx/production.conf` and its Compose file are untouched; nothing has been deployed.
+The single replacement is [production.conf](./nginx-auth-hardening/production.conf). It is a complete configuration, not a `conf.d` snippet. It keeps the original filename, certificates, Docker upstreams, ports, upload limit, cache sizes and shop URL mappings. This auth change does not edit that file or the external Nginx repository. The user reports deploying Nginx only; the actual VPS file has not been inspected.
 
 ### Changes
 
@@ -178,7 +194,7 @@ Local checks on 2026-10-27 use Nginx 1.30.6 and Next 16.4.3. The isolated webpac
 
 - 108 local Nginx safety checks passed, including warm-cache private-route bypass, all four hosts, both shop mappings, four logout cookie headers, malformed/conflicting/multiple Cache-Control values, STALE rejection, expiry during a 500 response, forwarding headers and unchanged asset caching.
 - A real product page, backed by a disposable SQLite snapshot, showed the updated product title after Next path invalidation and the deliberate 3.1-second wait. The new response then produced a proxy HIT. This tests Next regeneration plus the proxy, not merely a fake TTL timer.
-- The cache route/config checks passed locally, but their standalone test file is excluded from the commit at the user's request. The existing committed storefront suite passes 113 tests, and the auth suite passes 71 tests; TypeScript and targeted ESLint also pass. Temporary databases, fixture routes, build copies and benchmark scripts are removed after validation.
+- At the earlier cache-policy check, the standalone route/config tests passed locally but were excluded from the commit at the user's request; the committed storefront suite passed 113 tests and auth passed 71. TypeScript and targeted ESLint passed. Current auth-check results are in Verification above. Temporary databases, fixture routes, build copies and benchmark scripts are removed after validation.
 
 Performance used the real homepage and product-page code from committed baseline `ddadb9ba` plus this Next header change, with a synthetic product snapshot and no live API/database credentials. Tests alternated ISR-only and selective Nginx caching twice on four URLs across both domains: 400 requests per run, eight concurrent keep-alive clients, localhost HTTPS. Warm-run median response duration ranged from 5.30-6.93 ms with ISR alone to 1.92-2.44 ms with selective caching. All 3,200 measured selective warm requests hit Nginx after priming.
 
@@ -193,7 +209,9 @@ The selective run recorded 27,473 proxy HITs; the remaining requests reached Nex
 
 ### Apply On The VPS
 
-Run from the **codex-nginx repository on the VPS**. Stage the replacement at `nginx/proposed/production.conf`, leaving the active `nginx/production.conf` untouched until validation succeeds. Keep the existing Nginx image; do not pull an upgrade. Apply Nginx first, then rebuild/redeploy Next with the updated `next.config.mjs` through the existing deployment workflow. The header rules are compiled at build time. Until the Next opt-in header is present, Nginx safely falls back to ISR-only responses instead of storing HTML.
+Nginx is already redeployed according to the user. Next is the pending deployment. With the selective policy, an old Next image without `X-Accel-Expires: 2` does not enter the Nginx HTML cache; Next's own ISR remains available. Header rules are compiled at build time.
+
+The following procedure is retained for future Nginx updates, not an instruction to repeat the reported deployment. Run from the **codex-nginx repository on the VPS**. Stage the replacement at `nginx/proposed/production.conf`, leaving the active `nginx/production.conf` untouched until validation succeeds. Keep the existing Nginx image; do not pull an upgrade. Apply Nginx before Next when changing this cache contract.
 
 1. Validate using the container's real certificates and Docker network. Stop on failure:
 
@@ -258,6 +276,7 @@ No implementation or migration is approved by this guide. Cookies cannot span th
 
 ## Remaining Work And Resume Notes
 
+- Next action: deploy the rebuilt Next image, verify readiness/release revision, then run the disposable-account checks above behind production HTTPS. Only Nginx has been redeployed; local results do not close production verification.
 - Confirm whether PATCH creates a missing Django shop profile; Next must not invent that backend behavior.
 - Saved-address deletion, payment information and order history are separate feature work. The existing Delete control has no implemented action. Do not claim a complete order history from partial Next payment records or match private orders by unverified email.
 - Wishlist product UI was developed separately. This auth change only adds safe server authentication/refresh and same-origin mutation checks to its existing handler.

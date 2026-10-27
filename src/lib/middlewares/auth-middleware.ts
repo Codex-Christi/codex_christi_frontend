@@ -47,8 +47,21 @@ async function protect(req: NextRequest, admin: boolean) {
   const returnPath = admin
     ? sanitizeAdminReturnPath(path)
     : (safeAuthReturnPath(path, routes) ?? routes.account);
+  const unavailable = () => {
+    const destination = getRequestUrl(
+      `${routes.prefix}/auth/session-unavailable`,
+      req.headers,
+      req.url,
+    );
+    destination.searchParams.set('next', returnPath);
+    return NextResponse.redirect(destination, {
+      status: 307,
+      headers: { 'Cache-Control': 'private, no-store', 'Retry-After': '5' },
+    });
+  };
   let state = await getRequestSessionState(req);
   let freshCookies: AuthCookieDefinition[] = [];
+  let assertRefreshActive: (() => void) | undefined;
   let clearCookies = state.shouldClearCookies;
   if (!state.isAuthenticated) {
     const token = await getRequestRefreshToken(req);
@@ -56,23 +69,17 @@ async function protect(req: NextRequest, admin: boolean) {
       try {
         const tokens = await refreshDjangoSessionTokens(token);
         const built = await buildAuthSessionCookies({ ...tokens, requestHeaders: req.headers });
-        assertSessionRefreshActive(token);
+        assertRefreshActive = () => assertSessionRefreshActive(token, tokens);
+        assertRefreshActive();
         freshCookies = built.cookies;
         for (const cookie of freshCookies) req.cookies.set(cookie.name, cookie.value);
         state = await getRequestSessionState(req);
       } catch (error) {
         if (!(error instanceof SessionRefreshError && error.invalid)) {
-          const destination = getRequestUrl(
-            `${routes.prefix}/auth/session-unavailable`,
-            req.headers,
-            req.url,
-          );
-          destination.searchParams.set('next', returnPath);
-          return NextResponse.redirect(destination, {
-            status: 307,
-            headers: { 'Cache-Control': 'private, no-store', 'Retry-After': '5' },
-          });
+          return unavailable();
         }
+        freshCookies = [];
+        assertRefreshActive = undefined;
         clearCookies = true;
       }
     } else {
@@ -80,6 +87,25 @@ async function protect(req: NextRequest, admin: boolean) {
     }
   }
   const finish = (response: NextResponse) => {
+    // Recheck after session/admin awaits, immediately before writing response cookies.
+    if (freshCookies.length) {
+      try {
+        assertRefreshActive?.();
+      } catch (error) {
+        if (!(error instanceof SessionRefreshError && error.invalid)) {
+          return unavailable();
+        }
+        const destination = getRequestUrl(
+          authFlowUrl(admin ? '/auth/sign-in' : routes.login, { next: returnPath }),
+          req.headers,
+          req.url,
+        );
+        return clearAuthCookies(
+          NextResponse.redirect(destination, { headers: { 'Cache-Control': 'private, no-store' } }),
+          req.headers,
+        );
+      }
+    }
     for (const cookie of freshCookies)
       response.cookies.set(cookie.name, cookie.value, cookie.options);
     response.headers.set('Cache-Control', 'private, no-store');

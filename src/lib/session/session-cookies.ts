@@ -1,5 +1,6 @@
 import { JWTPayload, SignJWT, jwtVerify } from 'jose';
 import { jwtDecode } from 'jwt-decode';
+import { getEncodedSessionSecret } from './session-config';
 
 export const SESSION_COOKIE_NAME = 'session';
 export const REFRESH_TOKEN_COOKIE_NAME = 'refreshToken';
@@ -44,16 +45,6 @@ export interface BuiltAuthSessionCookies {
 }
 
 type CookieRequestHeaders = Pick<Headers, 'get'>;
-
-function getEncodedSessionSecret() {
-  const secretKey = process.env.SESSION_SECRET;
-
-  if (!secretKey || new TextEncoder().encode(secretKey).length < 32) {
-    throw new Error('SESSION_SECRET must contain at least 32 bytes.');
-  }
-
-  return new TextEncoder().encode(secretKey);
-}
 
 export function convertIatToDate(iat: number) {
   return new Date(iat * 1000);
