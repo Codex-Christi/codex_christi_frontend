@@ -44,6 +44,22 @@ const nextConfig = {
   serverExternalPackages: ['pdfkit'],
 
   // Func-based configs
+  async headers() {
+    // Limit only the reverse-proxy copy; Next's ISR lifetime stays unchanged.
+    return [
+      '/shop',
+      '/shop/product',
+      '/shop/product/:id',
+      '/shop/categories',
+      '/shop/categories/all',
+      '/shop/category/:id',
+      '/shop/category/:id/page/:page(\\d+)',
+    ].map((source) => ({
+      source,
+      headers: [{ key: 'X-Accel-Expires', value: '2' }],
+    }));
+  },
+
   async rewrites() {
     return [
       {

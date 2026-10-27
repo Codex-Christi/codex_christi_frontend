@@ -5,7 +5,7 @@ Updated 2026-10-27. This is the canonical guide; the [original audit index](./au
 ## Scope And Decisions
 
 - Keep `codexchristi.org/shop` and `codexchristi.shop` working with one Next application.
-- Use the existing production Django APIs. No Django edits, Nginx edits, database migrations, Redis or extra container are included.
+- Use the existing production Django APIs. No Django edits, database migrations, Redis or extra container are included. The proposed Nginx replacement below is not yet deployed.
 - Shop Register opens main-site signup: `https://codexchristi.org/auth/signup` in production and `/auth/signup` locally. Direct shop signup routes remain thin wrappers around the same forms, not the Register link destination.
 - Shop login/recovery use the corresponding shop routes. Verification/reset do not automatically create a login because the documented endpoints do not return login tokens.
 - Automatic sign-in between domains is evaluation only. Its eventual logout must affect this browser's linked login on both domains, not other devices.
@@ -138,25 +138,111 @@ Before committing, test the staged files in a separate copy and inspect the acti
 - [ ] Announce the one-time fresh sign-in: version-2 cookies deliberately reject old cookies from the previous unsafe helper boundary. Do not migrate by trusting their user ID.
 - [ ] Build with the real production public-site URL, and the intended internal Django URL. Development normally prefers the public API URL; internal preference is explicit or production-only.
 - [ ] Keep `/next-api` routed to Next on both hosts and preserve trusted public Host/protocol headers. Do not disable same-origin checks to work around proxy errors.
-- [ ] Apply the Nginx recommendations below separately, run nginx -t in the actual container, reload in a controlled deployment and purge affected old HTML cache entries.
+- [ ] Validate the Nginx replacement below inside the actual container before applying it. Recreate only Nginx during a brief maintenance window to read the new file and clear its old HTML cache. Purge affected Cloudflare HTML entries separately if applicable.
 - [ ] With disposable accounts behind HTTPS, verify both shop addresses, recovery, profile/address save past access expiry, invalid refresh, outages, two same-origin tabs and two independent devices.
 - [ ] During an outage, leave a dirty profile/address drawer open through access expiry: it must disappear while unverified and return unchanged after same-account recovery. Confirm actual logout and switching accounts discard the previous draft. Confirm hidden tabs do not retry continuously and exhausted retries require Retry or a later focus check.
 - [ ] Also open an expired session directly during an outage: confirm the temporary redirect preserves the requested destination, both responses prohibit caching, and Retry/Logout work on both shop addresses and the main profile. After a successful password reset, confirm the same browser lands on login, its other same-domain tabs clear private details, and its former admin unlock is gone. Failed resets must leave its current session intact.
 - [ ] Confirm actual Django lifetimes, refresh rotation, logout scope and password-reset revocation before claiming those behaviors. Verify parallel refresh in every deployed Next process/container.
 
-## Nginx Follow-Up
+## Nginx Configuration
 
-Reviewed, not edited: `/Users/devsantorz/Desktop/devProjects/codex-nginx/nginx/production.conf` and its adjacent Compose configuration.
+The single proposed replacement is [production.conf](./nginx-auth-hardening/production.conf). It is a complete configuration, not a `conf.d` snippet. It keeps the original filename, certificates, Docker upstreams, ports, upload limit, cache sizes and shop URL mappings. The original `/Users/devsantorz/Desktop/devProjects/codex-nginx/nginx/production.conf` and its Compose file are untouched; nothing has been deployed.
 
-1. Disable HTML microcaching temporarily in all three shop locations: exact root, prefixed shop passthrough and catch-all. Keep image/static caches separate.
-2. Before re-enabling, apply the main host's existing bypass/no-cache guards to every shop location: login cookies, Authorization, queries, POST, Next component/prefetch requests, allowed public routes and upstream Set-Cookie. Preserve upstream private/no-store and Vary behavior. Missing extra rules alone do not prove a leak; current Nginx defaults already honor upstream cache controls.
-3. Correct the main `/api` location's proxy_set_header inheritance: its local Upgrade/Connection overrides replace inherited header overrides. Include the full trusted header set after checking Django's accepted hosts; do not force Connection: close for normal HTTP requests.
-4. Set the accepted public X-Forwarded-Host explicitly and reject unknown hosts. Preserve the existing `/next-api` and `/shop/` exceptions.
-5. Measure upstream Cache-Control before describing the storefront as a two-second cache: Next's revalidation lifetime can take precedence. Do not ignore Cache-Control globally to force a shorter cache.
-6. Check shop OpenGraph/Twitter forwarding; the metadata regex currently forwards unprefixed paths unchanged. Limit immutable caching to hashed/versioned assets and reapply headers where a location defines its own add_header list.
-7. If Cloudflare proxies traffic, configure trusted real visitor IPs before relying on IP limits. Redact auth email/code query strings from logs and rotate logs.
-8. Do not increase workers, cache zones or buffers as an auth fix. Current cache metadata totals 96 MiB, response buffers can use roughly 512 KiB per active request and upstreams allow 128 idle reused connections per worker. Measure before tuning on the 2 GB VPS.
-9. Test upstream resolution/reload after container recreation. The storefront cache is container-local in the supplied Compose file, unlike the persisted image/static cache.
+### Changes
+
+| Original Audit Lines | Fix |
+| --- | --- |
+| 329, 344, 360 | Both domains selectively cache anonymous catalogue HTML. Private routes remain uncached; image/static policies stay separate. |
+| 84, 249 | Shared guards bypass session/admin/draft cookies, Authorization, queries, non-GET, Next page-data/prefetch, Range and action requests. Response guards reject private responses, cookies, errors and stale ISR output. |
+| 143, 224 | Next receives the accepted public host/protocol. Django keeps its internal Host with the full forwarding-header list. Normal requests can reuse connections. |
+| 16, 20 | Access-log queries and referrer values are omitted. |
+| New guards | Unknown TLS names and HTTP hosts are rejected. |
+
+Repeated TLS, upload and cache settings are shared in this file, with no extra Docker mounts. Django's explicit header list is intentional: a local list replaces the parent list under [Nginx's header inheritance rules](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_set_header).
+
+### Page Caching And Updates
+
+- Next's existing hourly ISR stays unchanged. The homepage and product/category output remain reusable inside Next; bypassing Nginx does not force a fresh page render.
+- `next.config.mjs` adds `X-Accel-Expires: 2` only to catalogue routes under `/shop`: home, product listing/detail, category listing/detail and numbered category pages. Nginx maps both public addresses into these routes.
+- Nginx stores only GET, query-free, successful HTML on that allowlist. It also requires the exact lifetime header, a single positive `s-maxage`, and Next cache state HIT, MISS or REVALIDATED. Missing/malformed/conflicting headers, private/no-store/no-cache, Set-Cookie and STALE responses do not enter the page cache. Existing entries are also bypassed for authenticated/draft and Next navigation requests.
+- The four HTML locations ignore Cache-Control/Expires **only for Nginx's cache timing**. Their explicit privacy guards remain mandatory, and the original headers still reach browsers. This prevents Next's long stale-while-revalidate window from extending Nginx's copy. Do not apply this override to the asset locations or remove the response guards.
+- HTML has no Nginx background refresh or stale-on-error fallback. The `isr-html-v2` key prevents reuse of older-policy HTML entries. Asset cache keys, lifetimes and stale behavior are unchanged.
+- Existing `revalidatePath` calls still invalidate Next, not Nginx. An existing proxy copy expires after nominally two seconds; Nginx's whole-second clock can make that nearly three. Next may then serve one STALE response while regenerating, but Nginx will not store it. Fresh output can be cached on a later request. In-flight fills and failed regeneration prevent a strict end-to-end freshness guarantee: this is a short-lived proxy cache, **not instant purge**. Next can retain its own older ISR output after a regeneration failure.
+- Invalidation must target the changed route. `revalidatePath('/shop')` alone does not invalidate every product/category descendant. The existing admin snapshot/SEO refresh flows invalidate their affected paths; this change does not broaden unrelated catalogue jobs.
+
+The external Nginx checkout now contains the earlier shop-cache-off proposal (SHA-256 `a236d45d903e61c51fd0804b9f71aa2c37362f559b685a92583dac376255d7da`), rather than the first audit's source. The table uses that first audit's line numbers. This update preserves the external copy's unrelated settings and does not modify that repository. Confirm the actual VPS version and review any newer edits before replacement.
+
+### Verification And Performance
+
+Local checks on 2026-10-27 use Nginx 1.30.6 and Next 16.4.3. The isolated webpack production build reuses local dependencies; its standalone tracing warning is not proof of a complete Docker package. Public pages remain static/ISR. No production requests, account writes or reloads were performed. Docker is not running locally, so the real container validation below is still required.
+
+- 108 local Nginx safety checks passed, including warm-cache private-route bypass, all four hosts, both shop mappings, four logout cookie headers, malformed/conflicting/multiple Cache-Control values, STALE rejection, expiry during a 500 response, forwarding headers and unchanged asset caching.
+- A real product page, backed by a disposable SQLite snapshot, showed the updated product title after Next path invalidation and the deliberate 3.1-second wait. The new response then produced a proxy HIT. This tests Next regeneration plus the proxy, not merely a fake TTL timer.
+- The cache route/config checks passed locally, but their standalone test file is excluded from the commit at the user's request. The existing committed storefront suite passes 113 tests, and the auth suite passes 71 tests; TypeScript and targeted ESLint also pass. Temporary databases, fixture routes, build copies and benchmark scripts are removed after validation.
+
+Performance used the real homepage and product-page code from committed baseline `ddadb9ba` plus this Next header change, with a synthetic product snapshot and no live API/database credentials. Tests alternated ISR-only and selective Nginx caching twice on four URLs across both domains: 400 requests per run, eight concurrent keep-alive clients, localhost HTTPS. Warm-run median response duration ranged from 5.30-6.93 ms with ISR alone to 1.92-2.44 ms with selective caching. All 3,200 measured selective warm requests hit Nginx after priming.
+
+A separate eight-second product-page run crossed several proxy expirations:
+
+| Mode | Requests | Median | 95th Percentile | Requests Reaching Next |
+| --- | --- | --- | --- | --- |
+| ISR only | 10,257 | 5.27 ms | 10.84 ms | 10,257 |
+| Selective proxy cache + ISR | 27,485 | 1.97 ms | 4.01 ms | 12 |
+
+The selective run recorded 27,473 proxy HITs; the remaining requests reached Next during expiry/refill. These are full-response localhost timings, not TTFB, VPS capacity, browser Web Vitals or an SEO ranking prediction. Tests used one Nginx worker and a 512 MiB Node heap limit, not the production Docker memory/CPU limits. Repeat on the VPS with comparable traffic before changing resource limits.
+
+### Apply On The VPS
+
+Run from the **codex-nginx repository on the VPS**. Stage the replacement at `nginx/proposed/production.conf`, leaving the active `nginx/production.conf` untouched until validation succeeds. Keep the existing Nginx image; do not pull an upgrade. Apply Nginx first, then rebuild/redeploy Next with the updated `next.config.mjs` through the existing deployment workflow. The header rules are compiled at build time. Until the Next opt-in header is present, Nginx safely falls back to ISR-only responses instead of storing HTML.
+
+1. Validate using the container's real certificates and Docker network. Stop on failure:
+
+```sh
+docker cp nginx/proposed/production.conf codex-con-nginxx:/tmp/production.conf
+docker exec codex-con-nginxx nginx -t -c /tmp/production.conf
+```
+
+2. After validation succeeds, back up and activate during a brief maintenance window. Stop if any command fails; keep the printed backup path:
+
+```sh
+backup="nginx/production.conf.before-auth-$(date +%Y%m%d%H%M%S)"
+cp nginx/production.conf "$backup"
+printf 'Backup: %s\n' "$backup"
+cp nginx/proposed/production.conf nginx/production.conf
+docker compose up -d --no-deps --force-recreate --pull never nginx
+docker compose exec -T nginx nginx -t
+docker compose ps nginx
+```
+
+Recreating only Nginx briefly interrupts traffic, reads the replacement through the existing bind mount and clears its container-local HTML cache. The named image/static cache volume and app/Django containers stay intact. A reload alone can miss a host file that an editor replaced atomically.
+
+3. Rebuild/redeploy Next, then test login, account redirects, reset and Logout at both shop addresses. Also check an existing read-only `/api/v1` endpoint. Account/auth pages and `/next-api` must never show an Nginx cache HIT. Logout cookie headers, private/no-store and Next Vary headers must pass through. Anonymous public HTML should MISS then HIT on quick repeat requests; after a few seconds it must reach Next again. Use a normal request without browser DevTools' Disable Cache, which intentionally bypasses the proxy cache.
+
+4. Refresh a product/category through its existing admin flow. Verify its HTML/metadata update after regeneration and the short proxy window. Inspect X-Cache-Status separately from X-Nextjs-Cache: a proxy HIT can retain Next's earlier MISS label. Check both domains and prefixed shop aliases. Do not add an unauthenticated purge endpoint to production.
+
+### Rollback
+
+For a quick rollback, keep the revised safeguards and change the shared `proxy_cache storefront_microcache;` line in deployed `nginx/production.conf` to `proxy_cache off;`. Image/static locations still explicitly enable their own cache. The ISR-only benchmark used this same switch.
+
+Validate the edited file before recreating Nginx; stop if validation fails:
+
+```sh
+docker cp nginx/production.conf codex-con-nginxx:/tmp/production.conf
+docker exec codex-con-nginxx nginx -t -c /tmp/production.conf
+docker compose up -d --no-deps --force-recreate --pull never nginx
+docker compose exec -T nginx nginx -t
+```
+
+Do not restore the older `$backup` while Next still emits `X-Accel-Expires`: older cache rules do not have the new explicit privacy/draft guards. For a complete rollback, first rebuild/redeploy Next without the new header rules, then validate and restore the recorded Nginx backup. Next's hourly ISR remains available in either rollback mode.
+
+### Remaining Checks
+
+- Verify private/page-data bypass and a real admin refresh behind production HTTPS before treating the local results as production validation. Missing guards in the original file did not demonstrate a private-data leak.
+- Measure response time, CPU and memory on the 2 GB VPS before tuning limits: cache metadata remains 96 MiB, response buffers can use roughly 512 KiB per active request and each upstream allows 128 idle connections per worker.
+- If Cloudflare proxies traffic, configure trusted visitor-IP ranges before relying on IP limits. Bypass **HTML** in custom edge-cache rules unless edge purging is separately integrated; otherwise the forwarded ISR headers can let Cloudflare retain pages longer than Nginx. Purge old edge HTML separately and keep edge asset caching.
+- Review log rotation and error/application/Cloudflare logs separately; error logs can still contain queries. Access-log cleanup does not cover those logs.
+- Review unprefixed shop OpenGraph/Twitter paths, long-lived caching of non-versioned assets and headers overridden by location-specific `add_header` lists. Those behaviors are unchanged.
+- Recheck upstream name resolution after app or Django container replacements.
 
 ## Automatic Cross-Domain Login Evaluation
 
