@@ -1,5 +1,27 @@
 import Image from 'next/image';
 
+function TeamPortrait({ name, alt }: { name: string; alt: string }) {
+  const imageBase = `/media/img/general/${name}`;
+
+  return (
+    <picture className='block'>
+      <source
+        type='image/webp'
+        srcSet={`${imageBase}-72.webp 1x, ${imageBase}-144.webp 2x, ${imageBase}-216.webp 3x`}
+      />
+      <Image
+        className='mx-auto'
+        src={`${imageBase}-216.webp`}
+        alt={alt}
+        width={72}
+        height={72}
+        unoptimized
+        loading='lazy'
+      />
+    </picture>
+  );
+}
+
 const AboutUs = () => {
   return (
     <>
@@ -66,13 +88,7 @@ const AboutUs = () => {
 
         <div className='mx-auto grid grid-cols-2 gap-10 lg:grid-cols-4'>
           <div className='space-y-4'>
-            <Image
-              className='mx-auto'
-              src='/media/img/general/saint-brisbe.svg'
-              alt='Saint Tarila Brisbe'
-              width={72}
-              height={72}
-            />
+            <TeamPortrait name='saint-brisbe' alt='Saint Tarila Brisbe' />
 
             <div className='text-center'>
               <p className='text-2xl font-semibold text-white'>
@@ -84,13 +100,7 @@ const AboutUs = () => {
           </div>
 
           <div className='space-y-4'>
-            <Image
-              className='mx-auto'
-              src='/media/img/general/adebisi-ade.svg'
-              alt='Adebisi Ade'
-              width={72}
-              height={72}
-            />
+            <TeamPortrait name='adebisi-ade' alt='Adebisi Ade' />
 
             <div className='text-center'>
               <p className='text-2xl font-semibold text-white'>Adebisi Ade</p>
@@ -100,13 +110,7 @@ const AboutUs = () => {
           </div>
 
           <div className='space-y-4'>
-            <Image
-              className='mx-auto'
-              src='/media/img/general/kennedy-barile.svg'
-              alt='Kennedy Barile'
-              width={72}
-              height={72}
-            />
+            <TeamPortrait name='kennedy-barile' alt='Kennedy Barile' />
 
             <div className='text-center'>
               <p className='text-2xl font-semibold text-white'>
@@ -118,13 +122,7 @@ const AboutUs = () => {
           </div>
 
           <div className='space-y-4'>
-            <Image
-              className='mx-auto'
-              src='/media/img/general/messi.svg'
-              alt='Lionel Messi'
-              width={72}
-              height={72}
-            />
+            <TeamPortrait name='messi' alt='Lionel Messi' />
 
             <div className='text-center'>
               <p className='text-2xl font-semibold text-white'>Lionel Messi</p>
