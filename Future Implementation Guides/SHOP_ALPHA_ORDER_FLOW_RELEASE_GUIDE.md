@@ -334,8 +334,9 @@ snapshot. Cart/checkout line displays and totals use verified server quote amoun
 SDK takes its currency from that same quote, including FX-failure fallback. Supported-currency
 fallback and PayPal HUF/JPY/TWD precision stay aligned. The unused legacy pricing wrapper and its
 standalone precision helper, obsolete hydration export, redundant shipping-estimate route, and
-browser-side aggregate conversion/shipping round-trip are removed. The remaining quantity action
-is named `validateCartItemForQuantityIncrease.ts`. No callers of the removed names/routes remain.
+browser-side aggregate conversion/shipping round-trip are removed. The later offline cart update
+also removed the unused quantity validation action: edits save through shared cart commands,
+while checkout still verifies availability and prices. See [current cart behavior](../src/lib/cart/README.md).
 
 The admin caller previously waited for active shared reads after cancellation. The correction
 settles the waiter and closes the stream at cancellation/deadline, suppresses queued checks and

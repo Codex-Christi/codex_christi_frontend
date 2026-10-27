@@ -50,7 +50,11 @@ export async function clearPrivateWishlist() {
 }
 
 let clientId: string | undefined;
-export const getAuthClientId = () => (clientId ??= crypto.randomUUID());
+// This only distinguishes browser tabs; it is never an authentication credential.
+export const getAuthClientId = () =>
+  (clientId ??=
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
 
 export function publishSessionChange(type: 'login' | 'logout') {
   try {

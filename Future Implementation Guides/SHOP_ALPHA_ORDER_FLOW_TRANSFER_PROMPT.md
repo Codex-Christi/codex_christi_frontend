@@ -162,7 +162,8 @@ The alpha must support a smooth real-customer flow:
   amounts, and the SDK currency follows the verified quote. USD 15.25 × 0.92345 × 3 shows EUR 42.24
   consistently. The unused legacy pricing wrapper/precision export, old hydration export,
   redundant shipping-estimate route, and obsolete browser-cart guide templates are removed.
-  Quantity increases use `validateCartItemForQuantityIncrease.ts`.
+  Quantity edits now save through the shared offline cart commands; checkout still verifies
+  availability and prices. See [current cart behavior](../src/lib/cart/README.md).
 - The cancellation correction settles the admin waiter/stream at cancellation/deadline without
   cancelling a shared supplier read another customer needs. It suppresses late results and queued
   work, handles late provider rejection, and avoids false supplier-outage records. Provider HTTP

@@ -60,7 +60,7 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
   const [downloading, setDownloading] = useState(false);
   const [hasHydratedFromLedger, setHasHydratedFromLedger] = useState(false);
   const [processingState, setProcessingState] = useState<MappedProcessingState | null>(null);
-  const clearCart = useCartStore((store) => store.clearCart);
+  const consumePurchase = useCartStore((store) => store.consumePurchase);
   const resetCheckoutToStoreDefaults = useShopCheckoutStore(
     (store) => store.resetCheckoutToStoreDefaults,
   );
@@ -157,25 +157,32 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
     }
   }, [canDownloadReceipt, receiptFileName, receiptLink]);
 
-  const resetCheckoutRelatedStoresAndVars = useCallback(() => {
-    if (isRecoveryReview) return;
-    if (!routeOrderToken || activeLocalOrderToken !== routeOrderToken) return;
+  const resetCheckoutRelatedStoresAndVars = useCallback(
+    async (purchase: NonNullable<PayPalTxPaymentStatusResponse['cartPurchase']>) => {
+      if (isRecoveryReview || !routeOrderToken || activeLocalOrderToken !== routeOrderToken)
+        return false;
+      if (usePayPalIntentStore.getState().orderToken !== routeOrderToken) return false;
 
-    clearIntent();
-    clearVerifiedEmails();
-    clearDjangoOrderIntent();
-    clearCart();
-    resetCheckoutToStoreDefaults();
-  }, [
-    clearCart,
-    clearIntent,
-    clearDjangoOrderIntent,
-    clearVerifiedEmails,
-    resetCheckoutToStoreDefaults,
-    activeLocalOrderToken,
-    isRecoveryReview,
-    routeOrderToken,
-  ]);
+      await consumePurchase(purchase.orderId, purchase.lines);
+      // A new checkout may have started while the purchase was being recorded locally.
+      if (usePayPalIntentStore.getState().orderToken !== routeOrderToken) return true;
+      clearIntent();
+      clearVerifiedEmails();
+      clearDjangoOrderIntent();
+      resetCheckoutToStoreDefaults();
+      return true;
+    },
+    [
+      consumePurchase,
+      clearIntent,
+      clearDjangoOrderIntent,
+      clearVerifiedEmails,
+      resetCheckoutToStoreDefaults,
+      activeLocalOrderToken,
+      isRecoveryReview,
+      routeOrderToken,
+    ],
+  );
 
   const copySupportReference = useCallback(async () => {
     try {
@@ -228,12 +235,9 @@ const CheckoutConfirmationPage = ({ params }: PageProps) => {
         if (!cancelled) {
           setProcessingState(nextState);
 
-          // Safe to clear here because the intent/authorize/capture routes have already persisted
-          // Django order intent IDs, cart/shipping snapshots, customer info, and PayPal payloads
-          // have already been persisted to the ledger.
-          if (!hasHydratedFromLedger) {
-            resetCheckoutRelatedStoresAndVars();
-            setHasHydratedFromLedger(true);
+          if (!hasHydratedFromLedger && data.cartPurchase) {
+            const consumed = await resetCheckoutRelatedStoresAndVars(data.cartPurchase);
+            if (!cancelled && consumed) setHasHydratedFromLedger(true);
           }
 
           if (!isRecoveryReview && nextState.flowStatus === 'completed') {

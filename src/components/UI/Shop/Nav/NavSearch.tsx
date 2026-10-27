@@ -7,18 +7,14 @@ const NavSearch: FC = () => {
   // Main JSX
   return (
     <form action='/shop/categories/all' className='contents' role='search'>
-      <section className='relative flex w-full max-w-[500px]'>
+      <section className='relative hidden w-full min-w-0 max-w-[500px] lg:flex'>
         <Input
           name='q'
           type='text'
           placeholder='Search for products here...'
-          className={`relative !bg-transparent rounded-2xl p-1 h-8 pr-8 pl-4 placeholder:text-white/80
-              hidden lg:inline-block `}
+          className='relative !bg-transparent rounded-2xl p-1 h-8 pr-8 pl-4 placeholder:text-white/80'
         />
-        <SearchButtonOnly
-          name='Search button'
-          className='hidden lg:!block'
-        />
+        <SearchButtonOnly name='Search button' />
       </section>
     </form>
   );

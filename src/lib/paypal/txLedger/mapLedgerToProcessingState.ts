@@ -1,3 +1,5 @@
+import type { CartPurchase } from '@/lib/cart/types';
+
 export type PayPalTxPaymentStatusResponse = {
   orderToken: string;
   status: string;
@@ -7,6 +9,7 @@ export type PayPalTxPaymentStatusResponse = {
   djangoPaymentSaveCustomId?: string | null;
   processingCompletedAt?: string | null;
   paidAmountLabel?: string | null;
+  cartPurchase?: CartPurchase | null;
   customerRecoveryStatus?: 'paid_unresolved' | null;
   recoveryReason?: string | null;
   updatedAt?: string | null;

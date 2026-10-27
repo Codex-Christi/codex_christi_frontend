@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, ReactNode, useMemo, useState } from 'react';
+import { FC, ReactNode, useCallback, useMemo, useState } from 'react';
 import Image from 'next/image';
 import GlobalProductPrice from '../GlobalShopComponents/GlobalProductPrice';
 import { formatOrderMoney, type OrderPreviewTotals } from '@/lib/shop/checkout/orderMoney';
@@ -23,7 +23,7 @@ type MiniCartListProps = {
   items: CartVariant[];
   showQuantityControls?: boolean;
   showRemoveButton?: boolean;
-  onRemove?: (variantId: string) => void;
+  onRemove?: (variantId: string) => void | Promise<void>;
   className?: string;
   emptyState?: ReactNode;
   variant?: 'default' | 'compact';
@@ -46,10 +46,23 @@ export const MiniCartList: FC<MiniCartListProps> = ({
   const remove = onRemove ?? defaultRemove;
   const isCompact = variant === 'compact';
   const [pendingRemoval, setPendingRemoval] = useState<CartVariant | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+
+  const removeItem = useCallback(
+    async (variantId: string) => {
+      setRemoveError(null);
+      try {
+        await remove(variantId);
+      } catch (error) {
+        setRemoveError(error instanceof Error ? error.message : 'We could not remove this item.');
+      }
+    },
+    [remove],
+  );
 
   const confirmRemove = () => {
     if (!pendingRemoval) return;
-    remove(pendingRemoval.variantId);
+    void removeItem(pendingRemoval.variantId);
     setPendingRemoval(null);
   };
 
@@ -61,12 +74,13 @@ export const MiniCartList: FC<MiniCartListProps> = ({
         setPendingRemoval(item);
         return;
       }
-      remove(item.variantId);
+      void removeItem(item.variantId);
     };
 
     return items.map((cartItem) => {
       const { itemDetail, quantity, variantId, title } = cartItem;
-      const { retail_price, options, image } = itemDetail;
+      const { retail_price, options } = itemDetail;
+      const image = itemDetail.image || itemDetail.image_uris?.[0];
       const optionArray = toCartOptions(options);
       const { summary } = buildOptionSummary(optionArray);
 
@@ -81,22 +95,24 @@ export const MiniCartList: FC<MiniCartListProps> = ({
       return (
         <div
           key={variantId}
-          className={`rounded-2xl border border-white/10 bg-black/10 ${cardPadding} space-y-3`}
+          className={`min-w-0 max-w-full rounded-2xl border border-white/10 bg-black/10 ${cardPadding} space-y-3`}
         >
-          <div className='flex items-start gap-3'>
+          <div
+            className={`grid min-w-0 items-start gap-x-3 gap-y-2 ${isCompact ? 'grid-cols-[48px_minmax(0,1fr)]' : 'grid-cols-[60px_minmax(0,1fr)]'}`}
+          >
             {image ? (
               <Image
                 src={image}
                 alt={title}
                 width={imageSize}
                 height={imageSize}
-                className={`rounded-xl object-cover object-center border border-white/10 ${
+                className={`row-span-2 shrink-0 rounded-xl object-cover object-top border border-white/10 ${
                   isCompact ? 'h-12 w-12' : 'h-[60px] w-[60px]'
                 }`}
               />
             ) : (
               <div
-                className={`rounded-xl bg-white/10 border border-white/10 flex items-center justify-center text-sm font-semibold text-white/70 ${
+                className={`row-span-2 shrink-0 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center text-sm font-semibold text-white/70 ${
                   isCompact ? 'h-12 w-12' : 'h-[60px] w-[60px]'
                 }`}
               >
@@ -104,24 +120,32 @@ export const MiniCartList: FC<MiniCartListProps> = ({
               </div>
             )}
 
-            <div className='flex-1 min-w-0 text-[#F3F3F3] space-y-1'>
-              <div className='flex items-start justify-between gap-2'>
-                <p className={`font-semibold truncate ${titleClass}`}>{title}</p>
+            <div className='min-w-0 text-[#F3F3F3] space-y-1'>
+              <div className='flex min-w-0 items-start justify-between gap-2'>
+                <p className={`min-w-0 font-semibold [overflow-wrap:anywhere] ${titleClass}`}>
+                  {title}
+                </p>
                 {showRemoveButton && (
                   <button
                     type='button'
                     aria-label={`Remove ${title}`}
                     onClick={() => requestRemove(cartItem)}
-                    className='text-red-500 hover:text-red-300 text-lg transition font-semibold leading-none'
+                    className='shrink-0 text-red-500 hover:text-red-300 text-lg transition font-semibold leading-none'
                   >
                     <Trash2Icon className='h-4 w-4' />
                   </button>
                 )}
               </div>
-              {summary && <p className={`${optionTextClass} text-white/70`}>{summary}</p>}
+              {summary && (
+                <p className={`min-w-0 [overflow-wrap:anywhere] ${optionTextClass} text-white/70`}>
+                  {summary}
+                </p>
+              )}
             </div>
 
-            <div className={`text-right font-semibold text-white ${priceClass}`}>
+            <div
+              className={`col-start-2 min-w-0 text-right font-semibold text-white [overflow-wrap:anywhere] ${priceClass}`}
+            >
               {linePrice ? (
                 formatOrderMoney(linePrice.lineTotalNum, prices!.currency)
               ) : (
@@ -132,7 +156,7 @@ export const MiniCartList: FC<MiniCartListProps> = ({
           </div>
 
           {showQuantityControls && (
-            <div className='flex flex-wrap items-center gap-3 justify-end'>
+            <div className='flex min-w-0 max-w-full flex-wrap items-center gap-3 justify-end'>
               <ItemQuantityComponent className='flex w-auto' cartItem={cartItem} />
             </div>
           )}
@@ -145,7 +169,7 @@ export const MiniCartList: FC<MiniCartListProps> = ({
     showRemoveButton,
     showQuantityControls,
     confirmBeforeRemove,
-    remove,
+    removeItem,
     prices,
   ]);
 
@@ -155,7 +179,12 @@ export const MiniCartList: FC<MiniCartListProps> = ({
 
   return (
     <>
-      <div className={`space-y-4 ${className ?? ''}`}>{entries}</div>
+      {removeError && (
+        <p role='alert' className='mb-3 text-sm text-amber-200'>
+          {removeError}
+        </p>
+      )}
+      <div className={`min-w-0 max-w-full space-y-4 ${className ?? ''}`}>{entries}</div>
       <AlertDialog open={pendingRemoval !== null} onOpenChange={(open) => !open && cancelRemove()}>
         <AlertDialogContent className='bg-black/70 backdrop-blur-xl backdrop-saturate-150 border border-white/10 text-white shadow-2xl shadow-black/70 rounded-2xl max-w-md w-[90vw]'>
           <AlertDialogHeader>

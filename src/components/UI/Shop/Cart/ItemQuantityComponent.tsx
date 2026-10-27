@@ -1,89 +1,77 @@
-import { CartVariant, useCartStore } from '@/stores/shop_stores/cartStore';
-import { FC, ReactNode, useCallback, useState } from 'react';
-import { Button, ButtonProps } from '../../primitives/button';
-import { validateCartItemForQuantityIncrease } from '@/actions/shop/cart/validateCartItemForQuantityIncrease';
-import type { CartItemAvailabilityStatus } from './cartAvailability';
+import { type CartVariant, useCartStore } from '@/stores/shop_stores/cartStore';
+import { type FC, useCallback, useState } from 'react';
+import { Button, type ButtonProps } from '../../primitives/button';
 
 export const ItemQuantityComponent: FC<{
   cartItem: CartVariant;
   className?: string;
   disableIncrement?: boolean;
-  onAvailabilityChange?: (variantId: string, status: CartItemAvailabilityStatus) => void;
-}> = ({ cartItem, className, disableIncrement = false, onAvailabilityChange }) => {
+}> = ({ cartItem, className, disableIncrement = false }) => {
   const { quantity, title, variantId } = cartItem;
 
-  //   Hooks
-  const { addToCart, reduceFromCart } = useCartStore();
-  const [isCheckingIncrement, setIsCheckingIncrement] = useState(false);
+  const addToCart = useCartStore((state) => state.addToCart);
+  const reduceFromCart = useCartStore((state) => state.reduceFromCart);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  //   Handlers
-  const incrementItemQuantity = useCallback(async () => {
-    if (disableIncrement || isCheckingIncrement) return;
+  const changeQuantity = useCallback(
+    async (delta: 1 | -1) => {
+      if (isSaving || (delta > 0 && disableIncrement)) return;
+      setIsSaving(true);
+      setError(null);
+      try {
+        if (delta > 0) {
+          await addToCart({ ...cartItem, quantity: 1 });
+        } else {
+          await reduceFromCart(variantId, 1);
+        }
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'We could not save this quantity.');
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [addToCart, reduceFromCart, cartItem, disableIncrement, variantId, isSaving],
+  );
 
-    setIsCheckingIncrement(true);
-    try {
-      const availability = await validateCartItemForQuantityIncrease(cartItem);
-      onAvailabilityChange?.(variantId, availability.status);
-      if (availability.status !== 'available') return;
-
-      addToCart({ ...cartItem, quantity: 1 });
-    } catch (error) {
-      console.warn('[ItemQuantityComponent] Availability check failed:', error);
-      onAvailabilityChange?.(variantId, 'unverified');
-    } finally {
-      setIsCheckingIncrement(false);
-    }
-  }, [addToCart, cartItem, disableIncrement, isCheckingIncrement, onAvailabilityChange, variantId]);
-
-  const decrementQuantity = useCallback(() => {
-    reduceFromCart(variantId, 1);
-  }, [reduceFromCart, variantId]);
-  //
-
-  // JSX
   return (
-    <section
-      className={`flex-row items-center border-gray-300 border-[.5px]
-         rounded-lg ${className} justify-between w-full min-w-[6.5rem] not-a`}
-    >
-      {/* Reduce quantity */}
-      <OperationButton name={`Remove ${title} ${variantId} from Cart`} onClick={decrementQuantity}>
-        -
-      </OperationButton>
-      {/* Quantity digit */}
-      <h4 className={`text-[1.05rem] font-bold`}>{`${quantity}`}</h4>
-
-      {/* Increment quantity */}
-      <OperationButton
-        name={`Add ${title} ${variantId} to Cart`}
-        disabled={disableIncrement || isCheckingIncrement}
-        aria-disabled={disableIncrement || isCheckingIncrement}
-        className={disableIncrement || isCheckingIncrement ? '!cursor-not-allowed' : undefined}
-        onClick={incrementItemQuantity}
+    <div className='min-w-0 max-w-full'>
+      <section
+        className={`flex w-auto min-w-[6.5rem] max-w-full items-center justify-between rounded-lg border-[.5px] border-gray-300 ${className ?? ''} not-a`}
       >
-        +
-      </OperationButton>
-    </section>
+        <OperationButton
+          name={`Decrease quantity of ${title}`}
+          disabled={isSaving}
+          onClick={() => void changeQuantity(-1)}
+        >
+          -
+        </OperationButton>
+        <span className='min-w-0 px-1 text-center text-base font-bold [overflow-wrap:anywhere]'>
+          {quantity}
+        </span>
+
+        <OperationButton
+          name={`Increase quantity of ${title}`}
+          disabled={disableIncrement || isSaving}
+          onClick={() => void changeQuantity(1)}
+        >
+          +
+        </OperationButton>
+      </section>
+      {error && (
+        <p role='alert' className='mt-1 max-w-56 text-xs text-amber-200'>
+          {error}
+        </p>
+      )}
+    </div>
   );
 };
 
-interface OperationButtonInterface extends ButtonProps {
-  onClick?: () => void;
-  name: string;
-  children: ReactNode;
-}
-
-const OperationButton: FC<OperationButtonInterface> = ({
-  className,
-  name,
-  onClick,
-  children,
-  ...rest
-}) => {
+const OperationButton: FC<ButtonProps> = ({ className, name, onClick, children, ...rest }) => {
   return (
     <Button
-      className={`bg-slate-950 !rounded-lg text-2xl p-3 ${className ?? ''}`}
-      name={`${name}`}
+      className={`h-11 w-11 shrink-0 rounded-lg bg-slate-950 p-2 text-xl ${className ?? ''}`}
+      name={name}
       onClick={onClick}
       {...rest}
     >

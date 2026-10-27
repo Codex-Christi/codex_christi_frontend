@@ -1,6 +1,5 @@
-import { ProductVariantOptions } from '@/lib/merchizeStorefront/productTypes';
-import { CartVariant, useCartStore } from '@/stores/shop_stores/cartStore';
-import React, { FC, useState } from 'react';
+import { type CartVariant, useCartStore } from '@/stores/shop_stores/cartStore';
+import { type FC, useState } from 'react';
 import Image from 'next/image';
 import SizeAndColorElem from './SizeAndColor';
 import { ItemQuantityComponent } from './ItemQuantityComponent';
@@ -19,34 +18,32 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/UI/primitives/alert-dialog';
-import {
-  getCartItemAvailability,
-  type CartItemAvailabilityStatus,
-  type CartItemAvailabilityMap,
-} from './cartAvailability';
+import { getCartItemAvailability, type CartItemAvailabilityMap } from './cartAvailability';
 
 const CartItems: FC<{
   cartItems: CartVariant[];
   availabilityByVariantId: CartItemAvailabilityMap;
-  onAvailabilityChange?: (variantId: string, status: CartItemAvailabilityStatus) => void;
   prices?: OrderPreviewTotals | null;
-}> = ({ cartItems, availabilityByVariantId, onAvailabilityChange, prices }) => {
-  const { removeFromCart } = useCartStore();
+}> = ({ cartItems, availabilityByVariantId, prices }) => {
+  const removeFromCart = useCartStore((state) => state.removeFromCart);
 
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
-  const handleConfirmRemove = () => {
+  const handleConfirmRemove = async () => {
     if (!pendingRemoveId) return;
     const id = pendingRemoveId;
     setPendingRemoveId(null);
     setRemovingId(id);
-
-    // Fade out, then actually remove from the cart.
-    setTimeout(() => {
-      removeFromCart(id);
-      setRemovingId((current) => (current === id ? null : current));
-    }, 200);
+    setRemoveError(null);
+    try {
+      await removeFromCart(id);
+    } catch (error) {
+      setRemoveError(error instanceof Error ? error.message : 'We could not remove this item.');
+    } finally {
+      setRemovingId(null);
+    }
   };
 
   const renderRemoveButton = (variantId: string) => (
@@ -57,7 +54,8 @@ const CartItems: FC<{
       aria-label='Remove item from cart'
       title='Remove item from cart'
       name='Remove item from cart'
-      className='flex items-center gap-1 font-semibold border-red-400 text-red-400 hover:text-red-200 hover:bg-destructive/30 bg-transparent'
+      disabled={removingId === variantId}
+      className='flex min-h-11 shrink-0 items-center gap-1 border-red-400 bg-transparent px-3 font-semibold text-red-400 hover:bg-destructive/30 hover:text-red-200'
       onClick={() => setPendingRemoveId(variantId)}
     >
       <Trash2 className='h-4 w-4' />
@@ -67,12 +65,16 @@ const CartItems: FC<{
 
   return (
     <>
+      {removeError && (
+        <p role='alert' className='text-sm text-amber-200'>
+          {removeError}
+        </p>
+      )}
       {cartItems.map((cartItem) => {
         const { itemDetail: variant, title, quantity } = cartItem;
-        const productTitle = title;
-        const { image, retail_price, options, product: parentID } = variant;
+        const { retail_price, options, product: parentID } = variant;
+        const image = variant.image || variant.image_uris?.[0];
         const availability = getCartItemAvailability(availabilityByVariantId, cartItem.variantId);
-        const canIncreaseQuantity = availability.status === 'available';
         const isUnavailable = availability.status === 'unavailable';
         const isUnverified = availability.status === 'unverified';
         const isChecking = availability.status === 'checking';
@@ -89,33 +91,27 @@ const CartItems: FC<{
         return (
           <div
             key={cartItem.variantId}
-            className={`bg-transparent px-0 md:px-4 my-4 rounded-l w-full mx-auto
-            grid grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2 md:gap-3 select-none 
-            transition-opacity duration-200
-            ${isUnavailable || isUnverified ? 'rounded-xl border border-amber-300/40 py-3' : ''}
-            ${removingId === cartItem.variantId ? 'opacity-0' : 'opacity-100'}`}
+            className={`my-3 grid w-full min-w-0 max-w-full select-none grid-cols-[76px_minmax(0,1fr)] gap-x-3 gap-y-4 bg-transparent sm:grid-cols-[90px_minmax(0,1fr)] sm:gap-x-4
+            ${isUnavailable || isUnverified ? 'rounded-xl border border-amber-300/40 py-3' : ''}`}
           >
-            {/* Item Image */}
-            {image && (
-              <CustomShopLink href={productHref}>
+            {image ? (
+              <CustomShopLink href={productHref} className='min-w-0 self-start'>
                 <Image
                   src={image}
-                  className='rounded-xl hover:cursor-pointer'
+                  className='aspect-square h-auto w-full rounded-xl object-cover object-top hover:cursor-pointer'
                   width={90}
                   height={90}
-                  alt={productTitle}
+                  alt={title}
                 />
               </CustomShopLink>
+            ) : (
+              <div aria-hidden='true' className='aspect-square rounded-xl bg-white/5' />
             )}
 
-            {/* Title & price */}
-            <section
-              className='text-left flex flex-col justify-around col-span-2 
-              md:col-span-2 xl:col-span-3 hover:cursor-pointer'
-            >
+            <section className='flex min-w-0 flex-col justify-between gap-2 text-left [overflow-wrap:anywhere]'>
               <CustomShopLink href={productHref}>
-                <h3 className='text-lg font-semibold hover:underline underline-offset-8'>
-                  {productTitle}
+                <h3 className='min-w-0 text-base font-semibold leading-snug underline-offset-4 hover:underline sm:text-lg'>
+                  {title}
                 </h3>
               </CustomShopLink>
 
@@ -143,7 +139,7 @@ const CartItems: FC<{
                 </p>
               )}
 
-              <h4 className='text-base text-white'>
+              <h4 className='min-w-0 text-sm text-white sm:text-base'>
                 Price:{' '}
                 {linePrice ? (
                   formatOrderMoney(linePrice.unitPriceNum, prices!.currency)
@@ -154,55 +150,29 @@ const CartItems: FC<{
               </h4>
             </section>
 
-            {/* Mobile: Size & Color under the image */}
-            <section className='col-span-1 col-start-1 flex flex-col gap-1 md:hidden'>
-              <SizeAndColorElem options={options as ProductVariantOptions} />
-            </section>
-
-            {/* Mobile: Quantity, Delete & Total on the right */}
-            <div className='col-span-2 col-start-2 flex flex-col items-end gap-2 md:hidden'>
-              <div className='flex items-center justify-end gap-2'>
-                <ItemQuantityComponent
-                  className='flex'
-                  cartItem={cartItem}
-                  disableIncrement={!canIncreaseQuantity}
-                  onAvailabilityChange={onAvailabilityChange}
-                />
-                {renderRemoveButton(cartItem.variantId)}
+            <div className='col-span-2 flex min-w-0 max-w-full flex-wrap items-end justify-between gap-3'>
+              <SizeAndColorElem
+                options={options}
+                className='min-w-0 max-w-full text-sm [overflow-wrap:anywhere]'
+              />
+              <div className='ml-auto flex min-w-0 max-w-full flex-col items-end gap-2'>
+                <div className='flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2'>
+                  <ItemQuantityComponent
+                    className='flex'
+                    cartItem={cartItem}
+                    disableIncrement={isUnavailable}
+                  />
+                  {renderRemoveButton(cartItem.variantId)}
+                </div>
+                <p className='max-w-full text-right text-base font-semibold [overflow-wrap:anywhere]'>
+                  Total: {lineTotal}
+                </p>
               </div>
-              <h3 className='text-[1.1rem] font-semibold text-right'>Total: {lineTotal}</h3>
-            </div>
-
-            {/* Tablet / Desktop: Size & Color with Quantity + Delete aligned on the right */}
-            <section className='hidden md:flex md:flex-col md:items-center md:justify-around gap-2'>
-              {/* Size & Color */}
-              <SizeAndColorElem options={options as ProductVariantOptions} />
-
-              {/* Quantity + Delete (desktop and up) */}
-              <div className='flex items-center justify-end gap-2'>
-                <ItemQuantityComponent
-                  className='flex'
-                  cartItem={cartItem}
-                  disableIncrement={!canIncreaseQuantity}
-                  onAvailabilityChange={onAvailabilityChange}
-                />
-                {renderRemoveButton(cartItem.variantId)}
-              </div>
-            </section>
-
-            {/* Total (tablet & desktop) */}
-            <div
-              className='hidden md:flex flex-col justify-center items-end text-right
-              col-span-2 md:col-span-4 xl:col-span-1 py-4 lg:py-0'
-            >
-              <span className='text-sm text-white/80 uppercase tracking-wide'>Line Total</span>
-              <h3 className='text-[1.075rem] font-semibold'>{lineTotal}</h3>
             </div>
           </div>
         );
       })}
 
-      {/* Remove confirmation dialog */}
       <AlertDialog
         open={pendingRemoveId !== null}
         onOpenChange={(open) => {
@@ -222,7 +192,7 @@ const CartItems: FC<{
             </AlertDialogCancel>
             <AlertDialogAction
               className='border border-red-400 bg-transparent text-red-400 hover:bg-red-500/15 hover:text-red-200 rounded-lg px-4 font-semibold'
-              onClick={handleConfirmRemove}
+              onClick={() => void handleConfirmRemove()}
             >
               Remove
             </AlertDialogAction>

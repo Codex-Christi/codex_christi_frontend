@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, use, useCallback, useEffect, useMemo, useState } from 'react';
+import { type FC, use, useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '../../primitives/button';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import {
@@ -12,33 +12,20 @@ import {
 import { OptionalProductVariantProps, ProductDetailsContext } from '.';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import { useShallow } from 'zustand/react/shallow';
-import { checkProductLineAvail } from '@/actions/shop/product/[each]/checkProdLineAvail';
 
-// ——— Types ———
 type Variant = NonNullable<OptionalProductVariantProps['variants'][number]>;
 
-// 1) Type guard to drop undefineds and satisfy TS narrowing on .filter
 function isVariant(v: OptionalProductVariantProps['variants'][number] | undefined): v is Variant {
   return !!v && typeof v._id === 'string' && Array.isArray(v.options);
 }
 
-const REQUIRED_ATTRIBUTE_LABELS: Record<string, string> = {
-  size: 'size',
-  color: 'color',
-  label: 'label',
-};
-
 function formatRequiredAttributes(attributes: readonly string[]) {
-  const labels = attributes.map((attribute) => REQUIRED_ATTRIBUTE_LABELS[attribute] ?? attribute);
-
-  if (labels.length === 1) return `a ${labels[0]}`;
-  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
-  return `${labels.slice(0, -1).join(', ')}, and ${labels[labels.length - 1]}`;
+  if (attributes.length === 1) return `a ${attributes[0]}`;
+  if (attributes.length === 2) return `${attributes[0]} and ${attributes[1]}`;
+  return `${attributes.slice(0, -1).join(', ')}, and ${attributes[attributes.length - 1]}`;
 }
 
-// Main Component
 export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
-  // Always read context at top-level (ok even if no provider)
   const ctx = use(ProductDetailsContext);
 
   // Prefer explicit props; fall back to context. Avoid non-null assertions.
@@ -47,13 +34,11 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
     [props.variants, ctx?.productVariants],
   );
 
-  // 2) Create a cleaned array with proper type Variant[]
   const cleanVariants = useMemo(() => productVariants.filter(isVariant), [productVariants]);
 
   const title = props.productMetaData?.title ?? ctx?.productMetaData?.title ?? '';
   const slug = props.productMetaData?.slug ?? ctx?.productMetaData?.slug ?? '';
 
-  // ---- Zustand selections with shallow memoization (one subscription) ----
   const { matchingVariant, setMatchingVariant, resetVariantOptions, currentVariantOptions } =
     useCurrentVariant(
       useShallow((s) => ({
@@ -66,7 +51,6 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
 
   const addToCart = useCartStore((s) => s.addToCart);
 
-  // Keep only one verification/add operation in flight.
   const [isBusy, setIsBusy] = useState(false);
   const isLoadingVariants = props.isLoadingVariants ?? ctx?.variantLoadState === 'loading';
   const requiredAttributes = useMemo(
@@ -85,7 +69,6 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
     ),
   );
 
-  // Use the cleaned array for messaging & indexing
   const selectOptionsMessage = useMemo(() => {
     if (isLoadingVariants) return 'Product options are still loading.';
     if (cleanVariants.length === 0) return 'This item is unavailable.';
@@ -102,36 +85,16 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
     !isLoadingVariants;
 
   const addToCartHandler = useCallback(async () => {
-    // Keep one verification/add operation in flight at a time.
     if (isBusy) return;
     setIsBusy(true);
 
     try {
-      const fail = async (message: string) => {
-        await showAddToCartErrorToast({ message });
-      };
-
       if (!canSubmit || !matchingVariant) {
-        await fail(selectOptionsMessage);
+        await showAddToCartErrorToast({ message: selectOptionsMessage });
         return;
       }
 
-      const lineCheckResp = await checkProductLineAvail({
-        storefrontProductId: matchingVariant.product,
-        storefrontVariantId: matchingVariant._id,
-      });
-
-      if (!lineCheckResp?.ok) {
-        await fail('This option is temporarily unavailable. Please try again in a moment.');
-        return;
-      }
-
-      if (!lineCheckResp.isAvailable) {
-        await fail('This option is no longer available. Please choose another option.');
-        return;
-      }
-
-      addToCart({
+      await addToCart({
         variantId: matchingVariant._id,
         quantity: 1,
         itemDetail: matchingVariant,
@@ -139,7 +102,7 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
         slug,
       });
 
-      await cartSuccessToast({ message: 'Item added to cart successfully.' });
+      await cartSuccessToast('Item saved to your cart. Availability is checked at checkout.');
 
       setMatchingVariant(null);
     } catch {
@@ -162,13 +125,10 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
     title,
   ]);
 
-  // if (!variantLineProductName) return;
-
   // Subscribes with a proper Variant[]; auto-unsub on deps change/unmount.
   useEffect(() => {
     if (cleanVariants.length === 0) return;
 
-    // Adapt local Variant[] to the shape expected by setupVariantAutoMatching
     const unsubscribe = setupVariantAutoMatching(
       cleanVariants as Parameters<typeof setupVariantAutoMatching>[0],
     );
@@ -178,7 +138,6 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
     };
   }, [cleanVariants, resetVariantOptions]);
 
-  // Main JSX
   return (
     <Button
       className='bg-white hover:bg-white rounded-lg !py-6 !px-8 flex items-center justify-between w-full'
@@ -219,24 +178,14 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
   );
 };
 
-type Position = 'top-right';
-
 async function showAddToCartErrorToast({ message }: { message: string }) {
   const { default: errorToast } = await import('@/lib/error-toast');
   errorToast({ message });
 }
 
-const cartSuccessToast = async ({
-  message,
-  header = 'Action Successful!',
-  position = 'top-right',
-}: {
-  message: string;
-  header?: string;
-  position?: Position;
-}) => {
+async function cartSuccessToast(message: string) {
   const { toast } = await import('sonner');
-  const toastID = toast.success(header, {
+  toast.success('Saved to cart', {
     description: message,
     action: (
       <CustomShopLink
@@ -247,8 +196,6 @@ const cartSuccessToast = async ({
         View Cart
       </CustomShopLink>
     ),
-    position,
+    position: 'top-right',
   });
-
-  return toastID;
-};
+}

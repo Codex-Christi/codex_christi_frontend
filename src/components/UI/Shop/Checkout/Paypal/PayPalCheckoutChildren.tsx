@@ -11,12 +11,7 @@ import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalI
 import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
 import successToast from '@/lib/success-toast';
 
-const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
-  // Props
-  const { mode } = props;
-
-  // Hooks
-  const cart = useCartStore((store) => store.variants);
+const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
   const { first_name, last_name, email, delivery_address } = useShopCheckoutStore();
   const { isFinalizingPayment, mainPayPalApproveCallback } = usePayPalTXApproveCallback();
   const setIntent = usePayPalIntentStore((store) => store.setIntent);
@@ -28,7 +23,6 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
     djangoOrderIntentVerifyPayload,
   } = useDjangoOrderIntentStore();
 
-  // Create order async function
   const createOrder = useCallback(async (): Promise<string> => {
     type IntentResponse =
       | {
@@ -46,20 +40,26 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
             requestId: string;
             orderToken?: string;
           };
-    };
+        };
 
     try {
+      const currentCart = useCartStore.getState();
+      const cartSnapshot = currentCart.createCheckoutSnapshot();
+      const productsByVariant = new Map(
+        currentCart.variants.map(({ variantId, itemDetail }) => [variantId, itemDetail.product]),
+      );
+      const selections = cartSnapshot.lines.map((line) => {
+        const productId = productsByVariant.get(line.variantId);
+        if (!productId) throw new Error('Please review your cart before starting checkout.');
+        return { productId, variantId: line.variantId, quantity: line.quantity };
+      });
       const response = await fetch('/next-api/paypal/tx-ledger/intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           // Product/variant IDs are selectors only. The server resolves every descriptive and
           // monetary field again before creating the PayPal order.
-          selections: cart.map((item) => ({
-            productId: item.itemDetail.product,
-            variantId: item.variantId,
-            quantity: item.quantity,
-          })),
+          selections,
           customer: {
             name: `${first_name} ${last_name}`,
             email: email ?? '',
@@ -93,6 +93,7 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
         throw error;
       }
 
+      await useCartStore.getState().recordCheckout(payload.data.orderToken, cartSnapshot);
       setIntent({
         orderToken: payload.data.orderToken,
         stage: mode === 'paypal_buttons' ? 'paypal_window_opened' : 'paypal_order_created',
@@ -113,7 +114,6 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = (props) => {
       throw new Error('Failed to create PayPal order');
     }
   }, [
-    cart,
     delivery_address,
     email,
     first_name,

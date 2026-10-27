@@ -1,209 +1,89 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { ProductVariantOptions } from '@/lib/merchizeStorefront/productTypes';
-import { createBrowserObfuscatedJSONStorage } from '@/lib/crypto/browserObfuscatedStorage';
+import { CartController, initialCartView, type CartView } from '@/lib/cart/controller';
+import { CartRepository } from '@/lib/cart/repository';
+import type {
+  CartCheckoutSnapshot,
+  CartOwner,
+  CartPurchaseLine,
+  CartVariant,
+} from '@/lib/cart/types';
 
-// Types
-export type VariantOption = {
-  is_preselected: boolean;
-  position: number;
-  hide_storefront: boolean;
-  slug: string;
-  value: string;
-  name: string;
-  attribute: {
-    _id: string;
-    name: 'Product' | 'Size' | 'Color'; // or string, if dynamic
-    value_type: 'slide' | 'size' | 'color'; // or string, if dynamic
-  };
-};
+export type { CartVariant, VariantDetail, VariantOption } from '@/lib/cart/types';
 
-type ItemDetail = {
-  _id: string;
-  sides?: string[]; // e.g., "front-name:Front-51LtyMNlV71"
-  image_uris: string[];
-  retail_price: number;
-  is_default: boolean;
-  sku?: string;
-  sku_seller?: string;
-  /** Server-verified fulfillment SKU; never accepted from browser input without revalidation. */
-  supplierSku?: string;
-  title: string;
-  weight?: number;
-  options: VariantOption[] | ProductVariantOptions;
-  product?: string;
-  base_cost?: number;
-  image?: string;
-};
-
-export type VariantDetail = ItemDetail;
-
-export type CartVariant = {
-  variantId: string;
-  quantity: number;
-  title: string;
-  slug: string;
-  itemDetail: ItemDetail;
-};
-
-interface CartState {
-  variants: CartVariant[];
-  offlineOnly: boolean;
-  setOfflineOnly: (value: boolean) => void;
-  addToCart: (variant: CartVariant) => void;
-  reduceFromCart: (variantId: string, quantity: number) => void;
-  removeFromCart: (variantId: string) => void;
-  clearCart: () => void;
-  syncRemoteCart: () => Promise<void>;
-  pushRemoteCart: () => Promise<void>;
-  pullRemoteCart: () => Promise<void>;
-  setVariants: (variants: CartVariant[]) => void;
-  applyMetadataTransform?: (variant: CartVariant) => CartVariant;
+interface CartState extends CartView {
+  addToCart: (line: CartVariant) => Promise<void>;
+  setQuantity: (variantId: string, quantity: number) => Promise<void>;
+  reduceFromCart: (variantId: string, quantity?: number) => Promise<void>;
+  removeFromCart: (variantId: string) => Promise<void>;
+  clearCart: () => Promise<void>;
+  resolveConflict: (variantId: string, choice: 'local' | 'remote') => Promise<void>;
+  retrySync: () => Promise<void>;
+  createCheckoutSnapshot: () => CartCheckoutSnapshot;
+  recordCheckout: (orderId: string, snapshot: CartCheckoutSnapshot) => Promise<void>;
+  consumePurchase: (orderId: string, lines: CartPurchaseLine[]) => Promise<void>;
 }
 
-// This key is public in the browser, so persisted cart encryption is obfuscation rather than a
-// security boundary. Web Crypto replaces the discontinued CryptoJS implementation.
-const STORAGE_OBFUSCATION_KEY = process.env.NEXT_PUBLIC_CART_KEY || 'fallback-secret';
-
-export const useCartStore = create<CartState>()(
-  persist(
-    (set, get) => ({
-      variants: [],
-      offlineOnly: true,
-
-      // Manually control offline mode
-      setOfflineOnly: (value) => {
-        set({ offlineOnly: value });
-        if (!value && typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('network-sync'));
-        }
-      },
-
-      addToCart: (variant) => {
-        const existing = get().variants.find((v) => v.variantId === variant.variantId);
-        const filtered = get().applyMetadataTransform?.(variant) || variant;
-
-        set({
-          variants: existing
-            ? get().variants.map((v) =>
-                v.variantId === variant.variantId
-                  ? { ...v, quantity: v.quantity + filtered.quantity }
-                  : v,
-              )
-            : [filtered, ...get().variants],
-        });
-      },
-
-      reduceFromCart: (variantId: string, quantity: number = 1) => {
-        const existing = get().variants.find((v) => v.variantId === variantId);
-        if (!existing) return;
-
-        const newQuantity = existing.quantity - quantity;
-
-        if (newQuantity > 0) {
-          set({
-            variants: get().variants.map((v) =>
-              v.variantId === variantId ? { ...v, quantity: newQuantity } : v,
-            ),
-          });
-        } else {
-          // Quantity is zero or less, remove the item
-          get().removeFromCart(variantId);
-        }
-      },
-
-      removeFromCart: (variantId) =>
-        set({
-          variants: get().variants.filter((v) => v.variantId !== variantId),
-        }),
-
-      clearCart: () => set({ variants: [] }),
-
-      setVariants: (variants) => set({ variants }),
-
-      // Remote sync methods
-      pushRemoteCart: async () => {
-        if (get().offlineOnly) return;
-
-        const body = JSON.stringify({ variants: get().variants });
-        await fetch('/api/cart/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body,
-        });
-      },
-
-      pullRemoteCart: async () => {
-        if (get().offlineOnly) return;
-
-        const res = await fetch('/api/cart');
-        const remote = await res.json();
-        set({ variants: remote.variants || [] });
-      },
-
-      syncRemoteCart: async () => {
-        const local = get().variants;
-
-        const res = await fetch('/api/cart');
-        const remoteData = await res.json();
-
-        const remote = remoteData.variants || [];
-
-        // Basic merge strategy: prioritize higher quantity and preserve unique
-        const merged: CartVariant[] = [];
-
-        const map = new Map<string, CartVariant>();
-
-        [...local, ...remote].forEach((v) => {
-          const key = v.variantId;
-          const existing = map.get(key);
-
-          const transformed = get().applyMetadataTransform?.(v) || v;
-
-          if (!existing) {
-            map.set(key, transformed);
-          } else {
-            map.set(key, {
-              ...transformed,
-              quantity: Math.max(existing.quantity, transformed.quantity),
-            });
-          }
-        });
-
-        merged.push(...map.values());
-        set({ variants: merged });
-        await get().pushRemoteCart(); // update remote with merged result
-      },
-    }),
-    {
-      name: 'cart-storage',
-      storage: createBrowserObfuscatedJSONStorage<{
-        variants: CartVariant[];
-        offlineOnly: boolean;
-      }>({
-        getStorage: () => window.localStorage,
-        publicKey: STORAGE_OBFUSCATION_KEY,
-        purpose: 'cart-storage',
-      }),
-      partialize: (state) => ({
-        variants: state.variants,
-        offlineOnly: state.offlineOnly,
-      }),
-      skipHydration: typeof window === 'undefined',
-    },
-  ),
+let broadcast: (() => void) | undefined;
+export const cartController = new CartController(
+  new CartRepository(undefined, undefined, () => broadcast?.()),
+  (view) => useCartStore.setState(view),
 );
 
-// Auto-sync when coming online or toggling offlineOnly
-if (typeof window !== 'undefined') {
-  const store = useCartStore;
+export const useCartStore = create<CartState>(() => ({
+  ...initialCartView,
+  addToCart: (line) => cartController.command({ type: 'add', line }),
+  setQuantity: (variantId, quantity) =>
+    cartController.command({ type: 'setQuantity', variantId, quantity }),
+  reduceFromCart: (variantId, quantity = 1) => cartController.reduce(variantId, quantity),
+  removeFromCart: (variantId) => cartController.command({ type: 'remove', variantId }),
+  clearCart: () => cartController.command({ type: 'clear' }),
+  resolveConflict: (variantId, choice) => cartController.resolveConflict(variantId, choice),
+  retrySync: () => cartController.retry(),
+  createCheckoutSnapshot: () => cartController.checkoutSnapshot(),
+  recordCheckout: (orderId, snapshot) => cartController.recordCheckout(orderId, snapshot),
+  consumePurchase: (orderId, lines) => cartController.consumePurchase(orderId, lines),
+}));
 
-  const trySync = async () => {
-    if (!store.getState().offlineOnly && navigator.onLine) {
-      await store.getState().syncRemoteCart();
+export function connectCartLifecycle(
+  readSession: () => { owner: CartOwner | null; authenticated: boolean },
+  subscribe: (listener: () => void) => () => void,
+) {
+  const syncSession = () => {
+    const session = readSession();
+    void cartController.activate(session.owner, session.authenticated);
+  };
+  let channel: BroadcastChannel | undefined;
+  try {
+    channel = new BroadcastChannel('codex-cart');
+    channel.onmessage = () => {
+      void cartController.refresh();
+    };
+    broadcast = () => channel?.postMessage('changed');
+  } catch {
+    /* IndexedDB transactions still preserve writes when messaging is unavailable. */
+  }
+  const refresh = () => {
+    if (document.visibilityState !== 'hidden') {
+      void cartController.refresh();
+      cartController.schedule(0);
     }
   };
-
-  window.addEventListener('online', trySync);
-  window.addEventListener('network-sync', trySync);
+  const unsubscribe = subscribe(syncSession);
+  window.addEventListener('online', refresh);
+  window.addEventListener('offline', refresh);
+  window.addEventListener('focus', refresh);
+  document.addEventListener('visibilitychange', refresh);
+  const interval = setInterval(refresh, 30_000);
+  syncSession();
+  return () => {
+    unsubscribe();
+    channel?.close();
+    broadcast = undefined;
+    clearInterval(interval);
+    cartController.dispose();
+    window.removeEventListener('online', refresh);
+    window.removeEventListener('offline', refresh);
+    window.removeEventListener('focus', refresh);
+    document.removeEventListener('visibilitychange', refresh);
+  };
 }

@@ -1,18 +1,13 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useHasMounted } from '@/lib/hooks/useHasMounted';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
+import { AlertTriangle } from 'lucide-react';
 
 export default function CartIconCount() {
-  const variantsLength = useCartStore((state) => state.variants.length);
-  const hasMounted = useHasMounted();
-  const approxCartItems = useMemo(() => {
-    if (!hasMounted) return 0;
-    return variantsLength >= 9 ? '9+' : variantsLength;
-  }, [hasMounted, variantsLength]);
-
-  const cartIsMoreThanNine = approxCartItems === '9+';
+  const totalQuantity = useCartStore((state) =>
+    state.hydrated ? state.variants.reduce((total, item) => total + item.quantity, 0) : 0,
+  );
+  const cartIsMoreThanNine = totalQuantity > 9;
 
   return (
     <text
@@ -21,7 +16,17 @@ export default function CartIconCount() {
       fontWeight='bold'
       transform={cartIsMoreThanNine ? 'translate(17.5 10)' : 'translate(19.5 11.7)'}
     >
-      {approxCartItems}
+      {cartIsMoreThanNine ? '9+' : totalQuantity}
     </text>
+  );
+}
+
+export function CartReviewBadge() {
+  const count = useCartStore((state) => state.conflicts.length);
+  if (!count) return null;
+  return (
+    <span className='absolute -right-2 -bottom-2 rounded-full bg-black p-0.5 text-amber-200'>
+      <AlertTriangle aria-hidden='true' size={15} fill='currentColor' stroke='#111' />
+    </span>
   );
 }

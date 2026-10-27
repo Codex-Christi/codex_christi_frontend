@@ -7,6 +7,7 @@ import { FaAngleRight } from 'react-icons/fa6';
 import CustomShopLink from '../../HelperComponents/CustomShopLink';
 import { Button } from '@/components/UI/primitives/button';
 import { formatOrderMoney, type OrderPreviewTotals } from '@/lib/shop/checkout/orderMoney';
+import { useCartStore } from '@/stores/shop_stores/cartStore';
 
 type OrderSummaryProps = {
   /** ISO-3 destination country code, e.g. 'USA', 'GBR', 'CAN'. Defaults to 'USA'. */
@@ -29,36 +30,32 @@ const OrderSummary: FC<OrderSummaryProps> = ({
   quoteError,
   onRetryQuote,
 }) => {
+  const hasConflicts = useCartStore((state) => state.conflicts.length > 0);
   const price = (amount?: number) =>
     totals && amount != null ? formatOrderMoney(amount, totals.currency) : '—';
 
   // JSX
   return (
-    <section
-      className='bg-[#3D3D3D4D] backdrop-blur-[5px] text-white rounded-[20px] 
-     w-full sm:w-[85vw] md:w-[80vw] lg:!w-[35%] xl:!w-[32.5%] py-8 lg:self-start mx-auto
-     px-5 flex flex-col select-none md:sticky md:top-6'
-    >
+    <section className='flex w-full min-w-0 max-w-full select-none flex-col rounded-[20px] bg-[#3D3D3D4D] px-4 py-6 text-white backdrop-blur-[5px] sm:px-5 sm:py-8 lg:sticky lg:top-6 lg:self-start'>
       {/* Header */}
-      <h1
-        className=' font-light text-white text-4xl font-ocr text-left mb-4
-      underline underline-offset-[1.5rem] lg:no-underline xl:underline select-none'
-      >
+      <h1 className='mb-4 min-w-0 break-words text-left font-ocr text-[clamp(1.5rem,4vw,2rem)] font-light leading-snug text-white'>
         Order Summary
       </h1>
 
-      <div className='pt-8 font-semibold flex flex-wrap gap-3 text-xl items-center max-[1289px]:text-lg'>
-        <span className='flex-1 min-w-[55%]'>Subtotal</span>
-        <span className='flex-1 min-w-[35%] text-right'>{price(totals?.retailPriceTotalNum)}</span>
+      <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-3 pt-6 text-lg font-semibold'>
+        <span className='min-w-0 break-words'>Subtotal</span>
+        <span className='min-w-0 text-right [overflow-wrap:anywhere]'>
+          {price(totals?.retailPriceTotalNum)}
+        </span>
       </div>
 
       {totals && (
         <>
-          <div className='pt-2 font-semibold flex flex-wrap gap-3 text-lg items-center max-[1289px]:text-base'>
-            <span className='flex-1 min-w-[55%]'>
+          <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-3 pt-2 text-base font-semibold'>
+            <span className='min-w-0 break-words'>
               Est. Shipping Fee <span className='font-extrabold'>**</span>
             </span>
-            <span className='flex-1 min-w-[35%] text-right px-0'>
+            <span className='min-w-0 text-right [overflow-wrap:anywhere]'>
               {price(totals.shippingPriceNum)}
             </span>
           </div>
@@ -83,18 +80,22 @@ const OrderSummary: FC<OrderSummaryProps> = ({
         </p>
       )}
 
-      <div className='mt-8 border-t border-white/10 pt-6 flex flex-wrap gap-3 items-center text-xl font-semibold max-[1289px]:text-xl'>
-        <span className='flex-1 min-w-[55%]'>Estimated Total</span>
-        <span className='flex-1 min-w-[35%] text-right'>{price(totals?.totalPriceNum)}</span>
+      <div className='mt-8 grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-3 border-t border-white/10 pt-6 text-lg font-semibold'>
+        <span className='min-w-0 break-words'>Estimated Total</span>
+        <span className='min-w-0 text-right [overflow-wrap:anywhere]'>
+          {price(totals?.totalPriceNum)}
+        </span>
       </div>
 
-      {checkoutBlocked || quotePending || quoteError || !totals ? (
+      {hasConflicts || checkoutBlocked || quotePending || quoteError || !totals ? (
         <>
-          <p role='status' className='pt-6 text-sm text-white/80'>
-            {quotePending
-              ? 'Updating delivery options...'
-              : (quoteError ??
-                'Please remove unavailable items or choose another option before checkout.')}
+          <p role='status' className='min-w-0 break-words pt-6 text-sm text-white/80'>
+            {hasConflicts
+              ? 'Please review the highlighted cart changes before checkout.'
+              : quotePending
+                ? 'Updating delivery options...'
+                : (quoteError ??
+                  'Please remove unavailable items or choose another option before checkout.')}
           </p>
           {quoteError && !quotePending && (
             <div className='mt-3 space-y-3'>
@@ -106,7 +107,8 @@ const OrderSummary: FC<OrderSummaryProps> = ({
                 wrapperClassName=''
                 classNames={{
                   trigger:
-                    'inline-flex min-h-10 max-w-full items-center gap-2 rounded-md border border-white/20 bg-black/40 px-3 text-white',
+                    'flex min-h-10 w-full min-w-0 max-w-full items-center gap-2 rounded-md border border-white/20 bg-black/40 px-3 text-white',
+                  popover: 'w-[min(320px,calc(100vw-2rem))] p-0 !z-[500]',
                 }}
               />
             </div>
@@ -116,17 +118,19 @@ const OrderSummary: FC<OrderSummaryProps> = ({
             type='button'
             disabled
             aria-disabled='true'
-            className='w-[95%] text-center !mx-auto py-4 px-4 text-xl mt-4 rounded-3xl bg-white text-black gap-2 !flex justify-center items-center'
+            className='mt-4 !flex w-full min-w-0 items-center justify-center gap-2 whitespace-normal rounded-3xl bg-white px-3 py-4 text-center text-base text-black sm:text-lg'
           >
-            <span>Proceed to Checkout</span> <FaAngleRight size={22.5} />
+            <span className='min-w-0'>Proceed to Checkout</span>{' '}
+            <FaAngleRight className='shrink-0' size={20} />
           </Button>
         </>
       ) : (
         <CustomShopLink
           href='/shop/checkout'
-          className='w-[95%] text-center !mx-auto py-4 px-4 text-xl mt-10 rounded-3xl bg-white text-black hover:bg-gray-200 gap-2 !flex justify-center items-center'
+          className='mt-6 !flex w-full min-w-0 items-center justify-center gap-2 rounded-3xl bg-white px-3 py-4 text-center text-base text-black hover:bg-gray-200 sm:text-lg'
         >
-          <h4>Proceed to Checkout</h4> <FaAngleRight size={22.5} />
+          <span className='min-w-0'>Proceed to Checkout</span>{' '}
+          <FaAngleRight className='shrink-0' size={20} />
         </CustomShopLink>
       )}
     </section>

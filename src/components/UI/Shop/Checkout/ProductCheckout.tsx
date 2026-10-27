@@ -47,7 +47,8 @@ const CheckoutPage = () => {
   const cartVariants = useCartStore((state) => state.variants);
   const { push } = useShopRouter();
   const hasMounted = useHasMounted();
-  const [cartHydrated, setCartHydrated] = useState(false);
+  const cartHydrated = useCartStore((state) => state.hydrated);
+  const hasCartConflicts = useCartStore((state) => state.conflicts.length > 0);
   const checkoutHydrated = useSyncExternalStore(
     useShopCheckoutStore.persist.onFinishHydration,
     useShopCheckoutStore.persist.hasHydrated,
@@ -110,7 +111,14 @@ const CheckoutPage = () => {
   }, [cartHydrated, cartCount, hasRedirected, triggerEmptyCartRedirect]);
 
   useEffect(() => {
-    if (!cartHydrated || !checkoutHydrated || hasRedirected || cartVariants.length === 0) return;
+    if (
+      !cartHydrated ||
+      !checkoutHydrated ||
+      hasRedirected ||
+      cartVariants.length === 0 ||
+      hasCartConflicts
+    )
+      return;
 
     let active = true;
     getOrderFinalDetails(cartVariants, country, 'merchize')
@@ -134,6 +142,7 @@ const CheckoutPage = () => {
     };
   }, [
     cartHydrated,
+    hasCartConflicts,
     checkoutHydrated,
     cartIdentity,
     quoteIdentity,
@@ -142,27 +151,6 @@ const CheckoutPage = () => {
     hasRedirected,
     triggerUnavailableCartRedirect,
   ]);
-
-  useEffect(() => {
-    if (cartHydrated) return;
-
-    const markHydrated = () => {
-      setCartHydrated(true);
-    };
-
-    if (useCartStore.persist?.hasHydrated?.()) {
-      markHydrated();
-      return;
-    }
-
-    const unsub = useCartStore.persist?.onFinishHydration?.(() => {
-      markHydrated();
-    });
-
-    return () => {
-      if (typeof unsub === 'function') unsub();
-    };
-  }, [cartHydrated]);
 
   const handleOpenItem = (itemValue: 'basic-checkout-info' | 'payment-section') => {
     setOpenItem(itemValue); // Update the state to open the desired item
@@ -175,6 +163,7 @@ const CheckoutPage = () => {
   if (
     !cartHydrated ||
     !checkoutHydrated ||
+    hasCartConflicts ||
     cartCount === 0 ||
     availabilityGateStatus !== 'available'
   ) {
@@ -186,11 +175,13 @@ const CheckoutPage = () => {
       >
         <h1 className='text-2xl font-bold'>Checking your cart</h1>
         <p className='mt-3 text-white/75'>
-          {availabilityGateStatus === 'checking'
-            ? 'Confirming that every selected option is still available…'
-            : 'Your cart needs attention before checkout.'}
+          {hasCartConflicts
+            ? 'Choose which quantities to keep in your cart before checking out.'
+            : availabilityGateStatus === 'checking'
+              ? 'Confirming that every selected option is still available…'
+              : 'Your cart needs attention before checkout.'}
         </p>
-        {availabilityGateStatus === 'blocked' && (
+        {(hasCartConflicts || availabilityGateStatus === 'blocked') && (
           <CustomShopLink
             href='/shop/cart'
             className='mt-5 inline-flex rounded-full bg-white px-5 py-3 font-semibold text-black'

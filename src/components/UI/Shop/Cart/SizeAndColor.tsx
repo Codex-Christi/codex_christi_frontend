@@ -1,9 +1,8 @@
-import { ProductVariantOptions } from '@/lib/merchizeStorefront/productTypes';
-import React, { FC, useMemo } from 'react';
-import { getColorAndSizeLabels, toCartOptions } from './cartOptionHelpers';
+import { type FC, useMemo } from 'react';
+import { getColorAndSizeLabels, toCartOptions, type CartOptionLike } from './cartOptionHelpers';
 
 const SizeAndColorElem: FC<{
-  options: ProductVariantOptions;
+  options: CartOptionLike[];
   className?: string;
 }> = ({ options, className }) => {
   const { color, size } = useMemo(() => getColorAndSizeLabels(toCartOptions(options)), [options]);

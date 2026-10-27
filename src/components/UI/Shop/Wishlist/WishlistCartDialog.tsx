@@ -9,7 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/UI/primitives/dialog';
-import { checkProductLineAvail } from '@/actions/shop/product/[each]/checkProdLineAvail';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore';
 import type { WishlistProduct } from '@/lib/wishlist/types';
@@ -25,6 +24,9 @@ type OptionsState = {
   error: string | null;
   notice: string | null;
 };
+
+// Known options remain usable while this loaded app is offline. They are rechecked at checkout.
+const optionsCache = new Map<string, Variant[]>();
 
 const buttonClassName =
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/70 px-4 py-2 text-sm font-medium transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50';
@@ -65,10 +67,21 @@ function CartOptions({
     const controller = new AbortController();
 
     async function loadOptions() {
-      setState({ loading: true, variants: [], error: null, notice: null });
+      const cacheKey = `${item.productId}:${country}`;
+      const cached = optionsCache.get(cacheKey);
+      const cachedNotice =
+        'Previously loaded options. Price and availability are checked at checkout.';
+      setState({
+        loading: !cached,
+        variants: cached ?? [],
+        error: null,
+        notice: cached ? cachedNotice : null,
+      });
       setSelectedId('');
       setAddError(null);
       try {
+        if (!navigator.onLine)
+          throw new Error('Connect to load this product’s options for the first time.');
         const response = await fetch(
           `/next-api/shop/products/${encodeURIComponent(item.productId)}/variants?country=${encodeURIComponent(country)}`,
           { cache: 'no-store', signal: controller.signal },
@@ -90,6 +103,9 @@ function CartOptions({
           throw new Error('Some product options could not be verified. Please try again.');
         }
         if (controller.signal.aborted) return;
+        optionsCache.delete(cacheKey);
+        if (optionsCache.size >= 50) optionsCache.delete(optionsCache.keys().next().value!);
+        optionsCache.set(cacheKey, variants);
         const notice = payload.verificationIncomplete
           ? 'Some options could not be verified. Only verified options are shown.'
           : typeof payload.unavailabilityReason === 'string'
@@ -100,9 +116,13 @@ function CartOptions({
         if (controller.signal.aborted) return;
         setState({
           loading: false,
-          variants: [],
-          error: error instanceof Error ? error.message : 'Product options could not be loaded.',
-          notice: null,
+          variants: cached ?? [],
+          error: cached
+            ? null
+            : error instanceof Error
+              ? error.message
+              : 'Product options could not be loaded.',
+          notice: cached ? cachedNotice : null,
         });
       }
     }
@@ -117,22 +137,7 @@ function CartOptions({
     setBusy(true);
     setAddError(null);
     try {
-      const check = await checkProductLineAvail({
-        storefrontProductId: selected.product,
-        storefrontVariantId: selected._id,
-      });
-      if (!mounted.current) return;
-      if (!check.ok) {
-        setAddError('We could not verify this option. Please try again shortly.');
-        return;
-      }
-      if (!check.isAvailable) {
-        setAddError(
-          'This option is no longer available. Choose another option or refresh the options.',
-        );
-        return;
-      }
-      addToCart({
+      await addToCart({
         variantId: selected._id,
         quantity: 1,
         itemDetail: selected,
@@ -140,7 +145,7 @@ function CartOptions({
         slug: item.slug || item.productId,
       });
       const { toast } = await import('sonner');
-      toast.success('Added to cart', { description: item.title });
+      toast.success('Saved to cart', { description: item.title });
       if (mounted.current) onClose();
     } catch {
       if (mounted.current) setAddError('We could not add this item right now. Please try again.');

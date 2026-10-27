@@ -3,12 +3,14 @@ import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureComplet
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { getCanonicalPaymentProjectionState } from '@/lib/paypal/txLedger/canonicalPaymentProjectionState';
+import { getCapturedCartPurchase } from '@/lib/cart/purchase';
 
 type PageProps = {
   params: Promise<{ orderToken: string }>;
 };
 
 const CUSTOMER_RECOVERY_GRACE_MS = 45_000;
+const privateHeaders = { 'Cache-Control': 'private, no-store' };
 
 const CUSTOMER_RECOVERY_LEDGER_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.CAPTURED,
@@ -70,7 +72,7 @@ export async function GET(_req: Request, { params }: PageProps) {
 
   const row = await paypalTxLedger.paypalIntent.findUnique({ where: { orderToken } });
   if (!row) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404, headers: privateHeaders });
   }
 
   const paymentState = getCanonicalPaymentProjectionState(row);
@@ -92,22 +94,26 @@ export async function GET(_req: Request, { params }: PageProps) {
     ? 'Your payment was received, but its amount requires review before fulfillment.'
     : getCustomerRecoveryReason(effectiveStatus);
 
-  return NextResponse.json({
-    orderToken: row.orderToken,
-    status: effectiveStatus,
-    lastEventType: row.lastEventType,
-    receiptLink: row.receiptLink,
-    receiptFile: row.receiptFile,
-    djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
-    processingCompletedAt: row.processingCompletedAt,
-    paidAmountLabel: getPaidAmountLabel(row.capturePayload),
-    customerRecoveryStatus: isCustomerProtectionVisible ? 'paid_unresolved' : null,
-    recoveryReason: isCustomerProtectionVisible ? recoveryReason : null,
-    updatedAt: row.updatedAt,
-    error: paymentFailure
-      ? { code: paymentFailure.errorCode, message: recoveryReason }
-      : row.lastErrorMessage
-        ? { code: row.lastErrorCode, message: row.lastErrorMessage }
-        : null,
-  });
+  return NextResponse.json(
+    {
+      orderToken: row.orderToken,
+      status: effectiveStatus,
+      lastEventType: row.lastEventType,
+      receiptLink: row.receiptLink,
+      receiptFile: row.receiptFile,
+      djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
+      processingCompletedAt: row.processingCompletedAt,
+      paidAmountLabel: getPaidAmountLabel(row.capturePayload),
+      cartPurchase: getCapturedCartPurchase(row, paymentState),
+      customerRecoveryStatus: isCustomerProtectionVisible ? 'paid_unresolved' : null,
+      recoveryReason: isCustomerProtectionVisible ? recoveryReason : null,
+      updatedAt: row.updatedAt,
+      error: paymentFailure
+        ? { code: paymentFailure.errorCode, message: recoveryReason }
+        : row.lastErrorMessage
+          ? { code: row.lastErrorCode, message: row.lastErrorMessage }
+          : null,
+    },
+    { headers: privateHeaders },
+  );
 }
