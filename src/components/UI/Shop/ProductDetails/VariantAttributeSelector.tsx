@@ -1,10 +1,9 @@
-// src/components/UI/Shop/ProductDetails/VariantAttributeSelector.tsx
-import React, { useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import RadioButtonGroup from './RadioButtonGroupWithText';
 import {
   ColorAttribute,
   SizeAttribute,
-  ProductVariantOptions,
+  ProductOption,
   LabelAttribute,
 } from '@/lib/merchizeStorefront/productTypes';
 import { useCurrentVariant } from './currentVariantStore';
@@ -15,19 +14,17 @@ import {
 } from '@/lib/merchizeStorefront/productOptionLayout';
 import { Skeleton } from '../../primitives/skeleton';
 
-type AttributeOption = ProductVariantOptions[number]; // base trait: has .value, .name, .slug, .attribute?
-
-interface VariantAttributeSelectorProps<T extends AttributeOption> {
+interface VariantAttributeSelectorProps {
   title: string;
   attribute: ProductOptionKind;
-  options: T[];
+  options: ProductOption[];
 }
 
-const VariantAttributeSelector = <T extends AttributeOption>({
+const VariantAttributeSelector = ({
   title,
   attribute,
   options,
-}: VariantAttributeSelectorProps<T>) => {
+}: VariantAttributeSelectorProps) => {
   const { setSize, setColor, setLabel } = useCurrentVariant();
 
   const radioOptions = useMemo(
@@ -71,7 +68,7 @@ const VariantAttributeSelector = <T extends AttributeOption>({
   return (
     <div className='space-y-1'>
       <h4 className='text-xl'>{title}</h4>
-      <RadioButtonGroup props={radioOptions} onChange={onChange} groupLabel={title} />
+      <RadioButtonGroup options={radioOptions} onChange={onChange} groupLabel={title} />
     </div>
   );
 };
@@ -86,7 +83,7 @@ export function VariantAttributeSkeleton({ title, options }: ProductOptionLayout
       <Skeleton className='w-fit bg-white/10'>
         <h4 className='invisible text-xl'>{title}</h4>
       </Skeleton>
-      <RadioButtonGroup props={options} onChange={ignorePlaceholderSelection} isLoading />
+      <RadioButtonGroup options={options} onChange={ignorePlaceholderSelection} isLoading />
     </div>
   );
 }

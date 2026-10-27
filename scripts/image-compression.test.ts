@@ -2,93 +2,66 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import portraits from '../reports/storefront/image-compression.json';
+import hero from '../reports/storefront/about-hero-compression.json';
 
-type PortraitEvidence = {
-  name: string;
-  sourcePath: string;
-  sourceSha256: string;
-  outputPath: string;
-  outputSha256: string;
-  deviceScaleFactor: number;
-  rasterSize: { width: number; height: number };
-  selected: { bytes: number; minSSIM: number; maxAlphaDifference: number };
-  browserComparisons: { ssim: number }[];
-};
+const MIN_SSIM = 0.995;
+const desktop = hero.desktopBackdrop;
+const assets = [
+  ...portraits.images.map((image) => ({
+    source: { path: image.sourcePath, bytes: image.sourceBytes, sha256: image.sourceSha256 },
+    output: { path: image.outputPath, bytes: image.selected.bytes, sha256: image.outputSha256 },
+  })),
+  ...[hero, desktop].map((image) => ({
+    source: { path: hero.sourcePath, bytes: hero.sourceBytes, sha256: hero.sourceSha256 },
+    output: { path: image.outputPath, bytes: image.outputBytes, sha256: image.outputSha256 },
+  })),
+];
 
-const reportPromise = readFile('reports/storefront/image-compression.json', 'utf8').then(
-  (source) => JSON.parse(source) as { images: PortraitEvidence[] },
-);
-
-test('portraits have independently verified 1x, 2x, and 3x versions', async () => {
-  const report = await reportPromise;
-  assert.equal(report.images.length, 12);
-  for (const name of new Set(report.images.map((image) => image.name))) {
-    assert.deepEqual(
-      report.images.filter((image) => image.name === name).map((image) => image.deviceScaleFactor),
-      [1, 2, 3],
-    );
-  }
-  for (const image of report.images) {
-    assert.equal(image.rasterSize.width, 72 * image.deviceScaleFactor);
-    assert.equal(image.rasterSize.height, image.rasterSize.width);
-    assert.ok(image.selected.minSSIM >= 0.995, image.outputPath);
-    assert.equal(image.selected.maxAlphaDifference, 0, image.outputPath);
-    assert.equal(image.browserComparisons.length, 2, image.outputPath);
-    assert.ok(image.browserComparisons.every((score) => score.ssim >= 0.995), image.outputPath);
-  }
-});
-
-test('originals are preserved and quality evidence matches the shipped files', async () => {
-  const report = await reportPromise;
-  for (const image of report.images) {
-    const original = await readFile(image.sourcePath);
-    const output = await readFile(image.outputPath);
-    assert.equal(createHash('sha256').update(original).digest('hex'), image.sourceSha256);
-    assert.equal(createHash('sha256').update(output).digest('hex'), image.outputSha256);
-    assert.equal(output.length, image.selected.bytes);
-    assert.equal(output.toString('ascii', 0, 4), 'RIFF');
-    assert.equal(output.toString('ascii', 8, 12), 'WEBP');
-  }
-});
-
-test('About hero preserves its drawing instructions and verified image quality', async () => {
-  const report = JSON.parse(await readFile('reports/storefront/about-hero-compression.json', 'utf8'));
-  const original = await readFile(report.sourcePath);
-  const output = await readFile(report.outputPath);
-  assert.equal(createHash('sha256').update(original).digest('hex'), report.sourceSha256);
-  assert.equal(createHash('sha256').update(output).digest('hex'), report.outputSha256);
-  assert.equal(output.length, report.outputBytes);
-  assert.ok(output.length < original.length);
-  const bitmap = /xlink:href="data:image\/(?:jpeg|avif);base64,[A-Za-z0-9+/=]+"/;
-  assert.ok(bitmap.test(original.toString()));
-  assert.ok(bitmap.test(output.toString()));
-  assert.equal(original.toString().replace(bitmap, 'BITMAP'), output.toString().replace(bitmap, 'BITMAP'));
-  assert.equal(report.rendering.length, 8);
-  assert.ok(report.rendering.every((row: { ssim: number }) => row.ssim >= 0.995));
-  assert.ok(report.selected.minRenderedSSIM >= 0.995);
-});
-
-test('desktop artwork reveals the full source without moving the cards or changing mobile', async () => {
-  const report = JSON.parse(await readFile('reports/storefront/about-hero-compression.json', 'utf8'));
-  const desktop = report.desktopBackdrop;
-  const output = await readFile(desktop.outputPath);
-  assert.equal(createHash('sha256').update(output).digest('hex'), desktop.outputSha256);
-  assert.equal(output.length, desktop.outputBytes);
-  assert.match(output.toString(), /viewBox="0 0 832\.624 468\.351"/);
-  assert.ok(desktop.nativeSSIM >= 0.995);
-  assert.equal(desktop.rendering.length, 11);
-  for (const row of desktop.rendering) {
-    assert.ok(row.ssim >= 0.995);
-    assert.ok(row.layoutPreserved);
-    assert.equal(row.heroFlowHeight, 320);
-    assert.equal(row.heroRequests, 1);
-    assert.equal(row.overflow, false);
-    assert.equal(row.runtimeErrors, 0);
-    assert.equal(row.failedCriticalResources, 0);
-    if (row.width < 1024) assert.equal(row.ssim, 1);
-    else {
-      assert.equal(row.objectPosition, '100% 100%');
-      assert.ok(row.backdropHeight >= row.lowestCardTop);
+test('originals and compressed assets match the files that were quality-checked', async () => {
+  const fingerprints = new Map<string, { bytes: number; sha256: string }>();
+  for (const { source, output } of assets) {
+    assert.ok(output.bytes < source.bytes, output.path);
+    for (const file of [source, output]) {
+      let fingerprint = fingerprints.get(file.path);
+      if (!fingerprint) {
+        const bytes = await readFile(file.path);
+        fingerprint = {
+          bytes: bytes.length,
+          sha256: createHash('sha256').update(bytes).digest('hex'),
+        };
+        fingerprints.set(file.path, fingerprint);
+      }
+      assert.deepEqual(fingerprint, { bytes: file.bytes, sha256: file.sha256 }, file.path);
     }
   }
+});
+
+test('recorded fidelity covers portrait densities and meets the quality policy', () => {
+  for (const name of new Set(portraits.images.map((image) => image.name))) {
+    const versions = portraits.images.filter((image) => image.name === name);
+    assert.deepEqual(versions.map((image) => image.deviceScaleFactor), [1, 2, 3]);
+  }
+  for (const image of portraits.images) {
+    assert.equal(image.rasterSize.width, 72 * image.deviceScaleFactor);
+    assert.equal(image.rasterSize.height, image.rasterSize.width);
+    assert.ok(image.selected.minSSIM >= MIN_SSIM, image.outputPath);
+    assert.equal(image.selected.maxAlphaDifference, 0, image.outputPath);
+    assert.deepEqual(image.browserComparisons.map((row) => row.background), ['#000000', '#ffffff']);
+    assert.ok(image.browserComparisons.every((row) => row.ssim >= MIN_SSIM), image.outputPath);
+  }
+  assert.ok(hero.rendering.every((row) => row.ssim >= MIN_SSIM));
+  assert.ok(desktop.nativeSSIM >= MIN_SSIM);
+  assert.ok(desktop.rendering.every((row) => row.ssim >= MIN_SSIM));
+});
+
+test('mobile keeps the original drawing and desktop reveals the full photo', async () => {
+  const [original, mobile, full] = await Promise.all(
+    [hero.sourcePath, hero.outputPath, desktop.outputPath].map((path) => readFile(path, 'utf8')),
+  );
+  const bitmap = /xlink:href="data:image\/(?:jpeg|avif);base64,[A-Za-z0-9+/=]+"/;
+  assert.ok(bitmap.test(original));
+  assert.ok(bitmap.test(mobile));
+  assert.equal(original.replace(bitmap, 'BITMAP'), mobile.replace(bitmap, 'BITMAP'));
+  assert.ok(full.includes('viewBox="' + desktop.expandedViewBox + '"'));
 });

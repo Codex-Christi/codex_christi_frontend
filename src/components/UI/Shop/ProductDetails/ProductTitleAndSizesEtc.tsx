@@ -4,14 +4,9 @@ import { useCurrentVariant } from './currentVariantStore';
 import { Suspense, useMemo } from 'react';
 import { PriceSkeleton } from '../GlobalShopComponents/GlobalProductPrice';
 import { Skeleton } from '../../primitives/skeleton';
-import {
-  SizeAttribute,
-  ColorAttribute,
-  ProductVariantOptions,
-} from '@/lib/merchizeStorefront/productTypes';
 import styles from './ProductDetails.module.css';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
-import { getProductAttributeOptions } from '@/lib/merchizeStorefront/productOptionLayout';
+import { getProductOptionGroups } from '@/lib/merchizeStorefront/productOptionLayout';
 import VariantAttributeSelector, { VariantAttributeSkeleton } from './VariantAttributeSelector';
 
 const AddToCart = dynamic(() => import('./AddToCart').then((mod) => mod.AddToCart));
@@ -24,43 +19,20 @@ const GlobalProductPrice = dynamic(() =>
   import('../GlobalShopComponents/GlobalProductPrice').then((mod) => mod.default),
 );
 
-// Main Component
 const ProductTitleAndSizesEtc = () => {
-  // Hooks
   const productDetailsContext = useProductDetailsContext();
   const matchingVariant = useCurrentVariant((state) => state.matchingVariant);
   const metadata = productDetailsContext.productMetaData;
   const variantsAreLoading = productDetailsContext.variantLoadState === 'loading';
   const variantsFailed = productDetailsContext.variantLoadState === 'error';
 
-  const { title, retail_price } = useMemo(() => {
-    if (!matchingVariant) {
-      return {
-        title: metadata.title,
-        retail_price: metadata.retail_price,
-      };
-    } else {
-      return {
-        title: metadata.title,
-        retail_price: matchingVariant?.retail_price,
-      };
-    }
-  }, [matchingVariant, metadata.retail_price, metadata.title]);
+  const title = metadata.title;
+  const retailPrice = matchingVariant ? matchingVariant.retail_price : metadata.retail_price;
+  const optionGroups = useMemo(
+    () => getProductOptionGroups(productDetailsContext.productVariants),
+    [productDetailsContext.productVariants],
+  );
 
-  const sizeAttrList = getProductAttributeOptions(
-    productDetailsContext.productVariants,
-    'size',
-  ) as SizeAttribute[];
-  const colorAttrList = getProductAttributeOptions(
-    productDetailsContext.productVariants,
-    'color',
-  ) as ColorAttribute[];
-  const labelAttrList = getProductAttributeOptions(
-    productDetailsContext.productVariants,
-    'label',
-  ) as ProductVariantOptions[number][];
-
-  //  JSX
   return (
     <div className='grid min-w-0 gap-4 lg:col-span-2 xl:col-span-1'>
       <div className={`${styles.productPanel} ${styles.spaceLarge} min-w-0`}>
@@ -71,7 +43,7 @@ const ProductTitleAndSizesEtc = () => {
             <div className='space-y-3 cursor-pointer'>
               <h3 className={styles.priceHeading}>
                 <Suspense fallback={<PriceSkeleton className='h-5 w-24' />}>
-                  <GlobalProductPrice usdAmount={Number(retail_price)} />
+                  <GlobalProductPrice usdAmount={Number(retailPrice)} />
                 </Suspense>
               </h3>
             </div>
@@ -146,25 +118,9 @@ const ProductTitleAndSizesEtc = () => {
                 </CustomShopLink>
               </div>
             ) : (
-              <>
-                {sizeAttrList.length > 0 && (
-                  <VariantAttributeSelector title='Size:' attribute='size' options={sizeAttrList} />
-                )}
-                {colorAttrList.length > 0 && (
-                  <VariantAttributeSelector
-                    title='Colors:'
-                    attribute='color'
-                    options={colorAttrList}
-                  />
-                )}
-                {labelAttrList.length > 0 && (
-                  <VariantAttributeSelector
-                    title='Label:'
-                    attribute='label'
-                    options={labelAttrList}
-                  />
-                )}
-              </>
+              optionGroups.map((group) => (
+                <VariantAttributeSelector key={group.attribute} {...group} />
+              ))
             )}
           </div>
         </div>

@@ -10,17 +10,14 @@ interface RadioOption {
 }
 
 interface RadioButtonGroupProps {
-  /** The list of radio options to render */
-  props: RadioOption[];
-  /** Called when selection changes (native radio change) */
+  options: RadioOption[];
   onChange: (value: string | { name: string; value: string }) => void;
-  /** Optional accessible name for the radio group */
   groupLabel?: string;
   isLoading?: boolean;
 }
 
 const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({
-  props,
+  options,
   onChange,
   groupLabel,
   isLoading = false,
@@ -29,23 +26,19 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({
   const groupId = useId();
   const groupName = `radio-group-${groupId}`;
 
-  // Hooks
   const { currentVariantOptions } = useCurrentVariant();
   const hasAnySelection = Object.values(currentVariantOptions).some(
     (value) => value !== null && value !== '',
   );
   const displaySelectedValue = hasAnySelection ? selectedValue : undefined;
 
-  // Helpers
-  const handleSelect = (prop: RadioOption, radioValue: string | undefined, scroll = false) => {
+  const handleSelect = (prop: RadioOption, radioValue: string | undefined) => {
     if (prop.value != null && radioValue != null) {
       setSelectedValue(radioValue);
       onChange(prop.value);
-      if (scroll) scrollToSection('mainGallery');
     }
   };
 
-  // JSX
   return (
     <div
       role='radiogroup'
@@ -54,7 +47,7 @@ const RadioButtonGroup: React.FC<RadioButtonGroupProps> = ({
       inert={isLoading || undefined}
       className='flex py-3 gap-8 flex-wrap justify-start items-center'
     >
-      {props.map((prop) => {
+      {options.map((prop) => {
         const radioValue = typeof prop.value === 'string' ? prop.value : prop.value?.value;
         const isSelected = !isLoading && displaySelectedValue === radioValue;
         const isColorValue = radioValue
@@ -156,12 +149,5 @@ function hex_is_light(color: string) {
   const brightness = (c_r * 299 + c_g * 587 + c_b * 114) / 1000;
   return brightness > 155;
 }
-
-const scrollToSection = (id: string) => {
-  const element = document.getElementById(id);
-  if (element && typeof window !== 'undefined') {
-    element.scrollIntoView({ behavior: 'smooth' });
-  }
-};
 
 export default RadioButtonGroup;

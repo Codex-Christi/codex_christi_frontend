@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildProductRadioOptions, getProductOptionLayout } from './productOptionLayout';
+import { getProductOptionGroups, getProductOptionLayout } from './productOptionLayout';
 import type { ProductVariantOptions, ProductVariantsInterface } from './productTypes';
 
 function variant(options: ProductVariantOptions): ProductVariantsInterface['data'][number] {
@@ -44,13 +44,7 @@ test('layout hints preserve selector order, deduplicate values, and omit empty g
     layout[1].options.map((option) => option.label),
     ['Black', 'White'],
   );
-  assert.deepEqual(
-    layout[0].options,
-    buildProductRadioOptions(
-      variants.map((entry) => entry.options[0]),
-      'size',
-    ),
-  );
+  assert.equal(getProductOptionGroups(variants)[0].options[0], variants[0].options[0]);
 });
 
 test('layout serialization contains geometry labels only, not sellability or money', () => {

@@ -1,5 +1,12 @@
 import Image from 'next/image';
 
+const teamMembers = [
+  { image: 'saint-brisbe', name: 'Saint Tarila Brisbe', role: 'Co Founder/Dev team' },
+  { image: 'adebisi-ade', name: 'Adebisi Ade', role: 'Dev team' },
+  { image: 'kennedy-barile', name: 'Kennedy Barile', role: 'Co founder/Design' },
+  { image: 'messi', name: 'Lionel Messi', role: 'THE GOAT' },
+];
+
 function TeamPortrait({ name, alt }: { name: string; alt: string }) {
   const imageBase = `/media/img/general/${name}`;
 
@@ -87,49 +94,15 @@ const AboutUs = () => {
         </h2>
 
         <div className='mx-auto grid grid-cols-2 gap-10 lg:grid-cols-4'>
-          <div className='space-y-4'>
-            <TeamPortrait name='saint-brisbe' alt='Saint Tarila Brisbe' />
-
-            <div className='text-center'>
-              <p className='text-2xl font-semibold text-white'>
-                Saint Tarila Brisbe
-              </p>
-
-              <p>Co Founder/Dev team</p>
+          {teamMembers.map(({ image, name, role }) => (
+            <div key={image} className='space-y-4'>
+              <TeamPortrait name={image} alt={name} />
+              <div className='text-center'>
+                <p className='text-2xl font-semibold text-white'>{name}</p>
+                <p>{role}</p>
+              </div>
             </div>
-          </div>
-
-          <div className='space-y-4'>
-            <TeamPortrait name='adebisi-ade' alt='Adebisi Ade' />
-
-            <div className='text-center'>
-              <p className='text-2xl font-semibold text-white'>Adebisi Ade</p>
-
-              <p>Dev team</p>
-            </div>
-          </div>
-
-          <div className='space-y-4'>
-            <TeamPortrait name='kennedy-barile' alt='Kennedy Barile' />
-
-            <div className='text-center'>
-              <p className='text-2xl font-semibold text-white'>
-                Kennedy Barile
-              </p>
-
-              <p>Co founder/Design</p>
-            </div>
-          </div>
-
-          <div className='space-y-4'>
-            <TeamPortrait name='messi' alt='Lionel Messi' />
-
-            <div className='text-center'>
-              <p className='text-2xl font-semibold text-white'>Lionel Messi</p>
-
-              <p>THE GOAT</p>
-            </div>
-          </div>
+          ))}
         </div>
       </section>
     </>

@@ -15,7 +15,7 @@ const OPTION_GROUPS = [
   ['label', 'Label:'],
 ] as const;
 
-export function getProductAttributeOptions(
+function getProductAttributeOptions(
   variants: ProductVariantsInterface['data'],
   attribute: ProductOptionKind,
 ) {
@@ -52,13 +52,20 @@ export function buildProductRadioOptions(options: ProductOption[], attribute: Pr
   ];
 }
 
-// Geometry only: cached labels never constitute availability or price evidence.
-export function getProductOptionLayout(variants: ProductVariantsInterface['data']) {
-  return OPTION_GROUPS.flatMap(([attribute, title]): ProductOptionLayoutGroup[] => {
-    const options = buildProductRadioOptions(
-      getProductAttributeOptions(variants, attribute),
-      attribute,
-    );
+export function getProductOptionGroups(variants: ProductVariantsInterface['data']) {
+  return OPTION_GROUPS.flatMap(([attribute, title]) => {
+    const options = getProductAttributeOptions(variants, attribute);
     return options.length ? [{ attribute, title, options }] : [];
   });
+}
+
+// Geometry only: cached labels never constitute availability or price evidence.
+export function getProductOptionLayout(
+  variants: ProductVariantsInterface['data'],
+): ProductOptionLayoutGroup[] {
+  return getProductOptionGroups(variants).map(({ attribute, title, options }) => ({
+    attribute,
+    title,
+    options: buildProductRadioOptions(options, attribute),
+  }));
 }

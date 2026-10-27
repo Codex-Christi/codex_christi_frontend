@@ -1,46 +1,20 @@
 import AboutUs from '@/components/UI/about/AboutUs';
+import AboutHero from '@/components/UI/about/AboutHero';
 import '../route-utilities.css';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
 import CometsContainer from '@/components/UI/general/CometsContainer';
-import Image from 'next/image';
 import Footer from '@/components/UI/general/Footer';
-import { Metadata } from 'next/types';
-import styles from '@/components/UI/about/AboutHero.module.css';
+import type { Metadata } from 'next';
 
-export async function generateMetadata(): Promise<Metadata> {
-  return {
-    title: 'Codex Christi | About Us',
-    description: 'All there is to know about Codex Christi',
-  };
-}
+export const metadata: Metadata = {
+  title: 'Codex Christi | About Us',
+  description: 'All there is to know about Codex Christi',
+};
 
 const AboutUsPage = () => {
   return (
-    <DefaultPageWrapper hasMainNav navAppearance='glass'>
-      <div className='relative h-[20rem]'>
-        <h1 className='text-3xl leading-6 font-nico w-auto inline-block absolute top-1/3 z-50 mx-10 md:mx-20'>
-          About <br /> <span className='text-right ml-auto block w-full'>Us</span>
-        </h1>
-
-        <div className={styles.backdrop}>
-          <picture className={styles.picture}>
-            <source
-              media='(min-width: 1024px)'
-              type='image/svg+xml'
-              srcSet='/media/img/about-hero.desktop.svg'
-            />
-            <Image
-              loading='eager'
-              fetchPriority='high'
-              alt='About Us'
-              fill
-              unoptimized
-              src='/media/img/about-hero.optimized.svg'
-              className={`size-full object-cover object-center ${styles.image}`}
-            />
-          </picture>
-        </div>
-      </div>
+    <DefaultPageWrapper navAppearance='glass'>
+      <AboutHero />
 
       <CometsContainer />
 
