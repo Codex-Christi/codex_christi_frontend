@@ -7,7 +7,6 @@ import { Metadata } from 'next/types';
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    // dynamically get the host from the Next headers
     title: 'Codex Christi | About Us',
     description: 'All there is to know about Codex Christi',
   };
@@ -22,11 +21,12 @@ const AboutUsPage = () => {
         </h1>
 
         <Image
-          priority
+          loading='eager'
           fetchPriority='high'
           alt='About Us'
-          fill={true}
-          src='/media/img/about-hero.svg'
+          fill
+          unoptimized
+          src='/media/img/about-hero.optimized.svg'
           className='size-full object-cover object-center -z-50'
         />
       </div>

@@ -1,0 +1,155 @@
+{
+  "sourcePath": "public/media/img/about-hero.svg",
+  "sourceBytes": 1285933,
+  "sourceGzipBytes": 960131,
+  "sourceSha256": "8ec1e6c0fd4b872071da1840eff2aac09a67e34f577feec77ae4bcd26c926845",
+  "outputPath": "public/media/img/about-hero.optimized.svg",
+  "outputBytes": 492013,
+  "outputGzipBytes": 372343,
+  "outputSha256": "a1c1579df7472ed69b031383280d7f29b7964083bfe2a7bbd83772c6ce071b45",
+  "originalsPreserved": true,
+  "unchangedDrawingInstructions": true,
+  "bitmapSize": {
+    "width": 3840,
+    "height": 2160
+  },
+  "method": "Keep original SVG markup, transforms, viewBox, and JPEG dimensions. Blank only source rows 1248-2159 outside the original viewBox; recompress embedded photo.",
+  "encoder": "sharp 0.35.3 / libvips 8.18.3; AVIF quality 75, effort 7, 4:4:4, sRGB ICC",
+  "minimumRenderedSSIM": 0.995,
+  "similarityNote": "SSIM is a similarity metric, not a percentage of quality retained. Original and candidate were rendered in the same Chromium production page, with animation frozen and fonts settled, at the dimensions below.",
+  "selected": {
+    "format": "avif",
+    "quality": 75,
+    "embeddedBytes": 368573,
+    "minRenderedSSIM": 0.9953063759200899
+  },
+  "candidates": [
+    {
+      "format": "jpeg",
+      "quality": 75,
+      "bytes": 517013,
+      "gzipBytes": 362642,
+      "minRenderedSSIM": 0.9874590322244952
+    },
+    {
+      "format": "jpeg",
+      "quality": 85,
+      "bytes": 723433,
+      "gzipBytes": 520404,
+      "minRenderedSSIM": 0.9934252004630643
+    },
+    {
+      "format": "jpeg",
+      "quality": 90,
+      "bytes": 956685,
+      "gzipBytes": 697859,
+      "minRenderedSSIM": 0.9971699468780244
+    },
+    {
+      "format": "jpeg",
+      "quality": 95,
+      "bytes": 1217689,
+      "gzipBytes": 894667,
+      "minRenderedSSIM": 0.9981952191075045
+    },
+    {
+      "format": "webp",
+      "quality": 80,
+      "bytes": 337981,
+      "gzipBytes": 248887,
+      "minRenderedSSIM": 0.9831403790800269
+    },
+    {
+      "format": "webp",
+      "quality": 85,
+      "bytes": 426573,
+      "gzipBytes": 315972,
+      "minRenderedSSIM": 0.9879637935487667
+    },
+    {
+      "format": "webp",
+      "quality": 90,
+      "bytes": 574381,
+      "gzipBytes": 428099,
+      "minRenderedSSIM": 0.9935333280532624
+    },
+    {
+      "format": "webp",
+      "quality": 95,
+      "bytes": 866269,
+      "gzipBytes": 649509,
+      "minRenderedSSIM": 0.9956926805219317
+    },
+    {
+      "format": "avif",
+      "quality": 65,
+      "bytes": 371313,
+      "gzipBytes": 280925,
+      "minRenderedSSIM": 0.9920099663594876
+    },
+    {
+      "format": "avif",
+      "quality": 75,
+      "bytes": 492013,
+      "gzipBytes": 372343,
+      "minRenderedSSIM": 0.9953063759200899
+    },
+    {
+      "format": "avif",
+      "quality": 85,
+      "bytes": 639617,
+      "gzipBytes": 484165,
+      "minRenderedSSIM": 0.9974153148385158
+    }
+  ],
+  "rendering": [
+    {
+      "width": 375,
+      "height": 812,
+      "deviceScaleFactor": 1,
+      "ssim": 0.9985259213462087
+    },
+    {
+      "width": 412,
+      "height": 915,
+      "deviceScaleFactor": 1.75,
+      "ssim": 0.9976066267547896
+    },
+    {
+      "width": 412,
+      "height": 915,
+      "deviceScaleFactor": 3,
+      "ssim": 0.9956263470896957
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "deviceScaleFactor": 2,
+      "ssim": 0.9970131783243527
+    },
+    {
+      "width": 1440,
+      "height": 1000,
+      "deviceScaleFactor": 1,
+      "ssim": 0.9976156679892846
+    },
+    {
+      "width": 1440,
+      "height": 1000,
+      "deviceScaleFactor": 2,
+      "ssim": 0.9960000224186555
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "deviceScaleFactor": 1,
+      "ssim": 0.9972481160608747
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "deviceScaleFactor": 2,
+      "ssim": 0.9953063759200899
+    }
+  ]
+}

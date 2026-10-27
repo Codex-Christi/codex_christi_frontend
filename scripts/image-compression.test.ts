@@ -50,3 +50,20 @@ test('originals are preserved and quality evidence matches the shipped files', a
     assert.equal(output.toString('ascii', 8, 12), 'WEBP');
   }
 });
+
+test('About hero preserves its drawing instructions and verified image quality', async () => {
+  const report = JSON.parse(await readFile('reports/storefront/about-hero-compression.json', 'utf8'));
+  const original = await readFile(report.sourcePath);
+  const output = await readFile(report.outputPath);
+  assert.equal(createHash('sha256').update(original).digest('hex'), report.sourceSha256);
+  assert.equal(createHash('sha256').update(output).digest('hex'), report.outputSha256);
+  assert.equal(output.length, report.outputBytes);
+  assert.ok(output.length < original.length);
+  const bitmap = /xlink:href="data:image\/(?:jpeg|avif);base64,[A-Za-z0-9+/=]+"/;
+  assert.ok(bitmap.test(original.toString()));
+  assert.ok(bitmap.test(output.toString()));
+  assert.equal(original.toString().replace(bitmap, 'BITMAP'), output.toString().replace(bitmap, 'BITMAP'));
+  assert.equal(report.rendering.length, 8);
+  assert.ok(report.rendering.every((row: { ssim: number }) => row.ssim >= 0.995));
+  assert.ok(report.selected.minRenderedSSIM >= 0.995);
+});
