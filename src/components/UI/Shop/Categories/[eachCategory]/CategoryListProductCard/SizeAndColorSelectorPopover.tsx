@@ -1,10 +1,21 @@
 'use client';
 
-import { useState, type ComponentProps, type SyntheticEvent } from 'react';
-import dynamic from 'next/dynamic';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/UI/primitives/popover';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { Button } from '@/components/UI/primitives/button';
-import { Skeleton } from '@/components/UI/primitives/skeleton';
+
+type LoadedPopover = (typeof import('./LoadedCategoryOptionsPopover'))['default'];
+let popoverImport: Promise<LoadedPopover> | undefined;
+
+function loadPopover() {
+  return (popoverImport ??= import('./LoadedCategoryOptionsPopover')
+    .then((module) => module.default)
+    .catch((error) => {
+      popoverImport = undefined;
+      throw error;
+    }));
+}
+
+const warmPopover = () => void loadPopover().catch(() => {});
 
 interface SizeAndColorSelectorPopoverProps {
   buttonProps?: ComponentProps<typeof Button>;
@@ -13,23 +24,6 @@ interface SizeAndColorSelectorPopoverProps {
   productSlug: string;
 }
 
-function ProductOptionsSkeleton() {
-  return (
-    <div className='space-y-6'>
-      <Skeleton className='h-12 w-full' />
-      <Skeleton className='h-12 w-full' />
-      <Skeleton className='h-12 w-full' />
-      <Skeleton className='h-10 w-full' />
-    </div>
-  );
-}
-
-const ProductOptionsContent = dynamic(() => import('./ProductOptionsContent'), {
-  loading: ProductOptionsSkeleton,
-});
-
-const stopPropagation = (event: SyntheticEvent) => event.stopPropagation();
-
 export default function SizeAndColorSelectorPopover({
   buttonProps,
   productId,
@@ -37,45 +31,123 @@ export default function SizeAndColorSelectorPopover({
   productSlug,
 }: SizeAndColorSelectorPopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [LoadedPopover, setLoadedPopover] = useState<LoadedPopover | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+  const isLoading = isOpen && !LoadedPopover && !loadError;
+
+  useEffect(() => {
+    if (!isOpen || LoadedPopover || loadError) return;
+    let cancelled = false;
+
+    void loadPopover()
+      .then((component) => {
+        if (!cancelled) setLoadedPopover(() => component);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, LoadedPopover, loadError]);
+
+  useEffect(() => {
+    if (!isOpen || LoadedPopover) return;
+
+    const cancelOpening = () => {
+      setIsOpen(false);
+      setLoadError(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      cancelOpening();
+      triggerRef.current?.focus();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !triggerRef.current?.contains(event.target) &&
+        !errorRef.current?.contains(event.target)
+      )
+        cancelOpening();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('pointerdown', onPointerDown);
+    };
+  }, [isOpen, LoadedPopover]);
+
+  const trigger = (
+    <Button
+      name={`Add ${productTitle} to cart`}
+      {...buttonProps}
+      ref={triggerRef}
+      className={`${buttonProps?.className ?? ''} relative`}
+      aria-haspopup='dialog'
+      aria-expanded={Boolean(LoadedPopover && isOpen)}
+      aria-busy={isLoading}
+      onPointerEnter={(event) => {
+        buttonProps?.onPointerEnter?.(event);
+        if (!event.defaultPrevented && !buttonProps?.disabled) warmPopover();
+      }}
+      onFocus={(event) => {
+        buttonProps?.onFocus?.(event);
+        if (!event.defaultPrevented) warmPopover();
+      }}
+      onClick={(event) => {
+        buttonProps?.onClick?.(event);
+        if (event.defaultPrevented || LoadedPopover) return;
+        setLoadError(false);
+        setIsOpen((open) => loadError || !open);
+      }}
+    >
+      <span className={isLoading ? 'invisible' : undefined}>Add to Cart</span>
+      {isLoading && (
+        <span aria-hidden='true' className='absolute inset-0 flex items-center justify-center'>
+          Loading...
+        </span>
+      )}
+    </Button>
+  );
+
+  if (LoadedPopover) {
+    return (
+      <LoadedPopover
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        trigger={trigger}
+        productId={productId}
+        productTitle={productTitle}
+        productSlug={productSlug}
+      />
+    );
+  }
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button name={`Add ${productTitle} to cart`} {...buttonProps}>
-          Add to Cart
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        onWheel={stopPropagation}
-        onTouchMove={stopPropagation}
-        align='start'
-        side='top'
-        sideOffset={8}
-        className={`bg-black/65 backdrop-blur-xl backdrop-saturate-150 ring-1 ring-white/10 rounded-2xl p-4 shadow-2xl
-             shadow-white/60 z-[60] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95
-             text-white select-none cursor-pointer lg:min-w-[375px] lg:scale-90 !min-h-[300px] transition-[all_.5s]`}
-      >
+    <>
+      {trigger}
+      {loadError && (
         <div
-          aria-hidden
-          className='pointer-events-none absolute inset-0 -z-10 [mask-image:radial-gradient(closest-side,rgba(0,0,0,1),transparent)]'
-          style={{
-            background: `radial-gradient(120px 60px at 80% -20%, rgba(80,120,255,.25), transparent),
-              radial-gradient(160px 100px at -10% 120%, rgba(0,0,0,.5), transparent)`,
-            filter: 'blur(12px)',
-          }}
-        />
-
-        <div className='max-h-[500px] overflow-y-auto scrollbar px-4 py-5'>
-          {isOpen && (
-            <ProductOptionsContent
-              productId={productId}
-              productTitle={productTitle}
-              productSlug={productSlug}
-              loading={<ProductOptionsSkeleton />}
-            />
-          )}
+          ref={errorRef}
+          role='alert'
+          className='absolute bottom-full right-0 z-30 mb-2 w-56 rounded-md border border-white/20 bg-black px-3 py-2 text-sm text-white shadow-lg'
+        >
+          <p>Product options could not load.</p>
+          <button
+            type='button'
+            className='mt-1 underline underline-offset-4'
+            onClick={() => setLoadError(false)}
+          >
+            Try again
+          </button>
         </div>
-      </PopoverContent>
-    </Popover>
+      )}
+    </>
   );
 }
