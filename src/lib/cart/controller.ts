@@ -521,40 +521,46 @@ export class CartController {
   }
 
   async recordCheckout(orderId: string, snapshot: CartCheckoutSnapshot) {
-    if (this.owner !== snapshot.owner || this.document?.cartId !== snapshot.cartId)
+    if (
+      snapshot.owner !== 'guest' &&
+      (this.owner !== snapshot.owner || this.document?.cartId !== snapshot.cartId)
+    )
       throw new Error('Your account changed. Review your cart before starting checkout.');
-    await this.repository.recordCheckout(orderId, snapshot);
-    if (this.owner !== snapshot.owner)
+    const captured = await this.repository.recordCheckout(orderId, snapshot);
+    if (this.owner !== captured.owner || this.document?.cartId !== captured.cartId)
       throw new Error('Your account changed. Review your cart before starting checkout.');
   }
 
   async consumePurchase(orderId: string, paidLines: CartPurchaseLine[]) {
-    const owner = await this.repository.purchaseOwner(orderId);
-    if (!owner) return;
-    await this.serialize(() =>
-      this.save(
-        owner,
-        (document) => {
-          const snapshot = document.checkoutSnapshots[orderId];
-          if (!snapshot || snapshot.cartId !== document.cartId || snapshot.owner !== owner)
-            return document;
-          const lines = paidLines.flatMap((paid) => {
-            const captured = snapshot.lines.find((line) => line.variantId === paid.variantId);
-            return captured?.lineage
-              ? [
-                  {
-                    ...paid,
-                    quantity: Math.min(paid.quantity, captured.quantity),
-                    lineage: captured.lineage,
-                  },
-                ]
-              : [];
-          });
-          return consumeCartPurchase(document, orderId, lines, cartId);
-        },
-        true,
-      ),
-    );
+    await this.serialize(async () => {
+      for (;;) {
+        const owner = await this.repository.purchaseOwner(orderId);
+        if (!owner) return;
+        await this.save(
+          owner,
+          (document) => {
+            const snapshot = document.checkoutSnapshots[orderId];
+            if (!snapshot || snapshot.cartId !== document.cartId || snapshot.owner !== owner)
+              return document;
+            const lines = paidLines.flatMap((paid) => {
+              const captured = snapshot.lines.find((line) => line.variantId === paid.variantId);
+              return captured?.lineage
+                ? [
+                    {
+                      ...paid,
+                      quantity: Math.min(paid.quantity, captured.quantity),
+                      lineage: captured.lineage,
+                    },
+                  ]
+                : [];
+            });
+            return consumeCartPurchase(document, orderId, lines, cartId);
+          },
+          true,
+        );
+        if ((await this.repository.purchaseOwner(orderId)) === owner) return;
+      }
+    });
     this.schedule(0);
   }
 

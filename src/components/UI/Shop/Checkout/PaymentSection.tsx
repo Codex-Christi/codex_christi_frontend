@@ -1,137 +1,292 @@
+'use client';
+
 import Image from 'next/image';
-import { Checkbox } from '../../primitives/checkbox';
-import { Label } from '../../primitives/label';
-import PayPal from '@/assets/img/paypal.png';
-import GooglePay from '@/assets/img/gpay.png';
-import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 import dynamic from 'next/dynamic';
-import { useContext, useState } from 'react';
-import { Button } from '../../primitives/button';
-import { FaAngleDoubleUp } from 'react-icons/fa';
+import { createContext, useContext, useState, type ContextType, type ReactNode } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { ArrowLeft, CreditCard, ShieldCheck } from 'lucide-react';
+import PayPal from '@/assets/img/paypal.png';
+import CustomShopLink from '../HelperComponents/CustomShopLink';
 import { CheckoutAccordionContext } from './ProductCheckout';
+import { ServerOrderDetailsContext } from './ServerOrderDetailsComponent';
+import { useCartStore, type CartVariant } from '@/stores/shop_stores/cartStore';
+import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
+import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
+import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
+import { formatOrderMoney } from '@/lib/shop/checkout/orderMoney';
+import { buildOptionSummary, toCartOptions } from '../Cart/cartOptionHelpers';
+import {
+  checkoutReviewIdentity,
+  createCheckoutReview,
+  type CheckoutReview,
+  type CheckoutContact,
+  createCheckoutInput,
+  checkoutInputIdentity,
+  hasDifferentBoundCheckout,
+} from './checkoutReview';
+import { applyCheckoutSetupFailure } from './checkoutSetupFailure';
 
-// Dynamic Imports
-const PayPalCheckout = dynamic(() =>
-  import('./Paypal/PayPalMainCheckoutComponent').then((comp) => comp.default),
+const PayPalCheckout = dynamic(() => import('./Paypal/PayPalMainCheckoutComponent'));
+const ActivePayPalCheckoutRecoveryBanner = dynamic(
+  () => import('./Paypal/ActivePayPalCheckoutRecoveryBanner'),
 );
-const ActivePayPalCheckoutRecoveryBanner = dynamic(() =>
-  import('./Paypal/ActivePayPalCheckoutRecoveryBanner').then((comp) => comp.default),
-);
+export type CheckoutOptions = 'card' | 'paypal_buttons' | '';
+export const CheckoutPaymentReviewContext = createContext<{
+  review: CheckoutReview | null;
+  onPaymentError: (message: string, code?: string) => void;
+}>({ review: null, onPaymentError: () => {} });
 
-export type CheckoutOptions = 'card' | 'paypal_buttons' | 'google_pay' | '';
-
-// Main Compoenent
-const PaymentSection = () => {
-  // Hooks
-  // Hooks
-  const { handleOpenItem } = useContext(CheckoutAccordionContext);
-
-  // States
-  const [payOption, setPayOption] = useState<CheckoutOptions>('');
-  const shouldRenderPayPalCheckout = payOption === 'card' || payOption === 'paypal_buttons';
-
-  // JSX
-  return (
-    <>
-      <section className='flex justify-between w-full items-center mb-10'>
-        <h2 className='border-b max-w-fit  border-white text-xl font-bold'>Payment Method</h2>
-
-        <Button
-          variant={'outline'}
-          className='bg-transparent flex gap-2'
-          name='Back to Delivery Information'
-          onClick={() => {
-            handleOpenItem('basic-checkout-info');
-          }}
-        >
-          <h4>Edit Delivery Info</h4> <FaAngleDoubleUp size={17.5} />
-        </Button>
-      </section>
-
-      <div className='grid gap-8'>
-        <ActivePayPalCheckoutRecoveryBanner
-          onSelectPaymentSurface={(paymentSurface) => setPayOption(paymentSurface ?? '')}
-        />
-
-        <div className='space-y-4'>
-          <p className='text-lg font-bold'>Pay with:</p>
-
-          <div className='flex items-center gap-8 flex-wrap'>
-            {/*  */}
-            {/* Checkbox for Debit / Credit Card */}
-            <p className='flex items-center gap-2'>
-              <Checkbox
-                className={`w-[1.15rem] h-[1.15rem] border-white text-white`}
-                checked={payOption === 'card'}
-                onCheckedChange={() => setPayOption('card')}
-                id='paypal_card_checkbox'
-              />
-              <Label htmlFor='paypal_card_checkbox' className='cursor-pointer'>
-                Credit/Debit Card
-              </Label>
-            </p>
-            {/*  */}
-
-            {/* Checkbox for Paypal Buttons */}
-            <p className='flex items-center gap-3'>
-              <Checkbox
-                className={`w-[1.15rem] h-[1.15rem] border-white text-white`}
-                checked={payOption === 'paypal_buttons'}
-                onCheckedChange={() => setPayOption('paypal_buttons')}
-                id='paypal_buttons'
-              />
-
-              <Label htmlFor='paypal_buttons' className='cursor-pointer'>
-                <Image className='w-10 h-auto' src={PayPal} alt='Pay with Paypal' />
-              </Label>
-            </p>
-            {/*  */}
-
-            {/* Checkbox for Google Pay */}
-            <p className='flex items-center gap-3'>
-              <Checkbox
-                className={`w-[1.15rem] h-[1.15rem] border-white text-white`}
-                checked={payOption === 'google_pay'}
-                onCheckedChange={() => setPayOption('google_pay')}
-              />
-
-              <Image className='w-10 h-auto' src={GooglePay} alt='Pay with Google Pay' />
-            </p>
-            {/*  */}
-          </div>
-        </div>
-
-        <p>
-          Create your account Or{' '}
-          <span className='font-medium'>
-            Already have an account?{' '}
-            <CustomShopLink className='underline underline-offset-4 font-semibold' href=''>
-              Sign In
-            </CustomShopLink>
-          </span>
-        </p>
-
-        {/* Paypal Component Here */}
-
-        {shouldRenderPayPalCheckout ? <PayPalCheckout mode={payOption} /> : null}
-
-        <div className='rounded-3xl border border-white/10 bg-gradient-to-br from-[#111827]/80 via-[#0b1220]/70 to-[#1f2937]/80 p-5 text-sm text-white/75 shadow-[0_20px_40px_rgba(0,0,0,0.35)]'>
-          <p className='text-base font-semibold text-white'>Shipping and POD policy</p>
-          <p className='mt-2'>
-            We produce each item on demand. Please confirm your shipping address, size, and
-            quantities before paying. Orders with incorrect buyer-provided details cannot be
-            reshipped or refunded once production begins.
-          </p>
-          <CustomShopLink
-            href='/shop/shipping-pod-policy'
-            className='mt-3 inline-flex items-center gap-2 text-white/90 underline underline-offset-4 hover:text-white'
-          >
-            Read the full Shipping and POD policy
-          </CustomShopLink>
-        </div>
-      </div>
-    </>
-  );
+type CheckoutPaymentViewProps = {
+  cart: CartVariant[];
+  checkout: CheckoutContact;
+  details: ContextType<typeof ServerOrderDetailsContext>;
+  canContinue: boolean;
+  onEdit: () => void;
+  onRefreshQuote: () => void;
+  onVerificationRequired: (message: string) => void;
+  renderRecovery?: (
+    choose: (surface: 'card' | 'paypal_buttons' | null) => void,
+    startSeparate: () => void,
+  ) => ReactNode;
+  renderPayment: (mode: CheckoutOptions) => ReactNode;
+  previousOrderToken?: string;
+  paymentBlocked?: boolean;
 };
 
-export default PaymentSection;
+export default function PaymentSection() {
+  const { handleOpenItem, canContinue, refreshQuote, requestVerification } =
+    useContext(CheckoutAccordionContext);
+  const details = useContext(ServerOrderDetailsContext);
+  const cart = useCartStore((state) => state.variants);
+  const checkout = useShopCheckoutStore(
+    useShallow(({ first_name, last_name, email, delivery_address }) => ({
+      first_name,
+      last_name,
+      email,
+      delivery_address,
+    })),
+  );
+  const attempt = usePayPalIntentStore((state) => state.checkoutAttempt);
+  const intentUuid = useDjangoOrderIntentStore((state) => state.djangoOrderIntentUuid);
+  const inputKey = details
+    ? checkoutInputIdentity(
+        createCheckoutInput(cart, checkout, intentUuid),
+        createCheckoutReview(details.finalPricesWithShippingFee),
+      )
+    : '';
+  const paymentBlocked = hasDifferentBoundCheckout(attempt, inputKey);
+  return (
+    <CheckoutPaymentView
+      cart={cart}
+      checkout={checkout}
+      details={details}
+      canContinue={canContinue}
+      paymentBlocked={paymentBlocked}
+      previousOrderToken={attempt?.orderToken}
+      onEdit={() => handleOpenItem('basic-checkout-info')}
+      onRefreshQuote={refreshQuote}
+      onVerificationRequired={requestVerification}
+      renderRecovery={(choose, startSeparate) => (
+        <ActivePayPalCheckoutRecoveryBanner
+          onSelectPaymentSurface={choose}
+          onStartSeparateOrder={startSeparate}
+        />
+      )}
+      renderPayment={(mode) => <PayPalCheckout mode={mode} />}
+    />
+  );
+}
+
+export function CheckoutPaymentView({
+  cart,
+  checkout,
+  details,
+  canContinue,
+  onEdit,
+  onRefreshQuote,
+  onVerificationRequired,
+  renderRecovery,
+  renderPayment,
+  paymentBlocked,
+  previousOrderToken,
+}: CheckoutPaymentViewProps) {
+  const [payOption, setPayOption] = useState<CheckoutOptions>('');
+  const [acceptedReview, setAcceptedReview] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const prices = details?.finalPricesWithShippingFee;
+  const reviewKey = prices ? checkoutReviewIdentity(cart, checkout, prices) : null;
+  const acknowledged = Boolean(reviewKey && acceptedReview === reviewKey && canContinue);
+  const address = checkout.delivery_address;
+  const countryName = details?.countrySupport.country?.country_name ?? address.shipping_country;
+  const review = acknowledged && prices ? createCheckoutReview(prices) : null;
+  const onPaymentError = (message: string, code?: string) => {
+    applyCheckoutSetupFailure(
+      { message, code },
+      {
+        showMessage: setPaymentError,
+        resetReview: () => setAcceptedReview(null),
+        refreshQuote: onRefreshQuote,
+        verifyDetails: onVerificationRequired,
+      },
+    );
+  };
+
+  return (
+    <CheckoutPaymentReviewContext.Provider value={{ review, onPaymentError }}>
+      <div className='min-w-0 space-y-6'>
+        <header className='flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-white/25 pb-4'>
+          <h2 className='text-xl font-semibold'>Review & payment</h2>
+          <button
+            type='button'
+            onClick={onEdit}
+            className='inline-flex min-h-11 items-center gap-2 text-sm text-white/75 hover:text-white'
+          >
+            <ArrowLeft size={16} aria-hidden='true' /> Edit delivery
+          </button>
+        </header>
+        {renderRecovery?.(
+          (surface) => setPayOption(surface ?? ''),
+          () => {
+            setAcceptedReview(null);
+            setPayOption('');
+            setPaymentError(null);
+          },
+        )}
+        <section
+          aria-labelledby='checkout-final-review'
+          className='min-w-0 rounded-xl border border-white/20 p-4'
+        >
+          <h3 id='checkout-final-review' className='font-semibold'>
+            Check your order
+          </h3>
+          <div className='mt-3 text-sm leading-6 text-white/75 [overflow-wrap:anywhere]'>
+            <p className='font-medium text-white'>
+              {checkout.first_name} {checkout.last_name}
+            </p>
+            <p>{checkout.email}</p>
+            <address className='mt-2 not-italic'>
+              {address.shipping_address_line_1}
+              <br />
+              {address.shipping_address_line_2 && (
+                <>
+                  {address.shipping_address_line_2}
+                  <br />
+                </>
+              )}
+              {[address.shipping_city, address.shipping_state, address.zip_code]
+                .filter(Boolean)
+                .join(', ')}
+              <br />
+              {countryName}
+            </address>
+          </div>
+          <ul className='mt-4 space-y-3 border-t border-white/15 pt-4 text-sm'>
+            {cart.map((line) => (
+              <li
+                key={line.variantId}
+                className='grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-3'
+              >
+                <div className='min-w-0 [overflow-wrap:anywhere]'>
+                  <p className='font-medium'>{line.title}</p>
+                  <p className='mt-1 text-xs text-white/65'>
+                    {buildOptionSummary(toCartOptions(line.itemDetail.options)).summary}
+                  </p>
+                </div>
+                <span className='whitespace-nowrap text-white/80'>Qty: {line.quantity}</span>
+              </li>
+            ))}
+          </ul>
+          <div className='mt-4 flex min-w-0 flex-wrap items-baseline justify-between gap-2 border-t border-white/20 pt-4'>
+            <span className='font-semibold'>Total to pay</span>
+            <strong className='text-lg [overflow-wrap:anywhere]'>
+              {prices
+                ? `${formatOrderMoney(prices.totalPriceNum, prices.currency)} ${prices.currency}`
+                : 'Updating…'}
+            </strong>
+          </div>
+        </section>
+        <label className='flex min-h-11 cursor-pointer items-start gap-3 text-sm leading-6'>
+          <input
+            type='checkbox'
+            checked={acknowledged}
+            disabled={!canContinue}
+            onChange={(event) => setAcceptedReview(event.target.checked ? reviewKey : null)}
+            className='mt-1 h-5 w-5 shrink-0 accent-[#0085ff]'
+          />
+          <span>I’ve checked the delivery address, items, quantities, and total.</span>
+        </label>
+        <p className='-mt-3 text-xs leading-5 text-white/60'>
+          Please review your details carefully; these items are made to order.{' '}
+          <CustomShopLink href='/shop/terms-of-use' className='underline'>
+            Terms (draft)
+          </CustomShopLink>{' '}
+          ·{' '}
+          <CustomShopLink href='/shop/privacy-policy' className='underline'>
+            Privacy (draft)
+          </CustomShopLink>
+        </p>
+        <fieldset className='min-w-0'>
+          <legend className='mb-3 font-semibold'>Payment method</legend>
+          <div className='grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2'>
+            {(['card', 'paypal_buttons'] as const).map((method) => (
+              <label
+                key={method}
+                className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 ${payOption === method ? 'border-[#0085ff] bg-[#0085ff]/10' : 'border-white/30'}`}
+              >
+                <input
+                  type='radio'
+                  name='checkout-payment-method'
+                  value={method}
+                  checked={payOption === method}
+                  onChange={() => setPayOption(method)}
+                  className='h-5 w-5 shrink-0 accent-[#0085ff]'
+                />
+                {method === 'card' ? (
+                  <>
+                    <CreditCard size={20} aria-hidden='true' />
+                    <span className='text-sm font-medium'>Credit / debit card</span>
+                  </>
+                ) : (
+                  <Image src={PayPal} alt='PayPal' className='h-auto w-16' />
+                )}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        {paymentError && (
+          <p
+            role='alert'
+            className='rounded-xl border border-amber-200/30 p-3 text-sm leading-6 text-amber-100'
+          >
+            {paymentError}
+          </p>
+        )}
+        {!acknowledged && (
+          <p role='status' className='text-sm text-white/65'>
+            Confirm the order details above to continue to payment.
+          </p>
+        )}
+        {paymentBlocked && previousOrderToken && (
+          <p
+            role='status'
+            className='rounded-xl border border-amber-200/30 p-4 text-sm leading-6 text-amber-100'
+          >
+            An earlier checkout still needs checking before you pay for these details.{' '}
+            <CustomShopLink
+              href={`/shop/checkout/confirmation/${encodeURIComponent(previousOrderToken)}`}
+              className='font-semibold underline'
+            >
+              View earlier checkout
+            </CustomShopLink>
+            , or use its status options above.
+          </p>
+        )}
+        {acknowledged && payOption && !paymentBlocked && renderPayment(payOption)}
+        <p className='flex items-center justify-center gap-2 text-xs text-white/60'>
+          <ShieldCheck size={14} aria-hidden='true' /> Payment details and authentication are
+          handled by PayPal.
+        </p>
+      </div>
+    </CheckoutPaymentReviewContext.Provider>
+  );
+}

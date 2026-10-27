@@ -11,22 +11,29 @@ import { useVerifiedEmailsStore } from '@/stores/shop_stores/checkoutStore/useVe
 import { usePaidCheckoutRecoveryStore } from '@/stores/shop_stores/checkoutStore/paidCheckoutRecoveryStore';
 import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 
-export async function clearPrivateClientState() {
+export function isGuestSession(state: { accountOwnerId: string | null; status: string }) {
+  return state.accountOwnerId === null && state.status === 'anonymous';
+}
+
+export async function clearPrivateClientState({ preserveGuestCheckout = false } = {}) {
   advanceAuthGeneration();
   useEditUserMainProfileStore.getState().clearEditData();
-  useShopCheckoutStore.getState().resetCheckoutToInitial();
-  useDjangoOrderIntentStore.getState().clearDjangoOrderIntent();
-  useVerifiedEmailsStore.getState().clearStore();
-  usePaidCheckoutRecoveryStore.getState().clearRecoverySession();
-  usePayPalIntentStore.getState().clearActiveCheckout();
-  usePayPalIntentStore.getState().clearIntent();
-  const removals = [
+  const checkoutStores = [
     useShopCheckoutStore,
     useDjangoOrderIntentStore,
     useVerifiedEmailsStore,
     usePaidCheckoutRecoveryStore,
     usePayPalIntentStore,
-  ].map((store) => {
+  ];
+  if (!preserveGuestCheckout) {
+    useShopCheckoutStore.getState().resetCheckoutToInitial();
+    useDjangoOrderIntentStore.getState().clearDjangoOrderIntent();
+    useVerifiedEmailsStore.getState().clearStore();
+    usePaidCheckoutRecoveryStore.getState().clearRecoverySession();
+    usePayPalIntentStore.getState().clearActiveCheckout();
+    usePayPalIntentStore.getState().clearIntent();
+  }
+  const removals = (preserveGuestCheckout ? [] : checkoutStores).map((store) => {
     const options = store.persist.getOptions();
     return options.name ? options.storage?.removeItem(options.name) : undefined;
   });

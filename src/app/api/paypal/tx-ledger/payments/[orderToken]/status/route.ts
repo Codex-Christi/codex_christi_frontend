@@ -1,3 +1,5 @@
+import { requireCheckoutAccess } from '@/lib/shop/checkout/serverAccess';
+import { checkoutRequestFailure } from '@/lib/shop/checkout/serverRequest';
 import { NextResponse } from 'next/server';
 import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
@@ -75,6 +77,12 @@ export async function GET(_req: Request, { params }: PageProps) {
     return NextResponse.json({ error: 'Not found' }, { status: 404, headers: privateHeaders });
   }
 
+  try {
+    await requireCheckoutAccess(row);
+  } catch (error) {
+    return checkoutRequestFailure(error);
+  }
+
   const paymentState = getCanonicalPaymentProjectionState(row);
   const { captureCompletion, paymentFailure } = paymentState;
   const unresolvedAgeMs = Date.now() - row.updatedAt.getTime();
@@ -111,7 +119,11 @@ export async function GET(_req: Request, { params }: PageProps) {
       error: paymentFailure
         ? { code: paymentFailure.errorCode, message: recoveryReason }
         : row.lastErrorMessage
-          ? { code: row.lastErrorCode, message: row.lastErrorMessage }
+          ? {
+              code: row.lastErrorCode,
+              message:
+                'Your payment or order needs review. Please keep your order reference and contact support.',
+            }
           : null,
     },
     { headers: privateHeaders },

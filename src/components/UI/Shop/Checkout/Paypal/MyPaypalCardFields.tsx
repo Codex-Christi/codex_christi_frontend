@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 'use client';
-import { FC, useEffect, useRef, useState } from 'react';
+
+import { type FC, useCallback, useContext, useEffect, useId, useState } from 'react';
 import {
   PayPalCardFieldsProvider,
   PayPalCVVField,
@@ -9,16 +9,17 @@ import {
   PayPalNumberField,
   usePayPalCardFields,
 } from '@paypal/react-paypal-js';
-import { OnApproveData } from '@paypal/paypal-js';
+import type { OnApproveData } from '@paypal/paypal-js';
+import { Loader2 } from 'lucide-react';
+import { CountryDropdown } from '@/components/UI/primitives/country-dropdown';
 import { Input } from '@/components/UI/primitives/input';
-import { Button } from '@/components/UI/primitives/button';
-import { Loader } from 'lucide-react';
-import { toast } from 'sonner';
-import errorToast from '@/lib/error-toast';
-import loadingToast from '@/lib/loading-toast';
-import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
-import { CheckoutOptions } from '../PaymentSection';
+import type { CheckoutOptions } from '../PaymentSection';
+import { CheckoutPaymentReviewContext } from '../PaymentSection';
+import { ServerOrderDetailsContext } from '../ServerOrderDetailsComponent';
+import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
+import { billingAddressFromDelivery, checkoutBillingAddressSchema } from '../checkoutAddress';
 import type { BillingAddressInterface } from '@/lib/paypal/createPayPalOrder';
+import { formatOrderMoney } from '@/lib/shop/checkout/orderMoney';
 import PayPalLoadingSkeleton from './PayPalLoadingSkeleton';
 
 export interface MyPayPalCardFieldInterface {
@@ -27,24 +28,92 @@ export interface MyPayPalCardFieldInterface {
   onApprove: (data: OnApproveData) => Promise<void>;
 }
 
-const billingFields: {
-  placeholder: string;
-  strName: keyof BillingAddressInterface;
-}[] = [
-  { placeholder: 'Address line 1', strName: 'addressLine1' },
-  { placeholder: 'Address line 2', strName: 'addressLine2' },
-  { placeholder: 'State / Province', strName: 'adminArea1' },
-  { placeholder: 'City / Town', strName: 'adminArea2' },
-  { placeholder: 'Country Code (e.g. US)', strName: 'countryCode' },
-  { placeholder: 'Postal Code', strName: 'postalCode' },
-];
+const billingFields = [
+  { name: 'addressLine1', label: 'Street address', autoComplete: 'billing address-line1' },
+  {
+    name: 'addressLine2',
+    label: 'Apartment, suite, etc. (optional)',
+    autoComplete: 'billing address-line2',
+  },
+  { name: 'adminArea2', label: 'City / town', autoComplete: 'billing address-level2' },
+  { name: 'adminArea1', label: 'State / province', autoComplete: 'billing address-level1' },
+  { name: 'postalCode', label: 'Postal code', autoComplete: 'billing postal-code' },
+] as const;
 
-// Main Component
 const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({ mode, createOrder, onApprove }) => {
-  const [isPaying, setIsPaying] = useState(false);
-  const [isReady, setIsReady] = useState(false);
+  const [retry, setRetry] = useState(0);
+  if (mode !== 'card') return null;
+  return (
+    <CardFieldsSession
+      key={retry}
+      createOrder={createOrder}
+      onApprove={onApprove}
+      onRetry={() => setRetry((value) => value + 1)}
+    />
+  );
+};
 
-  const [billingAddress, setBillingAddress] = useState<BillingAddressInterface>({
+function CardFieldsSession({
+  createOrder,
+  onApprove,
+  onRetry,
+}: Omit<MyPayPalCardFieldInterface, 'mode'> & { onRetry: () => void }) {
+  const [ready, setReady] = useState(false);
+  const [slow, setSlow] = useState(false);
+  const { onPaymentError } = useContext(CheckoutPaymentReviewContext);
+  const onReady = useCallback(() => setReady(true), []);
+  useEffect(() => {
+    if (ready) return;
+    const timeout = window.setTimeout(() => setSlow(true), 12000);
+    return () => window.clearTimeout(timeout);
+  }, [ready]);
+  return (
+    <section className='relative min-w-0' aria-busy={!ready}>
+      {!ready && !slow && <PayPalLoadingSkeleton mode='card' />}
+      {!ready && slow && (
+        <div
+          role='status'
+          className='rounded-xl border border-amber-200/30 p-3 text-sm leading-6 text-amber-100'
+        >
+          <p>The card form isn’t available right now. Choose PayPal above, or try again.</p>
+          <button
+            type='button'
+            onClick={onRetry}
+            className='mt-3 min-h-11 rounded-lg border border-current px-4 font-semibold'
+          >
+            Retry card form
+          </button>
+        </div>
+      )}
+      <PayPalCardFieldsProvider
+        createOrder={createOrder}
+        onApprove={onApprove}
+        onError={(error: unknown) => {
+          console.warn('[checkout] Card payment error', error);
+          if (String(error).includes('Failed to create PayPal order')) return;
+          onPaymentError(
+            'We couldn’t complete this payment. Check the payment status above before trying again.',
+          );
+        }}
+        style={{
+          input: { color: '#fff', 'font-size': '16px', 'font-family': 'Inter', padding: '12px' },
+          '.invalid': { color: '#fda4af' },
+        }}
+      >
+        <CardPaymentForm onReady={onReady} ready={ready} />
+      </PayPalCardFieldsProvider>
+    </section>
+  );
+}
+
+function CardPaymentForm({ onReady, ready }: { onReady: () => void; ready: boolean }) {
+  const { cardFieldsForm, fields } = usePayPalCardFields();
+  const formReady = ready && Boolean(cardFieldsForm);
+  const details = useContext(ServerOrderDetailsContext);
+  const delivery = useShopCheckoutStore((state) => state.delivery_address);
+  const { review } = useContext(CheckoutPaymentReviewContext);
+  const [sameAsDelivery, setSameAsDelivery] = useState(true);
+  const [customAddress, setCustomAddress] = useState<BillingAddressInterface>({
     addressLine1: '',
     addressLine2: '',
     adminArea1: '',
@@ -52,173 +121,203 @@ const MyPayPalCardFields: FC<MyPayPalCardFieldInterface> = ({ mode, createOrder,
     countryCode: '',
     postalCode: '',
   });
-
-  const handleBillingAddressChange = (field: keyof typeof billingAddress, value: string) => {
-    setBillingAddress((prev) => ({ ...prev, [field]: value }));
-  };
-
-  if (mode !== 'card') return null;
-
-  return (
-    <section className='w-full !mx-auto'>
-      {!isReady ? <PayPalLoadingSkeleton mode='card' /> : null}
-      <PayPalCardFieldsProvider
-        createOrder={createOrder}
-        onApprove={onApprove}
-        onError={(err: unknown) => {
-          console.error('PayPal Card Fields Error:', err);
-          const message = err instanceof Error ? err.message : String(err);
-          if (message.includes('Failed to create PayPal order')) return;
-          errorToast({
-            header: 'Payment setup failed',
-            message: 'An error occurred during payment. Please try again.',
-          });
-        }}
-        style={{
-          input: {
-            color: '#fff',
-            'font-size': '14px',
-            'font-family': 'Inter',
-            // @ts-ignore
-            background: 'transparent',
-            // @ts-ignore
-            border: '1px solid #fff',
-            padding: '1rem 2rem',
-            // @ts-ignore
-            'border-radius': '10px !important',
-          },
-          // @ts-ignore
-          'input:focus': { border: '3px solid #fff' },
-          'input:is(:-webkit-autofill, :autofill)': {
-            // @ts-ignore
-            background: 'transparent !important',
-          },
-          'input::placeholder': {
-            color: '#ccc !important',
-          },
-          '.invalid': { color: '#DC2626' },
-        }}
-      >
-        <CardFieldsReadyGate onReady={() => setIsReady(true)} />
-        <div className={isReady ? '' : 'opacity-0 pointer-events-none'}>
-          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-            <PayPalNameField />
-            <PayPalNumberField />
-            <PayPalExpiryField />
-            <PayPalCVVField />
-
-            {billingFields.map(
-              ({
-                strName,
-                placeholder,
-              }: {
-                strName: keyof BillingAddressInterface;
-                placeholder: string;
-              }) => (
-                <Input
-                  className='bg-transparent placeholder:text-[#ccc] !py-[1rem] !px-[2rem] text-[14px]
-        h-[unset] rounded-[10px] w-full'
-                  key={strName}
-                  name={placeholder}
-                  placeholder={placeholder}
-                  value={billingAddress[strName]}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    handleBillingAddressChange(strName, e.target.value);
-                  }}
-                />
-              ),
-            )}
-          </div>
-
-          <SubmitPaypalCardPaymentButton
-            isPaying={isPaying}
-            setIsPaying={setIsPaying}
-            billingAddress={billingAddress}
-          />
-        </div>
-      </PayPalCardFieldsProvider>
-    </section>
-  );
-};
-
-const CardFieldsReadyGate: FC<{ onReady: () => void }> = ({ onReady }) => {
-  const { cardFieldsForm } = usePayPalCardFields();
-
+  const [billingCountry, setBillingCountry] = useState('');
+  const [errors, setErrors] = useState<Partial<Record<keyof BillingAddressInterface, string>>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [paying, setPaying] = useState(false);
+  const inputId = useId();
+  const countryCode = details?.countrySupport.country?.country_iso2 ?? '';
+  const billingAddress = sameAsDelivery
+    ? billingAddressFromDelivery(delivery, countryCode)
+    : customAddress;
   useEffect(() => {
     if (cardFieldsForm) onReady();
   }, [cardFieldsForm, onReady]);
-
-  return null;
-};
-
-// Submit Button Compoanent
-function SubmitPaypalCardPaymentButton({
-  isPaying,
-  setIsPaying,
-  billingAddress,
-}: {
-  isPaying: boolean;
-  setIsPaying: (val: boolean) => void;
-  billingAddress: BillingAddressInterface;
-}) {
-  const { cardFieldsForm } = usePayPalCardFields();
-  const loadToastRef = useRef<string | number | null>(null);
-
   useEffect(() => {
-    if (isPaying) {
-      loadToastRef.current = loadingToast({ message: 'Payment processing...' });
-    } else {
-      if (loadToastRef.current) {
-        toast.dismiss(loadToastRef.current);
-        loadToastRef.current = null;
-      }
+    if (!cardFieldsForm) return;
+    const labels = {
+      NameField: 'Name on card',
+      NumberField: 'Card number',
+      ExpiryField: 'Expiry date',
+      CVVField: 'Card security code',
+    } as const;
+    for (const name of Object.keys(labels) as (keyof typeof labels)[]) {
+      void fields[name]?.setAttribute('aria-label', labels[name]).catch(() => {});
     }
-  }, [isPaying]);
+  }, [cardFieldsForm, fields]);
 
-  const handleClick = async () => {
-    if (!cardFieldsForm) return errorToast({ message: 'Payment form unavailable' });
-
-    const formState = await cardFieldsForm.getState();
-    if (!formState.isFormValid) return errorToast({ message: 'Payment details are invalid' });
-
-    setIsPaying(true);
+  const pay = async () => {
+    if (paying || !formReady) return;
+    setFormError(null);
+    const parsed = checkoutBillingAddressSchema.safeParse(billingAddress);
+    if (!parsed.success) {
+      const nextErrors: typeof errors = {};
+      for (const issue of parsed.error.issues)
+        nextErrors[issue.path[0] as keyof BillingAddressInterface] ??= issue.message;
+      setErrors(nextErrors);
+      setFormError('Check the highlighted billing address fields.');
+      return;
+    }
+    setErrors({});
+    if (!cardFieldsForm || !review) {
+      setFormError('Review your current order details before paying.');
+      return;
+    }
+    setPaying(true);
     try {
-      if (!billingAddress) {
-        throw new Error('Missing billingAddress');
+      const state = await cardFieldsForm.getState();
+      if (!state.isFormValid) {
+        setFormError('Check your card number, name, expiry date, and security code.');
+        return;
       }
-      const parseResult = billingAddressSchema.safeParse(billingAddress);
-
-      if (!parseResult.success) {
-        const errorObj = parseResult.error.flatten().fieldErrors;
-        const errorMessages = Object.values(errorObj)
-          .map((value) => value)
-          .join(' \n');
-
-        throw new Error(errorMessages);
-      } else {
-        await (
-          cardFieldsForm.submit as (params: {
-            billingAddress: BillingAddressInterface;
-          }) => Promise<void>
-        )({ billingAddress });
-      }
-    } catch (err) {
-      errorToast({ message: String(err) as string });
+      await cardFieldsForm.submit({ billingAddress: parsed.data });
+    } catch (error) {
+      console.warn('[checkout] Card submission unavailable', error);
+      setFormError('We couldn’t finish your payment. Check its status before trying again.');
     } finally {
-      setIsPaying(false);
+      setPaying(false);
     }
   };
 
   return (
-    <Button
-      name='Pay with Card'
-      onClick={handleClick}
-      disabled={isPaying}
-      className='border-[#0085FF] text-white bg-[#0085FF] hover:bg-[#0085FF]/70 hover:text-white 
-        !font-bold px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base text-center !my-5 w-full'
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        void pay();
+      }}
+      className={`min-w-0 space-y-5 ${formReady ? '' : 'invisible absolute inset-x-0 top-0 pointer-events-none'}`}
+      noValidate
+      aria-busy={paying}
+      aria-hidden={!formReady}
+      inert={!formReady}
     >
-      {isPaying ? <Loader className='w-4 h-4 animate-spin' /> : 'Pay with Card'}
-    </Button>
+      <div className='grid min-w-0 grid-cols-2 gap-4'>
+        <div className='col-span-2 min-w-0'>
+          <p id={`${inputId}-name-label`} className='mb-2 text-sm'>
+            Name on card
+          </p>
+          <PayPalNameField
+            placeholder='Name on card'
+            className='min-h-12 rounded-xl border border-white/40'
+          />
+        </div>
+        <div className='col-span-2 min-w-0'>
+          <p id={`${inputId}-number-label`} className='mb-2 text-sm'>
+            Card number
+          </p>
+          <PayPalNumberField
+            placeholder='Card number'
+            className='min-h-12 rounded-xl border border-white/40'
+          />
+        </div>
+        <div className='min-w-0'>
+          <p className='mb-2 text-sm'>Expiry date</p>
+          <PayPalExpiryField
+            placeholder='MM / YY'
+            className='min-h-12 rounded-xl border border-white/40'
+          />
+        </div>
+        <div className='min-w-0'>
+          <p className='mb-2 text-sm'>Security code</p>
+          <PayPalCVVField
+            placeholder='CVV'
+            className='min-h-12 rounded-xl border border-white/40'
+          />
+        </div>
+      </div>
+      <fieldset
+        disabled={!formReady || paying}
+        className='min-w-0 space-y-4 border-t border-white/20 pt-4'
+      >
+        <legend className='px-1 text-sm font-semibold'>Billing address</legend>
+        <label className='flex min-h-11 items-start gap-3 text-sm leading-6'>
+          <input
+            type='checkbox'
+            checked={sameAsDelivery}
+            onChange={(event) => {
+              setSameAsDelivery(event.target.checked);
+              setErrors({});
+            }}
+            className='mt-1 h-5 w-5 shrink-0 accent-[#0085ff]'
+          />
+          <span>Same as delivery address</span>
+        </label>
+        {!sameAsDelivery && (
+          <div className='grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2'>
+            {billingFields.map(({ name, label, autoComplete }) => (
+              <div
+                key={name}
+                className={`min-w-0 ${name.startsWith('addressLine') ? 'sm:col-span-2' : ''}`}
+              >
+                <label htmlFor={`${inputId}-${name}`} className='mb-2 block text-sm'>
+                  {label}
+                </label>
+                <Input
+                  id={`${inputId}-${name}`}
+                  name={`billing-${name}`}
+                  value={customAddress[name] ?? ''}
+                  onChange={(event) =>
+                    setCustomAddress((current) => ({ ...current, [name]: event.target.value }))
+                  }
+                  autoComplete={autoComplete}
+                  aria-invalid={Boolean(errors[name])}
+                  aria-describedby={errors[name] ? `${inputId}-${name}-error` : undefined}
+                  className='min-h-11 min-w-0 rounded-xl border-white/35 bg-transparent text-base'
+                />
+                {errors[name] && (
+                  <p id={`${inputId}-${name}-error`} className='mt-1 text-xs text-rose-300'>
+                    {errors[name]}
+                  </p>
+                )}
+              </div>
+            ))}
+            <div className='min-w-0'>
+              <label htmlFor={`${inputId}-country`} className='mb-2 block text-sm'>
+                Billing country
+              </label>
+              <CountryDropdown
+                id={`${inputId}-country`}
+                value={billingCountry}
+                aria-label='Billing country'
+                aria-invalid={Boolean(errors.countryCode)}
+                aria-describedby={errors.countryCode ? `${inputId}-country-error` : undefined}
+                onChange={(country) => {
+                  setBillingCountry(country.alpha3);
+                  setCustomAddress((current) => ({ ...current, countryCode: country.alpha2 }));
+                }}
+                classNames={{ trigger: 'min-h-11 rounded-xl border-white/35 text-base' }}
+              />
+              {errors.countryCode && (
+                <p id={`${inputId}-country-error`} className='mt-1 text-xs text-rose-300'>
+                  {errors.countryCode}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </fieldset>
+      {formError && (
+        <p
+          role='alert'
+          className='rounded-xl border border-amber-200/30 p-3 text-sm text-amber-100'
+        >
+          {formError}
+        </p>
+      )}
+      <button
+        type='submit'
+        disabled={!formReady || paying || !review}
+        className='inline-flex min-h-12 w-full items-center justify-center gap-2 whitespace-normal rounded-xl bg-[#0085ff] px-4 font-semibold text-white hover:bg-[#0085ff]/85 disabled:cursor-not-allowed disabled:opacity-50'
+      >
+        {paying ? (
+          <>
+            <Loader2 size={18} className='animate-spin' aria-hidden='true' /> Processing payment…
+          </>
+        ) : (
+          `Pay ${review ? `${formatOrderMoney(review.quote.total, review.quote.currency)} ${review.quote.currency}` : 'with card'}`
+        )}
+      </button>
+    </form>
   );
 }
 

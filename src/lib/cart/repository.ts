@@ -94,7 +94,37 @@ export class IndexedCartDriver implements CartStorageDriver {
 }
 
 const keyFor = (owner: CartOwner) => `cart:${owner}`;
+const adoptionKey = (cartId: string) => `cart-adoption:${cartId}`;
 const MIGRATION_KEY = 'migration:cart-storage:v1';
+type GuestAdoption = {
+  owner: CartOwner;
+  cartId: string;
+  lines: { variantId: string; quantity: number; lineage: string; sourceLineage: string }[];
+};
+
+function adoptedSnapshot(
+  snapshot: CartCheckoutSnapshot,
+  adoption: GuestAdoption,
+): CartCheckoutSnapshot {
+  return {
+    owner: adoption.owner,
+    cartId: adoption.cartId,
+    lines: snapshot.lines.flatMap((line) => {
+      const transferred = adoption.lines.find(
+        (item) => item.variantId === line.variantId && item.sourceLineage === line.lineage,
+      );
+      return transferred
+        ? [
+            {
+              variantId: line.variantId,
+              quantity: Math.min(line.quantity, transferred.quantity),
+              lineage: transferred.lineage,
+            },
+          ]
+        : [];
+    }),
+  };
+}
 
 export class CartRepository {
   private migration: Promise<void> | undefined;
@@ -211,18 +241,49 @@ export class CartRepository {
     const result = await this.driver.run([keyFor(owner), keyFor('guest')], (records) => {
       const account = this.document(records, owner);
       const guest = this.document(records, 'guest');
-      if (!projectCart(guest).length)
+      const guestLines = projectCart(guest);
+      if (!guestLines.length && !Object.keys(guest.checkoutSnapshots).length && guest.revision <= 1)
         return {
           value: account,
           ...(records[keyFor(owner)] === undefined ? { writes: { [keyFor(owner)]: account } } : {}),
         };
-      const merged = { ...mergeGuestCart(account, guest, cartId), revision: account.revision + 1 };
-      changed = true;
+      const imported = mergeGuestCart(account, guest, cartId);
+      const adoption: GuestAdoption = {
+        owner,
+        cartId: imported.cartId,
+        lines: guestLines.map((line) => ({
+          variantId: line.variantId,
+          quantity: line.quantity,
+          lineage: imported.lineage[line.variantId],
+          sourceLineage: guest.lineage[line.variantId],
+        })),
+      };
+      const snapshots = Object.fromEntries(
+        Object.entries(guest.checkoutSnapshots).map(([orderId, snapshot]) => [
+          orderId,
+          adoptedSnapshot(snapshot, adoption),
+        ]),
+      );
+      const merged = {
+        ...imported,
+        revision: account.revision + 1,
+        consumedOrderIds: [
+          ...new Set([...account.consumedOrderIds, ...guest.consumedOrderIds]),
+        ].slice(-200),
+        checkoutSnapshots: Object.fromEntries(
+          Object.entries({ ...snapshots, ...account.checkoutSnapshots }).slice(-200),
+        ),
+      };
+      changed = guestLines.length > 0 || Object.keys(snapshots).length > 0;
       return {
         value: merged,
         writes: {
           [keyFor(owner)]: merged,
           [keyFor('guest')]: createCartDocument('guest', cartId()),
+          [adoptionKey(guest.cartId)]: adoption,
+          ...Object.fromEntries(
+            Object.keys(snapshots).map((orderId) => [`purchase-owner:${orderId}`, owner]),
+          ),
         },
       };
     });
@@ -232,23 +293,36 @@ export class CartRepository {
 
   async recordCheckout(orderId: string, snapshot: CartCheckoutSnapshot) {
     await this.migrateLegacy();
-    const key = keyFor(snapshot.owner);
-    await this.driver.run([key], (records) => {
-      const document = this.document(records, snapshot.owner);
-      if (document.cartId !== snapshot.cartId)
-        throw new Error('The cart changed. Please review it before checkout.');
-      const checkoutSnapshots = Object.fromEntries(
-        Object.entries({ ...document.checkoutSnapshots, [orderId]: snapshot }).slice(-200),
-      );
-      return {
-        value: undefined,
-        writes: {
-          [key]: { ...document, checkoutSnapshots, revision: document.revision + 1 },
-          [`purchase-owner:${orderId}`]: snapshot.owner,
-        },
-      };
-    });
-    this.announce();
+    for (;;) {
+      const aliasKey = adoptionKey(snapshot.cartId);
+      const adoption =
+        snapshot.owner === 'guest'
+          ? await this.driver.run([aliasKey], (records) => ({
+              value: records[aliasKey] as GuestAdoption | undefined,
+            }))
+          : undefined;
+      const captured = adoption ? adoptedSnapshot(snapshot, adoption) : snapshot;
+      const key = keyFor(captured.owner);
+      const result = await this.driver.run([key, aliasKey], (records) => {
+        if (snapshot.owner === 'guest' && !adoption && records[aliasKey]) return { value: null };
+        const document = this.document(records, captured.owner);
+        if (document.cartId !== captured.cartId)
+          throw new Error('The cart changed. Please review it before checkout.');
+        const checkoutSnapshots = Object.fromEntries(
+          Object.entries({ ...document.checkoutSnapshots, [orderId]: captured }).slice(-200),
+        );
+        return {
+          value: captured,
+          writes: {
+            [key]: { ...document, checkoutSnapshots, revision: document.revision + 1 },
+            [`purchase-owner:${orderId}`]: captured.owner,
+          },
+        };
+      });
+      if (!result) continue;
+      this.announce();
+      return result;
+    }
   }
 
   async purchaseOwner(orderId: string): Promise<CartOwner | null> {

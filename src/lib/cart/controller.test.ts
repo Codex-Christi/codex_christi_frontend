@@ -459,3 +459,78 @@ test('an in-memory removal made during a storage outage is not resurrected after
   assert.deepEqual(f.current().variants, []);
   assert.deepEqual(projectCart(await f.repository.read('guest')), []);
 });
+
+test('guest purchase bindings follow sign-in, consume only transferred quantities, and survive reload', async (t) => {
+  const f = fixture(t);
+  await f.repository.update('user:alice', (document) =>
+    reconcileCart(document, [cartLine('shirt-m', 3)]),
+  );
+  await f.controller.activate('guest', false);
+  await f.controller.command({ type: 'add', line: cartLine('shirt-m', 2) });
+  await f.controller.recordCheckout('guest-order', f.controller.checkoutSnapshot());
+  await f.controller.command({ type: 'setQuantity', variantId: 'shirt-m', quantity: 1 });
+  await f.controller.activate('user:alice', true);
+  assert.equal(f.current().variants[0].quantity, 4);
+  assert.equal(await f.repository.purchaseOwner('guest-order'), 'user:alice');
+  await f.controller.command({ type: 'add', line: cartLine('shirt-m', 2) });
+  await f.controller.consumePurchase('guest-order', [{ variantId: 'shirt-m', quantity: 2 }]);
+  assert.equal(f.current().variants[0].quantity, 5);
+  await f.controller.consumePurchase('guest-order', [{ variantId: 'shirt-m', quantity: 2 }]);
+  assert.equal(f.current().variants[0].quantity, 5);
+  assert.equal(projectCart(await memoryRepository(f.driver).read('user:alice'))[0].quantity, 5);
+});
+
+test('a guest checkout response arriving after sign-in records its original snapshot in the adopted cart', async (t) => {
+  const f = fixture(t);
+  await f.controller.activate('guest', false);
+  await f.controller.command({ type: 'add', line: cartLine('shirt-m', 2) });
+  const captured = f.controller.checkoutSnapshot();
+  await f.controller.activate('user:alice', true);
+  await f.controller.command({ type: 'add', line: cartLine('shirt-m', 3) });
+  await f.controller.recordCheckout('late-guest-order', captured);
+  await f.controller.consumePurchase('late-guest-order', [{ variantId: 'shirt-m', quantity: 2 }]);
+  assert.equal(f.current().variants[0].quantity, 3);
+});
+
+test('guest adoption does not let an older checkout consume a removed and re-added item or account items', async (t) => {
+  const f = fixture(t);
+  await f.repository.update('user:alice', (document) =>
+    reconcileCart(document, [cartLine('shirt-m', 3)]),
+  );
+  await f.controller.activate('guest', false);
+  await f.controller.command({ type: 'add', line: cartLine('shirt-m', 2) });
+  await f.controller.recordCheckout('old-guest-order', f.controller.checkoutSnapshot());
+  await f.controller.command({ type: 'remove', variantId: 'shirt-m' });
+  await f.controller.command({ type: 'add', line: cartLine('shirt-m', 1) });
+  await f.controller.activate('user:alice', true);
+  await f.controller.consumePurchase('old-guest-order', [{ variantId: 'shirt-m', quantity: 2 }]);
+  assert.equal(f.current().variants[0].quantity, 4);
+});
+
+test('purchase cleanup follows a concurrent adoption in another tab instead of consuming the replacement guest cart', async (t) => {
+  const driver = new MemoryCartDriver();
+  const guest = fixture(t, driver);
+  const signedInTab = fixture(t, driver);
+  await guest.controller.activate('guest', false);
+  await guest.controller.command({ type: 'add', line: cartLine('shirt-m', 2) });
+  await guest.controller.recordCheckout('adoption-race', guest.controller.checkoutSnapshot());
+  const ownerRead = deferred();
+  const release = deferred();
+  let gated = false;
+  driver.beforeRun = async (keys) => {
+    if (!gated && keys.includes('purchase-owner:adoption-race')) {
+      gated = true;
+      ownerRead.resolve();
+      await release.promise;
+    }
+  };
+  const consuming = guest.controller.consumePurchase('adoption-race', [
+    { variantId: 'shirt-m', quantity: 2 },
+  ]);
+  await ownerRead.promise;
+  const adoption = signedInTab.controller.activate('user:alice', true);
+  release.resolve();
+  await Promise.all([consuming, adoption]);
+  assert.deepEqual(projectCart(await guest.repository.read('user:alice')), []);
+  assert.deepEqual(projectCart(await guest.repository.read('guest')), []);
+});

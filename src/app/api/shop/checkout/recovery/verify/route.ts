@@ -1,117 +1,54 @@
 import { NextResponse } from 'next/server';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import {
-  hashRecoveryOtp,
-  normalizeRecoveryEmail,
-} from '@/lib/shop/checkout/checkoutRecovery/recoveryOtpUtils';
-import { findUnresolvedPaidCheckoutsByEmail } from '@/lib/shop/checkout/checkoutRecovery/findUnresolvedPaidCheckouts';
+  checkoutEmail,
+  checkoutString,
+  CheckoutRequestError,
+  checkoutPrivateHeaders,
+  checkoutRequestFailure,
+  readCheckoutBody,
+} from '@/lib/shop/checkout/serverRequest';
+import { consumeRecoveryChallenge } from '@/lib/shop/checkout/checkoutRecovery/recoveryChallenges';
+import { findEmailRecoveryCheckouts } from '@/lib/shop/checkout/checkoutRecovery/findEmailRecoveryCheckouts';
 import { mapRecoveryCheckoutSummary } from '@/lib/shop/checkout/checkoutRecovery/mapRecoveryCheckoutSummary';
+import { grantCheckoutAccess } from '@/lib/shop/checkout/serverAccess';
+import { getServerSessionState } from '@/lib/session/server-session';
 
-const MAX_RECOVERY_OTP_ATTEMPTS = 5;
-
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const body = (await req.json()) as {
-      email?: string;
-      otp?: string;
-    };
-
-    if (!body.email || !body.otp) {
-      return NextResponse.json(
-        { ok: false, message: 'Email and OTP are required.' },
-        { status: 400 },
+    const body = await readCheckoutBody(request, 2048);
+    const email = checkoutEmail(body.email);
+    const orderToken = body.orderToken == null ? undefined : checkoutString(body.orderToken, 128);
+    const otp = checkoutString(body.otp, 6);
+    if (!/^\d{6}$/u.test(otp)) throw new CheckoutRequestError('Enter the six-digit recovery code.');
+    const result = await consumeRecoveryChallenge(email, otp);
+    if (result !== 'verified')
+      throw new CheckoutRequestError(
+        result === 'limited'
+          ? 'Too many incorrect attempts. Request a new code.'
+          : 'This recovery code is expired or invalid.',
+        result === 'limited' ? 429 : 400,
       );
-    }
-
-    const email = normalizeRecoveryEmail(body.email);
-    const otpHash = hashRecoveryOtp(body.otp);
-
-    const challenge = await paypalTxLedger.checkoutRecoveryOtpChallenge.findFirst({
-      where: {
-        email,
-        consumedAt: null,
-        expiresAt: {
-          gt: new Date(),
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    if (!challenge) {
-      return NextResponse.json(
-        { ok: false, message: 'This recovery code is expired or invalid.' },
-        { status: 400 },
-      );
-    }
-
-    if (challenge.attemptCount >= MAX_RECOVERY_OTP_ATTEMPTS) {
-      await paypalTxLedger.checkoutRecoveryOtpChallenge.update({
-        where: {
-          id: challenge.id,
-        },
-        data: {
-          consumedAt: new Date(),
-        },
-      });
-
-      return NextResponse.json(
-        { ok: false, message: 'Too many incorrect attempts. Request a new code.' },
-        { status: 429 },
-      );
-    }
-
-    if (challenge.otpHash !== otpHash) {
-      const nextAttemptCount = challenge.attemptCount + 1;
-      await paypalTxLedger.checkoutRecoveryOtpChallenge.update({
-        where: {
-          id: challenge.id,
-        },
-        data: {
-          attemptCount: {
-            increment: 1,
-          },
-          consumedAt:
-            nextAttemptCount >= MAX_RECOVERY_OTP_ATTEMPTS ? new Date() : undefined,
-        },
-      });
-
-      if (nextAttemptCount >= MAX_RECOVERY_OTP_ATTEMPTS) {
-        return NextResponse.json(
-          { ok: false, message: 'Too many incorrect attempts. Request a new code.' },
-          { status: 429 },
-        );
-      }
-
-      return NextResponse.json({ ok: false, message: 'Invalid recovery code.' }, { status: 400 });
-    }
-
-    await paypalTxLedger.checkoutRecoveryOtpChallenge.update({
-      where: {
-        id: challenge.id,
-      },
-      data: {
-        consumedAt: new Date(),
-      },
-    });
-
-    const unresolvedCheckouts = await findUnresolvedPaidCheckoutsByEmail(email);
-
-    return NextResponse.json({
-      ok: true,
-      recoveryVerified: true,
-      checkouts: unresolvedCheckouts.map(mapRecoveryCheckoutSummary),
-    });
-  } catch (error) {
-    console.error('[checkout-recovery.verify.failed]', error);
-
-    return NextResponse.json(
-      {
-        ok: false,
-        message: 'Unable to verify checkout recovery code.',
-      },
-      { status: 500 },
+    const unresolved = await findEmailRecoveryCheckouts(email, orderToken);
+    const response = NextResponse.json(
+      { ok: true, recoveryVerified: true, checkouts: unresolved.map(mapRecoveryCheckoutSummary) },
+      { headers: checkoutPrivateHeaders },
     );
+    const rows = await paypalTxLedger.paypalIntent.findMany({
+      where: { orderToken: { in: unresolved.map((row) => row.orderToken) } },
+      select: { orderToken: true, userId: true },
+    });
+    const session = await getServerSessionState();
+    for (const row of rows)
+      grantCheckoutAccess(
+        response,
+        request,
+        row,
+        'status',
+        session.isAuthenticated ? (session.userID ?? null) : null,
+      );
+    return response;
+  } catch (error) {
+    return checkoutRequestFailure(error);
   }
 }

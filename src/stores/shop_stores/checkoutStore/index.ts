@@ -119,14 +119,15 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
       hydrateFromShopProfile: (profile, fallbackEmail) => {
         const data = profile.data;
         set((state) => ({
-          first_name: data.first_name ?? '',
-          last_name: data.last_name ?? '',
-          email: fallbackEmail ?? '',
+          first_name: state.first_name || data.first_name || '',
+          last_name: state.last_name || data.last_name || '',
+          email: state.email || fallbackEmail || '',
           delivery_address: {
-            shipping_address_line_1: data.shipping_address ?? '',
+            shipping_address_line_1:
+              state.delivery_address.shipping_address_line_1 || data.shipping_address || '',
             shipping_address_line_2: state.delivery_address.shipping_address_line_2 ?? '',
-            shipping_city: data.shipping_city ?? '',
-            shipping_state: data.shipping_state ?? '',
+            shipping_city: state.delivery_address.shipping_city || data.shipping_city || '',
+            shipping_state: state.delivery_address.shipping_state || data.shipping_state || '',
             // Preserve the checkout/currency-selected country when it already exists.
             shipping_country:
               state.delivery_address.shipping_country ??

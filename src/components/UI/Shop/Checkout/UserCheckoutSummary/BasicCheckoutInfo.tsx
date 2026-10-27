@@ -3,19 +3,26 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/UI/primitives/button';
-import { Form, FormField, FormItem, FormLabel, FormMessage } from '@/components/UI/primitives/form';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/UI/primitives/form';
 import { CountryDropdown } from '@/components/UI/primitives/country-dropdown';
 import { SignUpFormSchema } from '@/lib/formSchemas/signUpFormSchema';
-import { EmailInput, NameInput } from '@/components/UI/Auth/FormFields';
 import { FaAngleDoubleDown } from 'react-icons/fa';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useCallback, useContext, useEffect, useRef, useState, startTransition } from 'react';
 import { CheckoutAccordionContext } from '../ProductCheckout';
-import { billingAddressSchema } from '@/lib/formSchemas/shop/paypal-order/billingAddressSchema';
+import { checkoutDeliveryAddressSchema } from '../checkoutAddress';
+import CheckoutAccountPrompt from '../CheckoutAccountPrompt';
+import { GenericCheckoutInfoInput } from './GenericCheckoutInfoInput';
 import { DeliveryAddressInputFields } from './DeliveryAddressInputFields';
 import errorToast from '@/lib/error-toast';
-import successToast from '@/lib/success-toast';
 import { useDjangoOrderIntentEmailVerification } from '@/lib/hooks/shopHooks/checkout/useDjangoOrderIntentEmailVerification';
 import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
@@ -31,7 +38,6 @@ import {
   getCheckoutValuesFromStore,
   getPaidCheckoutRecoveryExpiryMinutes,
   getRecipientName,
-  getRecentVerifiedDjangoOrderIntentForEmail,
   saveBasicCheckoutInfoToStore,
   startPaidCheckoutRecovery,
   toDjangoOrderIntentPayload,
@@ -52,20 +58,12 @@ const signupExtSchema = SignUpFormSchema.pick({
   lastname: true,
   email: true,
 });
-const deliveryAddressSchema = billingAddressSchema.pick({
-  addressLine1: true,
-  addressLine2: true,
-  adminArea1: true,
-  adminArea2: true,
-  postalCode: true,
-});
-
 const BasicCheckoutInfoFormSchema = z
   .object({
-    country: z.string().min(1, { message: 'Please select a country' }),
+    country: z.string().trim().length(3, { message: 'Please select a country.' }),
   })
   .merge(signupExtSchema)
-  .merge(deliveryAddressSchema);
+  .merge(checkoutDeliveryAddressSchema);
 
 export type BasicCheckoutInfoFormSchema = z.infer<typeof BasicCheckoutInfoFormSchema>;
 
@@ -78,8 +76,9 @@ export const BasicCheckoutInfo = () => {
   );
   const [paidCheckoutRecoveryPromptVersion, setPaidCheckoutRecoveryPromptVersion] = useState(0);
   const [isCheckingPaidCheckoutRecovery, setIsCheckingPaidCheckoutRecovery] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const { handleOpenItem } = useContext(CheckoutAccordionContext);
+  const { handleOpenItem, canContinue } = useContext(CheckoutAccordionContext);
   const [checkoutHydrated, setCheckoutHydrated] = useState(false);
   const { delivery_address, email } = useShopCheckoutStore(
     useShallow((s) => ({
@@ -93,10 +92,7 @@ export const BasicCheckoutInfo = () => {
   const fallbackEmail = useUserMainProfileStore((s) => s.userMainProfile?.email);
   const selectedCountryISO3 = useCurrencyCookie((s) => s.iso3);
   const changeCookieStoreCountry = useCurrencyCookie((s) => s.changeCountry);
-  const openDjangoOrderIntentOtpModal = useCallback(
-    () => setIsDjangoOrderIntentOtpOpen(true),
-    [],
-  );
+  const openDjangoOrderIntentOtpModal = useCallback(() => setIsDjangoOrderIntentOtpOpen(true), []);
   const djangoOrderIntentEmailVerification = useDjangoOrderIntentEmailVerification(
     email,
     openDjangoOrderIntentOtpModal,
@@ -184,27 +180,14 @@ export const BasicCheckoutInfo = () => {
 
   const createDjangoOrderIntentFromCheckoutInfo = useCallback(
     async (data: BasicCheckoutInfoFormSchema) => {
-      const recentVerifiedDjangoOrderIntent = getRecentVerifiedDjangoOrderIntentForEmail(
-        data.email,
-      );
-
-      if (recentVerifiedDjangoOrderIntent) {
-        successToast({
-          header: 'Email already verified',
-          message: 'Continuing with your recent verified checkout session.',
-        });
-        handleOpenItem('payment-section');
-        return;
-      }
-
       // This creates/reuses the Django backend order intent, not the PayPal ledger intent.
-      const djangoOrderIntent = await createDjangoOrderIntent(
-        toDjangoOrderIntentPayload(data),
-      );
+      const djangoOrderIntent = await createDjangoOrderIntent(toDjangoOrderIntentPayload(data));
 
       if (djangoOrderIntent?.data.otp_status === 'verified') {
         handleOpenItem('payment-section');
       }
+      if (!djangoOrderIntent)
+        setSubmitError('We couldn’t verify these details. Please check them and try again.');
     },
     [createDjangoOrderIntent, handleOpenItem],
   );
@@ -221,9 +204,7 @@ export const BasicCheckoutInfo = () => {
     clearActivePayPalCheckout();
     clearPayPalIntent();
 
-    await createDjangoOrderIntentFromCheckoutInfo(
-      paidCheckoutRecoveryPrompt.pendingCheckoutData,
-    );
+    await createDjangoOrderIntentFromCheckoutInfo(paidCheckoutRecoveryPrompt.pendingCheckoutData);
   }, [
     clearActivePayPalCheckout,
     clearPayPalIntent,
@@ -232,6 +213,8 @@ export const BasicCheckoutInfo = () => {
   ]);
 
   async function onSubmit(data: BasicCheckoutInfoFormSchema) {
+    if (!canContinue) return;
+    setSubmitError(null);
     saveBasicCheckoutInfoToStore(data);
     setPaidCheckoutRecoveryPrompt((current) => ({ ...current, pendingCheckoutData: data }));
     setIsCheckingPaidCheckoutRecovery(true);
@@ -271,22 +254,25 @@ export const BasicCheckoutInfo = () => {
 
       await createDjangoOrderIntentFromCheckoutInfo(data);
     } catch (error) {
-      errorToast({
-        header: 'Checkout recovery check failed',
-        message:
-          (error as Error)?.message ??
-          'Unable to check whether this email has a checkout recovery case.',
-      });
+      console.warn('[checkout] Contact verification unavailable', error);
+      setSubmitError(
+        'We couldn’t continue right now. Your details are still here. Please try again.',
+      );
     } finally {
       setIsCheckingPaidCheckoutRecovery(false);
     }
   }
 
+  const continueLabel = isCheckingPaidCheckoutRecovery
+    ? 'Checking your email…'
+    : 'Continue to review & payment';
+
   return (
     <>
-      <h2 className='border-b max-w-fit mb-10 border-white pb-1 text-xl font-bold'>
-        Contact and Delivery Information
-      </h2>
+      <h2 className='mb-3 text-xl font-semibold'>Contact & delivery</h2>
+      <CheckoutAccountPrompt
+        onSignIn={() => saveBasicCheckoutInfoToStore(basicCheckoutInfoForm.getValues())}
+      />
       <Form {...basicCheckoutInfoForm}>
         <form
           onSubmit={basicCheckoutInfoForm.handleSubmit(onSubmit, () => {
@@ -295,53 +281,77 @@ export const BasicCheckoutInfo = () => {
               header: 'Incorrect details!',
             });
           })}
-          className='w-full  grid grid-cols-1 md:grid-cols-2 gap-x-20 gap-3 items-center'
+          className='grid w-full min-w-0 grid-cols-1 items-start gap-x-4 gap-y-5 sm:grid-cols-2'
+          noValidate
         >
-          <NameInput currentZodForm={basicCheckoutInfoForm} inputName='firstname' />
-
-          <NameInput currentZodForm={basicCheckoutInfoForm} inputName='lastname' />
-
-          <EmailInput currentZodForm={basicCheckoutInfoForm} inputName='email' />
-
-          <DeliveryAddressInputFields currentZodForm={basicCheckoutInfoForm} />
+          <GenericCheckoutInfoInput
+            currentZodForm={basicCheckoutInfoForm}
+            inputName='firstname'
+            labelString='First name'
+            autoComplete='given-name'
+          />
+          <GenericCheckoutInfoInput
+            currentZodForm={basicCheckoutInfoForm}
+            inputName='lastname'
+            labelString='Last name'
+            autoComplete='family-name'
+          />
+          <GenericCheckoutInfoInput
+            currentZodForm={basicCheckoutInfoForm}
+            inputName='email'
+            labelString='Email address'
+            type='email'
+            autoComplete='email'
+            className='sm:col-span-2'
+          />
+          <p className='-mt-3 text-xs leading-5 text-white/60 sm:col-span-2'>
+            We’ll send your checkout verification code and order updates here.
+          </p>
 
           <FormField
             control={basicCheckoutInfoForm.control}
             name='country'
             render={({ field }) => (
-              <FormItem className='self-baseline'>
-                <FormLabel>Country</FormLabel>
-                <CountryDropdown
-                  placeholder='Country'
-                  defaultValue={field.value}
-                  onChange={(country) => {
-                    field.onChange(country.alpha3);
-                    startTransition(() => {
-                      changeCookieStoreCountry(country.alpha3);
-                    });
-                    setShippingCountryISO3(country.alpha3);
-                  }}
-                />
-                <FormMessage />
+              <FormItem className='min-w-0 self-baseline sm:col-span-2'>
+                <FormLabel>Delivery country</FormLabel>
+                <FormControl>
+                  <CountryDropdown
+                    aria-label='Delivery country'
+                    placeholder='Choose a country'
+                    value={field.value}
+                    classNames={{ trigger: 'min-h-11 rounded-xl border-white/35 text-base' }}
+                    onChange={(country) => {
+                      field.onChange(country.alpha3);
+                      startTransition(() => {
+                        changeCookieStoreCountry(country.alpha3);
+                      });
+                      setShippingCountryISO3(country.alpha3);
+                    }}
+                  />
+                </FormControl>
+                <FormMessage className='text-rose-300' />
               </FormItem>
             )}
           />
+          <DeliveryAddressInputFields currentZodForm={basicCheckoutInfoForm} />
+
+          {submitError && (
+            <p
+              role='alert'
+              className='rounded-xl border border-amber-200/30 p-3 text-sm text-amber-100 sm:col-span-2'
+            >
+              {submitError}
+            </p>
+          )}
 
           <Button
-            name='Checkout Summary Submit'
+            name={continueLabel}
             type='submit'
-            disabled={isCheckingPaidCheckoutRecovery}
-            className=' col-span-1 md:col-span-2 w-full max-w-[400px] mt-5 mx-auto rounded-3xl
-            !font-bold px-4 sm:px-6 py-2 sm:py-3 text-lg sm:text-base
-            bg-stone-500 hover:bg-stone-100 hover:bg-opacity-10 bg-opacity-10 
-            backdrop-blur-md shadow-md shadow-gray-400 flex gap-6'
+            disabled={isCheckingPaidCheckoutRecovery || !canContinue}
+            className='mt-2 min-h-12 w-full gap-3 whitespace-normal rounded-xl bg-[#0085ff] px-4 text-base font-semibold text-white hover:bg-[#0085ff]/85 sm:col-span-2'
           >
-            <h4 className='[word-spacing:0.25rem]'>
-              {isCheckingPaidCheckoutRecovery
-                ? 'Checking Checkout Status'
-                : 'Choose Payment Method'}
-            </h4>
-            <FaAngleDoubleDown size={22.5} />
+            <span>{continueLabel}</span>
+            <FaAngleDoubleDown size={18} className='shrink-0' aria-hidden='true' />
           </Button>
         </form>
       </Form>

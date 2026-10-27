@@ -74,10 +74,14 @@ type ClassNames = {
 
 // Dropdown props
 interface CountryDropdownProps {
+  id?: string;
   'aria-label'?: string;
+  'aria-describedby'?: string;
+  'aria-invalid'?: boolean;
   options?: Country[];
   onChange?: (country: Country) => void;
   defaultValue?: string; // ISO3
+  value?: string; // Controlled ISO3; defaultValue remains available for existing callers.
   disabled?: boolean;
   placeholder?: string;
   slim?: boolean;
@@ -133,6 +137,7 @@ const CountryDropdownComponent = (
     ),
     onChange,
     defaultValue,
+    value,
     disabled = false,
     placeholder = 'Select a country',
     slim = false,
@@ -169,17 +174,18 @@ const CountryDropdownComponent = (
   );
 
   const selectedCountry = useMemo(() => {
-    const alpha3 = selectedAlpha3 ?? defaultValue?.toUpperCase();
+    const alpha3 =
+      value !== undefined ? value.toUpperCase() : (selectedAlpha3 ?? defaultValue?.toUpperCase());
     return alpha3 ? optionsMapAlpha3.get(alpha3) : undefined;
-  }, [defaultValue, optionsMapAlpha3, selectedAlpha3]);
+  }, [defaultValue, optionsMapAlpha3, selectedAlpha3, value]);
 
   const handleSelect = useCallback(
     (country: Country) => {
-      setSelectedAlpha3(country.alpha3?.toUpperCase());
+      if (value === undefined) setSelectedAlpha3(country.alpha3?.toUpperCase());
       onChange?.(country);
       setOpen(false);
     },
-    [onChange],
+    [onChange, value],
   );
 
   // ⬇︎ unstyled now affects only the TRIGGER.

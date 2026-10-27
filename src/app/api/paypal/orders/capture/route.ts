@@ -1,3 +1,10 @@
+import {
+  checkoutString,
+  CheckoutRequestError,
+  checkoutRequestFailure,
+  readCheckoutBody,
+} from '@/lib/shop/checkout/serverRequest';
+import { requireCheckoutAccess } from '@/lib/shop/checkout/serverAccess';
 import { randomUUID } from 'crypto';
 import { after } from 'next/server';
 import { PaymentsController, type CapturedPayment } from '@paypal/paypal-server-sdk';
@@ -43,14 +50,6 @@ export async function POST(req: Request) {
     requestId,
     getOrderToken: () => orderToken,
   });
-
-  const validationError = (code: string, message: string, status = 400) =>
-    routeError({
-      status,
-      code,
-      stage: 'validate_request',
-      message,
-    });
 
   const persistCaptureFailure = async (failure: { code: string; message: string }) => {
     await commitOptimisticLedgerTransition({
@@ -112,21 +111,27 @@ export async function POST(req: Request) {
 
   const persistCanonicalPaymentFailure = async (
     reconciliation: CanonicalPaymentReconciliationResult,
-    payload?: CapturedPayment | unknown,
-    notificationContext?: CanonicalPaymentFailureNotificationContext,
+    payload: CapturedPayment | unknown,
+    notificationContext: CanonicalPaymentFailureNotificationContext & {
+      status: string;
+      updatedAt: Date;
+    },
   ) => {
-    await paypalTxLedger.paypalIntent.update({
-      where: { orderToken },
+    const changed = await paypalTxLedger.paypalIntent.updateMany({
+      where: {
+        orderToken,
+        status: notificationContext.status,
+        updatedAt: notificationContext.updatedAt,
+      },
       data: {
         status: PAYPAL_LEDGER_STATUS.ERROR,
-        ...(payload === undefined
-          ? {}
-          : { capturePayload: JSON.parse(JSON.stringify(payload)) }),
+        ...(payload === undefined ? {} : { capturePayload: JSON.parse(JSON.stringify(payload)) }),
         lastErrorCode: reconciliation.errorCode,
         lastErrorMessage: reconciliation.reason,
         ...checkoutSurface,
       },
     });
+    if (changed.count !== 1) return;
     if (orderToken) await refreshPaidOrderRecoveryProjectionSafely(orderToken);
     if (notificationContext) {
       await notifyCanonicalPaymentFailure(notificationContext, reconciliation);
@@ -147,11 +152,7 @@ export async function POST(req: Request) {
     const committed = await commitOptimisticLedgerTransition({
       load: () => paypalTxLedger.paypalIntent.findUnique({ where: { orderToken } }),
       build: (latest) => {
-        const transition = buildPayPalWebhookLedgerTransition(
-          latest,
-          transitionEventType,
-          payload,
-        );
+        const transition = buildPayPalWebhookLedgerTransition(latest, transitionEventType, payload);
         const paymentData = { ...(transition.data ?? {}) };
         delete paymentData.lastEventType;
         return {
@@ -204,15 +205,9 @@ export async function POST(req: Request) {
   };
 
   try {
-    const { authorizationId, orderToken: requestOrderToken } = await req.json();
-
-    orderToken = requestOrderToken;
-    if (!authorizationId || !orderToken) {
-      return validationError(
-        'INVALID_CAPTURE_REQUEST',
-        'authorizationId and orderToken are required',
-      );
-    }
+    const body = await readCheckoutBody(req, 4096);
+    const authorizationId = checkoutString(body.authorizationId, 128);
+    orderToken = checkoutString(body.orderToken, 128);
     const intent = await paypalTxLedger.paypalIntent.findUnique({
       where: { orderToken },
     });
@@ -226,7 +221,9 @@ export async function POST(req: Request) {
       });
     }
 
-    if (intent.paypalAuthorizationId && intent.paypalAuthorizationId !== authorizationId) {
+    await requireCheckoutAccess(intent, true, req);
+
+    if (!intent.paypalAuthorizationId || intent.paypalAuthorizationId !== authorizationId) {
       return routeError({
         status: 409,
         code: 'AUTHORIZATION_MISMATCH',
@@ -363,6 +360,7 @@ export async function POST(req: Request) {
 
     return Response.json(result);
   } catch (err: unknown) {
+    if (err instanceof CheckoutRequestError) return checkoutRequestFailure(err);
     return fail({
       code: 'CAPTURE_FAILED',
       stage: 'capture_payment',

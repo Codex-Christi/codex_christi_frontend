@@ -52,6 +52,11 @@ import { getMerchizeFulfillmentRetryEligibility } from '@/lib/paypal/txLedger/fu
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { assertShopOpsMutationAllowed } from '@/lib/prisma/shop/shopOpsDataTarget';
 import { encryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
+import {
+  ProcessingLeaseLostError,
+  requireProcessingLease,
+  startProcessingLease,
+} from './processingLease';
 import type { CartVariant } from '@/stores/shop_stores/cartStore';
 
 const POST_PROCESSING_LEASE_MS = 5 * 60_000;
@@ -192,11 +197,15 @@ async function updateLockedRow(
   data: Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
 ) {
   const result = await paypalTxLedger.paypalIntent.updateMany({
-    where: { orderToken, postProcessingLockId: lockId },
+    where: {
+      orderToken,
+      postProcessingLockId: lockId,
+      postProcessingLockExpiresAt: { gt: new Date() },
+    },
     data,
   });
-
-  if (result.count > 0) await refreshPaidOrderRecoveryProjectionSafely(orderToken);
+  requireProcessingLease(result);
+  await refreshPaidOrderRecoveryProjectionSafely(orderToken);
 }
 
 async function markFulfillmentFailedAndNotify(args: {
@@ -218,8 +227,12 @@ async function markFulfillmentFailedAndNotify(args: {
   merchizeProviderOrderCode?: string | null;
 }) {
   await paypalTxLedger.$transaction(async (tx) => {
-    await tx.paypalIntent.updateMany({
-      where: { orderToken: args.orderToken, postProcessingLockId: args.lockId },
+    const updated = await tx.paypalIntent.updateMany({
+      where: {
+        orderToken: args.orderToken,
+        postProcessingLockId: args.lockId,
+        postProcessingLockExpiresAt: { gt: new Date() },
+      },
       data: {
         status: PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
         lastErrorCode: args.errorCode,
@@ -237,6 +250,7 @@ async function markFulfillmentFailedAndNotify(args: {
       } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
     });
 
+    requireProcessingLease(updated);
     await enqueueAdminRecoveryNotification({
       db: tx,
       orderToken: args.orderToken,
@@ -284,8 +298,12 @@ async function markFulfillmentAttentionRequiredAndNotify(args: {
   merchizeProviderOrderCode?: string | null;
 }) {
   await paypalTxLedger.$transaction(async (tx) => {
-    await tx.paypalIntent.updateMany({
-      where: { orderToken: args.orderToken, postProcessingLockId: args.lockId },
+    const updated = await tx.paypalIntent.updateMany({
+      where: {
+        orderToken: args.orderToken,
+        postProcessingLockId: args.lockId,
+        postProcessingLockExpiresAt: { gt: new Date() },
+      },
       data: {
         status: PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED,
         lastErrorCode: args.errorCode,
@@ -303,6 +321,7 @@ async function markFulfillmentAttentionRequiredAndNotify(args: {
       } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
     });
 
+    requireProcessingLease(updated);
     await enqueueAdminRecoveryNotification({
       db: tx,
       orderToken: args.orderToken,
@@ -504,8 +523,17 @@ export async function runPaidFulfillmentProcessing(
   }
 
   let activeStage: PaidFulfillmentProcessingStage = 'ledger_validation';
+  const processingLease = startProcessingLease(async () => {
+    const now = new Date();
+    const renewed = await paypalTxLedger.paypalIntent.updateMany({
+      where: { orderToken, postProcessingLockId: lockId, postProcessingLockExpiresAt: { gt: now } },
+      data: { postProcessingLockExpiresAt: new Date(now.getTime() + POST_PROCESSING_LEASE_MS) },
+    });
+    return renewed.count === 1;
+  });
 
   try {
+    await processingLease.assertOwned();
     const authData = row.authorizePayload as PaymentReceiptProps['authData'] | null;
     const finalCapturedOrder = row.capturePayload as
       PaymentSavingActionProps['finalCapturedOrder'] | null;
@@ -589,6 +617,7 @@ export async function runPaidFulfillmentProcessing(
 
     if (!row.receiptLink || !row.receiptFile) {
       activeStage = 'receipt_generation';
+      await processingLease.assertOwned();
       const receiptRes = await savePaymentReceiptToCloud(
         buildPaymentReceiptPayload({
           authData,
@@ -601,6 +630,7 @@ export async function runPaidFulfillmentProcessing(
             null,
         }),
       );
+      await processingLease.assertOwned();
 
       if (
         !receiptRes.success ||
@@ -624,6 +654,7 @@ export async function runPaidFulfillmentProcessing(
 
     if (!row.djangoPaymentSaveCustomId) {
       activeStage = 'django_payment_save';
+      await processingLease.assertOwned();
       const paymentSave = await savePaymentDataToBackend(
         buildPaymentSavePayload({
           authData,
@@ -640,6 +671,7 @@ export async function runPaidFulfillmentProcessing(
           canonicalOrderSnapshot,
         }),
       );
+      await processingLease.assertOwned();
 
       if (!paymentSave.ok) {
         throw new Error(paymentSave.error?.message ?? 'Payment save failed');
@@ -683,6 +715,7 @@ export async function runPaidFulfillmentProcessing(
 
     if (!merchizeExternalOrderNumber) {
       activeStage = 'django_fulfillment_handoff';
+      await processingLease.assertOwned();
       const fulfillmentSend = await sendMerchizeFulfillmentOrder({
         cartSnapshot: row.cartSnapshot as CartVariant[],
         canonicalOrderSnapshot,
@@ -693,6 +726,7 @@ export async function runPaidFulfillmentProcessing(
         countryIso2: row.countryIso2,
         fulfillmentAddress,
       });
+      await processingLease.assertOwned();
 
       fulfillmentRequestPayload = fulfillmentSend.requestPayload;
       fulfillmentResponsePayload = {
@@ -723,6 +757,7 @@ export async function runPaidFulfillmentProcessing(
 
     if (merchizeExternalOrderNumber) {
       activeStage = 'merchize_order_registration';
+      await processingLease.assertOwned();
       await registerAcceptedMerchizeFulfillmentProcess({
         orderToken,
         paypalOrderId: row.paypalOrderId,
@@ -744,7 +779,9 @@ export async function runPaidFulfillmentProcessing(
       });
 
       activeStage = 'merchize_order_sync';
+      await processingLease.assertOwned();
       const sync = await syncMerchizeFulfillmentOrder(orderToken);
+      await processingLease.assertOwned();
       if (!sync.ok) {
         if (isMerchizeLookupPendingProviderProcessingError(sync.errorCode)) {
           await markFulfillmentLookupPendingForAutomaticRetry({
@@ -775,10 +812,12 @@ export async function runPaidFulfillmentProcessing(
       }
 
       activeStage = 'merchize_readiness';
+      await processingLease.assertOwned();
       const readinessCheck = await runMerchizeProductionReadinessChecks(orderToken, {
         allowStaleOrderManualRelease: options.allowStaleMerchizeOrderManualRelease,
         expectedBuyerAddress: getMerchizeBuyerAddressExpectationFromLedger(fulfillmentAddress),
       });
+      await processingLease.assertOwned();
       if (!readinessCheck.ok) {
         await markFulfillmentProviderPendingForAutomaticRetry({
           orderToken,
@@ -835,6 +874,7 @@ export async function runPaidFulfillmentProcessing(
       let pushVerification: Awaited<ReturnType<typeof verifyMerchizeFulfillmentPush>> | null = null;
       if (readiness.providerPushState === 'pushed') {
         activeStage = 'merchize_push_verification';
+        await processingLease.assertOwned();
         pushVerification = await verifyMerchizeFulfillmentPush(orderToken, {
           retryDelaysMs: [0],
         });
@@ -847,6 +887,7 @@ export async function runPaidFulfillmentProcessing(
       ) {
         const message =
           'Merchize push-to-fulfillment is disabled by MERCHIZE_FULFILLMENT_PUSH_ENABLED=false.';
+        await processingLease.assertOwned();
         await recordMerchizeFulfillmentPushDisabledByConfig({
           orderToken,
           merchizeExternalOrderNumber,
@@ -884,6 +925,7 @@ export async function runPaidFulfillmentProcessing(
         if (!shouldVerifyExistingPush) {
           try {
             activeStage = 'merchize_production_push';
+            await processingLease.assertOwned();
             await pushMerchizeFulfillmentOrderToProduction({
               orderToken,
               merchizeExternalOrderNumber,
@@ -891,6 +933,8 @@ export async function runPaidFulfillmentProcessing(
               identifier: CODEX_CHRISTI_FULFILLMENT_IDENTIFIER,
             });
           } catch (pushError) {
+            if (pushError instanceof ProcessingLeaseLostError) throw pushError;
+            await processingLease.assertOwned();
             const message =
               pushError instanceof Error
                 ? pushError.message
@@ -915,8 +959,10 @@ export async function runPaidFulfillmentProcessing(
         }
 
         activeStage = 'merchize_push_verification';
+        await processingLease.assertOwned();
         pushVerification = await verifyMerchizeFulfillmentPush(orderToken);
       }
+      await processingLease.assertOwned();
 
       if (pushVerification.status === 'pending') {
         await markFulfillmentProviderPendingForAutomaticRetry({
@@ -998,12 +1044,22 @@ export async function runPaidFulfillmentProcessing(
       });
     }
   } catch (error) {
+    if (error instanceof ProcessingLeaseLostError) return;
+    try {
+      await processingLease.assertOwned();
+    } catch {
+      return;
+    }
     const message = error instanceof Error ? error.message : String(error);
 
     if (error instanceof FulfillmentPayloadValidationError) {
       await paypalTxLedger.$transaction(async (tx) => {
-        await tx.paypalIntent.updateMany({
-          where: { orderToken, postProcessingLockId: lockId },
+        const updated = await tx.paypalIntent.updateMany({
+          where: {
+            orderToken,
+            postProcessingLockId: lockId,
+            postProcessingLockExpiresAt: { gt: new Date() },
+          },
           data: {
             status: PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED,
             lastErrorCode: 'FULFILLMENT_PAYLOAD_INVALID',
@@ -1020,6 +1076,7 @@ export async function runPaidFulfillmentProcessing(
           } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
         });
 
+        requireProcessingLease(updated);
         await enqueueAdminRecoveryNotification({
           db: tx,
           orderToken,
@@ -1050,8 +1107,12 @@ export async function runPaidFulfillmentProcessing(
 
     if (error instanceof FulfillmentProviderRejectedError) {
       await paypalTxLedger.$transaction(async (tx) => {
-        await tx.paypalIntent.updateMany({
-          where: { orderToken, postProcessingLockId: lockId },
+        const updated = await tx.paypalIntent.updateMany({
+          where: {
+            orderToken,
+            postProcessingLockId: lockId,
+            postProcessingLockExpiresAt: { gt: new Date() },
+          },
           data: {
             status: PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
             lastErrorCode: 'FULFILLMENT_PROVIDER_REJECTED',
@@ -1067,6 +1128,7 @@ export async function runPaidFulfillmentProcessing(
           } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
         });
 
+        requireProcessingLease(updated);
         await enqueueAdminRecoveryNotification({
           db: tx,
           orderToken,
@@ -1108,5 +1170,8 @@ export async function runPaidFulfillmentProcessing(
     });
 
     throw processingError;
+  } finally {
+    await processingLease.stop();
+    await clearLock(orderToken, lockId);
   }
 }

@@ -221,3 +221,23 @@ test('checkout ownership and captured lineages survive reload within their origi
   );
   assert.deepEqual((await reloaded.read('user:bob')).checkoutSnapshots, {});
 });
+
+test('recording a guest checkout concurrently with adoption binds it to the account atomically', async () => {
+  const repository = memoryRepository();
+  const guest = await repository.update('guest', (document) =>
+    editCart(document, { type: 'add', line: cartLine('shirt-m', 2) }, 'guest-line'),
+  );
+  const snapshot = {
+    owner: guest.owner,
+    cartId: guest.cartId,
+    lines: [{ variantId: 'shirt-m', quantity: 2, lineage: guest.lineage['shirt-m'] }],
+  };
+  const [, account] = await Promise.all([
+    repository.recordCheckout('race-order', snapshot),
+    repository.adoptGuest('user:alice'),
+  ]);
+  assert.equal(await repository.purchaseOwner('race-order'), 'user:alice');
+  const stored = await repository.read('user:alice');
+  assert.equal(stored.checkoutSnapshots['race-order'].cartId, account.cartId);
+  assert.equal(stored.checkoutSnapshots['race-order'].lines[0].lineage, stored.lineage['shirt-m']);
+});

@@ -1,46 +1,45 @@
-import errorToast from '@/lib/error-toast';
 import { PayPalButtons } from '@paypal/react-paypal-js';
-import { MyPayPalCardFieldInterface } from './MyPaypalCardFields';
-import { FC, useState } from 'react';
-import PayPalLoadingSkeleton from './PayPalLoadingSkeleton';
+import type { FC } from 'react';
+import { useContext } from 'react';
+import type { MyPayPalCardFieldInterface } from './MyPaypalCardFields';
+import { CheckoutPaymentReviewContext } from '../PaymentSection';
 
-const MyPaypalButtons: FC<
-  Omit<MyPayPalCardFieldInterface, 'billingAddress' | 'handleBillingAddressChange'> & {
-    onCancel?: () => void;
-  }
-> = (props) => {
-  // Props
-  const { mode, createOrder, onApprove, onCancel } = props;
-
-  const [isReady, setIsReady] = useState(false);
-
+const MyPaypalButtons: FC<MyPayPalCardFieldInterface & { onCancel?: () => void }> = ({
+  mode,
+  createOrder,
+  onApprove,
+  onCancel,
+}) => {
+  const { onPaymentError } = useContext(CheckoutPaymentReviewContext);
   if (mode !== 'paypal_buttons') return null;
-
-  // Main JSX
   return (
-    <section className='w-full !mx-auto'>
-      {!isReady ? <PayPalLoadingSkeleton mode='paypal_buttons' /> : null}
+    <section aria-label='Pay with PayPal' className='w-full min-w-0'>
       <PayPalButtons
         createOrder={createOrder}
         onApprove={onApprove}
         onCancel={onCancel}
-        onInit={() => setIsReady(true)}
-        onError={(err) => {
-          const message = err instanceof Error ? err.message : String(err);
-          console.error(message);
-          if (message.includes('Failed to create PayPal order')) return;
-          errorToast({ header: 'Payment setup failed', message });
+        onError={(error) => {
+          console.warn('[checkout] PayPal button unavailable', error);
+          if (String(error).includes('Failed to create PayPal order')) return;
+          onPaymentError('We couldn’t open PayPal. Check your connection and try again.');
         }}
-        className={isReady ? '' : 'opacity-0 pointer-events-none'}
         style={{
-          layout: 'horizontal',
+          layout: 'vertical',
           color: 'blue',
           shape: 'pill',
           label: 'pay',
-          height: 40,
+          height: 48,
           tagline: false,
         }}
-      />
+      >
+        <p
+          role='status'
+          className='rounded-xl border border-amber-200/30 p-3 text-sm leading-6 text-amber-100'
+        >
+          PayPal isn’t available here right now. Choose credit / debit card above, or try again
+          later.
+        </p>
+      </PayPalButtons>
     </section>
   );
 };

@@ -1,13 +1,11 @@
 'use client';
-import { FC, useContext, useMemo } from 'react';
+import { type FC, useContext, useMemo } from 'react';
 
-import { CheckoutOptions } from '../PaymentSection';
+import type { CheckoutOptions } from '../PaymentSection';
 
 import dynamic from 'next/dynamic';
 import { ServerOrderDetailsContext } from '../ServerOrderDetailsComponent';
 import { getPublicPayPalClientId } from '@/lib/paypal/publicPayPalConfig';
-
-// Dynamic components
 
 const PayPalScriptLoader = dynamic(() =>
   import('./PaypalScriptLoader').then((comp) => comp.default),
@@ -16,18 +14,14 @@ const PayPalCheckoutChildren = dynamic(() =>
   import('./PayPalCheckoutChildren').then((comp) => comp.default),
 );
 
-// Provider Script Initializer Options - MADE STATIC
 const initialOptions = {
   clientId: getPublicPayPalClientId(),
   'enable-funding': 'venmo',
   'buyer-country': 'US',
-  // currency: 'USD',
   intent: 'authorize',
-  components: 'buttons,card-fields', // KEEP THIS FIXED
+  components: 'buttons,card-fields',
   'data-sdk-integration-source': 'developer-studio',
-};
-
-// Main Components
+} as const;
 const PaypalMainCheckout: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
   const serverOrderDetails = useContext(ServerOrderDetailsContext);
   const { countrySupport, finalPricesWithShippingFee } = serverOrderDetails || {};
@@ -39,7 +33,6 @@ const PaypalMainCheckout: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
       ...initialOptions,
       'buyer-country': country_iso2 ?? initialOptions['buyer-country'],
       currency,
-      intent: (initialOptions.intent ?? 'authorize') as 'authorize' | 'capture',
     }),
     [country_iso2, currency],
   );

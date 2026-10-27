@@ -1,4 +1,28 @@
 import { randomUUID } from 'crypto';
+import {
+  checkoutInputFingerprint,
+  readReviewedCheckoutQuote,
+  requireMatchingReview,
+} from '@/lib/shop/checkout/checkoutReview';
+import { cookies } from 'next/headers';
+import {
+  checkoutAttemptToken,
+  emailProofCookieName,
+  matchesCheckoutProof,
+  openCheckoutValue,
+  type CheckoutEmailProof,
+  CHECKOUT_BROWSER_COOKIE,
+  checkoutGrantCookieName,
+} from '@/lib/shop/checkout/checkoutProof';
+import { grantCheckoutAccess, requireCheckoutAccess } from '@/lib/shop/checkout/serverAccess';
+import {
+  checkoutEmail,
+  checkoutString,
+  CheckoutRequestError,
+  checkoutRequestFailure,
+  readCheckoutBody,
+} from '@/lib/shop/checkout/serverRequest';
+import { parseCanonicalOrderSnapshotFromLedger } from '@/lib/paypal/orderSnapshot/canonicalize';
 import type { Order } from '@paypal/paypal-server-sdk';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
@@ -7,9 +31,7 @@ import { paypalRouteError, paypalRouteSuccess } from '@/lib/paypal/txLedger/rout
 import { getServerSessionState } from '@/lib/session/server-session';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 import { getCheckoutSurfaceProvenance } from '@/lib/paypal/txLedger/checkoutSurfaceProvenance';
-import {
-  CanonicalOrderResolutionError,
-} from '@/lib/paypal/orderSnapshot/resolver';
+import { CanonicalOrderResolutionError } from '@/lib/paypal/orderSnapshot/resolver';
 import type { CanonicalOrderResolutionInput } from '@/lib/paypal/orderSnapshot/types';
 import { resolveCanonicalOrderSnapshotFromMerchize } from '@/lib/paypal/orderSnapshot/merchizeResolver';
 import { getCountrySupport } from '@/lib/datasetSearchers/shippingSupportMerchize';
@@ -32,11 +54,11 @@ function hasRequiredDeliveryAddress(
   const address = asRecord(value);
   return Boolean(
     address &&
-      nonEmptyString(address.shipping_address_line_1) &&
-      nonEmptyString(address.shipping_city) &&
-      nonEmptyString(address.shipping_state) &&
-      nonEmptyString(address.shipping_country) &&
-      nonEmptyString(address.zip_code),
+    nonEmptyString(address.shipping_address_line_1) &&
+    nonEmptyString(address.shipping_city) &&
+    nonEmptyString(address.shipping_state) &&
+    nonEmptyString(address.shipping_country) &&
+    nonEmptyString(address.zip_code),
   );
 }
 
@@ -47,6 +69,7 @@ function toLedgerJson(value: unknown) {
 export async function POST(req: Request) {
   const requestId = randomUUID();
   let orderToken: string | undefined;
+  let creationVersion: Date | undefined;
   const validationError = (code: string, message: string) =>
     paypalRouteError({
       status: 400,
@@ -83,10 +106,15 @@ export async function POST(req: Request) {
   }) => {
     logRouteError(stage, code, err);
 
-    if (persistToLedger && orderToken) {
+    if (persistToLedger && orderToken && creationVersion) {
       try {
-        await paypalTxLedger.paypalIntent.update({
-          where: { orderToken },
+        await paypalTxLedger.paypalIntent.updateMany({
+          where: {
+            orderToken,
+            status: PAYPAL_LEDGER_STATUS.INTENT_CREATING,
+            paypalOrderId: null,
+            updatedAt: creationVersion,
+          },
           data: {
             status: PAYPAL_LEDGER_STATUS.ERROR,
             lastErrorCode: code,
@@ -115,20 +143,10 @@ export async function POST(req: Request) {
   };
 
   try {
-    const body = asRecord(await req.json());
-    if (!body) {
-      return validationError('INVALID_REQUEST', 'A checkout request object is required.');
-    }
+    const body = await readCheckoutBody(req);
     const checkoutSurface = getCheckoutSurfaceProvenance(req);
-    const {
-      selections,
-      customer,
-      delivery_address,
-      djangoOrderIntentUuid,
-      djangoOrderIntentOrderId,
-      djangoOrderIntentPayload,
-      djangoOrderIntentVerifyPayload,
-    } = body;
+    const { selections, customer, delivery_address, djangoOrderIntentUuid, attemptId, review } =
+      body;
     const customerRecord = asRecord(customer);
     const sessionState = await getServerSessionState();
     const authenticatedUserId = sessionState.isAuthenticated ? sessionState.userID : null;
@@ -141,6 +159,100 @@ export async function POST(req: Request) {
     }
     if (!hasRequiredDeliveryAddress(delivery_address)) {
       return validationError('INVALID_DELIVERY_ADDRESS', 'Delivery address required');
+    }
+
+    const email = checkoutEmail(customerRecord.email);
+    const name = checkoutString(customerRecord.name, 200);
+    const selector = checkoutString(djangoOrderIntentUuid, 128);
+    const proof = openCheckoutValue<CheckoutEmailProof>(
+      (await cookies()).get(emailProofCookieName(selector))?.value,
+      'email-proof',
+    );
+    const browserId = openCheckoutValue<string>(
+      (await cookies()).get(CHECKOUT_BROWSER_COOKIE)?.value,
+      'browser',
+    );
+    if (
+      !proof ||
+      !browserId ||
+      proof.browserId !== browserId ||
+      !matchesCheckoutProof(proof, email, delivery_address)
+    )
+      throw new CheckoutRequestError(
+        'Verify your email for this delivery address before paying.',
+        403,
+        'CHECKOUT_EMAIL_VERIFICATION_REQUIRED',
+      );
+    const quote = readReviewedCheckoutQuote(review);
+    const requestFingerprint = checkoutInputFingerprint({
+      selections,
+      email,
+      name,
+      address: delivery_address,
+      quote,
+    });
+    orderToken = checkoutAttemptToken(attemptId, proof);
+    let existing = await paypalTxLedger.paypalIntent.findUnique({ where: { orderToken } });
+    const respond = (paypalOrderId: string) =>
+      grantCheckoutAccess(
+        paypalRouteSuccess({ requestId, data: { orderToken: orderToken!, paypalOrderId } }),
+        req,
+        {
+          orderToken: orderToken!,
+          userId: existing ? existing.userId : (authenticatedUserId ?? null),
+        },
+      );
+    if (existing) {
+      const savedInput = asRecord(existing.djangoOrderIntentPayload);
+      if (
+        savedInput?.requestFingerprint !== requestFingerprint ||
+        existing.customerEmail !== email ||
+        (existing.userId && existing.userId !== authenticatedUserId)
+      )
+        throw new CheckoutRequestError(
+          'This checkout attempt belongs to different order details. Review the order again.',
+          409,
+          'CHECKOUT_ATTEMPT_CHANGED',
+        );
+      if (authenticatedUserId && (await cookies()).has(checkoutGrantCookieName(orderToken)))
+        await requireCheckoutAccess(existing, true, req);
+      if (existing.paypalOrderId) return respond(existing.paypalOrderId);
+      if (
+        existing.status === PAYPAL_LEDGER_STATUS.INTENT_CREATING &&
+        existing.updatedAt.getTime() > Date.now() - 90_000
+      )
+        throw new CheckoutRequestError(
+          'This checkout is still being prepared. Please try again shortly.',
+          409,
+          'CHECKOUT_ATTEMPT_PENDING',
+        );
+      if (
+        ![PAYPAL_LEDGER_STATUS.INTENT_CREATING, PAYPAL_LEDGER_STATUS.ERROR].includes(
+          existing.status as typeof PAYPAL_LEDGER_STATUS.ERROR,
+        )
+      )
+        throw new CheckoutRequestError(
+          'This checkout requires recovery. Please reopen your order.',
+          409,
+          'CHECKOUT_ATTEMPT_PENDING',
+        );
+      const claimVersion = new Date();
+      const claim = await paypalTxLedger.paypalIntent.updateMany({
+        where: {
+          orderToken,
+          updatedAt: existing.updatedAt,
+          status: existing.status,
+          paypalOrderId: null,
+        },
+        data: { status: PAYPAL_LEDGER_STATUS.INTENT_CREATING, updatedAt: claimVersion },
+      });
+      if (claim.count !== 1)
+        throw new CheckoutRequestError(
+          'This checkout is being updated. Please try again shortly.',
+          409,
+          'CHECKOUT_ATTEMPT_PENDING',
+        );
+      creationVersion = claimVersion;
     }
 
     const countryIso3 = normalizeCountryToIso3(delivery_address.shipping_country);
@@ -163,13 +275,15 @@ export async function POST(req: Request) {
 
     let canonicalOrderSnapshot;
     try {
-      canonicalOrderSnapshot = await resolveCanonicalOrderSnapshotFromMerchize({
-        selections: selections as CanonicalOrderResolutionInput['selections'],
-        destination: {
-          countryIso3,
-          region: delivery_address.shipping_state,
-        },
-      });
+      canonicalOrderSnapshot = existing
+        ? parseCanonicalOrderSnapshotFromLedger(existing).snapshot
+        : await resolveCanonicalOrderSnapshotFromMerchize({
+            selections: selections as CanonicalOrderResolutionInput['selections'],
+            destination: {
+              countryIso3,
+              region: delivery_address.shipping_state,
+            },
+          });
     } catch (resolutionError) {
       if (resolutionError instanceof CanonicalOrderResolutionError) {
         return fail({
@@ -192,39 +306,59 @@ export async function POST(req: Request) {
       });
     }
 
-    orderToken = randomUUID();
-
-    await paypalTxLedger.paypalIntent.create({
-      data: {
-        orderToken,
-        status: PAYPAL_LEDGER_STATUS.INTENT_CREATING,
-        customerName: customerRecord.name.trim(),
-        customerEmail: customerRecord.email.trim(),
-        userId: authenticatedUserId,
-        djangoOrderIntentUuid: nonEmptyString(djangoOrderIntentUuid)
-          ? djangoOrderIntentUuid.trim()
-          : null,
-        djangoOrderIntentOrderId: nonEmptyString(djangoOrderIntentOrderId)
-          ? djangoOrderIntentOrderId.trim()
-          : null,
-        djangoOrderIntentPayload:
-          djangoOrderIntentPayload == null ? undefined : toLedgerJson(djangoOrderIntentPayload),
-        djangoOrderIntentVerifyPayload:
-          djangoOrderIntentVerifyPayload == null
-            ? undefined
-            : toLedgerJson(djangoOrderIntentVerifyPayload),
-        countryIso2: countrySupport.country.country_iso2,
-        countryIso3,
-        initialCurrency: canonicalOrderSnapshot.currency,
-        // Required legacy column; new consumers use the sealed canonical snapshot instead.
-        cartSnapshot: toLedgerJson(selections),
-        shippingSnapshot: delivery_address,
-        canonicalOrderSnapshot: toLedgerJson(canonicalOrderSnapshot),
-        canonicalOrderSnapshotVersion: canonicalOrderSnapshot.version,
-        canonicalOrderSnapshotHash: canonicalOrderSnapshot.hash,
-        ...checkoutSurface,
-      },
-    });
+    if (!canonicalOrderSnapshot)
+      throw new CheckoutRequestError('This checkout requires review before payment.', 409);
+    requireMatchingReview(canonicalOrderSnapshot, quote);
+    if (!existing)
+      try {
+        existing = await paypalTxLedger.paypalIntent.create({
+          data: {
+            orderToken,
+            status: PAYPAL_LEDGER_STATUS.INTENT_CREATING,
+            customerName: name,
+            customerEmail: email,
+            userId: authenticatedUserId,
+            djangoOrderIntentUuid: proof.intentUuid,
+            djangoOrderIntentOrderId: proof.orderId,
+            djangoOrderIntentPayload: toLedgerJson({ proof, requestFingerprint }),
+            djangoOrderIntentVerifyPayload: toLedgerJson({
+              verified: true,
+              intentUuid: proof.intentUuid,
+              email: proof.email,
+              review: {
+                version: 'checkout-review-v1',
+                acknowledgedAt: new Date().toISOString(),
+                quote,
+                requestFingerprint,
+              },
+            }),
+            countryIso2: countrySupport.country.country_iso2,
+            countryIso3,
+            initialCurrency: canonicalOrderSnapshot.currency,
+            // Required legacy column; new consumers use the sealed canonical snapshot instead.
+            cartSnapshot: toLedgerJson(selections),
+            shippingSnapshot: delivery_address,
+            canonicalOrderSnapshot: toLedgerJson(canonicalOrderSnapshot),
+            canonicalOrderSnapshotVersion: canonicalOrderSnapshot.version,
+            canonicalOrderSnapshotHash: canonicalOrderSnapshot.hash,
+            ...checkoutSurface,
+          },
+        });
+        creationVersion = existing.updatedAt;
+      } catch (createError) {
+        if (
+          createError &&
+          typeof createError === 'object' &&
+          'code' in createError &&
+          createError.code === 'P2002'
+        )
+          throw new CheckoutRequestError(
+            'This checkout is already being prepared. Please try again shortly.',
+            409,
+            'CHECKOUT_ATTEMPT_PENDING',
+          );
+        throw createError;
+      }
     await refreshPaidOrderRecoveryProjectionSafely(orderToken);
 
     let paypalOrder: Order;
@@ -233,11 +367,12 @@ export async function POST(req: Request) {
         orderToken,
         canonicalOrderSnapshot,
         customer: {
-          name: customerRecord.name.trim(),
-          email: customerRecord.email.trim(),
+          name: existing?.customerName ?? name,
+          email: existing?.customerEmail ?? email,
         },
-        country: countrySupport.country.country_iso2,
-        delivery_address,
+        country: existing?.countryIso2 ?? countrySupport.country.country_iso2,
+        delivery_address:
+          existing?.shippingSnapshot as ShopCheckoutStoreInterface['delivery_address'],
       });
     } catch (createErr) {
       return fail({
@@ -258,15 +393,31 @@ export async function POST(req: Request) {
     }
 
     try {
-      await paypalTxLedger.paypalIntent.update({
-        where: { orderToken },
+      const persisted = await paypalTxLedger.paypalIntent.updateMany({
+        where: {
+          orderToken,
+          status: PAYPAL_LEDGER_STATUS.INTENT_CREATING,
+          paypalOrderId: null,
+          updatedAt: creationVersion,
+        },
         data: {
           paypalOrderId: paypalOrder.id,
           status: PAYPAL_LEDGER_STATUS.INTENT_CREATED,
         },
       });
+      if (persisted.count !== 1) {
+        const latest = await paypalTxLedger.paypalIntent.findUnique({ where: { orderToken } });
+        if (latest?.paypalOrderId !== paypalOrder.id)
+          throw new CheckoutRequestError(
+            'This checkout is still being updated. Please try again shortly.',
+            409,
+            'CHECKOUT_ATTEMPT_PENDING',
+          );
+        existing = latest;
+      }
       await refreshPaidOrderRecoveryProjectionSafely(orderToken);
     } catch (persistErr) {
+      if (persistErr instanceof CheckoutRequestError) return checkoutRequestFailure(persistErr);
       return fail({
         code: 'LEDGER_UPDATE_FAILED',
         stage: 'persist_paypal_order_id',
@@ -275,14 +426,9 @@ export async function POST(req: Request) {
       });
     }
 
-    return paypalRouteSuccess({
-      requestId,
-      data: {
-        orderToken,
-        paypalOrderId: paypalOrder.id,
-      },
-    });
+    return respond(paypalOrder.id);
   } catch (err) {
+    if (err instanceof CheckoutRequestError) return checkoutRequestFailure(err);
     return fail({
       code: 'INTENT_FAILED',
       stage: 'intent_route',

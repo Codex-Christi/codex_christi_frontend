@@ -3,7 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { loginUser } from '@/actions/login';
 import { useAuthReturnPath, useAuthRoutes } from '@/components/UI/Auth/AuthRoutesProvider';
-import { clearPrivateClientState, publishSessionChange } from '@/lib/auth/client-session';
+import {
+  clearPrivateClientState,
+  isGuestSession,
+  publishSessionChange,
+} from '@/lib/auth/client-session';
 import useAuthStore from '@/stores/authStore';
 import successToast from '@/lib/success-toast';
 import { useAuthTask } from './useAuthTask';
@@ -13,11 +17,16 @@ export const useLogin = () => {
   const routes = useAuthRoutes();
   const next = useAuthReturnPath();
   const router = useRouter();
-  const login = (input: { email: string; password: string }) =>
-    task.run(
+  const login = (input: { email: string; password: string }) => {
+    const wasGuest = isGuestSession(useAuthStore.getState());
+    return task.run(
       () => loginUser(input),
       async (result) => {
-        await clearPrivateClientState();
+        const currentOwner = useAuthStore.getState().accountOwnerId;
+        await clearPrivateClientState({
+          preserveGuestCheckout:
+            wasGuest && (!currentOwner || currentOwner === result.sessionState.user_id),
+        });
         useAuthStore.getState().setSessionState(result.sessionState);
         publishSessionChange('login');
         successToast({ message: 'Signed in successfully.' });
@@ -25,5 +34,6 @@ export const useLogin = () => {
         router.refresh();
       },
     );
+  };
   return { ...task, login };
 };

@@ -1,151 +1,140 @@
-import errorToast from '@/lib/error-toast';
+import { type FC, useCallback, useContext, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { Loader2, ShieldCheck } from 'lucide-react';
 import MyPaypalButtons from './MyPaypalButtons';
 import MyPayPalCardFields from './MyPaypalCardFields';
-import { FC, useCallback } from 'react';
-import { Loader2, ShieldCheck } from 'lucide-react';
-import { CheckoutOptions } from '../PaymentSection';
+import { CheckoutPaymentReviewContext, type CheckoutOptions } from '../PaymentSection';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { usePayPalTXApproveCallback } from '@/lib/hooks/shopHooks/checkout/usePayPalTXApproveCallback';
-import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
+import {
+  beginCheckoutAttempt,
+  captureCheckoutAttempt,
+  completeCheckoutAttempt,
+  isCurrentCheckoutAttempt,
+  setCheckoutAttemptStage,
+  type CheckoutAttempt,
+} from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
+import { flushCheckoutStorage } from '@/stores/shop_stores/checkoutStore/storage';
 import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
-import successToast from '@/lib/success-toast';
+import { readCheckoutSetupFailure } from '../checkoutSetupFailure';
+import {
+  createCheckoutInput,
+  checkoutInputIdentity,
+  hasDifferentBoundCheckout,
+} from '../checkoutReview';
+
+function checkoutInput() {
+  const cart = useCartStore.getState();
+  const { djangoOrderIntentUuid } = useDjangoOrderIntentStore.getState();
+  return createCheckoutInput(cart.variants, useShopCheckoutStore.getState(), djangoOrderIntentUuid);
+}
 
 const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
-  const { first_name, last_name, email, delivery_address } = useShopCheckoutStore();
-  const { isFinalizingPayment, mainPayPalApproveCallback } = usePayPalTXApproveCallback();
-  const setIntent = usePayPalIntentStore((store) => store.setIntent);
-  const setActiveCheckoutStage = usePayPalIntentStore((store) => store.setActiveCheckoutStage);
-  const {
-    djangoOrderIntentUuid,
-    djangoOrderIntentOrderId,
-    djangoOrderIntentPayload,
-    djangoOrderIntentVerifyPayload,
-  } = useDjangoOrderIntentStore();
+  const { review, onPaymentError } = useContext(CheckoutPaymentReviewContext);
+  const { isFinalizingPayment, mainPayPalApproveCallback } =
+    usePayPalTXApproveCallback(onPaymentError);
+  const providerAttempt = useRef<CheckoutAttempt | null>(null);
+  const creating = useRef<Promise<string> | null>(null);
 
-  const createOrder = useCallback(async (): Promise<string> => {
-    type IntentResponse =
-      | {
-          data: {
-            orderToken: string;
-            paypalOrderId: string;
-          };
-          requestId: string;
-        }
-      | {
-          error: {
-            code: string;
-            stage: string;
-            message: string;
-            requestId: string;
-            orderToken?: string;
-          };
-        };
-
-    try {
-      const currentCart = useCartStore.getState();
-      const cartSnapshot = currentCart.createCheckoutSnapshot();
-      const productsByVariant = new Map(
-        currentCart.variants.map(({ variantId, itemDetail }) => [variantId, itemDetail.product]),
-      );
-      const selections = cartSnapshot.lines.map((line) => {
-        const productId = productsByVariant.get(line.variantId);
-        if (!productId) throw new Error('Please review your cart before starting checkout.');
-        return { productId, variantId: line.variantId, quantity: line.quantity };
-      });
-      const response = await fetch('/next-api/paypal/tx-ledger/intent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          // Product/variant IDs are selectors only. The server resolves every descriptive and
-          // monetary field again before creating the PayPal order.
-          selections,
-          customer: {
-            name: `${first_name} ${last_name}`,
-            email: email ?? '',
-          },
-          delivery_address,
-          djangoOrderIntentUuid,
-          djangoOrderIntentOrderId,
-          djangoOrderIntentPayload,
-          djangoOrderIntentVerifyPayload,
-        }),
-      });
-
-      const payload = (await response.json()) as IntentResponse;
-
-      if (!response.ok || !('data' in payload)) {
-        const routeError =
-          'error' in payload
-            ? payload.error
-            : {
-                code: 'UNKNOWN_INTENT_ERROR',
-                stage: 'intent_response',
-                message: 'Failed to create PayPal intent',
-                requestId: 'unknown_request_id',
-              };
-
-        const error = new Error(routeError.message ?? 'Failed to create PayPal intent');
-        error.name =
-          routeError.stage === 'resolve_canonical_order_snapshot'
-            ? 'CanonicalOrderResolutionError'
-            : 'PayPalIntentError';
-        throw error;
+  const createOrder = useCallback((): Promise<string> => {
+    if (creating.current) return creating.current;
+    const operation = (async () => {
+      if (!review) throw new Error('Review the current order details before paying.');
+      const input = checkoutInput();
+      const inputKey = checkoutInputIdentity(input, review);
+      const previousAttempt = captureCheckoutAttempt();
+      if (hasDifferentBoundCheckout(previousAttempt, inputKey)) {
+        onPaymentError(
+          'Your earlier checkout has different details. Check its payment status above before starting a separate order.',
+        );
+        throw new Error('Failed to create PayPal order');
       }
+      const cartSnapshot = useCartStore.getState().createCheckoutSnapshot();
+      const attempt = beginCheckoutAttempt(inputKey);
+      try {
+        await flushCheckoutStorage('paypal-intent-store');
+        if (!isCurrentCheckoutAttempt(attempt))
+          throw new Error('This checkout has changed. Please review it again.');
+        const response = await fetch('/next-api/paypal/tx-ledger/intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...input, attemptId: attempt.attemptId, review }),
+        });
+        const payload = (await response.json()) as {
+          data?: { orderToken?: string; paypalOrderId?: string };
+          code?: string;
+          message?: string;
+          error?: { code?: string; message?: string };
+        };
+        if (!isCurrentCheckoutAttempt(attempt))
+          throw new Error('This checkout has changed. Please review it again.');
+        if (!response.ok || !payload.data?.orderToken || !payload.data.paypalOrderId) {
+          const failure = readCheckoutSetupFailure(payload);
+          onPaymentError(failure.message, failure.code);
+          throw new Error('Failed to create PayPal order');
+        }
+        if (checkoutInputIdentity(checkoutInput(), review) !== inputKey) {
+          onPaymentError('Your cart or delivery details changed. Review them before paying.');
+          throw new Error('Failed to create PayPal order');
+        }
+        await useCartStore.getState().recordCheckout(payload.data.orderToken, cartSnapshot);
+        if (
+          !completeCheckoutAttempt(attempt, {
+            orderToken: payload.data.orderToken,
+            paypalOrderId: payload.data.paypalOrderId,
+            stage: mode === 'paypal_buttons' ? 'paypal_window_opened' : 'paypal_order_created',
+            paymentSurface: mode === 'card' ? 'card' : 'paypal_buttons',
+          })
+        )
+          throw new Error('This checkout has changed. Please review it again.');
+        await flushCheckoutStorage('paypal-intent-store');
+        if (!isCurrentCheckoutAttempt(attempt))
+          throw new Error('This checkout has changed. Please review it again.');
+        providerAttempt.current = captureCheckoutAttempt(payload.data.orderToken);
+        return payload.data.paypalOrderId;
+      } catch (error) {
+        if (
+          isCurrentCheckoutAttempt(attempt) &&
+          !(error instanceof Error && error.message === 'Failed to create PayPal order')
+        )
+          onPaymentError(
+            error instanceof Error
+              ? error.message
+              : 'We couldn’t prepare this payment. Please try again.',
+          );
+        throw new Error('Failed to create PayPal order');
+      }
+    })();
+    creating.current = operation;
+    void operation.then(
+      () => {
+        creating.current = null;
+      },
+      () => {
+        creating.current = null;
+      },
+    );
+    return operation;
+  }, [mode, review, onPaymentError]);
 
-      await useCartStore.getState().recordCheckout(payload.data.orderToken, cartSnapshot);
-      setIntent({
-        orderToken: payload.data.orderToken,
-        stage: mode === 'paypal_buttons' ? 'paypal_window_opened' : 'paypal_order_created',
-        paymentSurface: mode === 'card' ? 'card' : 'paypal_buttons',
-      });
-
-      return payload.data.paypalOrderId;
-    } catch (err: unknown) {
-      const isOrderResolutionUnavailable =
-        err instanceof Error && err.name === 'CanonicalOrderResolutionError';
-
-      errorToast({
-        header: isOrderResolutionUnavailable
-          ? 'Checkout temporarily unavailable'
-          : 'Payment setup failed',
-        message: err instanceof Error ? err.message : String(err),
-      });
-      throw new Error('Failed to create PayPal order');
-    }
-  }, [
-    delivery_address,
-    email,
-    first_name,
-    last_name,
-    djangoOrderIntentUuid,
-    djangoOrderIntentOrderId,
-    djangoOrderIntentPayload,
-    djangoOrderIntentVerifyPayload,
-    mode,
-    setIntent,
-  ]);
-
-  // Main JSX
   const handlePayPalCancel = useCallback(() => {
-    setActiveCheckoutStage('paypal_cancelled');
-    successToast({
-      header: 'Payment not completed',
-      message: 'You have not been charged. You can safely try again.',
-    });
-  }, [setActiveCheckoutStage]);
+    const attempt = providerAttempt.current;
+    if (!attempt || !setCheckoutAttemptStage(attempt, 'paypal_cancelled')) return;
+    onPaymentError(
+      'The PayPal window was closed. Check the payment status above before trying again.',
+    );
+  }, [onPaymentError]);
 
   return (
-    <div className='w-full mx-auto'>
-      {isFinalizingPayment ? <PayPalFinalizingOverlay /> : null}
-
+    <div className='mx-auto w-full min-w-0'>
+      {isFinalizingPayment && createPortal(<PayPalFinalizingOverlay />, document.body)}
       <MyPaypalButtons
         mode={mode}
         createOrder={createOrder}
         onApprove={mainPayPalApproveCallback}
         onCancel={handlePayPalCancel}
       />
-
       <MyPayPalCardFields
         mode={mode}
         createOrder={createOrder}
@@ -157,17 +146,18 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
 
 function PayPalFinalizingOverlay() {
   return (
-    <div className='fixed inset-0 z-[80] flex items-center justify-center bg-black/55 px-4 backdrop-blur-md'>
-      <div className='w-full max-w-sm overflow-hidden rounded-3xl border border-cyan-100/20 bg-slate-950/80 p-5 text-center text-white shadow-[0_28px_80px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.08)]'>
-        <div className='mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-cyan-100/25 bg-cyan-100/[0.08]'>
-          <Loader2 className='h-6 w-6 animate-spin text-cyan-100' />
-        </div>
-        <div className='mt-4 flex items-center justify-center gap-2 text-sm font-semibold text-cyan-50'>
-          <ShieldCheck size={16} />
-          Finalizing payment
-        </div>
-        <p className='mt-2 text-sm leading-5 text-white/68'>
-          PayPal approved your payment. We are securely confirming it now.
+    <div
+      role='status'
+      aria-live='polite'
+      className='fixed inset-0 z-[600] flex items-center justify-center bg-black/65 px-4 backdrop-blur-sm'
+    >
+      <div className='w-full max-w-sm rounded-2xl border border-white/20 bg-[#171717] p-6 text-center text-white'>
+        <Loader2 className='mx-auto h-8 w-8 animate-spin text-sky-200' aria-hidden='true' />
+        <p className='mt-4 flex items-center justify-center gap-2 font-semibold'>
+          <ShieldCheck size={18} aria-hidden='true' /> Confirming payment
+        </p>
+        <p className='mt-2 text-sm leading-6 text-white/70'>
+          Keep this page open while we confirm the payment with PayPal.
         </p>
       </div>
     </div>

@@ -1,3 +1,10 @@
+import {
+  checkoutString,
+  CheckoutRequestError,
+  checkoutRequestFailure,
+  readCheckoutBody,
+} from '@/lib/shop/checkout/serverRequest';
+import { requireCheckoutAccess } from '@/lib/shop/checkout/serverAccess';
 // POST /api/paypal/authorize
 import { randomUUID } from 'crypto';
 import {
@@ -56,10 +63,7 @@ async function persistAuthorizedResult(
   });
   await refreshPaidOrderRecoveryProjectionSafely(orderToken);
   if (committed.transition.reconciliationFailure) {
-    await notifyCanonicalPaymentFailure(
-      committed.row,
-      committed.transition.reconciliationFailure,
-    );
+    await notifyCanonicalPaymentFailure(committed.row, committed.transition.reconciliationFailure);
   }
 
   return committed.transition.reconciliation;
@@ -82,10 +86,7 @@ async function persistAuthorizationFailure(
   });
   await refreshPaidOrderRecoveryProjectionSafely(orderToken);
   if (committed.transition.reconciliationFailure) {
-    await notifyCanonicalPaymentFailure(
-      committed.row,
-      committed.transition.reconciliationFailure,
-    );
+    await notifyCanonicalPaymentFailure(committed.row, committed.transition.reconciliationFailure);
   }
 }
 
@@ -107,13 +108,6 @@ export async function POST(req: Request) {
     requestId,
     getOrderToken: () => orderToken,
   });
-  const validationError = (code: string, message: string, status = 400) =>
-    routeError({
-      status,
-      code,
-      stage: 'validate_request',
-      message,
-    });
   const reconciliationError = (result: CanonicalPaymentReconciliationResult) =>
     routeError({
       status: 409,
@@ -160,12 +154,9 @@ export async function POST(req: Request) {
   };
 
   try {
-    const { orderToken: requestOrderToken, orderID } = await req.json();
-    orderToken = requestOrderToken;
-
-    if (!orderToken || !orderID) {
-      return validationError('INVALID_AUTHORIZE_REQUEST', 'orderToken and orderID are required');
-    }
+    const body = await readCheckoutBody(req, 4096);
+    const orderID = checkoutString(body.orderID, 128);
+    orderToken = checkoutString(body.orderToken, 128);
 
     const intent = await paypalTxLedger.paypalIntent.findUnique({
       where: { orderToken },
@@ -179,6 +170,8 @@ export async function POST(req: Request) {
         message: 'Intent not found',
       });
     }
+
+    await requireCheckoutAccess(intent, true, req);
 
     if (!intent.paypalOrderId || intent.paypalOrderId !== orderID) {
       return routeError({
@@ -257,6 +250,7 @@ export async function POST(req: Request) {
     const orders = new OrdersController(getPayPalClient());
     const { result } = await orders.authorizeOrder({
       id: orderID,
+      paypalRequestId: `authorize:${orderToken}`,
       prefer: 'return=representation',
     });
 
@@ -276,6 +270,7 @@ export async function POST(req: Request) {
 
     return Response.json(result);
   } catch (err: unknown) {
+    if (err instanceof CheckoutRequestError) return checkoutRequestFailure(err);
     return fail({
       code: 'AUTHORIZE_FAILED',
       stage: 'authorize_order',

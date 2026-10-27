@@ -5,7 +5,7 @@
 import successToast from '@/lib/success-toast';
 import { useVerifiedEmailsStore } from '@/stores/shop_stores/checkoutStore/useVerifiedEmailsStore';
 import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import errorToast from '@/lib/error-toast';
 import {
   DjangoOrderIntentPayload,
@@ -66,12 +66,32 @@ export const useDjangoOrderIntentEmailVerification = (
     isMutating: isResending,
   } = useResendDjangoOrderIntentOTPMutation();
 
-  const getEmailStatus = useVerifiedEmailsStore((s) => s.getEmailStatus);
+  const verifiedEmails = useVerifiedEmailsStore((s) => s.verifiedEmailsList);
   const addEmailToVerifiedList = useVerifiedEmailsStore((s) => s.addEmailToVerifiedList);
   const setDjangoOrderIntent = useDjangoOrderIntentStore((s) => s.setDjangoOrderIntent);
-  const storeVerified = email ? getEmailStatus(email) === true : false;
+  const storedUuid = useDjangoOrderIntentStore((s) => s.djangoOrderIntentUuid);
+  const generation = useDjangoOrderIntentStore((s) => s.generation);
+  const latestEmail = useRef(email);
+  const requestSequence = useRef(0);
+  useEffect(() => {
+    latestEmail.current = email;
+    return () => {
+      requestSequence.current += 1;
+    };
+  }, [email]);
+  const captureRequest = useCallback(() => {
+    const sequence = ++requestSequence.current;
+    const startedGeneration = useDjangoOrderIntentStore.getState().generation;
+    const startedEmail = latestEmail.current;
+    return () =>
+      sequence === requestSequence.current &&
+      startedGeneration === useDjangoOrderIntentStore.getState().generation &&
+      latestEmail.current === startedEmail;
+  }, []);
+  const storeVerified = email ? verifiedEmails[email] === true : false;
   const [locallyVerifiedEmail, setLocallyVerifiedEmail] = useState<string | null>(null);
-  const isEmailVerified = storeVerified || (email ? locallyVerifiedEmail === email : false);
+  const isEmailVerified =
+    storeVerified || (email ? locallyVerifiedEmail === `${generation}:${email}` : false);
 
   const createDjangoOrderIntent = useCallback(
     async (payload: DjangoOrderIntentPayload, extraHeaders?: HeadersInit) => {
@@ -84,10 +104,12 @@ export const useDjangoOrderIntentEmailVerification = (
         return;
       }
 
+      const current = captureRequest();
       try {
         setLocallyVerifiedEmail(null);
 
         const resp = await trigger({ ...payload, headers: extraHeaders });
+        if (!current()) return;
         const data = resp?.data;
         const otpStatus = data?.otp_status;
 
@@ -109,7 +131,9 @@ export const useDjangoOrderIntentEmailVerification = (
           });
           return resp;
         } else if (otpStatus === 'verified') {
-          setLocallyVerifiedEmail(payload.email);
+          setLocallyVerifiedEmail(
+            `${useDjangoOrderIntentStore.getState().generation}:${payload.email}`,
+          );
           addEmailToVerifiedList(payload.email);
           successToast({
             header: 'Email verified',
@@ -132,6 +156,7 @@ export const useDjangoOrderIntentEmailVerification = (
           return resp;
         }
       } catch (err: unknown) {
+        if (!current()) return;
         const message = getDjangoOrderIntentErrorMessage(
           err,
           mutationError?.message ??
@@ -140,7 +165,15 @@ export const useDjangoOrderIntentEmailVerification = (
         errorToast({ header: 'Order verification failed', message });
       }
     },
-    [addEmailToVerifiedList, isMutating, mutationError, openOTPModal, setDjangoOrderIntent, trigger],
+    [
+      addEmailToVerifiedList,
+      captureRequest,
+      isMutating,
+      mutationError,
+      openOTPModal,
+      setDjangoOrderIntent,
+      trigger,
+    ],
   );
 
   const triggerVerifyDjangoOrderIntentOTP = useCallback(
@@ -166,10 +199,12 @@ export const useDjangoOrderIntentEmailVerification = (
         return;
       }
 
+      const current = captureRequest();
       try {
         resetVerifyDjangoOrderIntentMutation();
 
         const resp = await verifyTrigger({ email, otp, order_id });
+        if (!current()) return;
         const data = resp?.data;
         const otpStatus = data?.otp_status;
 
@@ -186,7 +221,7 @@ export const useDjangoOrderIntentEmailVerification = (
             header: 'Email verified',
             message: resp.message ?? 'Email successfully verified. Proceeding to payment...',
           });
-          setLocallyVerifiedEmail(email);
+          setLocallyVerifiedEmail(`${useDjangoOrderIntentStore.getState().generation}:${email}`);
           addEmailToVerifiedList(email);
           return resp;
         } else {
@@ -196,6 +231,7 @@ export const useDjangoOrderIntentEmailVerification = (
           });
         }
       } catch (err: unknown) {
+        if (!current()) return;
         const message = getDjangoOrderIntentErrorMessage(
           err,
           verifyError?.message ?? 'An error occurred while verifying the OTP',
@@ -205,6 +241,7 @@ export const useDjangoOrderIntentEmailVerification = (
     },
     [
       isVerifying,
+      captureRequest,
       verifyTrigger,
       verifyError,
       resetVerifyDjangoOrderIntentMutation,
@@ -224,8 +261,10 @@ export const useDjangoOrderIntentEmailVerification = (
         return;
       }
 
+      const current = captureRequest();
       try {
         const resp = await resendTrigger({ email, headers: extraHeaders });
+        if (!current()) return;
 
         successToast({
           header: 'OTP Sent - Check your email',
@@ -234,6 +273,7 @@ export const useDjangoOrderIntentEmailVerification = (
         });
         return resp;
       } catch (err: unknown) {
+        if (!current()) return;
         const message = getDjangoOrderIntentErrorMessage(
           err,
           resendError?.message ?? 'An error occurred while resending OTP',
@@ -241,7 +281,7 @@ export const useDjangoOrderIntentEmailVerification = (
         errorToast({ header: 'OTP resend failed', message });
       }
     },
-    [isResending, resendError?.message, resendTrigger],
+    [captureRequest, isResending, resendError?.message, resendTrigger],
   );
 
   return {
@@ -256,7 +296,8 @@ export const useDjangoOrderIntentEmailVerification = (
     isEmailVerified,
     createDjangoOrderIntent,
     resetDjangoOrderIntentMutation,
-    djangoOrderIntentResp,
+    djangoOrderIntentResp:
+      djangoOrderIntentResp?.data.id === storedUuid ? djangoOrderIntentResp : undefined,
     djangoOrderIntentError: mutationError,
     isDjangoOrderIntentLoading: isMutating,
   };

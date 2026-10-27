@@ -1,174 +1,112 @@
 'use client';
 
-import { useContext, useMemo, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
+import { useContext, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { ServerOrderDetailsContext } from './ServerOrderDetailsComponent';
-import { useCartStore } from '@/stores/shop_stores/cartStore';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/UI/primitives/accordion';
-import { useResponsiveSSRValue } from '@/lib/hooks/useResponsiveSSR_Store';
-import { useFadeWhenNearTarget } from '@/lib/hooks/generalHooks/scrollUxHooks';
+import { useCartStore, type CartVariant } from '@/stores/shop_stores/cartStore';
+import { MiniCartList } from '../Cart/MiniCartList';
+import OrderSummaryTotals from './OrderSummaryTotals';
+import { formatOrderMoney, type OrderPreviewTotals } from '@/lib/shop/checkout/orderMoney';
 
-const MiniCartList = dynamic(() => import('../Cart/MiniCartList').then((mod) => mod.MiniCartList), {
-  ssr: false,
-});
-
-const OrderSummaryTotals = dynamic(() => import('./OrderSummaryTotals'), { ssr: false });
-
-// Main Component
-const OrderSummary = () => {
-  const serverOrderDetails = useContext(ServerOrderDetailsContext);
+export default function CheckoutPageOrderSummary() {
+  const details = useContext(ServerOrderDetailsContext);
   const cartItems = useCartStore((state) => state.variants);
-  const { isTabletAndAbove, isTabletOnly, isMobile } = useResponsiveSSRValue();
-  const fixedMiniSummaryTotalsMobileRef = useRef<HTMLDivElement>(null);
-  const originalSummaryTotalsRef = useRef<HTMLDivElement>(null);
-  const isClient = typeof window !== 'undefined';
-
-  const { progress } = useFadeWhenNearTarget({
-    sourceRef: fixedMiniSummaryTotalsMobileRef, // kept for API compatibility
-    targetRef: originalSummaryTotalsRef, // in-flow full summary wrapper div
-    // Start ~10px before it enters from the bottom
-    offsetPx: isMobile ? -10 : isClient && window.innerHeight > 1000 ? 40 : 30,
-    // Smooth ramp: reach progress=1 by ~8% of the target height visible
-    // (Using a ratio is more stable than a fixed px value when the target height changes.)
-    rangePx: isMobile ? 0.08 : isClient && window.innerHeight > 1000 ? 0.99 : 0.1,
-    // Keep snapping gentle; CSS transition will handle visual smoothing.
-    quantizeSteps: 100,
-  });
-
-  const previewCount = isTabletAndAbove ? 2 : 1;
-  const previewItems = useMemo(() => cartItems.slice(0, previewCount), [cartItems, previewCount]);
-  const remainingItems = useMemo(() => cartItems.slice(previewCount), [cartItems, previewCount]);
-  const hasMoreItems = remainingItems.length > 0;
-
-  const [accordionValue, setAccordionValue] = useState<string | undefined>(undefined);
-  const cartCount = cartItems.length;
-  const cartPlural = cartCount === 1 ? 'item' : 'items';
-
-  const prices = serverOrderDetails?.finalPricesWithShippingFee;
-  const { retailPriceTotalNum, shippingPriceNum, totalPriceNum, currency } = prices ?? {};
-
-  const t = progress; // 0..1
-  const ease = t * t * (3 - 2 * t); // smoothstep
-  const opacity = 1 - ease; // overlay fades OUT as target becomes visible
-  const glow = (1 - ease) * 0.75; // 0..0.75
-
-  const effectiveAccordionValue = hasMoreItems ? accordionValue : undefined;
-
-  // Main JSX
   return (
-    <>
-      <div
-        className='bg-[#4C3D3D3D] backdrop-blur-[10px] p-4 rounded-[10px] md:p-10 space-y-8 lg:col-span-5 min-h-[15rem]'
-        ref={originalSummaryTotalsRef}
-      >
-        <h2 className='border-b border-white pb-1 text-xl font-bold flex items-center justify-between'>
-          <span>Order Summary</span>
-          <span className='text-sm font-medium text-white/70'>{`${cartCount} ${cartPlural}`}</span>
-        </h2>
-
-        <div className='space-y-8'>
-          <div className='space-y-4'>
-            <MiniCartList
-              items={previewItems}
-              showQuantityControls={false}
-              className='mt-1'
-              variant={isTabletAndAbove ? 'default' : 'compact'}
-              confirmBeforeRemove
-              prices={prices}
-              emptyState={<p className='text-sm text-white/60 pt-2'>Your cart is empty.</p>}
-            />
-
-            {hasMoreItems && (
-              <Accordion
-                type='single'
-                collapsible
-                value={effectiveAccordionValue}
-                onValueChange={(value) => setAccordionValue(value || undefined)}
-                className='rounded-[10px] border border-white/10'
-              >
-                <AccordionItem value='cart-items' className='border-none px-4'>
-                  <AccordionTrigger className='text-sm font-semibold text-white/80 hover:text-white py-3 px-0'>
-                    View remaining {remainingItems.length} item
-                    {remainingItems.length === 1 ? '' : 's'}
-                  </AccordionTrigger>
-                  <AccordionContent className='pb-4 px-1 max-h-80 overflow-y-auto scrollbar'>
-                    <MiniCartList
-                      items={remainingItems}
-                      showQuantityControls={false}
-                      variant='compact'
-                      className='mt-2'
-                      confirmBeforeRemove
-                      prices={prices}
-                    />
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            )}
-          </div>
-
-          {/* <div className='flex items-start gap-3'>
-          <input
-            className='input w-full !px-4 !py-2.5 !rounded-[10px] !border-[#F3F3F399] cursor-not-allowed'
-            type='text'
-            placeholder='Coupon or discount code'
-            id='coupon'
-            name='coupon'
-            disabled
-          />
-
-          <button
-            className='btn border-[#F3F3F366] text-[#F3F3F3] bg-[#F3F3F366] hover:bg-[#F3F3F366]/30 hover:text-[#F3F3F3] 
-          !font-bold px-4 sm:px-6 !py-2.5 rounded-[10px] text-sm sm:text-base text-center shrink-0 cursor-not-allowed'
-          >
-            Apply
-          </button>
-        </div> */}
-
-          <div>
-            <OrderSummaryTotals
-              cartCount={cartCount}
-              retailPriceTotalNum={retailPriceTotalNum}
-              shippingPriceNum={shippingPriceNum}
-              totalPriceNum={totalPriceNum}
-              currency={currency}
-            />
-          </div>
-        </div>
-      </div>
-
-      {(isMobile || isTabletOnly) && (
-        <OrderSummaryTotals
-          cartCount={cartCount}
-          retailPriceTotalNum={retailPriceTotalNum}
-          shippingPriceNum={shippingPriceNum}
-          totalPriceNum={totalPriceNum}
-          currency={currency}
-          slim
-          className='fixed bottom-0 left-1/2 !z-50 w-full  -translate-x-1/2 
-          shadow-[0px_0px_20px_5px_rgba(205,_205,_255,_0.75)]'
-          style={{
-            opacity,
-            // Bold but professional: dark depth + subtle glass rim + controlled violet glow.
-            boxShadow: `
-              0 18px 55px rgba(0,0,0,0.70),
-              0 0 0 1px rgba(255,255,255,0.06),
-              0 0 26px rgba(205,205,255,${Math.max(0, Math.min(1, glow * 0.6))})
-            `,
-            // Smooth out step-like IntersectionObserver updates without touching transforms.
-            transition: 'opacity 180ms ease-out, box-shadow 220ms ease-out',
-            willChange: 'opacity, box-shadow',
-            // Prevent accidental taps when the overlay is effectively invisible.
-            pointerEvents: opacity < 0.05 ? 'none' : 'auto',
-          }}
-        />
-      )}
-    </>
+    <CheckoutOrderSummaryView cartItems={cartItems} prices={details?.finalPricesWithShippingFee} />
   );
-};
+}
 
-export default OrderSummary;
+export function CheckoutOrderSummaryView({
+  cartItems,
+  prices,
+}: {
+  cartItems: CartVariant[];
+  prices?: OrderPreviewTotals;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const quantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  return (
+    <aside
+      aria-label='Order summary'
+      className='order-1 min-w-0 rounded-2xl bg-[#222]/95 p-4 sm:p-6 lg:order-2 lg:p-7'
+    >
+      <button
+        type='button'
+        aria-expanded={expanded}
+        aria-controls='checkout-order-summary'
+        onClick={() => setExpanded((value) => !value)}
+        className='flex min-h-11 w-full min-w-0 items-center justify-between gap-3 text-left lg:hidden'
+      >
+        <span className='min-w-0'>
+          <span className='block text-xl font-semibold'>Order summary</span>
+          <span className='mt-1 block text-sm text-white/65'>
+            {quantity} {quantity === 1 ? 'item' : 'items'}
+          </span>
+        </span>
+        <span className='flex min-w-0 items-center gap-2 lg:hidden'>
+          {prices && (
+            <span className='text-sm font-semibold [overflow-wrap:anywhere]'>
+              {formatOrderMoney(prices.totalPriceNum, prices.currency)}
+            </span>
+          )}
+          <ChevronDown
+            size={20}
+            aria-hidden='true'
+            className={`shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          />
+        </span>
+      </button>
+      <h2 className='hidden text-xl font-semibold lg:block'>
+        <span>Order summary</span>
+        <span className='mt-1 block text-sm font-normal text-white/65'>
+          {quantity} {quantity === 1 ? 'item' : 'items'}
+        </span>
+      </h2>
+      <div
+        id='checkout-order-summary'
+        className={`${expanded ? 'block' : 'hidden'} mt-5 space-y-6 border-t border-white/25 pt-5 lg:block`}
+      >
+        <MiniCartList
+          items={cartItems}
+          showQuantityControls={false}
+          showRemoveButton={false}
+          variant='compact'
+          confirmBeforeRemove
+          prices={prices}
+        />
+        <div>
+          <label htmlFor='checkout-discount-code' className='sr-only'>
+            Discount code
+          </label>
+          <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-3'>
+            <input
+              id='checkout-discount-code'
+              type='text'
+              disabled
+              placeholder='Coupon or discount code'
+              aria-describedby='checkout-discount-note'
+              className='min-h-11 w-full min-w-0 rounded-xl border border-white/35 bg-transparent px-3 text-sm placeholder:text-white/55 disabled:cursor-not-allowed'
+            />
+            <button
+              type='button'
+              disabled
+              className='min-h-11 rounded-xl bg-white/25 px-4 text-sm font-semibold text-white/60 disabled:cursor-not-allowed'
+            >
+              Apply
+            </button>
+          </div>
+          <p id='checkout-discount-note' className='mt-2 text-xs text-white/60'>
+            Discount codes aren’t available yet.
+          </p>
+        </div>
+        <OrderSummaryTotals
+          retailPriceTotalNum={prices?.retailPriceTotalNum}
+          shippingPriceNum={prices?.shippingPriceNum}
+          totalPriceNum={prices?.totalPriceNum}
+          currency={prices?.currency}
+        />
+      </div>
+    </aside>
+  );
+}

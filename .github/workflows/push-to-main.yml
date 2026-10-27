@@ -30,6 +30,8 @@ jobs:
         run: yarn test:storefront
       - name: Authentication safeguards
         run: yarn test:auth
+      - name: Checkout state and payment safeguards
+        run: yarn test:checkout
   deploy:
     needs: verify
     if: github.event_name == 'push'

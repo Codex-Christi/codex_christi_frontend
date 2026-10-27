@@ -7,6 +7,7 @@ import {
   clearPrivateClientState,
   clearPrivateWishlist,
   getAuthClientId,
+  isGuestSession,
 } from '@/lib/auth/client-session';
 import { clearUserMainProfileStore, useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import {
@@ -38,7 +39,9 @@ export default function LoggedinProvider({ children }: { children?: ReactNode })
         return;
       const type = message.type;
       if (type !== 'login' && type !== 'logout') return;
-      await clearPrivateClientState();
+      await clearPrivateClientState({
+        preserveGuestCheckout: type === 'login' && isGuestSession(useAuthStore.getState()),
+      });
       useAuthStore.getState().setSessionState({ isAuthenticated: false, user_id: null });
       window.location.reload();
     };

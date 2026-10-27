@@ -1,109 +1,46 @@
 import { Skeleton } from '@/components/UI/primitives/skeleton';
-import { CSSProperties, LegacyRef } from 'react';
 import { formatOrderMoney } from '@/lib/shop/checkout/orderMoney';
 
 type OrderSummaryTotalsProps = {
-  slim?: boolean;
-  className?: string;
-  cartCount: number;
   retailPriceTotalNum?: number;
   shippingPriceNum?: number;
   totalPriceNum?: number;
   currency?: string;
-  ref?: LegacyRef<HTMLDivElement>;
-  style?: CSSProperties;
+  className?: string;
 };
 
-const skel = (cls: string) => <Skeleton className={`${cls} bg-white/10`} />;
-
-const OrderSummaryTotals = ({
-  slim,
-  className,
-  cartCount,
+export default function OrderSummaryTotals({
   retailPriceTotalNum,
   shippingPriceNum,
   totalPriceNum,
   currency,
-  ref,
-  style,
-}: OrderSummaryTotalsProps) => {
-  const isSlim = !!slim;
-  const hasPricing =
-    retailPriceTotalNum != null && shippingPriceNum != null && totalPriceNum != null && !!currency;
-
-  const subtotal = hasPricing ? formatOrderMoney(retailPriceTotalNum, currency) : '';
-  const shipping = hasPricing ? formatOrderMoney(shippingPriceNum, currency) : '';
-  const total = hasPricing ? `${formatOrderMoney(totalPriceNum, currency)} ${currency}` : '';
-
-  const rows: Array<[label: string, value: string, skeletonClass: string]> = isSlim
-    ? [
-        ['Subtotal', subtotal, 'h-3 w-20'],
-        ['Shipping', shipping, 'h-3 w-16'],
-      ]
-    : [
-        ['Subtotal', subtotal, 'h-4 w-20'],
-        ['Shipping/Delivery Fee', shipping, 'h-4 w-24'],
-      ];
-
-  const cartPlural = cartCount === 1 ? 'item' : 'items';
-
-  const renderValue = (value: string, skeletonClass: string, valueClassName?: string) =>
-    hasPricing ? <span className={valueClassName}>{value}</span> : skel(skeletonClass);
-
-  const rowWrapClass = isSlim
-    ? 'flex items-center justify-between gap-3'
-    : 'flex items-center justify-between gap-4 font-semibold';
-  const rowsContainerClass = isSlim ? 'space-y-1 text-xs' : 'space-y-2 text-[#F3F3F3]';
-  const labelClass = isSlim ? 'text-white/95' : undefined;
-  const defaultValueClass = isSlim ? 'font-medium' : undefined;
-
-  const Rows = (
-    <div className={rowsContainerClass}>
-      {rows.map(([label, value, skeletonClass]) => (
-        <div key={label} className={rowWrapClass}>
-          <span className={labelClass}>{label}</span>
-          {renderValue(value, skeletonClass, defaultValueClass)}
-        </div>
-      ))}
-    </div>
-  );
-
-  const TotalLine = isSlim ? (
-    <div className='mt-2 flex items-center justify-between gap-3 border-t border-white/10 pt-2'>
-      <span className='text-sm font-semibold'>Total</span>
-      {renderValue(total, 'h-4 w-24', 'text-sm font-semibold')}
-    </div>
-  ) : (
-    <div className='flex items-center justify-between gap-4 mt-5 font-semibold text-[#F3F3F3]'>
-      <span>Total</span>
-      {renderValue(total, 'h-5 w-28', 'text-xl')}
-    </div>
-  );
-
-  if (!isSlim) {
-    return (
-      <div className={className ?? ''} ref={ref}>
-        {Rows}
-        {TotalLine}
-      </div>
+  className,
+}: OrderSummaryTotalsProps) {
+  const value = (amount?: number) =>
+    amount != null && currency ? (
+      <span className='min-w-0 text-right [overflow-wrap:anywhere]'>
+        {formatOrderMoney(amount, currency)}
+      </span>
+    ) : (
+      <Skeleton aria-label='Updating price' className='ml-auto h-5 w-20 bg-white/10' />
     );
-  }
-
   return (
-    <div
-      className={`rounded-t-[10px] border border-white/10 bg-black/75 px-3 py-3 text-[#F3F3F3] 
-        backdrop-blur-[12px] ${className ? ` ${className}` : ''}`}
-      ref={ref}
-      style={style}
-    >
-      <div className='flex items-center justify-between gap-3 pb-2'>
-        <span className='text-sm font-semibold'>Order Summary</span>
-        <span className='text-xs font-medium text-white'>{`${cartCount} ${cartPlural}`}</span>
+    <dl className={`space-y-3 text-sm ${className ?? ''}`}>
+      <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,auto)] items-baseline gap-3'>
+        <dt>Subtotal</dt>
+        <dd>{value(retailPriceTotalNum)}</dd>
       </div>
-      {/* {Rows} */}
-      {TotalLine}
-    </div>
+      <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,auto)] items-baseline gap-3'>
+        <dt>Shipping / delivery</dt>
+        <dd>{value(shippingPriceNum)}</dd>
+      </div>
+      <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,auto)] items-baseline gap-3 border-t border-white/30 pt-5 text-lg font-semibold'>
+        <dt>
+          Total
+          {currency && <span className='ml-2 text-xs font-normal text-white/65'>{currency}</span>}
+        </dt>
+        <dd>{value(totalPriceNum)}</dd>
+      </div>
+    </dl>
   );
-};
-
-export default OrderSummaryTotals;
+}

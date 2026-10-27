@@ -3,10 +3,10 @@ import { PayPalScriptOptions } from '@paypal/paypal-js';
 import {
   DISPATCH_ACTION,
   PayPalScriptProvider,
-  ScriptContext,
   usePayPalScriptReducer,
 } from '@paypal/react-paypal-js';
-import { FC, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import type { CheckoutOptions } from '../PaymentSection';
 import PayPalLoadingSkeleton from './PayPalLoadingSkeleton';
 
 // Single namespace for the PayPal JS SDK globals
@@ -24,7 +24,7 @@ type PayPalLoaderOptions = {
   'data-sdk-integration-source'?: string; // informational/analytics
 };
 
-type PayPalMode = 'card' | 'paypal_buttons' | 'google_pay' | '';
+type PayPalMode = CheckoutOptions;
 
 const areOptionsEqual = (a: PayPalScriptOptions, b: PayPalScriptOptions) =>
   a.clientId === b.clientId &&
@@ -42,8 +42,6 @@ const PayPalScriptGate: FC<{
   mode?: PayPalMode;
 }> = ({ options, children, mode }) => {
   const [{ isInitial, isPending, isRejected }, dispatch] = usePayPalScriptReducer();
-  const scriptContext = useContext(ScriptContext);
-  const loadingStatusErrorMessage = scriptContext?.loadingStatusErrorMessage;
   const prevOptionsRef = useRef<PayPalScriptOptions | null>(null);
   const shouldLoad = mode === 'card' || mode === 'paypal_buttons';
 
@@ -67,9 +65,18 @@ const PayPalScriptGate: FC<{
 
   if (isRejected) {
     return (
-      <div className='space-y-2 text-error text-sm'>
-        <div>PayPal failed to load. Please refresh or try again.</div>
-        {loadingStatusErrorMessage ? <div>{loadingStatusErrorMessage}</div> : null}
+      <div
+        role='alert'
+        className='space-y-3 rounded-xl border border-amber-200/30 p-4 text-sm text-amber-100'
+      >
+        <p>The payment options couldn’t load. Check your connection and try again.</p>
+        <button
+          type='button'
+          onClick={() => dispatch({ type: DISPATCH_ACTION.RESET_OPTIONS, value: options })}
+          className='min-h-11 rounded-lg border border-current px-4 font-semibold'
+        >
+          Try again
+        </button>
       </div>
     );
   }

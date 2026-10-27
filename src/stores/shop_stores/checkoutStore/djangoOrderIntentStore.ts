@@ -5,6 +5,7 @@ import { persist } from 'zustand/middleware';
 import { createCheckoutObfuscatedStorage } from './storage';
 
 interface DjangoOrderIntentState {
+  generation: number;
   djangoOrderIntentUuid: string;
   djangoOrderIntentOrderId: string;
   djangoOrderIntentPayload: unknown | null;
@@ -32,6 +33,7 @@ export const useDjangoOrderIntentStore = create<DjangoOrderIntentState>()(
   persist(
     (set) => ({
       ...initialState,
+      generation: 0,
       setDjangoOrderIntent: (intent) =>
         set((state) => ({
           djangoOrderIntentUuid: intent.djangoOrderIntentUuid ?? state.djangoOrderIntentUuid,
@@ -50,11 +52,18 @@ export const useDjangoOrderIntentStore = create<DjangoOrderIntentState>()(
               ? state.djangoOrderIntentVerifiedAt
               : intent.djangoOrderIntentVerifiedAt,
         })),
-      clearDjangoOrderIntent: () => set({ ...initialState }),
+      clearDjangoOrderIntent: () =>
+        set((state) => ({ ...initialState, generation: state.generation + 1 })),
     }),
     {
       name: 'django-order-intent-store',
       storage: createCheckoutObfuscatedStorage<DjangoOrderIntentState>('django-order-intent-store'),
+      partialize: (state) => ({ ...state, generation: 0 }),
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<DjangoOrderIntentState>),
+        generation: current.generation,
+      }),
       skipHydration: typeof window === 'undefined',
     },
   ),

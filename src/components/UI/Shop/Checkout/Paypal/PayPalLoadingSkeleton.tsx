@@ -1,7 +1,8 @@
 import { cn } from '@/lib/utils';
 import { FC } from 'react';
+import type { CheckoutOptions } from '../PaymentSection';
 
-type PayPalMode = 'card' | 'paypal_buttons' | 'google_pay' | '';
+type PayPalMode = CheckoutOptions;
 
 const shimmerStyle = {
   backgroundImage:

@@ -19,7 +19,6 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/UI/primitive
 import { Button } from '@/components/UI/primitives/button';
 import {
   AlertTriangle,
-  BellRing,
   CheckCircle2,
   Clipboard,
   Clock3,
@@ -241,11 +240,6 @@ export const PaidCheckoutRecoveryModal = (props: PaidCheckoutRecoveryModalProps)
       errorToast({ message: 'Unable to copy support details.' });
     }
   }, [checkouts]);
-
-  const notifySupportPlaceholder = React.useCallback(() => {
-    // TODO: Replace this close-only placeholder with the support notification workflow.
-    handleOpenChange(false);
-  }, [handleOpenChange]);
 
   const startSeparateOrder = React.useCallback(async () => {
     setIsContinuing(true);
@@ -532,26 +526,15 @@ export const PaidCheckoutRecoveryModal = (props: PaidCheckoutRecoveryModalProps)
               <div className='sticky bottom-0 -mx-5 mt-4 border-t border-white/10 bg-slate-950/75 px-5 pt-4 pb-1 supports-[backdrop-filter]:backdrop-blur-xl sm:-mx-6 sm:px-6'>
                 <div className='grid grid-cols-2 gap-3'>
                   {checkouts.length ? (
-                    <>
-                      <Button
-                        name='Notify support about recovered checkout'
-                        type='button'
-                        onClick={notifySupportPlaceholder}
-                        className='col-span-2 rounded-2xl bg-white text-black hover:bg-white/90 font-semibold gap-2'
-                      >
-                        <BellRing size={17} />
-                        Notify support
-                      </Button>
-                      <Button
-                        name='Copy checkout recovery support details'
-                        type='button'
-                        onClick={copySupportDetails}
-                        className='rounded-2xl border border-white/20 bg-transparent hover:bg-white/10 font-semibold gap-2'
-                      >
-                        <Clipboard size={17} />
-                        Copy details
-                      </Button>
-                    </>
+                    <Button
+                      name='Copy checkout recovery support details'
+                      type='button'
+                      onClick={copySupportDetails}
+                      className='rounded-2xl border border-white/20 bg-transparent hover:bg-white/10 font-semibold gap-2'
+                    >
+                      <Clipboard size={17} />
+                      Copy details
+                    </Button>
                   ) : null}
                   <Button
                     name='Start a new order after checkout recovery'

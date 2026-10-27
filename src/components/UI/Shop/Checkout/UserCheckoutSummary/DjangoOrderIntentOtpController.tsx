@@ -7,12 +7,8 @@ import {
 import { forwardRef, useCallback, useEffect } from 'react';
 import loadingToast from '@/lib/loading-toast';
 import { toast } from 'sonner';
-import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
 
-type DjangoOrderIntentOtpControllerProps = Omit<
-  DjangoOrderIntentOtpModalProps,
-  'onComplete'
-> & {
+type DjangoOrderIntentOtpControllerProps = Omit<DjangoOrderIntentOtpModalProps, 'onComplete'> & {
   proceedToPaymentTrigger: (itemValue: 'basic-checkout-info' | 'payment-section') => void;
   djangoOrderIntentEmailVerification: ReturnType<typeof useDjangoOrderIntentEmailVerification>;
 };
@@ -30,8 +26,7 @@ export const DjangoOrderIntentOtpController = forwardRef<
     isVerifying,
     isDjangoOrderIntentLoading,
   } = djangoOrderIntentEmailVerification;
-  const { id: djangoOrderIntentUuid, order_id } = djangoOrderIntentResp?.data || {};
-  const setDjangoOrderIntent = useDjangoOrderIntentStore((s) => s.setDjangoOrderIntent);
+  const { order_id } = djangoOrderIntentResp?.data || {};
   const { email } = rest;
 
   useEffect(() => {
@@ -72,26 +67,12 @@ export const DjangoOrderIntentOtpController = forwardRef<
                 return;
               }
 
-              setDjangoOrderIntent({
-                djangoOrderIntentUuid: resp.data.id ?? djangoOrderIntentUuid,
-                djangoOrderIntentOrderId: resp.data.order_id,
-                djangoOrderIntentVerifyPayload: resp,
-                djangoOrderIntentVerifiedAt: new Date().toISOString(),
-              });
               rest.onOpenChange?.(false);
               proceedToPaymentTrigger('payment-section');
             }
           }
         },
-        [
-          djangoOrderIntentUuid,
-          email,
-          order_id,
-          proceedToPaymentTrigger,
-          rest,
-          setDjangoOrderIntent,
-          triggerVerifyDjangoOrderIntentOTP,
-        ],
+        [email, order_id, proceedToPaymentTrigger, rest, triggerVerifyDjangoOrderIntentOTP],
       )}
     />
   );

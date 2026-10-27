@@ -21,6 +21,7 @@ export type BuildPayPalOrderCreatePayloadInput = Readonly<{
 export type PayPalOrderCreatePayload = Readonly<{
   body: OrderRequest;
   prefer: 'return=representation';
+  paypalRequestId: string;
 }>;
 
 const shippingPreferenceForPaymentContext = {
@@ -63,6 +64,7 @@ export function buildPayPalOrderCreatePayload({
   const items = canonicalOrderSnapshot.lines.map((line) => buildPayPalItem(line, currencyCode));
 
   return {
+    paypalRequestId: `create:${orderToken}`,
     body: {
       intent: 'AUTHORIZE' as CheckoutPaymentIntent,
       purchaseUnits: [

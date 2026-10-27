@@ -109,6 +109,19 @@ test('builds multi-currency PayPal items and exact totals only from the canonica
   );
 });
 
+test('provider creation uses one stable request ID per immutable checkout attempt', () => {
+  const input = buildInput();
+  assert.equal(buildPayPalOrderCreatePayload(input).paypalRequestId, `create:${input.orderToken}`);
+  assert.equal(
+    buildPayPalOrderCreatePayload(input).paypalRequestId,
+    buildPayPalOrderCreatePayload(input).paypalRequestId,
+  );
+  assert.notEqual(
+    buildPayPalOrderCreatePayload(input).paypalRequestId,
+    buildPayPalOrderCreatePayload({ ...input, orderToken: 'another-attempt' }).paypalRequestId,
+  );
+});
+
 test('passes zero-decimal snapshot amounts to PayPal without adding decimal precision', () => {
   const snapshot = euroSnapshot();
   snapshot.currency = 'JPY';

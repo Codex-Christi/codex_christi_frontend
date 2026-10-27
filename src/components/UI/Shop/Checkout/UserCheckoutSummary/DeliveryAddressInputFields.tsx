@@ -1,47 +1,33 @@
-import { FieldValues, UseFormReturn } from 'react-hook-form';
+import type { UseFormReturn } from 'react-hook-form';
 import { GenericCheckoutInfoInput } from './GenericCheckoutInfoInput';
-import { BasicCheckoutInfoFormSchema } from './BasicCheckoutInfo';
+import type { BasicCheckoutInfoFormSchema } from './BasicCheckoutInfo';
 
-interface DeliveryInputFieldsProps<T extends FieldValues> {
-  //   billingAddress: BillingAddress;
-  //   handleBillingAddressChange: (
-  //     field: keyof BillingAddress,
-  //     value: string
-  //   ) => void;
-  currentZodForm: UseFormReturn<T>;
-}
+const fields = [
+  { name: 'addressLine1', label: 'Street address', autoComplete: 'address-line1', fullWidth: true },
+  {
+    name: 'addressLine2',
+    label: 'Apartment, suite, etc. (optional)',
+    autoComplete: 'address-line2',
+    fullWidth: true,
+  },
+  { name: 'adminArea2', label: 'City / town', autoComplete: 'address-level2' },
+  { name: 'adminArea1', label: 'State / province', autoComplete: 'address-level1' },
+  { name: 'postalCode', label: 'Postal code', autoComplete: 'postal-code' },
+] as const;
 
-// Main Component
-export const DeliveryAddressInputFields = ({
+export function DeliveryAddressInputFields({
   currentZodForm,
-}: DeliveryInputFieldsProps<BasicCheckoutInfoFormSchema>) => {
-  // Main JSX
-  return (
-    <>
-      {/* Delivery Details Inputs */}
-      {(
-        [
-          { placeholder: 'Address Line 1', strName: 'addressLine1' },
-          { placeholder: 'Apt. Number (Address Line 2) ', strName: 'addressLine2' },
-          { placeholder: 'State / Province', strName: 'adminArea1' },
-          { placeholder: 'City / Town', strName: 'adminArea2' },
-          { placeholder: 'Postal Code', strName: 'postalCode' },
-        ] as {
-          placeholder: string;
-          strName: string;
-        }[]
-      ).map((each) => {
-        const { strName, placeholder } = each;
-        return (
-          <GenericCheckoutInfoInput
-            currentZodForm={currentZodForm}
-            key={strName as string}
-            inputName={strName as string}
-            placeholder={placeholder}
-            labelString={placeholder}
-          />
-        );
-      })}
-    </>
-  );
-};
+}: {
+  currentZodForm: UseFormReturn<BasicCheckoutInfoFormSchema>;
+}) {
+  return fields.map(({ name, label, autoComplete, ...layout }) => (
+    <GenericCheckoutInfoInput
+      key={name}
+      currentZodForm={currentZodForm}
+      inputName={name}
+      labelString={label}
+      autoComplete={autoComplete}
+      className={'fullWidth' in layout ? 'sm:col-span-2' : undefined}
+    />
+  ));
+}
