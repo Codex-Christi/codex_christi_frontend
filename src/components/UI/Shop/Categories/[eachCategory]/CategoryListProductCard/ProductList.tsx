@@ -24,7 +24,7 @@ export default function ProductList({
           <Skeleton count={count} />
         ) : (
           initialData.map((product, index) => (
-            <ProductCard key={product._id} product={product} priority={index < 4} />
+            <ProductCard key={product._id} product={product} priority={index === 0} />
           ))
         )}
       </div>
@@ -33,7 +33,7 @@ export default function ProductList({
         name='Refresh Products Button'
         onClick={() => startTransition(() => router.refresh())}
         disabled={isPending}
-        className='px-4 py-2 bg-[#0085FF] text-white mx-auto rounded hover:bg-blue-600 disabled:opacity-50'
+        className='px-4 py-2 bg-[#0066CC] text-white mx-auto rounded hover:bg-blue-700 disabled:opacity-50'
       >
         {isPending ? 'Refreshing...' : 'Refresh Products'}
       </Button>

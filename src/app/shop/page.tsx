@@ -1,16 +1,13 @@
 import Categories from '@/components/UI/Shop/Index/Categories';
-// import SpecialDeals from '@/components/UI/Shop/Index/SpecialDeals';
 import { FC } from 'react';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
-import dynamic from 'next/dynamic';
-
-const Deals = dynamic(() => import('@/components/UI/Shop/Index/Deals'));
+import Deals from '@/components/UI/Shop/Index/Deals';
 
 export const revalidate = 3600;
 
 const Shop: FC = () => {
   return (
-    <>
+    <main>
       <aside
         aria-label='Shop alpha notice'
         className='mx-2 mt-4 rounded-xl border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-center text-sm leading-6 text-amber-50 md:mx-5 lg:mx-6'
@@ -154,9 +151,8 @@ const Shop: FC = () => {
 
         <Categories />
 
-        {/* <SpecialDeals /> */}
       </div>
-    </>
+    </main>
   );
 };
 

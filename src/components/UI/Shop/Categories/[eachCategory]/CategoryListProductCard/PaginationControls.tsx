@@ -38,7 +38,7 @@ export default function PaginationControls({
   return (
     <div className='flex justify-center items-center my-8 space-x-1'>
       {currentPage === 1 ? (
-        <span className={disabledClassName} aria-disabled='true' aria-label='Previous page'>
+        <span role='link' className={disabledClassName} aria-disabled='true' aria-label='Previous page'>
           <ChevronLeft size={20} />
         </span>
       ) : (
@@ -72,7 +72,7 @@ export default function PaginationControls({
       )}
 
       {currentPage === totalPages ? (
-        <span className={disabledClassName} aria-disabled='true' aria-label='Next page'>
+        <span role='link' className={disabledClassName} aria-disabled='true' aria-label='Next page'>
           <ChevronRight size={20} />
         </span>
       ) : (

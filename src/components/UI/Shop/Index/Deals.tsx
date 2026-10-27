@@ -4,14 +4,11 @@ import CustomShopLink from '../HelperComponents/CustomShopLink';
 import DealsScrollControls from './DealsScrollControls';
 import styles from './Deals.module.css';
 
-// Top-Page Deals Component
 const Deals = () => {
   const eagerImageCount = 1;
   const imageQuality = 50;
-  const imageSizes =
-    '(max-width: 640px) 80px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 160px';
+  const imageSizes = '(max-width: 767px) 135px, 160px';
 
-  // Main JSX
   return (
     <div
       className='min-h-[21rem] md:min-h-[14rem] md:pt-12 pb-8 px-4 bg-[linear-gradient(95.55deg,_#9747FF_3.68%,_#4264FF_53.29%,_#007AFF_100%)] relative 
@@ -20,20 +17,20 @@ const Deals = () => {
       {/* Launch Merch Text */}
       <CustomShopLink
         href='/shop/category/launch-merch'
-        className='flex font-ocr justify-between md:gap-4 -ml-10 md:ml-[unset]
+        className='flex h-28 font-ocr items-center justify-between md:h-auto md:gap-4
          md:col-span-4 md:flex-col place-items-center select-none md:scale-[0.6] lg:scale-100
       '
       >
-        <div className=' -space-y-8 md:-space-y-2 flex flex-col items-center justify-center'>
-          <p className={`${styles.outlinedText} scale-[0.6] md:scale-100 text-7xl -tracking-widest text-center`}>
+        <div className='flex w-32 shrink-0 flex-col items-center justify-center md:w-auto md:-space-y-2'>
+          <p className={`${styles.outlinedText} whitespace-nowrap text-[2rem] leading-none text-center md:text-7xl`}>
             Launch
           </p>
-          <p className={`${styles.outlinedText} scale-[0.6] md:scale-100 text-7xl -tracking-widest text-center`}>
+          <p className={`${styles.outlinedText} whitespace-nowrap text-[2rem] leading-none text-center md:text-7xl`}>
             Merch
           </p>
         </div>
         <div className='text-center mt-0.5'>
-          <div className='bg-white text-[#007AFF] font-bold rounded-lg py-2 px-4 mx-auto text-center w-auto inline-block'>
+          <div className='bg-white text-[#0066CC] whitespace-nowrap text-sm md:text-base font-bold rounded-lg py-2 px-3 md:px-4 mx-auto text-center w-auto inline-block'>
             Special Sales
           </div>
         </div>

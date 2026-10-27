@@ -1,5 +1,6 @@
 import ProfileSidebar from '@/components/UI/profile/ProfileSidebar';
 import RequireAccount from '@/components/UI/Auth/RequireAccount';
+import '../route-utilities.css';
 import dynamic from 'next/dynamic';
 const CometsContainer = dynamic(() => import('@/components/UI/general/CometsContainer'));
 

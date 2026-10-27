@@ -48,9 +48,9 @@ export default function ProductCard({
             alt={product.title}
             height={300}
             width={150}
-            fetchPriority={priority ? 'high' : 'auto'}
-            loading={priority ? 'eager' : 'lazy'}
-            sizes='(min-width: 1280px) 25vw, (min-width: 900px) 33vw, (min-width: 640px) 50vw, 100vw'
+            preload={priority}
+            loading={priority ? undefined : 'lazy'}
+            sizes='(max-width: 639px) min(306px, calc(100vw - 68px)), (max-width: 899px) min(306px, calc((100vw - 96px) / 2)), (max-width: 1279px) min(346px, calc((100vw - 124px) / 3)), min(346px, calc((100vw - 152px) / 4))'
             className='h-auto w-full object-cover object-top aspect-[16/18] md:aspect-[16/13]'
             style={{ filter: isDayOrNight() === 'night' ? 'brightness(.9)' : 'none' }}
           />
@@ -75,7 +75,7 @@ export default function ProductCard({
                   buttonProps={{
                     type: 'button',
                     name: `Add ${product.title} to cart`,
-                    className: `px-3 py-1 bg-[#0085FF] font-ocr text-[0.95rem] font-[900] rounded-md hover:bg-gray-500 
+                    className: `px-3 py-1 bg-[#0066CC] font-ocr text-[0.95rem] font-[900] rounded-md hover:bg-gray-500
                     transition-colors hover:scale-110`,
                   }}
                 />

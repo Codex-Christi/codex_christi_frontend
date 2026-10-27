@@ -1,3 +1,4 @@
+import '../../route-utilities.css';
 import AuthFormLayout from '@/components/UI/Auth/AuthFormLayout';
 import type { ReactNode } from 'react';
 

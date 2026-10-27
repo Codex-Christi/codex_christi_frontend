@@ -1,4 +1,5 @@
 import AboutUs from '@/components/UI/about/AboutUs';
+import '../route-utilities.css';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
 import CometsContainer from '@/components/UI/general/CometsContainer';
 import Image from 'next/image';

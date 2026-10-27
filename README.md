@@ -12,6 +12,22 @@ for routing, server/client boundaries, tests, deployment and remaining proxy wor
 The [original audit index](Future%20Implementation%20Guides/auth-session-shop-domain-audit-and-implementation-plan.md)
 is historical, not a second implementation plan.
 
+### Storefront CSS
+
+Shop browsing loads a smaller stylesheet instead of downloading every page's styles:
+
+- `globals.css` and `tailwind.storefront.config.ts`: shared UI, shop home, categories and products.
+- `route-utilities.css` and `tailwind.route-utilities.config.ts`: extra styles for home, About,
+  authentication, profiles, cart, checkout, account pages and wishlist.
+- `admin.css`: the existing admin styles.
+
+Keep extra styles imported at their page or layout boundary, not the root layout.
+Include new browsing components in the storefront content paths. Tailwind/shadcn classes
+still work normally; no CSS Modules migration is required. Next.js may keep a stylesheet
+after client-side navigation, so this split primarily reduces the initial browsing download.
+Run `node --import tsx --test scripts/storefront-css.test.ts` to check rule coverage,
+route imports and the shared CSS size budget. ISR and data caching are unchanged.
+
 ### Storefront Rendering
 
 Product metadata and the gallery render before destination-verified options arrive.
@@ -25,6 +41,13 @@ There is no fixed-height options panel or hidden overflow. A missing snapshot us
 a generic placeholder, and genuinely new options can still increase its height.
 The canonical selector is `VariantAttributeSelector`; the server page structure is
 `ProductDetailsShell`. Size and colour ordering live in `productOptionLayout.ts`.
+
+Reserve image space before loading, keep responsive `sizes` aligned with the rendered
+width, and preload only the leading category product image. Gallery settings remain
+shared in `src/components/UI/Shop/ProductDetails/ProductImageGallery/galleryShared.tsx`;
+changing OG metadata does not resize gallery images.
+Do not remove glass blur based on CSS size alone: the local gallery blur comparison
+showed no meaningful render-delay improvement, so the measured design was preserved.
 
 ### About Hero Assets
 

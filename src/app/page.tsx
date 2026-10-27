@@ -1,4 +1,5 @@
 import HomePageComponent from '@/components/UI/Home';
+import './route-utilities.css';
 import BluePlanet from '@/components/UI/Home/BluePlanet';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
 

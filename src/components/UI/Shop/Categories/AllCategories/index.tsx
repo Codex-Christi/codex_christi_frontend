@@ -60,7 +60,7 @@ const AllCategoriesClientComponent = () => {
 
   //   Main JSX
   return (
-    <div
+    <main
       className=' backdrop-blur-[10px] my-10 rounded-[10px] p-3 py-10  w-full sm:w-[80vw] lg:w-[75%] mx-auto max-w-[1200px] 
       md:p-10 !pb-24'
       style={{
@@ -96,7 +96,7 @@ const AllCategoriesClientComponent = () => {
           );
         })}
       </section>
-    </div>
+    </main>
   );
 };
 
@@ -124,18 +124,18 @@ const ShopLinkWithIcon: FC<ShopLinkWithIconInterface> = ({
   return (
     <CustomShopLink
       className={`${styles['category-grid-item']} flex flex-col gap-2 items-center justify-center mx-auto 
-             p-10 md:p-14 category-grid-item w-full ${numOfGridChildren! > 3 ? 'border-b-[1px]' : ''} 
+             px-2 py-8 sm:px-4 sm:py-10 lg:p-10 category-grid-item w-full ${numOfGridChildren! > 3 ? 'border-b-[1px]' : ''}
              group hover:bg-black/50 hover:backdrop-blur-sm`}
       href={`/shop/category${href}`}
       tabIndex={0}
     >
-      <h4
-        className={`text-nowrap group-hover:scale-125 group-hover:font-semibold group-hover:font-ocr
+      <h2
+        className={`max-w-full text-center text-sm sm:text-base break-words group-hover:scale-125 group-hover:font-semibold group-hover:font-ocr
           group-focus-visible:underline
            transition-transform duration-300 ease-in-out`}
       >
         {textValue}
-      </h4>
+      </h2>
       <SvgElem
         className='group-hover:scale-150 transition-transform duration-300 ease-in-out'
         width={30}

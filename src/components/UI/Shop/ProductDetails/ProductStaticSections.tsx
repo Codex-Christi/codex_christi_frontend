@@ -97,7 +97,7 @@ export function ProductFeedbackSection() {
         <p>Please tell us what you think.</p>
 
         <Link
-          className='text-center bg-[#0085FF] px-4 py-3 rounded-lg text-white'
+          className='text-center bg-[#0066CC] px-4 py-3 rounded-lg text-white'
           href='/shop/contact-us/'
         >
           Kindly give us a feedback!

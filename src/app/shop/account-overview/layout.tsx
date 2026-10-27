@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 
+import '../../route-utilities.css';
 import RequireAccount from '@/components/UI/Auth/RequireAccount';
 
 const AccountOverviewLayout = async ({ children }: { children: React.ReactNode }) => {

@@ -44,11 +44,18 @@ export const DeliveryandPaymentsBanner = () => {
           encryption and PCI DSS data protection protocols
         </p>
 
-        <Image
-          className='inline-block w-1/2 h-auto'
-          src={PaymentProcessors}
-          alt='SECURITY & PAYMENTS'
-        />
+        <div
+          className='relative w-1/2'
+          style={{ aspectRatio: `${PaymentProcessors.width} / ${PaymentProcessors.height}` }}
+        >
+          <Image
+            className='object-contain object-left'
+            src={PaymentProcessors}
+            alt='SECURITY & PAYMENTS'
+            fill
+            sizes='(max-width: 1023px) 50vw, 17vw'
+          />
+        </div>
       </div>
 
       <div className='space-y-1'>

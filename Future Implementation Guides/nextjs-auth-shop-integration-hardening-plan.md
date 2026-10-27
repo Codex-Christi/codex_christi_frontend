@@ -109,7 +109,7 @@ Browser checks in the implementation pass verified invalid login/reset submissio
 
 Before committing, test the staged tree separately from the unrelated dirty working tree and inspect its action manifest for exposed private helpers. Do not run a verification server against a build directory another task is overwriting. Local tests do not establish production proxy/cache/token behavior or a measured latency improvement.
 
-Commit verification on 2026-10-27: all 46 tests, TypeScript and targeted ESLint passed in an exported staged tree. Its production webpack build also passed after supplying the two existing local storefront CSS files as temporary verification dependencies, not staged changes. Without them, the clean staged build fails because baseline commit `64335359` already imports untracked `src/app/route-utilities.css` from the wishlist page; its `tailwind.route-utilities.config.ts` is also untracked. Complete that separate storefront change before deploying a fresh checkout. Auth-only staging deliberately excludes those files and their unrelated layout imports.
+Auth commit verification on 2026-10-27: all 46 tests, TypeScript and targeted ESLint passed in an exported staged tree. Its production webpack build also passed with the separate storefront CSS changes included as verification dependencies. Those styles and their route imports are maintained by the [Storefront CSS guide](../README.md#storefront-css), not by the auth implementation. Keep both CSS files in deployments; the storefront regression test checks their route imports and rule coverage. The storefront changes were also verified in a full isolated Turbopack production build.
 
 ## Deployment Checklist
 

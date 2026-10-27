@@ -43,7 +43,7 @@ export default function ProductDetailsShell({
   optionLayoutHints,
 }: ProductDetailsShellProps) {
   return (
-    <div className='grid min-w-0 gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-6 xl:grid-cols-3'>
+    <main className='grid min-w-0 gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] lg:grid-cols-6 xl:grid-cols-3'>
       <ProductDetailsProvider
         key={productId}
         productId={productId}
@@ -99,6 +99,6 @@ export default function ProductDetailsShell({
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
