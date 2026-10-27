@@ -1,112 +1,36 @@
 'use client';
 
-import { useCartStore } from '@/stores/shop_stores/cartStore';
-import type { CartVariant } from '@/stores/shop_stores/cartStore';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import type { FC } from 'react';
 import { FaAngleRight } from 'react-icons/fa6';
 import CustomShopLink from '../../HelperComponents/CustomShopLink';
-import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
-import GlobalProductPrice from '../../GlobalShopComponents/GlobalProductPrice';
 import { Button } from '@/components/UI/primitives/button';
+import { formatOrderMoney, type OrderPreviewTotals } from '@/lib/shop/checkout/orderMoney';
 
 type OrderSummaryProps = {
   /** ISO-3 destination country code, e.g. 'USA', 'GBR', 'CAN'. Defaults to 'USA'. */
   countryIso3?: string;
-  cartItemsOverride?: CartVariant[];
   checkoutBlocked?: boolean;
-  shippingUsd?: number | null;
+  totals: OrderPreviewTotals | null;
   quotePending?: boolean;
   quoteError?: string | null;
   onRetryQuote?: () => void;
 };
 
-type ShippingEstimate = {
-  /** USD amount for FX conversions */
-  max: number;
-};
 const DeliveryCountryDropdown = dynamic(() => import('../../Index/CountryDropDownClientFloating'));
 
 // Main Component
 const OrderSummary: FC<OrderSummaryProps> = ({
   countryIso3 = 'USA',
-  cartItemsOverride,
   checkoutBlocked = false,
-  shippingUsd,
+  totals,
   quotePending = false,
   quoteError,
   onRetryQuote,
 }) => {
-  // Hooks
-  const { variants: storeCartItems } = useCartStore();
-  const cartItems = cartItemsOverride ?? storeCartItems;
-  const country = useShopCheckoutStore((state) => state.delivery_address.shipping_country);
-  const shippingState = useShopCheckoutStore((state) => state.delivery_address.shipping_state);
-
-  const subTotal = useMemo(
-    () =>
-      cartItems.reduce((acc, { itemDetail: { retail_price }, quantity }) => {
-        return acc + retail_price * quantity;
-      }, 0),
-    [cartItems],
-  );
-  const [shippingEstimates, setShippingEstimates] = useState<ShippingEstimate | null>(null);
-
-  //   Funcs
-  const getShippingEstimates = useCallback(async () => {
-    if (!cartItems.length || checkoutBlocked) return null;
-    if (shippingUsd !== undefined) return shippingUsd === null ? null : { max: shippingUsd };
-
-    try {
-      const res = await fetch('/next-api/shop/cart/shipping-estimate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cart: cartItems,
-          countryIso3: (country ?? countryIso3).toUpperCase(),
-          stateIso2: shippingState,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch shipping estimate (${res.status})`);
-      }
-
-      const data = await res.json();
-      const totals = data?.totals;
-
-      if (!totals || typeof totals.shippingPriceNum !== 'number') return null;
-
-      const multiplier = typeof totals?.multiplier === 'number' ? totals.multiplier : null;
-      const usdBase =
-        multiplier && multiplier > 0
-          ? totals.shippingPriceNum / multiplier
-          : totals.shippingPriceNum;
-
-      return {
-        max: Number(Math.max(usdBase, 0).toFixed(2)),
-      };
-    } catch (error) {
-      console.error('[OrderSummary] Failed to fetch shipping estimates:', error);
-      return null;
-    }
-  }, [cartItems, checkoutBlocked, country, countryIso3, shippingState, shippingUsd]);
-
-  //   UseEffects
-  useEffect(() => {
-    async function fetchShippingEstimates() {
-      const estimates = await getShippingEstimates();
-      if (estimates) {
-        setShippingEstimates(estimates);
-      } else {
-        setShippingEstimates(null);
-      }
-    }
-    fetchShippingEstimates();
-  }, [getShippingEstimates]);
-
-  const estimatedTotal = subTotal + (shippingEstimates?.max ?? 0);
+  const price = (amount?: number) =>
+    totals && amount != null ? formatOrderMoney(amount, totals.currency) : '—';
 
   // JSX
   return (
@@ -125,19 +49,18 @@ const OrderSummary: FC<OrderSummaryProps> = ({
 
       <div className='pt-8 font-semibold flex flex-wrap gap-3 text-xl items-center max-[1289px]:text-lg'>
         <span className='flex-1 min-w-[55%]'>Subtotal</span>
-        <GlobalProductPrice className='flex-1 min-w-[35%] text-right' usdAmount={subTotal} />
+        <span className='flex-1 min-w-[35%] text-right'>{price(totals?.retailPriceTotalNum)}</span>
       </div>
 
-      {shippingEstimates && (
+      {totals && (
         <>
           <div className='pt-2 font-semibold flex flex-wrap gap-3 text-lg items-center max-[1289px]:text-base'>
             <span className='flex-1 min-w-[55%]'>
               Est. Shipping Fee <span className='font-extrabold'>**</span>
             </span>
-            <GlobalProductPrice
-              className='flex-1 min-w-[35%] text-right px-0'
-              usdAmount={shippingEstimates.max}
-            />
+            <span className='flex-1 min-w-[35%] text-right px-0'>
+              {price(totals.shippingPriceNum)}
+            </span>
           </div>
 
           <p className='font-semibold pt-8 leading-relaxed text-sm sm:text-base'>
@@ -154,7 +77,7 @@ const OrderSummary: FC<OrderSummaryProps> = ({
         </>
       )}
 
-      {!shippingEstimates && (
+      {!totals && (
         <p className='text-sm text-white/60 pt-6'>
           Shipping is calculated at checkout once we know your delivery details.
         </p>
@@ -162,10 +85,10 @@ const OrderSummary: FC<OrderSummaryProps> = ({
 
       <div className='mt-8 border-t border-white/10 pt-6 flex flex-wrap gap-3 items-center text-xl font-semibold max-[1289px]:text-xl'>
         <span className='flex-1 min-w-[55%]'>Estimated Total</span>
-        <GlobalProductPrice className='flex-1 min-w-[35%] text-right' usdAmount={estimatedTotal} />
+        <span className='flex-1 min-w-[35%] text-right'>{price(totals?.totalPriceNum)}</span>
       </div>
 
-      {checkoutBlocked || quotePending || quoteError ? (
+      {checkoutBlocked || quotePending || quoteError || !totals ? (
         <>
           <p role='status' className='pt-6 text-sm text-white/80'>
             {quotePending
@@ -179,7 +102,7 @@ const OrderSummary: FC<OrderSummaryProps> = ({
                 Try again
               </button>
               <DeliveryCountryDropdown
-                initialIso3={country || countryIso3}
+                initialIso3={countryIso3}
                 wrapperClassName=''
                 classNames={{
                   trigger:

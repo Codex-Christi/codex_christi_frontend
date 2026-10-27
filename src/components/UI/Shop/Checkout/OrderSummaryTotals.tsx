@@ -1,5 +1,6 @@
 import { Skeleton } from '@/components/UI/primitives/skeleton';
 import { CSSProperties, LegacyRef } from 'react';
+import { formatOrderMoney } from '@/lib/shop/checkout/orderMoney';
 
 type OrderSummaryTotalsProps = {
   slim?: boolean;
@@ -7,8 +8,8 @@ type OrderSummaryTotalsProps = {
   cartCount: number;
   retailPriceTotalNum?: number;
   shippingPriceNum?: number;
+  totalPriceNum?: number;
   currency?: string;
-  currency_symbol?: string;
   ref?: LegacyRef<HTMLDivElement>;
   style?: CSSProperties;
 };
@@ -21,20 +22,18 @@ const OrderSummaryTotals = ({
   cartCount,
   retailPriceTotalNum,
   shippingPriceNum,
+  totalPriceNum,
   currency,
-  currency_symbol,
   ref,
   style,
 }: OrderSummaryTotalsProps) => {
   const isSlim = !!slim;
   const hasPricing =
-    retailPriceTotalNum != null && shippingPriceNum != null && !!currency && !!currency_symbol;
+    retailPriceTotalNum != null && shippingPriceNum != null && totalPriceNum != null && !!currency;
 
-  const subtotal = hasPricing ? `${currency_symbol} ${retailPriceTotalNum}` : '';
-  const shipping = hasPricing ? `${currency_symbol} ${shippingPriceNum}` : '';
-  const total = hasPricing
-    ? `${((retailPriceTotalNum ?? 0) + (shippingPriceNum ?? 0)).toLocaleString()} ${currency}`
-    : '';
+  const subtotal = hasPricing ? formatOrderMoney(retailPriceTotalNum, currency) : '';
+  const shipping = hasPricing ? formatOrderMoney(shippingPriceNum, currency) : '';
+  const total = hasPricing ? `${formatOrderMoney(totalPriceNum, currency)} ${currency}` : '';
 
   const rows: Array<[label: string, value: string, skeletonClass: string]> = isSlim
     ? [

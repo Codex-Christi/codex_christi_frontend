@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { getDollarMultiplier } from '@/actions/shop/general/currencyConvert';
-import { PAYPAL_CURRENCY_CODES } from '@/datasets/shop_general/paypal_currency_specifics';
+import { resolveOrderCurrency } from '@/lib/shop/checkout/orderMoney';
 import { loadExtrasBySku } from '@/lib/datasetSearchers/merchize/shipping.data';
 import {
   CanonicalOrderResolutionError,
@@ -61,10 +61,7 @@ function createOrderDependencies(
     },
     async resolveCurrency(countryIso3) {
       const conversion = await getDollarMultiplier(countryIso3);
-      const currency = conversion.currency?.toUpperCase() ?? 'USD';
-      return PAYPAL_CURRENCY_CODES.includes(currency as (typeof PAYPAL_CURRENCY_CODES)[number])
-        ? { currency, multiplier: conversion.multiplier }
-        : { currency: 'USD', multiplier: 1 };
+      return resolveOrderCurrency(conversion);
     },
     resolveShipping: async ({ lines, catalogVariants, countryIso3 }) =>
       calculateStrictShippingQuoteUsd({

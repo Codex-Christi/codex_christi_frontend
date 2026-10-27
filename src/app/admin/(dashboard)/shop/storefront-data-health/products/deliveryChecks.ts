@@ -8,6 +8,7 @@ import { supplierEvidenceTtlMs } from '@/lib/merchizeCatalog/currentEvidence';
 import { getSavedProductDelivery } from './savedDeliveryData';
 import { presentDeliveryStatus, type DeliveryCheckEvent } from './deliveryStatus';
 import { normalizeCountryToIso3 } from '@/lib/utils/shop/checkout/normalizeCountryToIso3';
+import { waitForDeliveryWork } from './deliveryCheckStream';
 
 export const deliveryCheckInputSchema = z.object({
   productIds: z.array(z.string().trim().min(1).max(128)).min(1).max(100),
@@ -41,12 +42,15 @@ export async function runDeliveryQueue<T>(
   signal: AbortSignal,
 ) {
   let next = 0;
-  await Promise.all(
+  const workers = Promise.all(
     Array.from({ length: Math.min(4, ids.length) }, async () => {
       while (!signal.aborted && next < ids.length) {
         const id = ids[next++];
         const result = await Promise.resolve()
-          .then(() => check(id))
+          .then(() => {
+            signal.throwIfAborted();
+            return check(id);
+          })
           .then(
             (value): PromiseSettledResult<T> => ({ status: 'fulfilled', value }),
             (reason): PromiseSettledResult<T> => ({ status: 'rejected', reason }),
@@ -55,6 +59,11 @@ export async function runDeliveryQueue<T>(
       }
     }),
   );
+  try {
+    await waitForDeliveryWork(workers, signal);
+  } catch (error) {
+    if (!signal.aborted) throw error;
+  }
 }
 
 export async function checkDeliveryProducts({

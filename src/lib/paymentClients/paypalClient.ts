@@ -27,9 +27,11 @@ export function getPayPalClient() {
     timeout: 0,
     environment: config.paymentMode === 'live' ? Environment.Production : Environment.Sandbox,
     logging: {
-      logLevel: LogLevel.Debug,
-      logRequest: { logBody: true },
-      logResponse: { logHeaders: true },
+      // Customer and delivery data is present in order requests. Keep SDK diagnostics
+      // error-only and never emit request/response bodies or headers.
+      logLevel: LogLevel.Error,
+      logRequest: { logBody: false, logHeaders: false },
+      logResponse: { logBody: false, logHeaders: false },
     },
   });
   cachedClientKey = clientKey;

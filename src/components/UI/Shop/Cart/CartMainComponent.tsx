@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { getCartOverview } from '@/actions/shop/cart/getCartOverview';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore';
+import type { OrderPreviewTotals } from '@/lib/shop/checkout/orderMoney';
 import {
   createCartAvailabilityMap,
   getCartVerificationIdentity,
@@ -19,7 +20,7 @@ type CartDisplayState = {
   cartIdentity: string | null;
   cartItems: CartVariant[];
   availabilityByVariantId: CartItemAvailabilityMap;
-  shippingUsd?: number | null;
+  totals?: OrderPreviewTotals | null;
   quoteCountry?: string;
   quoteError?: string | null;
   quoteSequence?: number;
@@ -41,7 +42,6 @@ const OrderSummary = dynamic(() => import('./OrderSummary').then((mod) => mod.de
 
 // Main component
 const CartMainComponent = () => {
-  // Hooks
   // Hooks
   const { variants } = useCartStore((state) => state);
   const checkoutCountry = useShopCheckoutStore((state) => state.delivery_address.shipping_country);
@@ -105,7 +105,7 @@ const CartMainComponent = () => {
           cartIdentity,
           cartItems,
           availabilityByVariantId: availability,
-          shippingUsd: totals?.shippingUsd ?? null,
+          totals,
           quoteCountry: country,
           quoteError,
           quoteSequence,
@@ -158,6 +158,11 @@ const CartMainComponent = () => {
               cartItems={cartItemsForDisplay}
               availabilityByVariantId={availabilityByVariantId}
               onAvailabilityChange={handleAvailabilityChange}
+              prices={
+                displayStateIsCurrent && cartDisplayState.quoteCountry === country
+                  ? cartDisplayState.totals
+                  : null
+              }
             />
           </div>
         )}
@@ -166,7 +171,7 @@ const CartMainComponent = () => {
       {/* Conatiner for Order Summary */}
       {!isCartEmpty && variants && (
         <OrderSummary
-          cartItemsOverride={cartItemsForDisplay}
+          countryIso3={country}
           checkoutBlocked={checkoutBlocked}
           quotePending={
             !displayStateIsCurrent ||
@@ -177,9 +182,11 @@ const CartMainComponent = () => {
             cartDisplayState.quoteCountry === country ? cartDisplayState.quoteError : null
           }
           onRetryQuote={() => setQuoteSequence((sequence) => sequence + 1)}
-          shippingUsd={
-            displayStateIsCurrent && cartDisplayState.quoteCountry === country
-              ? (cartDisplayState.shippingUsd ?? null)
+          totals={
+            displayStateIsCurrent &&
+            cartDisplayState.quoteCountry === country &&
+            cartDisplayState.quoteSequence === quoteSequence
+              ? (cartDisplayState.totals ?? null)
               : null
           }
         />

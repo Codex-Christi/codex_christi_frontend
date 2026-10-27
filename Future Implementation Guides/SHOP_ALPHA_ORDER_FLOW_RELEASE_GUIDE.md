@@ -1,6 +1,6 @@
 # Shop Alpha Order Flow Release Guide
 
-Last updated: 2026-08-06
+Last updated: 2026-10-27
 
 Status: **CANONICAL RELEASE PLAN**
 
@@ -63,29 +63,29 @@ Alpha is release-ready only when all of the following are true:
 
 ## 2. Resolved Product And Architecture Decisions
 
-| Area                    | Alpha decision                                                                                                                                                                                                                                                                              |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Participation           | Every completed ordinary account signup is implicitly part of the alpha waitlist. Do not add a separate enrollment record, acknowledgement, user-linking flow, or invite approval gate.                                                                                                     |
-| Alpha disclosure        | Use small informational notices on the signup page and shop homepage. They do not block signup, require dismissal, or create persisted state.                                                                                                                                               |
-| Auth evolution          | Preserve the core signup → OTP → login contract. Independently justified auth enhancements are allowed, but they must not be coupled to alpha participation or replace the order-flow priority.                                                                                             |
+| Area                    | Alpha decision                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Participation           | Every completed ordinary account signup is implicitly part of the alpha waitlist. Do not add a separate enrollment record, acknowledgement, user-linking flow, or invite approval gate.                                                                                                                                                                                                                                                    |
+| Alpha disclosure        | Use small informational notices on the signup page and shop homepage. They do not block signup, require dismissal, or create persisted state.                                                                                                                                                                                                                                                                                              |
+| Auth evolution          | Preserve the core signup → OTP → login contract. Independently justified auth enhancements are allowed, but they must not be coupled to alpha participation or replace the order-flow priority.                                                                                                                                                                                                                                            |
 | Catalog eligibility     | Do not create an arbitrary small hardcoded allowlist. A storefront `all-variants` row proves identity only, not current sellability. A variant may be offered only after exact, unambiguous reconciliation to the current product-line/catalog source, live server price, and current shipping calculation. Storefront and supplier SKU namespaces remain separate. This is an order-integrity check, not a new destination or tax policy. |
-| Currency behavior       | Preserve the existing multi-currency checkout and PayPal behavior. P0.2 records the exact server-resolved currency and amounts used for an order; it does not restrict the alpha to USD.                                                                                                    |
-| PayPal tax capability   | The current PayPal setup does not provide tax-charging capability. The alpha must not calculate, add, collect, or pass a tax amount or tax line to PayPal.                                                                                                                                  |
-| Django scope            | Keep Django at its current boundary: order-intent verification, payment save, and initial Merchize order preparation/handoff. New address, contact, confirmation-access, notification, and lifecycle work is Next.js-owned.                                                                 |
-| US addresses            | Merchize `valid` plus exact buyer-details read-back may continue automatically. Explicit invalid states stop before push.                                                                                                                                                                   |
-| Non-US addresses        | Merchize US validation does not apply. Provider `other`/`others` plus exact buyer-details read-back may continue automatically, labeled "not provider-validated." No routine admin batch approval is required.                                                                              |
-| Customer responsibility | Require a clear pre-payment review of address, size, variant, and quantity. Record a versioned acknowledgement. Do not claim that customer acknowledgement removes statutory rights.                                                                                                        |
-| Provider push           | `MERCHIZE_FULFILLMENT_PUSH_ENABLED` must be explicitly configured. Missing or invalid configuration fails closed. Every eligible order must eventually be pushed and verified.                                                                                                              |
-| Immediate processing    | Keep the capture-route `after(...)` continuation as the fast first-party trigger when explicitly enabled. Treat it as opportunistic, not durable.                                                                                                                                           |
-| Durable recovery        | Keep the scheduled PayPal recovery scanner and lifecycle scanner as the durable fallback. The confirmation status route stays read-only.                                                                                                                                                    |
-| PayPal webhooks         | Keep the existing verified PayPal webhook path as a payment-event safety net. This is separate from Merchize webhooks.                                                                                                                                                                      |
-| Merchize webhooks       | P1. The first alpha uses synchronous reads plus scheduled polling. Webhooks later accelerate the same durable milestone projection.                                                                                                                                                         |
-| Customer email owner    | Codex Christi owns customer order emails. Do not depend on or duplicate unconfirmed Merchize buyer emails.                                                                                                                                                                                  |
-| Customer milestones     | Payment received, address action required, preparing, tracking available, shipped, and delivered.                                                                                                                                                                                           |
-| Guest confirmation      | Use an emailed, purpose-bound, long-lived viewing capability. Authenticated access also requires matching `userId`. Expiry uses email OTP to issue a new capability.                                                                                                                        |
-| Destination scope       | P0.2 does not add, remove, or redefine supported destinations. Preserve current checkout behavior. Any later destination-policy change requires separate product direction and implementation scope.                                                                                        |
-| Worldwide scope         | Keep the storefront's current destination coverage during canonical-snapshot work. Missing SKU or reproducible shipping data may stop an individual order as a data-integrity failure, but P0.2 must not invent a geographic block.                                                         |
-| Broad provider controls | Refunds, disputes, automatic cancellation, product replacement, arbitrary artwork mutation, and full dashboard parity remain outside alpha scope.                                                                                                                                           |
+| Currency behavior       | Preserve the existing multi-currency checkout and PayPal behavior. P0.2 records the exact server-resolved currency and amounts used for an order; it does not restrict the alpha to USD.                                                                                                                                                                                                                                                   |
+| PayPal tax capability   | The current PayPal setup does not provide tax-charging capability. The alpha must not calculate, add, collect, or pass a tax amount or tax line to PayPal.                                                                                                                                                                                                                                                                                 |
+| Django scope            | Keep Django at its current boundary: order-intent verification, payment save, and initial Merchize order preparation/handoff. New address, contact, confirmation-access, notification, and lifecycle work is Next.js-owned.                                                                                                                                                                                                                |
+| US addresses            | Merchize `valid` plus exact buyer-details read-back may continue automatically. Explicit invalid states stop before push.                                                                                                                                                                                                                                                                                                                  |
+| Non-US addresses        | Merchize US validation does not apply. Provider `other`/`others` plus exact buyer-details read-back may continue automatically, labeled "not provider-validated." No routine admin batch approval is required.                                                                                                                                                                                                                             |
+| Customer responsibility | Require a clear pre-payment review of address, size, variant, and quantity. Record a versioned acknowledgement. Do not claim that customer acknowledgement removes statutory rights.                                                                                                                                                                                                                                                       |
+| Provider push           | `MERCHIZE_FULFILLMENT_PUSH_ENABLED` must be explicitly configured. Missing or invalid configuration fails closed. Every eligible order must eventually be pushed and verified.                                                                                                                                                                                                                                                             |
+| Immediate processing    | Keep the capture-route `after(...)` continuation as the fast first-party trigger when explicitly enabled. Treat it as opportunistic, not durable.                                                                                                                                                                                                                                                                                          |
+| Durable recovery        | Keep the scheduled PayPal recovery scanner and lifecycle scanner as the durable fallback. The confirmation status route stays read-only.                                                                                                                                                                                                                                                                                                   |
+| PayPal webhooks         | Keep the existing verified PayPal webhook path as a payment-event safety net. This is separate from Merchize webhooks.                                                                                                                                                                                                                                                                                                                     |
+| Merchize webhooks       | P1. The first alpha uses synchronous reads plus scheduled polling. Webhooks later accelerate the same durable milestone projection.                                                                                                                                                                                                                                                                                                        |
+| Customer email owner    | Codex Christi owns customer order emails. Do not depend on or duplicate unconfirmed Merchize buyer emails.                                                                                                                                                                                                                                                                                                                                 |
+| Customer milestones     | Payment received, address action required, preparing, tracking available, shipped, and delivered.                                                                                                                                                                                                                                                                                                                                          |
+| Guest confirmation      | Use an emailed, purpose-bound, long-lived viewing capability. Authenticated access also requires matching `userId`. Expiry uses email OTP to issue a new capability.                                                                                                                                                                                                                                                                       |
+| Destination scope       | P0.2 does not add, remove, or redefine supported destinations. Preserve current checkout behavior. Any later destination-policy change requires separate product direction and implementation scope.                                                                                                                                                                                                                                       |
+| Worldwide scope         | Keep the storefront's current destination coverage during canonical-snapshot work. Missing SKU or reproducible shipping data may stop an individual order as a data-integrity failure, but P0.2 must not invent a geographic block.                                                                                                                                                                                                        |
+| Broad provider controls | Refunds, disputes, automatic cancellation, product replacement, arbitrary artwork mutation, and full dashboard parity remain outside alpha scope.                                                                                                                                                                                                                                                                                          |
 
 ### What "validated catalog" means
 
@@ -117,7 +117,9 @@ The server must prove all of this for the selected variant:
 
 The same current-sellability verdict must fail closed at public variant display, add-to-cart, cart
 hydration/revalidation, quantity increase, checkout entry, direct checkout, and PayPal intent
-creation. Compatibility reads have a 15-second timeout. A timed-out, failed, or incomplete provider
+creation. Individual compatibility provider reads have a 15-second timeout. The admin delivery
+stream has a separate two-minute caller deadline; shared reads may continue for another customer.
+This does not introduce an aggregate deadline for every customer lookup. A timed-out, failed, or incomplete provider
 read is `unverified`, never positive availability evidence. A stale cart row remains visible so the
 customer can remove it (or reduce its quantity), but it cannot be increased, checked out, silently
 substituted, or deferred for post-payment adjustment.
@@ -180,7 +182,8 @@ requires same-origin `shop.catalog.refresh` authorization, validates known store
 country, and streams private/no-store newline-delimited JSON. There is one authorization and one
 aggregate audit pair per batch, not per product. Requests contain at most 100 products; larger
 selections run sequential batches. Each batch has at most four product workers, shares preset and
-supplier lookups, and has a two-minute deadline. There is no full supplier traversal, cron,
+supplier lookups, and has a two-minute caller deadline. Cancellation settles the caller and closes
+the response without waiting for a shared read; offline verification is recorded below. There is no full supplier traversal, cron,
 `after()`, or polling loop. Read-only admins see saved results without starting supplier reads.
 Stop Checks, country/name navigation, and leaving the page cancel pending work and abort private
 provider reads. Already shared supplier reads retain their own bounded deadline so cancellation
@@ -240,7 +243,7 @@ not rebuild every search-preview shard or trigger a whole-catalog scan.
 - Signup and shop-home alpha notices are informational only. Completing ordinary signup is the
   product-level definition of joining the alpha waitlist.
 
-### P0.2 correction checkpoint — locally complete, deployment pending
+### P0.2 correction checkpoint — implementation present, acceptance in progress
 
 - P0.2 extends the existing `PaypalIntent` ledger. It does not create a standalone order database,
   new payment table, or alpha-participation store.
@@ -253,7 +256,8 @@ not rebuild every search-preview shard or trigger a whole-catalog scan.
   fresh product-scoped catalog response; variants without a Product option require exact current-
   catalog SKU membership. This dual-source proof is enforced at public variant display, add-to-cart,
   stale-cart revalidation, quantity increase, checkout, direct checkout, and PayPal intent creation.
-  Compatibility reads time out after 15 seconds and fail closed as `unverified`.
+  Individual provider reads time out after 15 seconds and fail closed as `unverified`; the
+  shared work retains its own timeout while the admin caller has an independent cancellation gate.
   Explicit inactive/deleted/private/taken-down/hidden/draft/retired/unapproved state remains an
   immediate block.
 - Public selector work is bounded to 25 selector rows, 128 characters per identifier, 25 units per
@@ -271,7 +275,9 @@ not rebuild every search-preview shard or trigger a whole-catalog scan.
   external version/hash metadata. A database constraint requires all three fields to be either
   populated together or null together.
 - PayPal purchase-unit line items, subtotal, shipping, currency, and total are built only from the
-  canonical snapshot. No tax field or tax line is present.
+  canonical snapshot. No tax field or tax line is present. Supplier image URLs remain in the
+  snapshot for internal consumers but are omitted from PayPal items, restoring the established
+  working request format. SDK request/response body and header logging is disabled.
 - Authorization and capture must each exactly match the canonical total and currency. The shared
   full-chain gate is used by capture/webhook recovery, payment reconciliation, scanners, the
   fulfillment runner, and mutating admin recovery actions, so a later matching capture cannot hide
@@ -291,14 +297,72 @@ not rebuild every search-preview shard or trigger a whole-catalog scan.
   label describing money paid always shows the actual completed PayPal capture, never the expected
   canonical total; any difference is surfaced for review.
 
-Historical full-catalog verification: an additive local SQLite `db push` was
-completed, followed by a complete current-catalog generation covering 905 products and 19,885
-variants. The pre-final live baseline audit found 141 variants across 13 products: 138 available, 3
-confirmed unavailable, and 0 unverified. The final dual-source catalog cross-check is covered by six
-focused regressions, and the full local suite passed 195/195 tests, along with TypeScript, targeted
-ESLint, the production webpack build, and diff checks. A repeat live audit under the final gate and
-deployed sandbox/E2E evidence remain pending. The repair run did not send a notification email. No
-PayPal ledger migration was deployed.
+Historical checkpoints: the initial additive SQLite update and full catalog generation covered 905
+products and 19,885 variants; the pre-final audit found 141 variants across 13 published products,
+with 138 available, 3 unavailable, and 0 unverified. On 2026-08-28, the complete refresh covered 925
+products and 20,167 variants, and the final-gate published audit found 140 available, 1 unavailable,
+and 0 unverified from the same 141-variant/13-product scope. After the PayPal image-field regression
+was corrected, 196 tests and the production build passed, and a local sandbox create-order request
+succeeded with HTTP 201. That order was not authorized or captured. These are historical results,
+not validation of all later working-tree changes.
+
+The 2026-10-27 read-only/local checkpoint found 230 tests passing (228 source tests plus two
+stylesheet tests) when `.integration.test.ts` files were excluded, plus passing TypeScript,
+ESLint, and the 57-page production webpack build. The
+catalog integration fixture was not provisioned because its test invokes
+disposable-database `db push` and this verification run excludes migrations. Read-only SQLite and
+generated-client inspection confirms the four scoped-evidence/check tables and
+`StorefrontProductCheck.supplierOptionsJson` already exist locally. No migration or `db push` was
+executed in this run. Admin UI currently shows 156 saved option flags across 8 products needing
+review, 33 of 34 products checked, and 3 temporary verification failures. Those saved UI totals are
+not a new full published-variant audit. Subsequent Delivery Checker browsing showed 34/34 checked
+with 3 requiring another check. In-app browser checks passed for product search, USA/Canada
+delivery filters, filter-preserving pagination, product-scoped issue details, and issue pages
+1/2/4 (1–50, 51–100, and 151–156). Only one issue disclosure stays open at once. There was no
+horizontal overflow at the actual 494px viewport; the browser did not apply requested viewport
+overrides, so specific mobile/tablet/desktop breakpoints were not verified in this run. Public
+variant selection, add-to-cart, quantity changes, USD 40 + 5 shipping = 45 cart totals, and checkout
+form rendering passed. An unverified product kept purchase controls disabled.
+
+### Offline rounding and cancellation correction — verified 2026-10-27
+
+The earlier validation found EUR 42.25 preview versus EUR 42.24 canonical subtotal for USD 15.25 ×
+0.92345 × 3. The correction centralizes pure money conversion in
+`src/lib/shop/checkout/orderMoney.ts`: convert and round each unit before multiplying quantity,
+sum integer line amounts, and share the currency-specific shipping rule between preview and
+snapshot. Cart/checkout line displays and totals use verified server quote amounts, and the PayPal
+SDK takes its currency from that same quote, including FX-failure fallback. Supported-currency
+fallback and PayPal HUF/JPY/TWD precision stay aligned. The unused legacy pricing wrapper and its
+standalone precision helper, obsolete hydration export, redundant shipping-estimate route, and
+browser-side aggregate conversion/shipping round-trip are removed. The remaining quantity action
+is named `validateCartItemForQuantityIncrease.ts`. No callers of the removed names/routes remain.
+
+The admin caller previously waited for active shared reads after cancellation. The correction
+settles the waiter and closes the stream at cancellation/deadline, suppresses queued checks and
+late output, and handles late provider rejection. A shared supplier read can continue for another
+customer and cancellation does not become a supplier outage. Provider HTTP timeouts remain per
+read; this does not claim an aggregate deadline for every customer checkout lookup.
+
+Offline verification passed: 244 repository tests, including six new preview/canonical-money
+regressions and eight new cancellation/stream-lifecycle regressions. Tests use local fixtures and
+a guard that rejects live `fetch` calls. Coverage includes EUR unit-before-quantity rounding,
+multi-line totals, USD addition, HUF/JPY/TWD shipping, existing supported-currency fallback,
+invalid/overflowing money, immediate waiter cancellation with another shared reader, late rejection
+handling, listener cleanup, the two-minute stream deadline with a pending audit, request/consumer
+cancellation, and partial audit counts. TypeScript, full ESLint, the 56-page production webpack
+build, formatting, and diff checks passed. The unused shipping route was removed from the build.
+The database-provisioning integration test stays excluded. Unrelated image-compression work is
+outside this commit's test set. The earlier browser/sandbox results above remain historical;
+this correction run creates no orders, calls no payment/fulfillment APIs, and runs no migrations
+or `db push`.
+
+Reproduce the offline repository suite after staging/committing the changes:
+
+```bash
+node --conditions=react-server --import tsx \
+  --import 'data:text/javascript,globalThis.fetch=async()=>{throw new Error("Offline verification forbids live fetch");}' \
+  --test $(git ls-files src scripts | rg '\.test\.ts$' | rg -v '\.integration\.test\.ts$')
+```
 
 Deployment remains gated. The apparent development history-name divergence was a lost legitimate
 migration file, not a replacement for the checked-in webhook-binding migration. Development has
@@ -309,15 +373,29 @@ renames PostgreSQL's truncated `...paypalPaymentMode_isActiv` index to Prisma's 
 `2356add3eeef5a0e2c45d179244f99c262c4658590beb55116243f0c7787df3e`.
 
 Do not edit either applied migration, delete or rename `_prisma_migrations` rows, reset a configured
-ledger, or use `migrate resolve` for this repair. The restored 13-migration chain passes on
-disposable PostgreSQL. Read-only status confirms that development has only
-`20260806000000_add_canonical_order_snapshot` pending, while production stops first at the restored
-index rename. The next move is explicit database approval for `prisma migrate deploy` against
-development. The restored rename is already recorded there, so only the canonical-snapshot
-migration should apply. Production's later reviewed rollout must apply and verify the index rename,
-recheck status, then apply the canonical-snapshot migration. Deployed development sandbox/E2E
-verification must pass before production rollout or any P0.2 release gate is checked. P0.3 then
-begins as a read-only destination-behavior trace.
+ledger, or use `migrate resolve` for this repair. The restored 13-migration chain passed on
+disposable PostgreSQL. Read-only status on 2026-08-28 reported both development and production up to
+date. Fresh 2026-10-27 checks again report all 13 migrations applied in both targets. Start any
+future deployment preparation with target-selected
+`prisma migrate status --schema prisma/shop/paypal/paypalTXLedger.schema.prisma`. If it reports up
+to date, stop: there is no pending PayPal migration to deploy. A newly pending migration requires a
+review of its exact SQL and target before deployment; this checkpoint authorizes no migration.
+
+Verify the offline correction before considering any later payment E2E. The inspected local configuration uses
+development ledgers and PayPal sandbox, requires webhook signatures, selects `sandbox_ngrok` as
+webhook owner, disables the capture-route runner, enables the scanner, and sets provider push false.
+However, Django still targets `codexchristi.org` and Merchize is live. Sandbox capture can therefore
+trigger a real provider order through webhook/scanner processing even while push is disabled.
+Before the user's stop instruction, the current create-only smoke created sandbox PayPal order
+`5S9692836H3433644`. Read-only development-ledger verification found `intent_created`, snapshot
+version/hash agreement, USD 40.00 merchandise + 5.00 shipping = 45.00, and retained snapshot images.
+No authorization, capture, receipt, or fulfillment was performed. The user then confirmed that no
+staging/mock setup exists and instructed **do not perform order creation**. Do not create further
+PayPal or Django test intents/orders, authorize, capture, or invoke order/fulfillment recovery in
+this verification run. Full receipt/handoff/recovery testing requires controlled downstream targets
+and renewed direction to resume order creation. Deployed sandbox/E2E evidence must pass
+before production rollout or any P0.2 release gate is checked. P0.3 then begins as a read-only
+destination-behavior trace.
 
 ### Remaining verified alpha gaps
 
@@ -445,12 +523,11 @@ Do these in order. Do not start P1 Merchize webhooks before the P0 release gates
 
 ### P0.2 Create one canonical server order snapshot
 
-Correction checkpoint: the snapshot/payment foundation and current-sellability code are locally
-complete. Local SQLite received the additive compatibility data and a complete 905-product/
-19,885-variant generation was built. A pre-final 13-product live baseline returned 141 total/138
-available/3 unavailable/0 unverified; the completed dual-source gate now has focused regression
-coverage and the 195-test suite plus type/lint/build checks pass. Repeat the live audit under the
-final gate before development PayPal migration deployment and deployed sandbox/E2E verification.
+Correction checkpoint: shared preview/canonical rounding and admin caller cancellation passed
+offline verification in the dated checkpoint above. Previous database,
+browser, and sandbox-create evidence is historical. This run creates no orders and runs no
+migrations. Full sandbox E2E remains stopped until controlled downstream targets and renewed user
+direction exist.
 The following remains the acceptance contract.
 
 1. Resolve every storefront product and variant from trusted server data. Treat `all-variants`
@@ -494,8 +571,8 @@ The following remains the acceptance contract.
    - snapshot version and hash.
 9. Build PayPal purchase units and line items only from this snapshot.
 10. Compare both authorization and capture amount/currency to the snapshot before fulfillment. Keep
-   the complete chain enforced in webhook, reconciliation, scanner, runner, and admin mutation
-   paths.
+    the complete chain enforced in webhook, reconciliation, scanner, runner, and admin mutation
+    paths.
 11. Generate the receipt from the same snapshot, not from mutable browser state.
 12. Do not add or remove supported destinations as part of this phase.
 13. Do not calculate, add, collect, or pass tax through PayPal. The canonical monetary snapshot,
@@ -1079,7 +1156,9 @@ Required tests:
 ### Stage B: local UI with dev ledgers
 
 1. Use `SHOP_OPS_DATA_TARGET=dev`.
-2. Keep live PayPal credentials and production provider mutations unavailable.
+2. Keep live PayPal credentials and production provider mutations unavailable. Verify Django and
+   Merchize fixture/staging targets as well as the ledger and PayPal mode. Push disabled only pauses
+   production release; it does not prevent initial provider order creation by webhook/scanner work.
 3. Complete the ordinary signup and OTP flow unchanged; verify the signup and shop-home alpha
    notices without expecting a separate enrollment or acknowledgement row.
 4. With a controlled, confirmed stale-variant fixture, verify add-to-cart is disabled/prevented, an
@@ -1092,7 +1171,8 @@ Required tests:
    catalog-email side effects.
 6. Exercise checkout acknowledgement and the existing shipping-validation behavior. Do not expect
    P0.2 to introduce new destination rules or PayPal tax charging.
-7. Use PayPal sandbox for payment paths.
+7. Use PayPal sandbox for payment paths. With live downstream targets, limit smoke tests to order
+   creation; authorization/capture and recovery require controlled downstream fixtures or staging.
 8. Verify confirmation access on the same device, a private window, and a second device/email link.
 9. Simulate each blocker and confirm customer/admin copy and outbox rows.
 10. Run cron dry-run, then a controlled dev scan.
@@ -1101,7 +1181,8 @@ Required tests:
 ### Stage C: deployed sandbox
 
 1. Use a stable HTTPS deployment with sandbox PayPal mode.
-2. Use production-shaped infrastructure but development ledgers/provider fixtures.
+2. Use production-shaped infrastructure but development ledgers and controlled Django/Merchize
+   fixtures or staging. Confirm every automatic runner's target before capture.
 3. Verify PayPal webhook signature and duplicate delivery behavior.
 4. Close the browser immediately after capture and verify the scanner completes the order.
 5. Disable the capture-route runner for one test and prove webhook/scanner recovery.
@@ -1159,22 +1240,24 @@ actually completed. P0.2 implementation presence alone does not mark a release g
 - [ ] Ordinary signup/OTP/login behavior remains intact and the two lightweight alpha notices render
       without blocking authentication.
 - [ ] Canonical server snapshot owns PayPal amount/line items. Local repository verification passed;
-      migration deployment and deployed sandbox/E2E verification remain pending.
+      current automated/build checks and sandbox creation smoke passed. Full deployed sandbox/E2E
+      remains pending and order creation is stopped by user direction. All 13 PayPal migrations are
+      up to date in development and production as of 2026-10-27.
 - [ ] Authorization or capture amount/currency mismatch blocks fulfillment. Local repository
-      verification passed; migration deployment and deployed sandbox/E2E verification remain
-      pending.
+      verification passed; deployed sandbox/E2E verification remains pending.
 - [ ] Existing supported-currency behavior remains intact; alpha is not restricted to USD.
-      Local automated/build verification passed; deployed sandbox/E2E verification remains pending.
+      The shared preview/canonical rounding correction passed offline verification; deployed
+      sandbox/E2E verification remains pending.
 - [ ] PayPal purchase units contain no tax amount or tax line, and the order is not represented as
       having collected tax. Local automated/build verification passed; deployed sandbox/E2E
       verification remains pending.
 - [ ] Missing supplier SKU/current mapping or an unsafe shipping fallback cannot enter checkout or
       authorize payment, without redefining destination policy. Local correction and verification
-      passed; migration deployment and deployed sandbox/E2E verification remain pending.
+      passed; deployed sandbox/E2E verification remains pending.
 - [ ] Product/variant availability and resolver budgets prevent unavailable inventory or an
       unbounded public selector request from entering the cart or reaching PayPal/provider work.
-      Local correction and verification passed; migration deployment and deployed sandbox/E2E
-      verification remain pending.
+      The caller cancellation/stream-deadline correction passed offline verification; deployed
+      sandbox/E2E verification remains pending.
 - [ ] Recovery surfaces show actual captured money as paid, keep canonical total as expected order
       value, and disable mutations on a full-chain mismatch. Local automated/build verification
       passed; deployed sandbox/E2E verification remains pending.
@@ -1190,7 +1273,8 @@ actually completed. P0.2 implementation presence alone does not mark a release g
 
 ### P0 operational gates
 
-- [ ] Dev and production migrations are at parity.
+- [x] Dev and production migration histories were both up to date with all 13 migrations in
+      read-only checks on 2026-10-27. No migration is authorized or needed for the offline correction.
 - [ ] Production target badge and local mutation lock are verified.
 - [ ] PayPal live signature verification is required.
 - [ ] Provider API key is server-only.

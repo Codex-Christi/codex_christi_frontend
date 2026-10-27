@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { PAYPAL_ZERO_DIGIT_CURRENCY_CODES } from '@/datasets/shop_general/paypal_currency_specifics';
+import { currencyExponent } from '@/lib/shop/checkout/orderMoney';
+export { currencyExponent } from '@/lib/shop/checkout/orderMoney';
 import {
   CANONICAL_ORDER_SNAPSHOT_HASH_ALGORITHM,
   CANONICAL_ORDER_SNAPSHOT_VERSION,
@@ -73,14 +74,6 @@ export class InvalidCanonicalOrderSnapshotError extends Error {
     this.name = 'InvalidCanonicalOrderSnapshotError';
     Object.setPrototypeOf(this, new.target.prototype);
   }
-}
-
-export function currencyExponent(currency: string): 0 | 2 {
-  return PAYPAL_ZERO_DIGIT_CURRENCY_CODES.includes(
-    currency.toUpperCase() as (typeof PAYPAL_ZERO_DIGIT_CURRENCY_CODES)[number],
-  )
-    ? 0
-    : 2;
 }
 
 export function formatMinorAmount(currency: string, minorAmount: number | bigint): string {

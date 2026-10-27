@@ -6,7 +6,7 @@ import {
   deliveryCheckInputSchema,
   isSameOriginDeliveryRequest,
 } from '../deliveryChecks';
-import type { DeliveryCheckEvent } from '../deliveryStatus';
+import { createDeliveryCheckStream } from '../deliveryCheckStream';
 
 export const runtime = 'nodejs';
 
@@ -41,8 +41,6 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   if (request.signal.aborted) return new Response(null, { status: 499 });
-  const controller = new AbortController();
-  const signal = AbortSignal.any([request.signal, controller.signal, AbortSignal.timeout(120_000)]);
   const audit = (outcome: 'started' | 'success' | 'failure', metadata = {}) =>
     writeAdminAuditLog({
       actor: admin,
@@ -51,38 +49,10 @@ export async function POST(request: Request) {
       metadata: { country: input.data.country, products: productIds.length, ...metadata },
     });
   await audit('started');
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream<Uint8Array>({
-    async start(output) {
-      const emit = (event: DeliveryCheckEvent) => {
-        if (!signal.aborted) output.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
-      };
-      try {
-        const summary = await checkDeliveryProducts({ ...input.data, productIds, signal, emit });
-        if (signal.aborted && !request.signal.aborted && !controller.signal.aborted)
-          output.enqueue(
-            encoder.encode(
-              `${JSON.stringify({ type: 'error', message: 'The check timed out. Retry the remaining products.' })}\n`,
-            ),
-          );
-        else emit({ type: 'complete' });
-        await audit(summary.failed || signal.aborted ? 'failure' : 'success', {
-          ...summary,
-          cancelled: signal.aborted,
-        });
-      } catch {
-        emit({
-          type: 'error',
-          message: 'The delivery check could not complete. Retry the remaining products.',
-        });
-        await audit('failure').catch(() => undefined);
-      } finally {
-        if (!request.signal.aborted && !controller.signal.aborted) output.close();
-      }
-    },
-    cancel() {
-      controller.abort();
-    },
+  const stream = createDeliveryCheckStream({
+    requestSignal: request.signal,
+    check: (signal, emit) => checkDeliveryProducts({ ...input.data, productIds, signal, emit }),
+    audit,
   });
   return new Response(stream, {
     headers: {

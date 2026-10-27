@@ -5,7 +5,6 @@ import { CheckoutOptions } from '../PaymentSection';
 
 import dynamic from 'next/dynamic';
 import { ServerOrderDetailsContext } from '../ServerOrderDetailsComponent';
-import { PAYPAL_CURRENCY_CODES } from '@/datasets/shop_general/paypal_currency_specifics';
 import { getPublicPayPalClientId } from '@/lib/paypal/publicPayPalConfig';
 
 // Dynamic components
@@ -31,25 +30,21 @@ const initialOptions = {
 // Main Components
 const PaypalMainCheckout: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
   const serverOrderDetails = useContext(ServerOrderDetailsContext);
-  const { countrySupport } = serverOrderDetails || {};
-  const { country_iso2, currency } = countrySupport?.country || {};
-
-  // Validate currency support; fall back to USD when unknown
-  const supportsCurrency = useMemo(
-    () =>
-      PAYPAL_CURRENCY_CODES.includes((currency ?? 'USD') as (typeof PAYPAL_CURRENCY_CODES)[number]),
-    [currency],
-  );
+  const { countrySupport, finalPricesWithShippingFee } = serverOrderDetails || {};
+  const { country_iso2 } = countrySupport?.country || {};
+  const currency = finalPricesWithShippingFee?.currency;
 
   const liveOptions = useMemo(
     () => ({
       ...initialOptions,
       'buyer-country': country_iso2 ?? initialOptions['buyer-country'],
-      currency: supportsCurrency ? (currency ?? 'USD') : 'USD',
+      currency,
       intent: (initialOptions.intent ?? 'authorize') as 'authorize' | 'capture',
     }),
-    [country_iso2, currency, supportsCurrency],
+    [country_iso2, currency],
   );
+
+  if (!currency) return null;
 
   return (
     <PayPalScriptLoader options={liveOptions} mode={mode}>

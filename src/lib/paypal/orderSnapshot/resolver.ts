@@ -8,7 +8,12 @@ import {
   type CanonicalOrderSelection,
   type CanonicalOrderSnapshot,
 } from './types';
-import { currencyExponent, finalizeCanonicalOrderSnapshot, moneyFromMinor } from './canonicalize';
+import { finalizeCanonicalOrderSnapshot, moneyFromMinor } from './canonicalize';
+import {
+  unitUsdToMinor as convertUnitUsdToMinor,
+  shippingUsdCentsToMinor,
+  type OrderCurrencyResolution,
+} from '@/lib/shop/checkout/orderMoney';
 import type { CatalogItem } from '@/lib/datasetSearchers/merchize/catalog';
 import type { StrictShippingQuoteUsd } from './strictShipping';
 
@@ -114,12 +119,7 @@ export type TrustedCatalogVariant = {
   catalogRow: CatalogItem;
 };
 
-export type TrustedCurrencyResolution = {
-  /** Final PayPal-compatible order currency, preserving the existing supported-currency behavior. */
-  currency: string;
-  /** USD-to-order-currency multiplier. USD fallback is represented as 1. */
-  multiplier: number;
-};
+export type TrustedCurrencyResolution = OrderCurrencyResolution;
 
 export type CanonicalOrderShippingQuote =
   | StrictShippingQuoteUsd
@@ -374,32 +374,31 @@ async function mapWithConcurrency<Input, Output>(
 }
 
 function unitUsdToMinor(unitPriceUsd: number, resolution: TrustedCurrencyResolution) {
-  const factor = currencyExponent(resolution.currency) === 0 ? 1 : 100;
-  const minor = Math.round(unitPriceUsd * resolution.multiplier * factor);
-  if (!Number.isSafeInteger(minor) || minor <= 0) {
+  try {
+    const minor = convertUnitUsdToMinor(unitPriceUsd, resolution);
+    if (minor <= 0) throw new RangeError('Unit price rounds to zero.');
+    return minor;
+  } catch (cause) {
     throw new CanonicalOrderResolutionError(
       'LIVE_PRICE_UNAVAILABLE',
       'The resolved unit price cannot be represented safely in the order currency.',
       503,
+      { cause },
     );
   }
-  return minor;
 }
 
 function shippingToMinor(totalUsdCents: number, resolution: TrustedCurrencyResolution) {
-  const rawMajor = (totalUsdCents / 100) * resolution.multiplier;
-  const minor =
-    currencyExponent(resolution.currency) === 0
-      ? Math.round(rawMajor)
-      : Math.ceil(totalUsdCents * resolution.multiplier - Number.EPSILON);
-  if (!Number.isSafeInteger(minor) || minor < 0) {
+  try {
+    return shippingUsdCentsToMinor(totalUsdCents, resolution);
+  } catch (cause) {
     throw new CanonicalOrderResolutionError(
       'INVALID_SHIPPING_QUOTE',
       'The shipping total cannot be represented safely in the order currency.',
       503,
+      { cause },
     );
   }
-  return minor;
 }
 
 function allocateMinor(total: number, weights: number[]) {

@@ -44,7 +44,6 @@ function buildPayPalItem(
     description: line.title,
     sku: line.sellerSku ?? line.sku,
     url: getShopSiteUrl(`/product/${line.productId}`),
-    imageUrl: line.imageUrl,
     category: 'PHYSICAL_GOODS' as ItemCategory,
   };
 }

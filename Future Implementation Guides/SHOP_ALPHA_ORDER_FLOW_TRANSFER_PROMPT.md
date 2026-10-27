@@ -19,11 +19,14 @@ The release guide is canonical for priority and resolved product decisions. The 
 domain references. If an older guide says a different item is "next" or contains an unresolved
 decision already resolved by the release guide, follow the release guide.
 
-Current checkpoint: 2026-08-06. The P0.2 snapshot/payment foundation and local current-sellability
-correction are complete. Merchize `all-variants` is identity only; availability now requires exact
-current Product-line/options proof or completed-current-catalog SKU proof, with storefront and
-supplier SKU namespaces kept separate. Local SQLite received the additive compatibility update, but
-the PayPal ledger migration and deployed sandbox/E2E verification remain pending.
+Current checkpoint: 2026-10-27. P0.2 implementation is present and current acceptance is in progress.
+Merchize `all-variants` is identity only; exact current Product-line/options proof must agree with
+fresh scoped supplier evidence, with storefront and supplier SKU namespaces kept separate.
+All 13 PayPal migrations are applied in development and production. Local sandbox create-order
+previously succeeded, but authorization/capture and full deployed E2E remain unverified. The current
+rounding/caller-cancellation correction passed 244 offline repository tests plus type/lint/build
+verification. The user's no-orders and
+no-migrations constraints remain active; earlier test/build results do not certify these changes.
 
 ## Product target
 
@@ -114,7 +117,8 @@ The alpha must support a smooth real-customer flow:
   option-map match and use the resolved supplier SKU. Without a `Product` option, require exact
   current SKU membership from complete product-scoped supplier evidence. Missing, ambiguous, partial,
   stale, or unverified evidence fails closed; storefront and supplier SKU namespaces stay separate.
-  Compatibility reads time out after 15 seconds. The same verdict fails closed at public variant
+  Individual provider reads time out after 15 seconds; an aggregate deadline remains unverified.
+  The same verdict fails closed at public variant
   display, add-to-cart, stale-cart hydration/revalidation, quantity increase, checkout entry, direct
   checkout, and PayPal intent creation. A stale cart row remains visible and removable but cannot be
   increased or purchased. Base-product and `all-variants` trust reads are strict `no-store` calls;
@@ -146,13 +150,25 @@ The alpha must support a smooth real-customer flow:
   completed PayPal capture, and a difference from the canonical total is flagged for review.
 - P0.2 preserves existing currencies and destination behavior. The snapshot and PayPal request
   contain merchandise plus shipping only; there is no tax amount or tax line.
-- Historical full-catalog verification: the additive local SQLite `db push` completed; a complete
-  current-catalog generation contains 905 products and 19,885 variants; the pre-final live baseline
-  audit returned 141 total, 138 available, 3 unavailable, and 0 unverified across 13 products; and
-  the final dual-source catalog gate has six focused regressions. The full local suite passed 195/195
-  tests together with TypeScript, targeted ESLint, the production webpack build, and diff checks. A
-  repeat live audit under the final gate and deployed sandbox/E2E remain pending. The repair run sent
-  no notification email.
+- PayPal items omit the optional image URL, restoring the earlier working payload format after real
+  Merchize transformation URLs were rejected. Snapshot images remain available to internal receipt,
+  recovery, and fulfillment consumers. SDK request/response bodies and headers are not logged.
+- The release guide's [Current Codebase Checkpoint](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#3-current-codebase-checkpoint)
+  is the single record of historical audit counts, saved admin totals, prior browser evidence, and
+  final offline validation results. Prior success does not certify later working-tree edits.
+- The rounding correction shares `src/lib/shop/checkout/orderMoney.ts` between preview and
+  canonical resolution: round converted units before quantity multiplication and share shipping
+  precision/fallback, including PayPal HUF/JPY/TWD. Cart/checkout line displays use verified quote
+  amounts, and the SDK currency follows the verified quote. USD 15.25 × 0.92345 × 3 shows EUR 42.24
+  consistently. The unused legacy pricing wrapper/precision export, old hydration export,
+  redundant shipping-estimate route, and obsolete browser-cart guide templates are removed.
+  Quantity increases use `validateCartItemForQuantityIncrease.ts`.
+- The cancellation correction settles the admin waiter/stream at cancellation/deadline without
+  cancelling a shared supplier read another customer needs. It suppresses late results and queued
+  work, handles late provider rejection, and avoids false supplier-outage records. Provider HTTP
+  timeouts remain per read; this does not claim a new aggregate customer-checkout deadline.
+  Both corrections passed offline verification in the release checkpoint (244 repository tests,
+  type/lint checks, and the 56-page build). Payment/fulfillment E2E remains unverified and stopped.
 - Only confirmed current drift/unavailability creates or updates a per-variant catalog-health
   incident. Provider timeouts/outages and incomplete or otherwise unverified evidence remain one
   aggregate operational condition and do not fan out into incidents. Confirmed incidents accumulate
@@ -170,9 +186,10 @@ The alpha must support a smooth real-customer flow:
   on load and country/name changes for all matching products, not only the visible page. Fresh
   SQLite evidence appears immediately; missing/stale/unverified evidence renews through one
   authenticated, same-origin streaming POST per batch (100 products maximum, four workers,
-  two-minute deadline). Skeletons, actual progress, Stop Checks, Retry Remaining, Refresh All,
+  two-minute caller deadline). Skeletons,
+  actual progress, Stop Checks, Retry Remaining, Refresh All,
   and Check Live share that request path. Pagination does not restart the queue. Provider reads
-  cancel on navigation; cancellation is not persisted as a supplier outage. Shared catalog reads
+  cancel private reads on navigation; cancellation is not persisted as a supplier outage. Shared catalog reads
   keep their own deadline to avoid cancelling another customer's checkout. No cron, `after()`,
   polling, full supplier traversal, or per-product Server Action/page reload is used. This remains
   diagnostic data; canonical checkout safeguards and product/category ISR are unchanged.
@@ -182,10 +199,21 @@ The alpha must support a smooth real-customer flow:
   rename recorded successfully. The exact rename SQL is restored in the repository with checksum
   `2356add3eeef5a0e2c45d179244f99c262c4658590beb55116243f0c7787df3e`; do not rewrite database
   history or use `migrate resolve`.
-- The restored 13-migration chain passes on disposable PostgreSQL. Read-only status shows only the
-  canonical-snapshot migration pending in development and the restored index rename as production's
-  first pending migration. The immediate action is explicitly approved development migration
-  deployment followed by deployed PayPal sandbox/E2E. P0.3 begins afterward as a read-only trace.
+- The restored 13-migration chain passed on disposable PostgreSQL. Read-only checks on 2026-08-28
+  reported development and production up to date; a fresh 2026-10-27 development check again reports
+  all 13 migrations applied in both targets. Start with
+  target-selected `migrate status`; an up-to-date target needs no deployment. Do not execute
+  migrations from an older guide's pending-deployment instruction.
+- The current local configuration is dev-ledger/sandbox-PayPal, push=false, capture-route
+  runner=false, scanner=true, signature verification required, webhook owner=`sandbox_ngrok`.
+  Django targets `codexchristi.org` and Merchize is live. Webhook/scanner processing after sandbox
+  capture can create a real provider order even with push disabled. Before the user's stop
+  instruction, a create-only smoke created sandbox order `5S9692836H3433644`; the development ledger
+  is `intent_created`, canonical version/hash match, and USD 40 + 5 shipping = 45. No authorization,
+  capture, receipt, or fulfillment followed. The user confirmed no staging/mock setup exists and
+  instructed **do not perform order creation**. Do not create more PayPal/Django intents or orders,
+  authorize/capture, or invoke fulfillment/recovery in this run. Full E2E needs controlled
+  downstream fixtures/staging and renewed direction to resume order creation.
 
 Remaining release gaps after that checkpoint include:
 
@@ -198,12 +226,15 @@ Remaining release gaps after that checkpoint include:
 
 ## Required first implementation order
 
-1. With explicit database approval, run `prisma migrate deploy` against development. The index
-   rename is already recorded there, so only the canonical-snapshot migration should apply. Run the
-   deployed PayPal sandbox/E2E P0.2 acceptance cases afterward.
-2. After development evidence passes, deploy production through the normal reviewed rollout.
-   Production must apply the restored index rename first and the canonical-snapshot migration
-   second. Keep release gates unchecked until their deployed evidence exists.
+1. Finish offline revalidation of the shared money and caller-cancellation corrections, update the
+   canonical release checkpoint, and commit the scoped changes. Do not create orders or run
+   migrations. The last read-only database/schema checkpoint needs no deployment action for these
+   code-only fixes.
+2. Preserve the user's order-creation stop until renewed direction. Establish controlled
+   Django/Merchize fixtures or staging before resuming the full deployed sandbox P0.2
+   payment/receipt/handoff/recovery acceptance cases. Recheck production migration status read-only
+   before any later rollout; deploy only genuinely pending reviewed changes through the normal
+   approval flow. Keep release gates unchecked until their deployed evidence exists.
 3. Perform P0.3 as documentation and read-only code/data tracing only. Record existing destination
    behavior and confirm P0.2 did not change coverage, currencies, or customer copy. Do not modify
    destination eligibility, add geographic blocks, introduce a policy table, or add tax behavior.
@@ -266,10 +297,10 @@ Do not jump to Merchize webhook implementation until the P0 gates in the release
 1. Run `git status --short` and inspect recent commits.
 2. Re-scan the current implementations before editing because other agents may have changed files.
 3. Compare the code against the release guide's "Current Codebase Checkpoint."
-4. Treat the current-sellability code and local automated verification as complete. Repeat the live
-   compatibility audit under the final dual-source gate, then confirm explicit approval and deploy
-   the pending canonical-snapshot migration to development. Run deployed PayPal sandbox/E2E before
-   beginning the P0.3 read-only trace.
+4. Use the dated release checkpoint, preserve unrelated working-tree changes, and finish the
+   current offline verification. Do not run orders or migrations. Controlled downstream
+   fixtures/staging and renewed direction are required before full sandbox payment E2E; P0.3
+   remains the later read-only destination trace.
 5. Before editing, state the exact files and behavior being changed.
 6. Use existing patterns, preserve unrelated dirty changes, add risk-proportionate tests, and verify
    migrations against both dev and production branches when schema changes are involved.

@@ -3,6 +3,7 @@
 import { FC, ReactNode, useMemo, useState } from 'react';
 import Image from 'next/image';
 import GlobalProductPrice from '../GlobalShopComponents/GlobalProductPrice';
+import { formatOrderMoney, type OrderPreviewTotals } from '@/lib/shop/checkout/orderMoney';
 import { ItemQuantityComponent } from './ItemQuantityComponent';
 import { CartVariant, useCartStore } from '@/stores/shop_stores/cartStore';
 import { buildOptionSummary, toCartOptions } from './cartOptionHelpers';
@@ -27,6 +28,7 @@ type MiniCartListProps = {
   emptyState?: ReactNode;
   variant?: 'default' | 'compact';
   confirmBeforeRemove?: boolean;
+  prices?: OrderPreviewTotals | null;
 };
 
 export const MiniCartList: FC<MiniCartListProps> = ({
@@ -38,6 +40,7 @@ export const MiniCartList: FC<MiniCartListProps> = ({
   emptyState = <p className='text-sm text-white/60 pt-2'>Your cart is empty.</p>,
   variant = 'compact',
   confirmBeforeRemove = false,
+  prices,
 }) => {
   const defaultRemove = useCartStore((state) => state.removeFromCart);
   const remove = onRemove ?? defaultRemove;
@@ -67,7 +70,7 @@ export const MiniCartList: FC<MiniCartListProps> = ({
       const optionArray = toCartOptions(options);
       const { summary } = buildOptionSummary(optionArray);
 
-      const lineTotal = retail_price * quantity;
+      const linePrice = prices?.linePricesByVariantId[variantId];
       const fallbackInitials = (title || 'Item').slice(0, 2).toUpperCase();
       const imageSize = isCompact ? 48 : 60;
       const cardPadding = isCompact ? 'px-2 py-3' : 'px-3 py-4';
@@ -119,7 +122,11 @@ export const MiniCartList: FC<MiniCartListProps> = ({
             </div>
 
             <div className={`text-right font-semibold text-white ${priceClass}`}>
-              <GlobalProductPrice usdAmount={lineTotal} />
+              {linePrice ? (
+                formatOrderMoney(linePrice.lineTotalNum, prices!.currency)
+              ) : (
+                <GlobalProductPrice usdAmount={retail_price * quantity} />
+              )}
               <p className={`${qtyTextClass} text-white/60`}>Qty: {quantity}</p>
             </div>
           </div>
@@ -132,7 +139,15 @@ export const MiniCartList: FC<MiniCartListProps> = ({
         </div>
       );
     });
-  }, [items, isCompact, showRemoveButton, showQuantityControls, confirmBeforeRemove, remove]);
+  }, [
+    items,
+    isCompact,
+    showRemoveButton,
+    showQuantityControls,
+    confirmBeforeRemove,
+    remove,
+    prices,
+  ]);
 
   if (!items.length) {
     return <div className={className}>{emptyState}</div>;

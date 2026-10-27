@@ -145,6 +145,20 @@ test('emits no item tax or PayPal tax-total field', () => {
   assert.equal(JSON.stringify(purchaseUnit).toLowerCase().includes('tax'), false);
 });
 
+test('keeps supplier image URLs out of PayPal items', () => {
+  const snapshot = euroSnapshot();
+  snapshot.lines[0].imageUrl =
+    'https://d2dytk4tvgwhb4.cloudfront.net/attributes-size:s,background:ffffff/mockup.jpg';
+
+  const purchaseUnit = buildPayPalOrderCreatePayload(buildInput(snapshot)).body.purchaseUnits[0];
+
+  assert.equal('imageUrl' in (purchaseUnit.items?.[0] ?? {}), false);
+  assert.equal(
+    snapshot.lines[0].imageUrl,
+    'https://d2dytk4tvgwhb4.cloudfront.net/attributes-size:s,background:ffffff/mockup.jpg',
+  );
+});
+
 test('cannot override snapshot money with obsolete browser-cart or request-level money fields', () => {
   const input = {
     ...buildInput(),

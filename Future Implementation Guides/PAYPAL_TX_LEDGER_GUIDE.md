@@ -11,12 +11,13 @@ Shop Ops runtime-target and scoped recovery hardening checkpoint: 2026-07-24
 
 Release sequencing checkpoint: 2026-07-27
 
-P0.2 canonical-order checkpoint: 2026-08-06. The snapshot/payment foundation and local
-current-sellability correction are complete. Storefront `all-variants` rows are identity only;
-availability now requires exact current Product-line/options proof or completed-current-catalog SKU
-proof, with storefront and supplier SKU namespaces separate. The additive local SQLite update and
-local verification passed. PayPal ledger migration deployment and deployed sandbox/E2E verification
-remain pending.
+P0.2 acceptance checkpoint: 2026-10-27. The snapshot/payment implementation is present. Storefront
+`all-variants` rows are identity only; availability requires exact current Product-line/options
+proof plus fresh scoped supplier evidence, with storefront and supplier SKU namespaces separate.
+All 13 PayPal migrations are applied in development and production. The current correction covers
+preview rounding and admin caller cancellation; 244 offline repository tests and type/lint/build
+verification passed. Complete
+sandbox/E2E remains unverified and order creation is stopped by user direction.
 
 `SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md` is canonical for public-alpha priority, cross-domain release
 gates, secure confirmation access, customer milestones, and E2E testing. This guide remains
@@ -63,12 +64,16 @@ ledger or creating a standalone order database:
 - admin/scheduled published-variant audit sets above 100 products are globally trimmed, deduped, and
   sorted, then scanned in sequential chunks of at most 100. Per-scan four-worker concurrency remains
   bounded, and counts, results, and product errors are aggregated across every chunk;
-- compatibility reads time out after 15 seconds. PayPal creation uses only canonical lines,
+- individual provider reads time out after 15 seconds. PayPal creation uses only canonical lines,
   subtotal, shipping, currency, and total. Missing or unproven current supplier mapping/SKU data,
   catalog mismatch, an unsafe shipping fallback, an invalid quote, a provider timeout/outage, or
   incomplete evidence fails closed. The same verdict is enforced at public variant display,
   add-to-cart, cart hydration/revalidation, quantity increase, checkout entry, direct checkout, and
   intent creation. A stale cart row remains visible/removable but cannot be increased or purchased;
+- PayPal items omit optional supplier image URLs. The canonical snapshot retains images for receipt,
+  recovery, and fulfillment consumers. This restores the earlier working PayPal format after real
+  Merchize transformation URLs caused `INVALID_PARAMETER_SYNTAX` at `items[0].image_url`;
+- SDK request/response bodies and headers are explicitly excluded from logging;
 - only drift or unavailability confirmed by complete current evidence creates or updates a
   per-variant catalog-data-health incident. Provider timeouts/outages and incomplete or otherwise
   unverified evidence stay aggregate and do not fan out into per-variant incidents. Confirmed
@@ -110,14 +115,28 @@ ledger or creating a standalone order database:
   actual completed PayPal capture money, never the expected canonical total; mismatches are review
   incidents.
 
-The current-sellability correction is locally verified. An additive local SQLite `db push` completed,
-then a complete current-catalog generation covered 905 products and 19,885 variants. The pre-final
-live baseline audit found 141 variants across 13 products: 138 available, 3 confirmed unavailable,
-and 0 unverified. The final dual-source catalog gate has six focused regressions, and the full local
-suite passed 195/195 tests, along with TypeScript, targeted ESLint, the production webpack build, and
-diff checks. A repeat live audit under the final gate and deployed sandbox/E2E remain pending. The
-repair run sent no notification email. The apparent development
-history-name divergence was a lost legitimate migration file. Development records both
+The release guide's [Current Codebase Checkpoint](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#3-current-codebase-checkpoint)
+holds the historical catalog counts, migration-status evidence, prior local/browser results, and
+current offline validation result. Earlier successful builds do not certify later working-tree edits.
+The database-provisioning integration fixture remains excluded from the no-migrations run.
+
+The rounding correction shares one pure money conversion path between the canonical resolver and
+cart/checkout preview. Converted unit prices round before multiplication by quantity; shipping uses
+the same currency-specific rule in both consumers. USD 15.25 × 0.92345 × 3 must produce EUR 42.24
+through preview, canonical lines, and PayPal payload. Preview line displays and SDK currency use
+the verified quote rather than redoing currency conversion in the browser. The unused pricing
+wrapper, hydration export, shipping-estimate route, and historical browser-cart templates are
+removed. The quantity-validation action has a matching filename and updated import.
+
+The cancellation correction settles the admin caller and closes its response when cancelled or
+timed out, suppressing late results and queued work. Shared supplier reads retain their own timeout
+so another customer's lookup can finish. This fixes the caller's wait without treating cancellation
+as a supplier failure. Individual provider reads still have their own 15-second timeout; the change
+does not claim a new aggregate deadline for every customer checkout lookup. Offline verification
+passed with 244 repository tests, TypeScript, full ESLint, the 56-page production webpack build,
+formatting, and diff checks; see the release checkpoint for coverage and the offline command.
+
+The apparent development history-name divergence was a lost legitimate migration file. Development records both
 `20260622190000_add_paypal_ledger_transaction_webhook_bindings` and the later
 `20260622190331_add_paypal_ledger_transaction_webhook_bindings` recorded successfully. The latter
 renames PostgreSQL's truncated `...paypalPaymentMode_isActiv` index to Prisma's expected
@@ -125,13 +144,25 @@ renames PostgreSQL's truncated `...paypalPaymentMode_isActiv` index to Prisma's 
 `2356add3eeef5a0e2c45d179244f99c262c4658590beb55116243f0c7787df3e`.
 
 Do not edit either applied migration, alter `_prisma_migrations`, reset a configured ledger, or use
-`migrate resolve`. The restored 13-migration chain passes on disposable PostgreSQL. Read-only status
-confirms only `20260806000000_add_canonical_order_snapshot` pending in development and the restored
-rename as production's first pending migration. The next move is explicitly approved `prisma migrate
-deploy` on development; it should skip the already-recorded rename and apply only the canonical
-migration. Run deployed PayPal sandbox/E2E verification next. Production's later reviewed rollout
-must deploy and verify the rename, recheck status, then deploy the canonical migration. P0.3 follows
-as a read-only destination-behavior trace.
+`migrate resolve`. The restored 13-migration chain passed on disposable PostgreSQL. Both development
+and production reported up to date in read-only checks on 2026-08-28. Fresh checks on
+2026-10-27 again report all 13 migrations applied in both targets. Use target-selected read-only
+`migrate status` first. If up to date, stop: no PayPal migration
+deployment is needed. Review any genuinely new pending SQL and its exact target separately; no
+migration is authorized by this checkpoint.
+
+Full sandbox/E2E remains pending. Current local configuration uses development ledgers, sandbox
+PayPal, required webhook signatures, `sandbox_ngrok` webhook ownership, a disabled capture-route
+runner, an enabled scanner, and provider push disabled. Django still targets `codexchristi.org` and
+Merchize is live. A sandbox capture can trigger a real provider order through webhook/scanner
+processing even when push is disabled. Before the user's stop instruction, this run created sandbox
+order `5S9692836H3433644`; read-only ledger inspection confirms `intent_created`, canonical
+version/hash agreement, retained snapshot images, and USD 40.00 + 5.00 shipping = 45.00. No
+authorization, capture, receipt, or fulfillment was performed. The user confirmed no staging/mock
+setup exists and instructed **do not perform order creation**. Do not create further PayPal/Django
+test intents/orders or run authorization, capture, or fulfillment/recovery in this verification
+run. Full E2E requires controlled downstream fixtures/staging and renewed direction to resume order
+creation. P0.3 follows as a read-only destination-behavior trace.
 
 The snapshot intentionally contains merchandise plus shipping only. The current PayPal account
 cannot charge tax, so there is no tax amount or tax line in the canonical snapshot, PayPal purchase
@@ -175,7 +206,7 @@ Not part of this checkpoint:
 11. Ledger Types (JSON payload typing strategy)
 12. Checkout Intent Store (client)
 13. PayPal Intent Endpoint (server)
-14. PayPalCheckoutChildren Integration (replace createOrderAction path)
+14. PayPal Checkout Client Integration
 15. Authorize Route Update (ledger write)
 16. Capture Route Update (ledger write)
 17. Approve Hook Update (`usePayPalTXApproveCallback`)
@@ -344,7 +375,9 @@ Implement in this order to avoid half-migrated behavior:
 3. Add ledger client wrapper.
 4. Add intent store (client).
 5. Move Django order-intent HMAC signing behind the local Next proxy routes. The browser must not sign `/orders/intent`, `/verify`, or `/resend-otp` directly.
-6. Extract create-order logic into `src/lib/paypal/createPayPalOrder.ts` and refactor `create-order` route to use it.
+6. Keep SDK creation in `src/lib/paypal/createPayPalOrder.ts`, called directly by the intent route;
+   build its payload only from the sealed canonical snapshot. The separate create-order route is
+   retired.
 7. Add `/next-api/paypal/tx-ledger/intent` (calls `createPayPalOrder` directly, no self-referential fetch).
 8. Update `PayPalCheckoutChildren` to use intent route.
 9. Update authorize route to persist ledger.
@@ -638,7 +671,7 @@ yarn prisma migrate dev \
 
 ## P0.2 additive canonical snapshot migration
 
-The checked-in migration is:
+The applied canonical-snapshot migration is:
 
 ```text
 prisma/shop/paypal/migrations/20260806000000_add_canonical_order_snapshot/migration.sql
@@ -650,15 +683,21 @@ the all-null triple is the only supported legacy envelope. The SQL and both targ
 have passed local validation without mutating a configured database. The lost
 `20260622190331_add_paypal_ledger_transaction_webhook_bindings` index-rename migration has now been
 restored exactly as documented in the P0.2 checkpoint above. The complete 13-migration history
-passes on disposable PostgreSQL. Read-only status confirms that development already records the
-rename and should apply only the canonical-snapshot migration; production stops first at the rename
-and must apply and verify it before the canonical-snapshot migration in its later reviewed rollout.
+passed on disposable PostgreSQL. Fresh read-only checks on 2026-10-27 report both development and
+production up to date with all 13 migrations. Repeat target-selected status before a future rollout.
 
-## Deploy migrations (production)
+## Check migration status before considering deployment
 
 ```bash
-yarn prisma migrate deploy --schema prisma/shop/paypal/paypalTXLedger.schema.prisma
+PAYPAL_TX_LEDGER_NEON_BRANCH=dev yarn prisma migrate status \
+  --schema prisma/shop/paypal/paypalTXLedger.schema.prisma
+PAYPAL_TX_LEDGER_NEON_BRANCH=prod yarn prisma migrate status \
+  --schema prisma/shop/paypal/paypalTXLedger.schema.prisma
 ```
+
+An up-to-date result requires no deployment command. Only a reviewed, genuinely pending migration
+with an approved target should proceed through the normal deployment workflow; do not rerun a
+migration or alter history to satisfy an older guide checkpoint.
 
 ## Inspect / validate
 
@@ -814,449 +853,50 @@ Design note:
 
 # 13) PayPal Intent Endpoint (server)
 
-P0.2 supersession notice: the current intent route does **not** accept browser cart descriptions,
-prices, SKUs, shipping totals, country codes, or currency as authoritative order data. It accepts
-`selections` containing only product ID, variant ID, and quantity, resolves and seals the canonical
-snapshot server-side, persists all three canonical ledger fields, and passes that verified snapshot
-to `createPayPalOrder`. Selection/identifier/quantity budgets and max-four unique-product
-concurrency prevent a public request from amplifying into unbounded provider work. `all-variants`
-proves storefront identity only. The implemented correction requires exact current Product-line/
-options evidence plus an exact supplier product ID, variant ID, and SKU match in the latest completed
-catalog generation; the no-Product path requires exact current-catalog SKU evidence. It keeps
-storefront/supplier namespaces separate and applies a 15-second compatibility-read timeout. Public
-display, add-to-cart, stale-cart hydration/revalidation, quantity increase, checkout, direct checkout,
-and intent creation fail closed; stale rows stay visible/removable. Only confirmed drift creates a
-per-variant incident,
-while transient/incomplete/unverified provider evidence remains aggregate and does not create an
-alert flood. The older code templates in 13a/13b are retained as historical structure only and must
-not be copied over the current implementation.
+The current implementation is the reference; historical browser-cart pricing templates have been
+removed so they cannot overwrite the canonical snapshot safeguards.
 
-## 13a) Extract create-order logic into a shared function
+## Server ownership and source references
 
-The existing `create-order` route handler contains the full order-creation business logic inline. Before adding the intent endpoint, extract that logic into a directly-importable function so the intent route can call it without an HTTP round-trip to itself.
+- [Intent route](../src/app/api/paypal/tx-ledger/intent/route.ts) accepts product ID, variant ID, and
+  quantity as lookup selectors. Customer/contact/delivery values describe the request; the route
+  resolves the destination code server-side and reads authenticated ownership from the session.
+  Browser titles, prices, SKUs, currency, totals, and user IDs cannot become authoritative order data.
+- [Merchize resolver](../src/lib/paypal/orderSnapshot/merchizeResolver.ts) and
+  [canonical resolver](../src/lib/paypal/orderSnapshot/resolver.ts) verify live storefront identity,
+  exact Product-line/options mapping, fresh product-scoped supplier evidence, price, and shipping.
+  Full-catalog generation age is not the product-scoped runtime gate.
+- [Shared order money](../src/lib/shop/checkout/orderMoney.ts) owns converted unit and shipping
+  rounding for both the canonical snapshot and cart/checkout preview. Round each converted unit
+  before multiplying quantity; add the resulting minor-unit line amounts. Preserve the existing
+  supported-currency fallback and PayPal HUF/JPY/TWD zero-digit precision.
+- [Order creation helper](../src/lib/paypal/createPayPalOrder.ts) validates the sealed snapshot
+  again, then calls the PayPal SDK directly. It does not call a local HTTP route or reprice cart data.
+- [Payload builder](../src/lib/paypal/createPayPalOrderPayload.ts) maps the snapshot's exact currency,
+  unit amounts, quantities, subtotal, shipping, and total into PayPal. Optional supplier image URLs
+  and tax fields are omitted; snapshot images remain available to receipt/recovery consumers.
 
-Why this matters:
+The route persists the canonical snapshot, version, and hash in the existing `PaypalIntent` row
+before the PayPal call. Success returns `{ data: { orderToken, paypalOrderId }, requestId }`; failures
+use the shared stage/code response envelope. The PayPal purchase-unit `custom_id` is the local
+`orderToken`, not Django's payment-save custom ID. Selection and concurrency budgets, stale-cart
+blocks, and confirmed-drift incident behavior are defined in the canonical checkpoint above.
 
-- A self-referential `fetch()` (route calling its own server) can deadlock under load when all Node.js workers are occupied waiting on themselves.
-- Direct function calls are faster, testable, and do not depend on `host` header availability.
+# 14) PayPal Checkout Client Integration
 
-New file:
+The current
+[PayPalCheckoutChildren.tsx](../src/components/UI/Shop/Checkout/Paypal/PayPalCheckoutChildren.tsx)
+posts to `/next-api/paypal/tx-ledger/intent` and is the client implementation reference.
 
-- `src/lib/paypal/createPayPalOrder.ts`
+It sends only product/variant/quantity selectors, checkout customer/address data, and the existing
+verified Django order-intent correlation data. It does not send browser pricing or a user ID as
+authoritative order fields. It stores the local `orderToken`, checkout stage, and payment surface
+in the intent store, and returns `paypalOrderId` to the SDK. After capture, browser UI consumes
+durable status; server webhook/recovery processing owns completion.
 
-```ts
-import {
-  OrdersController,
-  CheckoutPaymentIntent,
-  OrderRequest,
-  ItemCategory,
-  Item,
-} from '@paypal/paypal-server-sdk';
-import { paypalClient } from '@/lib/paymentClients/paypalClient';
-import { getOrderFinalDetails } from '@/actions/shop/checkout/getOrderFinalDetails';
-import { PAYPAL_CURRENCY_CODES } from '@/datasets/shop_general/paypal_currency_specifics';
-import { removeOrKeepDecimalPrecision } from '@/actions/merchize/getMerchizeTotalWithShipping';
-import { format } from 'date-fns';
-
-const orders = new OrdersController(paypalClient);
-
-const shippingPreferenceForPaymentContext = {
-  experienceContext: {
-    shippingPreference: 'SET_PROVIDED_ADDRESS',
-    brandName: 'Codex Christi',
-  },
-};
-
-export type CreatePayPalOrderArgs = {
-  orderToken: string;
-  cart: Array<{ title: string; itemDetail: any; quantity: number; [k: string]: any }>;
-  customer: { name: string; email: string };
-  country: string;
-  country_iso_3?: string;
-  initialCurrency?: string;
-  delivery_address: {
-    shipping_address_line_1: string;
-    shipping_address_line_2?: string;
-    shipping_state?: string;
-    shipping_city?: string;
-    zip_code?: string;
-    [k: string]: any;
-  };
-};
-
-/**
- * Core order-creation logic extracted from the create-order route.
- * Returns the raw PayPal order response body (includes `.id`).
- * Throws on validation or PayPal API failure.
- */
-export async function createPayPalOrder(args: CreatePayPalOrderArgs) {
-  const { orderToken, cart, customer, country, country_iso_3, initialCurrency, delivery_address } =
-    args;
-
-  if (!orderToken) throw new Error('Missing order token');
-  if (!cart || cart.length === 0) throw new Error('Missing cart');
-  if (!customer) throw new Error('Missing customer');
-
-  const payPalSupportsCurrency = PAYPAL_CURRENCY_CODES.includes(
-    initialCurrency as (typeof PAYPAL_CURRENCY_CODES)[number],
-  );
-
-  const orderDetailsFromServer = await getOrderFinalDetails(
-    cart,
-    country_iso_3 ?? 'USA',
-    'merchize',
-  );
-  const { finalPricesWithShippingFee } = orderDetailsFromServer || {};
-  const { currency, retailPriceTotalNum, shippingPriceNum, multiplier } =
-    finalPricesWithShippingFee || {};
-
-  const currencyCode = currency && payPalSupportsCurrency ? currency : 'USD';
-  const getAdjAmount = (num: number) => (payPalSupportsCurrency ? num : num / (multiplier ?? 1));
-  const adjShipping = getAdjAmount(shippingPriceNum!);
-
-  const cartItemsForPaypalBodyContext = cart.map(
-    async ({ title, itemDetail, quantity }) =>
-      ({
-        name: title,
-        unitAmount: {
-          currencyCode: currency,
-          value: String(
-            await removeOrKeepDecimalPrecision(
-              currency!,
-              getAdjAmount(itemDetail.retail_price * (multiplier ?? 1)),
-            ),
-          ),
-        },
-        quantity: String(quantity),
-        description: title,
-        sku: itemDetail.sku_seller,
-        url: `https://codexchristi.shop/product/${itemDetail.product}`,
-        category: ItemCategory.PhysicalGoods,
-      }) as Item,
-  );
-
-  if (!retailPriceTotalNum || !shippingPriceNum) {
-    throw new Error('Invalid Price!! Aborting...');
-  }
-
-  const resolvedCartItems = await Promise.all(cartItemsForPaypalBodyContext);
-  const itemsContextTotal = await removeOrKeepDecimalPrecision(
-    currencyCode,
-    resolvedCartItems.reduce(
-      (accum, itm) => accum + Number(itm.unitAmount.value) * Number(itm.quantity),
-      0,
-    ),
-  );
-
-  const payload = {
-    body: {
-      intent: 'AUTHORIZE' as CheckoutPaymentIntent,
-      purchaseUnits: [
-        {
-          description: `Codex Christi Shop Order for ${customer.name} on ${format(
-            new Date(Date.now()),
-            "EEEE d 'of' MMMM yyyy hh:mm a",
-          )}`,
-          amount: {
-            currencyCode,
-            value: String(
-              await removeOrKeepDecimalPrecision(currencyCode, itemsContextTotal + adjShipping),
-            ),
-            breakdown: {
-              itemTotal: { currencyCode, value: String(itemsContextTotal) },
-              shipping: {
-                currencyCode,
-                value: String(await removeOrKeepDecimalPrecision(currencyCode, adjShipping)),
-              },
-            },
-          },
-          shipping: {
-            name: { fullName: customer.name },
-            address: {
-              addressLine1: delivery_address.shipping_address_line_1,
-              addressLine2: delivery_address.shipping_address_line_2,
-              adminArea1: delivery_address.shipping_state,
-              adminArea2: delivery_address.shipping_city,
-              postalCode: delivery_address.zip_code,
-              countryCode: country,
-            },
-            emailAddress: customer.email,
-          },
-          customId: orderToken,
-          items: payPalSupportsCurrency ? resolvedCartItems : undefined,
-        },
-      ],
-      payer: {
-        name: { givenName: customer.name },
-        emailAddress: customer.email,
-      },
-      paymentSource: {
-        paypal: shippingPreferenceForPaymentContext,
-        card: {
-          experienceContext: shippingPreferenceForPaymentContext.experienceContext,
-          attributes: { verification: { method: 'SCA_WHEN_REQUIRED' } },
-        },
-        venmo: shippingPreferenceForPaymentContext,
-      },
-    } as OrderRequest,
-    prefer: 'return=representation',
-  };
-
-  const { body: resBody } = await orders.createOrder(payload);
-  return resBody;
-}
-```
-
-Then update the existing create-order route to use it:
-
-Updated file:
-
-- `src/app/api/paypal/orders/create-order/route.ts`
-
-```ts
-import { NextResponse } from 'next/server';
-import { createPayPalOrder } from '@/lib/paypal/createPayPalOrder';
-
-export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const resBody = await createPayPalOrder(body);
-    return NextResponse.json(resBody);
-  } catch (err: unknown) {
-    console.error('Create Order Error', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
-    );
-  }
-}
-```
-
-## 13b) Intent endpoint (calls `createPayPalOrder` directly)
-
-New file:
-
-- `src/app/api/paypal/tx-ledger/intent/route.ts`
-
-Purpose:
-
-- Create ledger row first.
-- Call `createPayPalOrder(...)` directly (no self-referential HTTP fetch).
-- Return `orderToken + paypalOrderId`.
-
-Important ownership note:
-
-- Store only `orderToken` in browser state.
-- Return `paypalOrderId` only so `createOrder()` can hand it to the PayPal SDK.
-- PayPal `purchase_units[].custom_id` should be set to `orderToken`. It is a local ledger correlation key, not the Django payment-save `custom_id`.
-- After capture succeeds, the client should act only as a status consumer. Durable completion belongs to webhook + server runner.
-
-```ts
-import { NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
-import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
-import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
-import { createPayPalOrder } from '@/lib/paypal/createPayPalOrder';
-
-export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const {
-      cart,
-      customer,
-      country,
-      country_iso_3,
-      initialCurrency,
-      delivery_address,
-      userId,
-      djangoOrderIntentUuid,
-      djangoOrderIntentOrderId,
-      djangoOrderIntentPayload,
-      djangoOrderIntentVerifyPayload,
-    } = body;
-
-    if (!Array.isArray(cart) || cart.length === 0) {
-      return NextResponse.json({ error: 'Cart required' }, { status: 400 });
-    }
-    if (!customer?.name || !customer?.email) {
-      return NextResponse.json({ error: 'Customer required' }, { status: 400 });
-    }
-    if (!delivery_address) {
-      return NextResponse.json({ error: 'Delivery address required' }, { status: 400 });
-    }
-
-    const orderToken = randomUUID();
-
-    await paypalTxLedger.paypalIntent.create({
-      data: {
-        orderToken,
-        status: PAYPAL_LEDGER_STATUS.INTENT_CREATING,
-        customerName: customer.name,
-        customerEmail: customer.email,
-        userId: userId ?? null,
-        djangoOrderIntentUuid: djangoOrderIntentUuid ?? null,
-        djangoOrderIntentOrderId: djangoOrderIntentOrderId ?? null,
-        djangoOrderIntentPayload: djangoOrderIntentPayload ?? null,
-        djangoOrderIntentVerifyPayload: djangoOrderIntentVerifyPayload ?? null,
-        countryIso2: country ?? null,
-        countryIso3: country_iso_3 ?? null,
-        initialCurrency: initialCurrency ?? null,
-        cartSnapshot: cart,
-        shippingSnapshot: delivery_address,
-      },
-    });
-
-    let paypalOrder: any;
-    try {
-      paypalOrder = await createPayPalOrder({
-        orderToken,
-        cart,
-        customer,
-        country,
-        country_iso_3,
-        initialCurrency,
-        delivery_address,
-      });
-    } catch (createErr) {
-      await paypalTxLedger.paypalIntent.update({
-        where: { orderToken },
-        data: {
-          status: PAYPAL_LEDGER_STATUS.ERROR,
-          lastErrorCode: 'CREATE_ORDER_FAILED',
-          lastErrorMessage: createErr instanceof Error ? createErr.message : String(createErr),
-        },
-      });
-      return NextResponse.json({ error: 'Create order failed' }, { status: 500 });
-    }
-
-    if (!paypalOrder?.id) {
-      await paypalTxLedger.paypalIntent.update({
-        where: { orderToken },
-        data: {
-          status: PAYPAL_LEDGER_STATUS.ERROR,
-          lastErrorCode: 'MISSING_PAYPAL_ORDER_ID',
-          lastErrorMessage: 'createPayPalOrder returned no id',
-        },
-      });
-      return NextResponse.json({ error: 'Missing PayPal order ID' }, { status: 500 });
-    }
-
-    await paypalTxLedger.paypalIntent.update({
-      where: { orderToken },
-      data: {
-        paypalOrderId: paypalOrder.id,
-        status: PAYPAL_LEDGER_STATUS.INTENT_CREATED,
-      },
-    });
-
-    return NextResponse.json({
-      orderToken,
-      paypalOrderId: paypalOrder.id,
-    });
-  } catch (err) {
-    return NextResponse.json({ error: 'Intent failed' }, { status: 500 });
-  }
-}
-```
-
----
-
-# 14) PayPalCheckoutChildren Integration (replace createOrderAction path)
-
-Current file:
-
-- `src/components/UI/Shop/Checkout/Paypal/PayPalCheckoutChildren.tsx`
-
-Replace the `createOrder` callback to call `/next-api/paypal/tx-ledger/intent`.
-
-Important behavior:
-
-- The intent route returns both `orderToken` and `paypalOrderId`.
-- Store only `orderToken` in `paypalIntentStore`.
-- Return `paypalOrderId` directly to the PayPal SDK.
-- Do not persist `paypalOrderId` in your own client app state after `createOrder()` returns.
-
-## Required payload sources (codebase-verified)
-
-- product ID, variant ID, and quantity selectors derived from `useCartStore`; do not send browser
-  title, SKU, option, price, currency, or shipping fields as order truth
-- `customer` + `delivery_address` from `useShopCheckoutStore`
-- `djangoOrderIntentUuid`, `djangoOrderIntentOrderId`, and `djangoOrderIntentVerifyPayload` from `djangoOrderIntentStore`
-
-## Template (drop-in replacement shape)
-
-This is the older pre-P0.2 integration shape. The current component sends `selections` and omits
-client-owned country/currency/price fields; preserve that current contract.
-
-```ts
-import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
-import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
-
-// inside component
-const {
-  djangoOrderIntentUuid,
-  djangoOrderIntentOrderId,
-  djangoOrderIntentPayload,
-  djangoOrderIntentVerifyPayload,
-} = useDjangoOrderIntentStore();
-const setIntent = usePayPalIntentStore((s) => s.setIntent);
-
-const createOrder = useCallback(async (): Promise<string> => {
-  const payload = {
-    cart,
-    customer: {
-      name: `${first_name} ${last_name}`,
-      email: email ?? 'john@example.com',
-    },
-    country: country_iso2 ?? 'US',
-    country_iso_3: country_iso3 ?? 'USA',
-    initialCurrency: currency ?? 'USD',
-    delivery_address,
-    djangoOrderIntentUuid,
-    djangoOrderIntentOrderId,
-    djangoOrderIntentPayload,
-    djangoOrderIntentVerifyPayload,
-  };
-
-  const res = await fetch('/next-api/paypal/tx-ledger/intent', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`PayPal intent failed: ${text}`);
-  }
-
-  const data = await res.json();
-  if (!data?.orderToken || !data?.paypalOrderId) {
-    throw new Error('Invalid intent response');
-  }
-
-  setIntent({ orderToken: data.orderToken });
-  return data.paypalOrderId as string;
-}, [
-  cart,
-  first_name,
-  last_name,
-  email,
-  country_iso2,
-  country_iso3,
-  currency,
-  delivery_address,
-  djangoOrderIntentUuid,
-  djangoOrderIntentOrderId,
-  djangoOrderIntentPayload,
-  djangoOrderIntentVerifyPayload,
-  setIntent,
-]);
-```
-
-Why this replaces `createOrderAction` in PayPal button path:
-
-- Prevents duplicate order creation paths.
-- Ensures ledger row exists before PayPal approve/capture.
+Do not restore the removed browser-cart payload examples, a separate create-order endpoint, or
+client-side repricing. The current verification run is offline only: no PayPal/Django intent or order
+creation, authorization, capture, fulfillment, or migrations.
 
 ---
 
@@ -2330,9 +1970,7 @@ type PostProcessingCipherPurpose = 'receipt' | 'payment-save' | 'fulfillment';
 function getServerActionSecret() {
   const secret = process.env.SHOP_CHECKOUT_SERVER_ACTIONS_POST_PROCESSING_CRYPTO_SECRET;
   if (!secret) {
-    throw new Error(
-      'SHOP_CHECKOUT_SERVER_ACTIONS_POST_PROCESSING_CRYPTO_SECRET is not configured',
-    );
+    throw new Error('SHOP_CHECKOUT_SERVER_ACTIONS_POST_PROCESSING_CRYPTO_SECRET is not configured');
   }
   return secret;
 }
@@ -3194,7 +2832,8 @@ This is the missing operational sequence from earlier drafts.
 1. Add schema file.
 2. Add `AdminNotificationOutbox`.
 3. Run `prisma format` + `prisma validate`.
-4. Run ledger migrations.
+4. Inspect target-selected ledger migration status. Apply only reviewed, genuinely pending migrations
+   through the approved deployment workflow; an up-to-date target needs no migration.
 5. Generate ledger Prisma client.
 
 ## Step 2: Write-only ledger instrumentation (no behavior change yet)
@@ -3322,6 +2961,15 @@ Why this is safe:
   the same snapshot and contain no tax amount or tax line.
 - Verify multiple currently supported currencies retain their existing decimal-precision behavior;
   do not test or document an alpha-wide USD restriction.
+- Verify preview totals use the same rounding boundaries as canonical unit/line amounts, including
+  USD 15.25 × 0.92345 × 3 = EUR 42.24, multiple lines/quantities, unsupported-currency fallback, and
+  HUF/JPY/TWD zero-digit unit and shipping amounts. Compare preview, canonical, and PayPal payload
+  values using offline fixtures.
+- Verify admin cancellation/deadline settles the caller and response while a shared supplier read
+  remains pending, starts no further queued checks, emits no late results or false outage records,
+  and handles late provider rejection. An uncancelled customer sharing that read must still receive
+  its result. Provider timeouts remain per read; do not abort all shared consumers to close one
+  admin stream.
 - Verify every field labeled as paid uses actual completed PayPal capture money while the canonical
   total remains the expected order value; a difference is shown as a reconciliation incident.
 - Poll order status endpoint.
@@ -3337,7 +2985,9 @@ Why this is safe:
 
 ## Sandbox webhook testing
 
-- Enable webhook verification as needed.
+- Require webhook verification and confirm the configured processing owner/listener.
+- Use controlled Django/Merchize fixtures or staging for authorization/capture and automatic recovery.
+  Sandbox PayPal and disabled provider push alone do not prevent live provider order creation.
 - Confirm webhook rows dedupe by `eventId`.
 - Confirm `completed` rows are not reprocessed.
 - Confirm repeated webhook/post-processing attempts do not spam duplicate admin alerts.

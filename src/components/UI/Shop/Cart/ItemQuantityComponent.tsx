@@ -1,7 +1,7 @@
 import { CartVariant, useCartStore } from '@/stores/shop_stores/cartStore';
 import { FC, ReactNode, useCallback, useState } from 'react';
 import { Button, ButtonProps } from '../../primitives/button';
-import { validateCartItemForQuantityIncrease } from '@/actions/shop/cart/hydrateCartDisplayFromMerchizeOfflineCatalog';
+import { validateCartItemForQuantityIncrease } from '@/actions/shop/cart/validateCartItemForQuantityIncrease';
 import type { CartItemAvailabilityStatus } from './cartAvailability';
 
 export const ItemQuantityComponent: FC<{

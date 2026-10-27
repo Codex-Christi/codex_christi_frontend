@@ -8,6 +8,7 @@ import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink
 import { Button } from '@/components/UI/primitives/button';
 import { Trash2 } from 'lucide-react';
 import GlobalProductPrice from '../GlobalShopComponents/GlobalProductPrice';
+import { formatOrderMoney, type OrderPreviewTotals } from '@/lib/shop/checkout/orderMoney';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +29,8 @@ const CartItems: FC<{
   cartItems: CartVariant[];
   availabilityByVariantId: CartItemAvailabilityMap;
   onAvailabilityChange?: (variantId: string, status: CartItemAvailabilityStatus) => void;
-}> = ({ cartItems, availabilityByVariantId, onAvailabilityChange }) => {
+  prices?: OrderPreviewTotals | null;
+}> = ({ cartItems, availabilityByVariantId, onAvailabilityChange, prices }) => {
   const { removeFromCart } = useCartStore();
 
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
@@ -77,7 +79,12 @@ const CartItems: FC<{
         const productLookupKey = parentID || cartItem.slug;
         const productHref = `/shop/product/${encodeURIComponent(productLookupKey)}`;
 
-        const lineTotal = retail_price * quantity;
+        const linePrice = prices?.linePricesByVariantId[cartItem.variantId];
+        const lineTotal = linePrice ? (
+          formatOrderMoney(linePrice.lineTotalNum, prices!.currency)
+        ) : (
+          <GlobalProductPrice usdAmount={retail_price * quantity} />
+        );
 
         return (
           <div
@@ -137,7 +144,13 @@ const CartItems: FC<{
               )}
 
               <h4 className='text-base text-white'>
-                Price: <GlobalProductPrice usdAmount={retail_price} /> (each)
+                Price:{' '}
+                {linePrice ? (
+                  formatOrderMoney(linePrice.unitPriceNum, prices!.currency)
+                ) : (
+                  <GlobalProductPrice usdAmount={retail_price} />
+                )}{' '}
+                (each)
               </h4>
             </section>
 
@@ -157,9 +170,7 @@ const CartItems: FC<{
                 />
                 {renderRemoveButton(cartItem.variantId)}
               </div>
-              <h3 className='text-[1.1rem] font-semibold text-right'>
-                Total: <GlobalProductPrice usdAmount={lineTotal} />
-              </h3>
+              <h3 className='text-[1.1rem] font-semibold text-right'>Total: {lineTotal}</h3>
             </div>
 
             {/* Tablet / Desktop: Size & Color with Quantity + Delete aligned on the right */}
@@ -185,9 +196,7 @@ const CartItems: FC<{
               col-span-2 md:col-span-4 xl:col-span-1 py-4 lg:py-0'
             >
               <span className='text-sm text-white/80 uppercase tracking-wide'>Line Total</span>
-              <h3 className='text-[1.075rem] font-semibold'>
-                <GlobalProductPrice usdAmount={lineTotal} />
-              </h3>
+              <h3 className='text-[1.075rem] font-semibold'>{lineTotal}</h3>
             </div>
           </div>
         );

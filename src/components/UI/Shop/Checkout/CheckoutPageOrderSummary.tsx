@@ -49,8 +49,8 @@ const OrderSummary = () => {
   const cartCount = cartItems.length;
   const cartPlural = cartCount === 1 ? 'item' : 'items';
 
-  const { retailPriceTotalNum, shippingPriceNum, currency, currency_symbol } =
-    serverOrderDetails?.finalPricesWithShippingFee ?? {};
+  const prices = serverOrderDetails?.finalPricesWithShippingFee;
+  const { retailPriceTotalNum, shippingPriceNum, totalPriceNum, currency } = prices ?? {};
 
   const t = progress; // 0..1
   const ease = t * t * (3 - 2 * t); // smoothstep
@@ -79,6 +79,7 @@ const OrderSummary = () => {
               className='mt-1'
               variant={isTabletAndAbove ? 'default' : 'compact'}
               confirmBeforeRemove
+              prices={prices}
               emptyState={<p className='text-sm text-white/60 pt-2'>Your cart is empty.</p>}
             />
 
@@ -102,6 +103,7 @@ const OrderSummary = () => {
                       variant='compact'
                       className='mt-2'
                       confirmBeforeRemove
+                      prices={prices}
                     />
                   </AccordionContent>
                 </AccordionItem>
@@ -132,8 +134,8 @@ const OrderSummary = () => {
               cartCount={cartCount}
               retailPriceTotalNum={retailPriceTotalNum}
               shippingPriceNum={shippingPriceNum}
+              totalPriceNum={totalPriceNum}
               currency={currency}
-              currency_symbol={currency_symbol ?? ''}
             />
           </div>
         </div>
@@ -144,8 +146,8 @@ const OrderSummary = () => {
           cartCount={cartCount}
           retailPriceTotalNum={retailPriceTotalNum}
           shippingPriceNum={shippingPriceNum}
+          totalPriceNum={totalPriceNum}
           currency={currency}
-          currency_symbol={currency_symbol ?? ''}
           slim
           className='fixed bottom-0 left-1/2 !z-50 w-full  -translate-x-1/2 
           shadow-[0px_0px_20px_5px_rgba(205,_205,_255,_0.75)]'
