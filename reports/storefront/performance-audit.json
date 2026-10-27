@@ -1,0 +1,816 @@
+{
+  "notes": [
+    "Localhost and production scores are deliberately not treated as a before/after performance improvement.",
+    "All accepted runs have successful Document, Stylesheet, and Script requests.",
+    "Full Lighthouse JSON, screenshots, and coverage are retained in /tmp/codex-storefront-audit on the audit machine.",
+    "No checkout, payment, Cloudflare, Nginx, image quality setting for product previews, BluePlanet, or font configuration was changed in these milestones."
+  ],
+  "css": {
+    "before": {
+      "rawBytes": 141280,
+      "gzipBytes": 23627
+    },
+    "after": [
+      {
+        "file": "3zyffaed91idg.css",
+        "rawBytes": 122606,
+        "gzipBytes": 20742
+      }
+    ],
+    "savingGzipBytes": 2885,
+    "savingPercent": 12.21,
+    "adminTradeoff": "Admin loads a separate full utility stylesheet in addition to shared styles to preserve existing and shared components; storefront routes do not request it."
+  },
+  "images": {
+    "originalSourceBytes": 29603552,
+    "deliveredPortraitBytesByDensity": [
+      {
+        "deviceScaleFactor": 1,
+        "bytes": 9058
+      },
+      {
+        "deviceScaleFactor": 2,
+        "bytes": 26528
+      },
+      {
+        "deviceScaleFactor": 3,
+        "bytes": 51188
+      }
+    ],
+    "minimumEncoderSSIM": 0.9951791997699739,
+    "minimumBrowserSSIM": 0.9951764252562513,
+    "alphaMaxDifference": 0,
+    "originalsPreserved": true,
+    "evidence": "reports/storefront/image-compression.json"
+  },
+  "historicalLoadTests": {
+    "source": "User-provided June 21, 2026 results; not rerun during these CSS/image milestones",
+    "url": "https://codexchristi.shop/product/68b39ac590dbad697de11bbf",
+    "runs": [
+      {
+        "connections": 100,
+        "workers": 4,
+        "durationSeconds": 60,
+        "requestsPerSecond": 228.12,
+        "averageLatencyMs": 436.86,
+        "p99Ms": 801,
+        "http500": 0,
+        "timeouts": 0
+      },
+      {
+        "connections": 160,
+        "workers": 4,
+        "durationSeconds": 60,
+        "requestsPerSecond": 288.62,
+        "averageLatencyMs": 549.85,
+        "p99Ms": 992,
+        "http500": 2,
+        "timeouts": 0
+      },
+      {
+        "connections": 200,
+        "workers": 4,
+        "durationSeconds": 60,
+        "requestsPerSecond": 292.15,
+        "averageLatencyMs": 671.42,
+        "p99Ms": 4051,
+        "http500": 2,
+        "timeouts": 2
+      },
+      {
+        "connections": 500,
+        "workers": 0,
+        "durationSeconds": 60,
+        "requestsPerSecond": 274.84,
+        "averageLatencyMs": 1635.82,
+        "p99Ms": 7188,
+        "http500": 4,
+        "timeouts": 204
+      }
+    ],
+    "interpretation": "Historical throughput plateau between 160 and 200 connections; p99 rose sharply. Reported near-idle Next CPU during the 160-connection run indicates warm proxy-cache traffic, not a measurement of current origin capacity. Do not use these older results to size the current deployment without separating HIT, MISS, regeneration, and API tests."
+  },
+  "lighthouse": [
+    {
+      "phase": "production-baseline",
+      "environment": "Public production URL; existing deployment",
+      "medians": [
+        {
+          "mode": "mobile",
+          "validRuns": 3,
+          "performance": 83,
+          "fcpMs": 1915.65,
+          "lcpMs": 4483.370000000001,
+          "tbtMs": 13,
+          "cls": 0,
+          "unusedCssBytes": 22759
+        },
+        {
+          "mode": "desktop",
+          "validRuns": 3,
+          "performance": 98,
+          "fcpMs": 641.367,
+          "lcpMs": 1088.6444999999999,
+          "tbtMs": 0,
+          "cls": 0.03640250032834253,
+          "unusedCssBytes": 22141
+        }
+      ],
+      "runs": [
+        {
+          "file": "desktop-1.json",
+          "url": "https://codexchristi.shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T06:55:33.342Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "desktop",
+          "performance": 98,
+          "seo": 100,
+          "accessibility": 95,
+          "fcpMs": 641.367,
+          "lcpMs": 1088.6444999999999,
+          "tbtMs": 0,
+          "cls": 0.03639188862621487,
+          "unusedCssBytes": 22141
+        },
+        {
+          "file": "desktop-2.json",
+          "url": "https://codexchristi.shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T06:55:41.813Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "desktop",
+          "performance": 98,
+          "seo": 100,
+          "accessibility": 95,
+          "fcpMs": 679.316,
+          "lcpMs": 1142.8020000000004,
+          "tbtMs": 0,
+          "cls": 0.03640250032834253,
+          "unusedCssBytes": 22141
+        },
+        {
+          "file": "desktop-3.json",
+          "url": "https://codexchristi.shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T06:55:50.076Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "desktop",
+          "performance": 98,
+          "seo": 100,
+          "accessibility": 95,
+          "fcpMs": 612.8050000000001,
+          "lcpMs": 1071.4975000000004,
+          "tbtMs": 0,
+          "cls": 0.03640250032834253,
+          "unusedCssBytes": 22141
+        },
+        {
+          "file": "mobile-1.json",
+          "url": "https://codexchristi.shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T06:55:05.159Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 76,
+          "seo": 92,
+          "accessibility": 91,
+          "fcpMs": 2546.5720000000006,
+          "lcpMs": 5419.325999999999,
+          "tbtMs": 9,
+          "cls": 0,
+          "unusedCssBytes": 22743
+        },
+        {
+          "file": "mobile-2.json",
+          "url": "https://codexchristi.shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T06:55:15.214Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 84,
+          "seo": 100,
+          "accessibility": 95,
+          "fcpMs": 1899.711,
+          "lcpMs": 4254.633999999999,
+          "tbtMs": 14.5,
+          "cls": 0,
+          "unusedCssBytes": 22759
+        },
+        {
+          "file": "mobile-3.json",
+          "url": "https://codexchristi.shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T06:55:24.870Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 83,
+          "seo": 100,
+          "accessibility": 95,
+          "fcpMs": 1915.65,
+          "lcpMs": 4483.370000000001,
+          "tbtMs": 13,
+          "cls": 0,
+          "unusedCssBytes": 22759
+        }
+      ],
+      "excluded": []
+    },
+    {
+      "phase": "admin-css-isolation",
+      "environment": "Local production build; not comparable to production network timings",
+      "medians": [
+        {
+          "mode": "mobile",
+          "validRuns": 3,
+          "performance": 93,
+          "fcpMs": 1806.522,
+          "lcpMs": 3253.4051,
+          "tbtMs": 14.5,
+          "cls": 0,
+          "unusedCssBytes": 19138
+        },
+        {
+          "mode": "desktop",
+          "validRuns": 3,
+          "performance": 100,
+          "fcpMs": 365.862,
+          "lcpMs": 629.1474499999999,
+          "tbtMs": 0,
+          "cls": 0.03640250032834253,
+          "unusedCssBytes": 18522
+        }
+      ],
+      "runs": [
+        {
+          "file": "desktop-1.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:05:18.184Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "desktop",
+          "performance": 100,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 365.862,
+          "lcpMs": 724.8620000000001,
+          "tbtMs": 0,
+          "cls": 0.03639188862621487,
+          "unusedCssBytes": 18522
+        },
+        {
+          "file": "desktop-2.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:05:26.758Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "desktop",
+          "performance": 100,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 369.14745,
+          "lcpMs": 629.1474499999999,
+          "tbtMs": 0,
+          "cls": 0.03640250032834253,
+          "unusedCssBytes": 18522
+        },
+        {
+          "file": "desktop-3.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:05:34.659Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "desktop",
+          "performance": 100,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 364.8585,
+          "lcpMs": 624.8585,
+          "tbtMs": 0,
+          "cls": 0.03640250032834253,
+          "unusedCssBytes": 18522
+        },
+        {
+          "file": "mobile-1.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:04:54.112Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 93,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 1355.6034,
+          "lcpMs": 3253.4051,
+          "tbtMs": 22.5,
+          "cls": 0,
+          "unusedCssBytes": 19138
+        },
+        {
+          "file": "mobile-2.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:05:02.044Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 90,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 1806.9656999999997,
+          "lcpMs": 3532.9656999999997,
+          "tbtMs": 13,
+          "cls": 0,
+          "unusedCssBytes": 19138
+        },
+        {
+          "file": "mobile-3.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:05:10.359Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 93,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 1806.522,
+          "lcpMs": 3081.522,
+          "tbtMs": 14.5,
+          "cls": 0,
+          "unusedCssBytes": 19138
+        }
+      ],
+      "excluded": []
+    },
+    {
+      "phase": "component-css-ownership",
+      "environment": "Local production build; failed critical-resource runs excluded",
+      "medians": [
+        {
+          "mode": "mobile",
+          "validRuns": 3,
+          "performance": 90,
+          "fcpMs": 1805.35155,
+          "lcpMs": 3534.0343000000003,
+          "tbtMs": 14.5,
+          "cls": 0,
+          "unusedCssBytes": 18939
+        },
+        {
+          "mode": "desktop",
+          "validRuns": 1,
+          "performance": 100,
+          "fcpMs": 366.62444999999997,
+          "lcpMs": 626.62445,
+          "tbtMs": 0,
+          "cls": 0.03640250032834253,
+          "unusedCssBytes": 18325
+        }
+      ],
+      "runs": [
+        {
+          "file": "desktop-1.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:09:37.794Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "desktop",
+          "performance": 100,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 366.62444999999997,
+          "lcpMs": 626.62445,
+          "tbtMs": 0,
+          "cls": 0.03640250032834253,
+          "unusedCssBytes": 18325
+        },
+        {
+          "file": "mobile-1.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:09:10.978Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 90,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 1807.77585,
+          "lcpMs": 3533.77585,
+          "tbtMs": 13,
+          "cls": 0,
+          "unusedCssBytes": 18939
+        },
+        {
+          "file": "mobile-2.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:09:20.771Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 90,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 1805.35155,
+          "lcpMs": 3536.3515500000003,
+          "tbtMs": 15.5,
+          "cls": 0,
+          "unusedCssBytes": 18939
+        },
+        {
+          "file": "mobile-3.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:09:29.626Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 90,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 1805.0343000000003,
+          "lcpMs": 3534.0343000000003,
+          "tbtMs": 14.5,
+          "cls": 0,
+          "unusedCssBytes": 18939
+        }
+      ],
+      "excluded": [
+        {
+          "file": "desktop-2.json",
+          "reason": "Failed critical CSS/JS requests; the performance score is invalid",
+          "failedUrls": [
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/3zyffaed91idg.css",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/1ylbune37p04l.css",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/1edfvwc5_eck-.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/2-urkx3cuhmdn.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/0utw17at0d_4r.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/16i7mdcslfyyk.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/26g4tn5b226u5.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/turbopack-2o9w9u2dpd5x0.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/03f9uj69ir4z_.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/2mbi052oc121u.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/36c9w2w3rmeze.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/2avu771l9dqty.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/09bdok5reelhc.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/3d29i754gv8c-.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/2si6xha63vjqf.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/12yx219i65l9p.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/1prza4v75_6k-.js",
+              "status": 500
+            }
+          ]
+        },
+        {
+          "file": "desktop-3.json",
+          "reason": "Failed critical CSS/JS requests; the performance score is invalid",
+          "failedUrls": [
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/3zyffaed91idg.css",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/1ylbune37p04l.css",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/1edfvwc5_eck-.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/2-urkx3cuhmdn.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/0utw17at0d_4r.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/16i7mdcslfyyk.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/26g4tn5b226u5.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/turbopack-2o9w9u2dpd5x0.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/03f9uj69ir4z_.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/2mbi052oc121u.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/36c9w2w3rmeze.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/2avu771l9dqty.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/09bdok5reelhc.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/3d29i754gv8c-.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/2si6xha63vjqf.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/12yx219i65l9p.js",
+              "status": 500
+            },
+            {
+              "url": "http://127.0.0.1:3023/_next/static/chunks/1prza4v75_6k-.js",
+              "status": 500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "isolated-product-check",
+      "environment": "Isolated standalone build with copied catalog",
+      "medians": [
+        {
+          "mode": "mobile",
+          "validRuns": 3,
+          "performance": 89,
+          "fcpMs": 1810.0630500000002,
+          "lcpMs": 3544.0630500000007,
+          "tbtMs": 17,
+          "cls": 0,
+          "unusedCssBytes": 18939
+        },
+        {
+          "mode": "desktop",
+          "validRuns": 3,
+          "performance": 100,
+          "fcpMs": 366.50475,
+          "lcpMs": 726.5059000000001,
+          "tbtMs": 0,
+          "cls": 0.03639188862621487,
+          "unusedCssBytes": 18325
+        }
+      ],
+      "runs": [
+        {
+          "file": "desktop-1.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:14:19.494Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "desktop",
+          "performance": 100,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 365.5059,
+          "lcpMs": 726.5059000000001,
+          "tbtMs": 0,
+          "cls": 0.03639188862621487,
+          "unusedCssBytes": 18325
+        },
+        {
+          "file": "desktop-2.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:14:27.560Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "desktop",
+          "performance": 100,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 366.50475,
+          "lcpMs": 727.5047499999998,
+          "tbtMs": 0,
+          "cls": 0.03639188862621487,
+          "unusedCssBytes": 18325
+        },
+        {
+          "file": "desktop-3.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:14:35.618Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "desktop",
+          "performance": 100,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 367.3524,
+          "lcpMs": 726.3524,
+          "tbtMs": 0,
+          "cls": 0.03640250032834253,
+          "unusedCssBytes": 18325
+        },
+        {
+          "file": "mobile-1.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:13:55.320Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 90,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 1805.8915500000003,
+          "lcpMs": 3534.8915500000003,
+          "tbtMs": 14.5,
+          "cls": 0,
+          "unusedCssBytes": 18939
+        },
+        {
+          "file": "mobile-2.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:14:03.471Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 89,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 1810.0630500000002,
+          "lcpMs": 3544.0630500000007,
+          "tbtMs": 17,
+          "cls": 0,
+          "unusedCssBytes": 18939
+        },
+        {
+          "file": "mobile-3.json",
+          "url": "http://127.0.0.1:3023/shop/product/68b39ac590dbad697de11bbf",
+          "fetchTime": "2026-10-27T07:14:11.448Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 89,
+          "seo": 91,
+          "accessibility": 91,
+          "fcpMs": 1817.2011,
+          "lcpMs": 3622.934799999999,
+          "tbtMs": 21,
+          "cls": 0,
+          "unusedCssBytes": 18939
+        }
+      ],
+      "excluded": []
+    },
+    {
+      "phase": "responsive-portrait-check",
+      "environment": "Isolated standalone about page",
+      "medians": [
+        {
+          "mode": "mobile",
+          "validRuns": 3,
+          "performance": 75,
+          "fcpMs": 1505.9343000000001,
+          "lcpMs": 7803.9562,
+          "tbtMs": 28,
+          "cls": 0.003168356024141485,
+          "unusedCssBytes": 19533
+        },
+        {
+          "mode": "desktop",
+          "validRuns": 3,
+          "performance": 94,
+          "fcpMs": 326.55575,
+          "lcpMs": 1624.3705,
+          "tbtMs": 0,
+          "cls": 0.01644673783490938,
+          "unusedCssBytes": 19002
+        }
+      ],
+      "runs": [
+        {
+          "file": "desktop-1.json",
+          "url": "http://127.0.0.1:3023/about-us",
+          "fetchTime": "2026-10-27T07:20:37.843Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "desktop",
+          "performance": 94,
+          "seo": 100,
+          "accessibility": 100,
+          "fcpMs": 325.23275,
+          "lcpMs": 1623.4885000000002,
+          "tbtMs": 0,
+          "cls": 0.01644673783490938,
+          "unusedCssBytes": 19002
+        },
+        {
+          "file": "desktop-2.json",
+          "url": "http://127.0.0.1:3023/about-us",
+          "fetchTime": "2026-10-27T07:21:30.255Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "desktop",
+          "performance": 94,
+          "seo": 100,
+          "accessibility": 100,
+          "fcpMs": 328.93385,
+          "lcpMs": 1625.9559000000004,
+          "tbtMs": 0,
+          "cls": 0.01644673783490938,
+          "unusedCssBytes": 19002
+        },
+        {
+          "file": "desktop-3.json",
+          "url": "http://127.0.0.1:3023/about-us",
+          "fetchTime": "2026-10-27T07:22:22.693Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "desktop",
+          "performance": 94,
+          "seo": 100,
+          "accessibility": 100,
+          "fcpMs": 326.55575,
+          "lcpMs": 1624.3705,
+          "tbtMs": 0,
+          "cls": 0.01644673783490938,
+          "unusedCssBytes": 19002
+        },
+        {
+          "file": "mobile-1.json",
+          "url": "http://127.0.0.1:3023/about-us",
+          "fetchTime": "2026-10-27T07:20:15.771Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 75,
+          "seo": 100,
+          "accessibility": 100,
+          "fcpMs": 1507.02675,
+          "lcpMs": 7804.6845,
+          "tbtMs": 39,
+          "cls": 0.003168356024141485,
+          "unusedCssBytes": 19533
+        },
+        {
+          "file": "mobile-2.json",
+          "url": "http://127.0.0.1:3023/about-us",
+          "fetchTime": "2026-10-27T07:20:23.510Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 75,
+          "seo": 100,
+          "accessibility": 100,
+          "fcpMs": 1505.9343000000001,
+          "lcpMs": 7803.9562,
+          "tbtMs": 27,
+          "cls": 0.003168356024141485,
+          "unusedCssBytes": 19533
+        },
+        {
+          "file": "mobile-3.json",
+          "url": "http://127.0.0.1:3023/about-us",
+          "fetchTime": "2026-10-27T07:20:30.659Z",
+          "lighthouseVersion": "13.5.0",
+          "formFactor": "mobile",
+          "performance": 75,
+          "seo": 100,
+          "accessibility": 100,
+          "fcpMs": 1505.2224,
+          "lcpMs": 7803.481600000001,
+          "tbtMs": 28,
+          "cls": 0.002967568905759139,
+          "unusedCssBytes": 19533
+        }
+      ],
+      "excluded": []
+    }
+  ],
+  "remaining": [
+    "Production deployment and a same-environment production rerun are required before claiming any score improvement.",
+    "Product desktop CLS remains around 0.036 when the variant panel replaces its smaller loading placeholder; mobile CLS is zero in accepted runs.",
+    "The about hero still uses its original 1.29 MB SVG; it was not converted without a separate fidelity and responsive-cropping check.",
+    "The variants endpoint now verifies per-destination availability and uses private, no-store; it must not receive the previously proposed blanket shared-cache policy.",
+    "Cache Components and edge-cache ownership changes have not been applied. They need an updated design against the newer catalog verification flow and active VPS config."
+  ]
+}
