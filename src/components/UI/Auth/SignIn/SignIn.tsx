@@ -9,11 +9,9 @@ import { EmailInput, PasswordInput } from '@/components/UI/Auth/FormFields';
 import { SubmitButton } from '@/components/UI/Auth/FormActionButtons';
 import { useLogin } from '@/lib/hooks/authHooks/useLogin';
 import Link from 'next/link';
-import GoogleIcon from '@/components/UI/general/IconComponents/GoogleIcon';
-import AppleIcon from '@/components/UI/general/IconComponents/AppleIcon';
-import GitHubIcon from '@/components/UI/general/IconComponents/GitHubIcon';
-import { useHasMounted } from '@/lib/hooks/useHasMounted';
-import { getMainSiteUrl, isShopSiteHostname } from '@/lib/siteBaseUrls';
+import { useAuthRoutes } from '../AuthRoutesProvider';
+import { authFlowUrl, safeAuthReturnPath } from '@/lib/auth/domain-routing';
+import { useSearchParams } from 'next/navigation';
 import successToast from '@/lib/success-toast';
 import errorToast from '@/lib/error-toast';
 
@@ -52,19 +50,18 @@ function getAuthRedirectNotice(search: string) {
 // Main Component
 const SignIn = () => {
   const { login, isLoading } = useLogin();
-  const hasMounted = useHasMounted();
+  const routes = useAuthRoutes();
+  const search = useSearchParams();
   const noticeShownRef = useRef(false);
-  const isCodexChristiShop =
-    hasMounted && isShopSiteHostname(window.location.hostname);
-  const signUpHref =
-    isCodexChristiShop && hasMounted
-      ? `${getMainSiteUrl('/auth/signup')}?redirect=${encodeURIComponent(window.location.href)}`
-      : '/auth/signup';
+  const next = safeAuthReturnPath(search.get('next'), routes);
+  const signupNext =
+    routes.shop && next && !next.startsWith('/shop/') ? `/shop${next === '/' ? '' : next}` : next;
+  const signUpHref = authFlowUrl(routes.signup, { next: signupNext });
 
   const signInForm = useForm<signInSchemaType>({
     resolver: zodResolver(signInSchema),
     defaultValues: {
-      email: '',
+      email: search.get('email') ?? '',
       password: '',
     },
     mode: 'all',
@@ -114,6 +111,7 @@ const SignIn = () => {
     <>
       <Form {...signInForm}>
         <form
+          noValidate
           onSubmit={signInForm.handleSubmit(signInFormSubmitHandler)}
           className={`w-[80%] max-w-[375px] mt-12 !font-inter
                     sm:w-[70%] sm:max-w-[400px]
@@ -123,7 +121,17 @@ const SignIn = () => {
         >
           <EmailInput currentZodForm={signInForm} inputName='email' />
 
-          <PasswordInput currentZodForm={signInForm} inputName='password' />
+          <PasswordInput
+            currentZodForm={signInForm}
+            inputName='password'
+            autoComplete='current-password'
+          />
+          <Link
+            className='block text-right text-sm underline'
+            href={authFlowUrl(routes.forgot, { next })}
+          >
+            Forgot password?
+          </Link>
 
           <SubmitButton
             name='Submit Button'
@@ -135,31 +143,9 @@ const SignIn = () => {
       </Form>
 
       <div className='mt-16 space-y-12 text-center'>
-        <div className='space-y-4 lg:w-1/2 lg:mx-auto'>
-          <p>or Sign In with</p>
-
-          <div className='flex place-content-center justify-between gap-4 mx-auto'>
-            <Link href=''>
-              <GoogleIcon />
-            </Link>
-
-            <Link href=''>
-              <AppleIcon />
-            </Link>
-
-            <Link href=''>
-              <GitHubIcon />
-            </Link>
-          </div>
-        </div>
-
         <p className='w-full text-center'>
           Don’t have an account?{' '}
-          <Link
-            className='text-white font-semibold'
-            type='button'
-            href={signUpHref}
-          >
+          <Link className='text-white font-semibold' type='button' href={signUpHref}>
             Sign Up
           </Link>
         </p>

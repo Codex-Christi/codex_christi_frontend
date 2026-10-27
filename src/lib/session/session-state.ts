@@ -1,6 +1,9 @@
 import { JWTPayload } from 'jose';
+import { AUTH_SESSION_VERSION } from './session-cookies';
 
 export interface SessionPayload extends JWTPayload {
+  version?: number;
+  kind?: string;
   userID?: string;
   mainAccessToken?: string | null;
   mainRefreshToken?: string | null;
@@ -13,6 +16,7 @@ export interface SessionState {
   mainRefreshToken: string | null;
   expiresSoon: boolean;
   shouldClearCookies: boolean;
+  expiresAt: number | null;
 }
 
 export function deriveSessionState(
@@ -21,7 +25,16 @@ export function deriveSessionState(
 ): SessionState {
   const hasSessionCookie = options?.hasSessionCookie ?? false;
 
-  if (!payload?.exp) {
+  if (
+    payload?.version !== AUTH_SESSION_VERSION ||
+    payload.kind !== 'access' ||
+    typeof payload.exp !== 'number' ||
+    !Number.isFinite(payload.exp) ||
+    typeof payload.userID !== 'string' ||
+    !payload.userID ||
+    typeof payload.mainAccessToken !== 'string' ||
+    !payload.mainAccessToken
+  ) {
     return {
       isAuthenticated: false,
       userID: null,
@@ -29,12 +42,13 @@ export function deriveSessionState(
       mainRefreshToken: null,
       expiresSoon: false,
       shouldClearCookies: hasSessionCookie,
+      expiresAt: null,
     };
   }
 
-  const hoursToSessionExpiry = compareDatesInHours(new Date(payload.exp * 1000));
+  const secondsToExpiry = payload.exp - Date.now() / 1000;
 
-  if (hoursToSessionExpiry <= 0) {
+  if (secondsToExpiry <= 0) {
     return {
       isAuthenticated: false,
       userID: null,
@@ -42,6 +56,7 @@ export function deriveSessionState(
       mainRefreshToken: null,
       expiresSoon: false,
       shouldClearCookies: hasSessionCookie,
+      expiresAt: null,
     };
   }
 
@@ -50,19 +65,10 @@ export function deriveSessionState(
     userID: getStringValue(payload.userID),
     mainAccessToken: getStringValue(payload.mainAccessToken),
     mainRefreshToken: getStringValue(payload.mainRefreshToken),
-    expiresSoon: hoursToSessionExpiry <= 24,
+    expiresSoon: secondsToExpiry <= 30,
     shouldClearCookies: false,
+    expiresAt: payload.exp * 1000,
   };
-}
-
-function compareDatesInHours(targetDate: Date | string | number) {
-  const date = new Date(targetDate);
-  const now = new Date();
-
-  const diffMs = date.getTime() - now.getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
-
-  return Math.ceil(diffHours);
 }
 
 function getStringValue(value: unknown) {

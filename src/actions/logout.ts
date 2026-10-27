@@ -1,39 +1,42 @@
 'use client';
 
-import loadingToast from '@/lib/loading-toast';
+import useAuthStore from '@/stores/authStore';
+import { clearPrivateClientState, publishSessionChange } from '@/lib/auth/client-session';
+import { getAuthRoutes } from '@/lib/auth/domain-routing';
 import errorToast from '@/lib/error-toast';
-import { clearUserMainProfileStore } from '@/stores/userMainProfileStore';
-import { toast } from 'sonner';
 
-type LogoutResult = {
-  status: boolean;
-  error?: string;
-};
-
-export const logoutUser = async (): Promise<boolean | LogoutResult> => {
-  const loadingToastID = loadingToast({
-    message: 'Please wait a moment...',
-  });
-
-  try {
-    await clearUserMainProfileStore();
-    toast.dismiss(loadingToastID);
-    window.location.assign('/next-api/logout');
-
-    return true;
-  } catch (err: unknown) {
-    toast.dismiss(loadingToastID);
-
-    const apiErrorMessage =
-      err instanceof Error ? err.message : 'Something went wrong. Please try again.';
-
-    errorToast({
-      message: apiErrorMessage,
+let pending: Promise<boolean> | null = null;
+export const logoutUser = (): Promise<boolean> => {
+  if (pending) return pending;
+  pending = (async () => {
+    const response = await fetch('/next-api/logout', {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8000),
     });
-
-    return {
-      status: false,
-      error: apiErrorMessage,
-    };
-  }
+    if (!response.ok) throw new Error('Unable to sign out. Please try again.');
+    const result: unknown = await response.json();
+    if (!result || typeof result !== 'object' || !('success' in result) || result.success !== true)
+      throw new Error('Unable to confirm logout. Please try again.');
+    await clearPrivateClientState();
+    useAuthStore.getState().setSessionState({ isAuthenticated: false, user_id: null });
+    publishSessionChange('logout');
+    const routes = getAuthRoutes(
+      window.location.hostname,
+      window.location.pathname.startsWith('/shop/'),
+    );
+    window.location.replace(`${routes.login}?from-logout=true`);
+    return true;
+  })()
+    .catch((error) => {
+      errorToast({
+        message: error instanceof Error ? error.message : 'Unable to sign out. Please try again.',
+      });
+      return false;
+    })
+    .finally(() => {
+      pending = null;
+    });
+  return pending;
 };

@@ -5,13 +5,9 @@ import { IconBaseProps, IconType } from 'react-icons/lib';
 import { Eye, EyeOff } from 'lucide-react';
 
 type MyIconType =
-  | IconType
-  | React.ForwardRefExoticComponent<
-      IconBaseProps & React.RefAttributes<SVGSVGElement>
-    >;
+  IconType | React.ForwardRefExoticComponent<IconBaseProps & React.RefAttributes<SVGSVGElement>>;
 
-export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   startIcon?: MyIconType;
   endIcon?: MyIconType;
   iconProps?: IconBaseProps;
@@ -54,11 +50,7 @@ const InputWithIcon = React.forwardRef<HTMLInputElement, InputProps>(
       return (
         <div className='w-full relative'>
           <div className='absolute left-6 top-1/2 transform -translate-y-1/2'>
-            <LockIcon
-              size={18}
-              className={cn('text-white/75', iconClassName)}
-              {...iconRest}
-            />
+            <LockIcon size={18} className={cn('text-white/75', iconClassName)} {...iconRest} />
           </div>
           <input
             autoComplete='off'
@@ -69,13 +61,16 @@ const InputWithIcon = React.forwardRef<HTMLInputElement, InputProps>(
               file:text-sm file:font-medium focus-visible:outline-none 
               focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0 
               disabled:cursor-not-allowed disabled:opacity-50
-              } ${className}`
+              } ${className}`,
             )}
             ref={ref}
             {...props}
           />
           <button
             onClick={() => setShow((prev) => !prev)}
+            aria-label={show ? 'Hide password' : 'Show password'}
+            title={show ? 'Hide password' : 'Show password'}
+            aria-pressed={show}
             className='absolute right-3 top-1/2 transform -translate-y-1/2'
             type='button'
           >
@@ -103,9 +98,7 @@ const InputWithIcon = React.forwardRef<HTMLInputElement, InputProps>(
             text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm 
             file:font-medium focus-visible:outline-none focus-visible:ring-1 
             focus-visible:ring-ring focus-visible:ring-offset-0 disabled:cursor-not-allowed 
-            disabled:opacity-50 ${startIcon ? 'pl-14' : ''} ${
-              endIcon ? 'pr-8' : ''
-            } ${className}`
+            disabled:opacity-50 ${startIcon ? 'pl-14' : ''} ${endIcon ? 'pr-8' : ''} ${className}`,
           )}
           ref={ref}
           {...props}
@@ -117,7 +110,7 @@ const InputWithIcon = React.forwardRef<HTMLInputElement, InputProps>(
         )}
       </div>
     );
-  }
+  },
 );
 InputWithIcon.displayName = 'InputWithIcon';
 

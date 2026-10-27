@@ -6,9 +6,7 @@ import { PrismaClient } from './generated/adminOpsLedger/client';
 
 function resolveAdminOpsLedgerConnectionString(): string | null {
   return (
-    process.env.NEON_ADMIN_OPS_LEDGER_POOLED_URL ??
-    process.env.NEON_ADMIN_OPS_LEDGER_URL ??
-    null
+    process.env.NEON_ADMIN_OPS_LEDGER_POOLED_URL ?? process.env.NEON_ADMIN_OPS_LEDGER_URL ?? null
   );
 }
 
@@ -20,6 +18,8 @@ declare global {
   var __adminOpsLedgerPrisma__: PrismaClient | undefined;
 }
 
+let adminOpsLedgerSingleton: PrismaClient | undefined;
+
 export function getAdminOpsLedgerPrisma() {
   const connectionString = resolveAdminOpsLedgerConnectionString();
 
@@ -29,12 +29,12 @@ export function getAdminOpsLedgerPrisma() {
     );
   }
 
-  if (global.__adminOpsLedgerPrisma__) {
-    return global.__adminOpsLedgerPrisma__;
-  }
+  const cachedClient = global.__adminOpsLedgerPrisma__ ?? adminOpsLedgerSingleton;
+  if (cachedClient) return cachedClient;
 
   const adapter = new PrismaPg({ connectionString: normalizePostgresSslMode(connectionString) });
   const prisma = new PrismaClient({ adapter });
+  adminOpsLedgerSingleton = prisma;
 
   if (process.env.NODE_ENV !== 'production') {
     global.__adminOpsLedgerPrisma__ = prisma;

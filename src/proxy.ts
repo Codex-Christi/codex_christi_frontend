@@ -17,12 +17,14 @@ export const proxy = createNEMO({
   '/shop/account-overview': [redirectExpSessionToLoginPage],
   '/shop/account-overview/(.*)': [redirectExpSessionToLoginPage],
   '/shop/auth/login': [authVerifierAndRouteProtector],
+  '/shop/auth/signup': [authVerifierAndRouteProtector],
   // For auth routes
   '/auth': {
     '/sign-in': [redirectLoggedInUserToProfileMiddleware],
     '/signup': [redirectLoggedInUserToProfileMiddleware],
   },
   '/profile': [redirectExpSessionToLoginPage],
+  '/profile/(.*)': [redirectExpSessionToLoginPage],
 });
 
 // Config for middleware matcher
@@ -30,6 +32,7 @@ export const config = {
   matcher: [
     '/shop/account-overview/:path*',
     '/shop/auth/login',
+    '/shop/auth/signup',
     '/auth/sign-in',
     '/auth/signup',
     '/profile/:path*',

@@ -4,6 +4,7 @@ import { jwtDecode } from 'jwt-decode';
 export const SESSION_COOKIE_NAME = 'session';
 export const REFRESH_TOKEN_COOKIE_NAME = 'refreshToken';
 export const SESSION_REFRESH_GUARD_PARAM = '__session_refreshed';
+export const AUTH_SESSION_VERSION = 2;
 
 export interface TokenInterface {
   token_type: 'access' | 'refresh';
@@ -13,7 +14,8 @@ export interface TokenInterface {
 }
 
 export interface AuthSessionPayload extends JWTPayload {
-  version?: 1;
+  version?: number;
+  kind?: 'access' | 'refresh';
   userID?: string;
   mainAccessToken?: string | null;
   mainRefreshToken?: string | null;
@@ -46,8 +48,8 @@ type CookieRequestHeaders = Pick<Headers, 'get'>;
 function getEncodedSessionSecret() {
   const secretKey = process.env.SESSION_SECRET;
 
-  if (!secretKey) {
-    throw new Error('SESSION_SECRET is not configured.');
+  if (!secretKey || new TextEncoder().encode(secretKey).length < 32) {
+    throw new Error('SESSION_SECRET must contain at least 32 bytes.');
   }
 
   return new TextEncoder().encode(secretKey);
@@ -68,6 +70,7 @@ function getForwardedProto(value: string | null) {
 }
 
 export function shouldUseSecureCookie(requestHeaders?: CookieRequestHeaders) {
+  if (process.env.NODE_ENV === 'production') return true;
   const forwardedProto = requestHeaders
     ? (getFirstHeaderValue(requestHeaders.get('x-forwarded-proto')) ??
       getForwardedProto(requestHeaders.get('forwarded')))
@@ -102,10 +105,7 @@ export function getExpiredAuthCookieOptions(
   };
 }
 
-export async function encryptSessionPayload(
-  payload: AuthSessionPayload,
-  expiresAt: Date,
-) {
+export async function encryptSessionPayload(payload: AuthSessionPayload, expiresAt: Date) {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -123,19 +123,40 @@ export async function decryptSessionToken(session: string | undefined = '') {
       algorithms: ['HS256'],
     });
 
+    if (
+      payload.version !== AUTH_SESSION_VERSION ||
+      !['access', 'refresh'].includes(String(payload.kind)) ||
+      typeof payload.exp !== 'number'
+    )
+      return undefined;
     return payload as AuthSessionPayload;
-  } catch (error: Error | unknown) {
-    console.log(`Failed to verify session. Reason: ${error}`);
+  } catch {
     return undefined;
   }
 }
 
 function decodeDjangoToken(token: string, label: 'access' | 'refresh') {
-  if (!token) {
+  if (!token || token.length > 3000) {
     throw new Error(`Missing ${label} token.`);
   }
 
-  return jwtDecode<TokenInterface>(token);
+  const value = jwtDecode<TokenInterface>(token);
+  const now = Date.now() / 1000;
+  if (
+    value.token_type !== label ||
+    !Number.isFinite(value.exp) ||
+    value.exp <= now ||
+    !Number.isFinite(value.iat) ||
+    value.iat > now + 60 ||
+    value.exp <= value.iat ||
+    typeof value.user_id !== 'string' ||
+    !value.user_id.trim() ||
+    value.user_id.length > 128 ||
+    !Number.isFinite(new Date(value.exp * 1000).getTime())
+  ) {
+    throw new Error(`Invalid ${label} token claims.`);
+  }
+  return value;
 }
 
 export async function buildAuthSessionCookies({
@@ -153,8 +174,8 @@ export async function buildAuthSessionCookies({
   const { exp: accessExp, user_id } = decryptedAccessToken;
   const { exp: refreshExp } = decryptedRefreshToken;
 
-  if (!user_id) {
-    throw new Error('Access token is missing user_id.');
+  if (!user_id || user_id !== decryptedRefreshToken.user_id) {
+    throw new Error('Session tokens must belong to the same user.');
   }
 
   const accessExpiresAt = convertIatToDate(accessExp);
@@ -162,7 +183,8 @@ export async function buildAuthSessionCookies({
 
   const sessionObj = await encryptSessionPayload(
     {
-      version: 1,
+      version: AUTH_SESSION_VERSION,
+      kind: 'access',
       userID: user_id,
       mainAccessToken: accessToken,
     },
@@ -170,11 +192,15 @@ export async function buildAuthSessionCookies({
   );
   const encodedRefreshToken = await encryptSessionPayload(
     {
-      version: 1,
+      version: AUTH_SESSION_VERSION,
+      kind: 'refresh',
+      userID: user_id,
       mainRefreshToken: refreshToken,
     },
     refreshExpiresAt,
   );
+  if (sessionObj.length > 3800 || encodedRefreshToken.length > 3800)
+    throw new Error('Session cookie exceeds the safe size limit.');
 
   return {
     userID: user_id,
@@ -217,11 +243,15 @@ export function buildExpiredAuthCookies(
 export async function getMainAccessTokenFromCookieValue(cookieValue?: string) {
   const payload = await decryptSessionToken(cookieValue);
 
-  return typeof payload?.mainAccessToken === 'string' ? payload.mainAccessToken : null;
+  return payload?.kind === 'access' && typeof payload.mainAccessToken === 'string'
+    ? payload.mainAccessToken
+    : null;
 }
 
 export async function getMainRefreshTokenFromCookieValue(cookieValue?: string) {
   const payload = await decryptSessionToken(cookieValue);
 
-  return typeof payload?.mainRefreshToken === 'string' ? payload.mainRefreshToken : null;
+  return payload?.kind === 'refresh' && typeof payload.mainRefreshToken === 'string'
+    ? payload.mainRefreshToken
+    : null;
 }

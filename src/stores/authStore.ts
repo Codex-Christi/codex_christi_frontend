@@ -1,59 +1,55 @@
-// src/store/authStore.ts
 import { create } from 'zustand';
-import { AuthSessionState, getAuthSessionState } from '@/actions/login';
+import { type AuthSessionState, getAuthSessionState } from '@/actions/login';
+import { advanceAuthGeneration, getAuthGeneration } from '@/lib/auth/session-generation';
 
-// Interfaces and types
 interface AuthState {
-  autoUpDateSession: () => Promise<AuthSessionState>;
+  refreshAuthState: () => Promise<AuthSessionState>;
   isAuthenticated: boolean;
-  setIsAuthenticated: (bool: boolean) => void;
-  setSessionState: (sessionState: AuthSessionState) => void;
-  // setLoginState: (accessToken: string, refreshToken: string) => void;
-  // setLogoutState: () => void;
-  userSessionInfo: {
-    user_id: string;
-  } | null;
+  status: 'unknown' | 'authenticated' | 'anonymous' | 'unavailable';
+  expiresAt: number | null;
+  setSessionState: (session: AuthSessionState) => void;
+  userSessionInfo: { user_id: string } | null;
 }
+let pending: { generation: number; promise: Promise<AuthSessionState> } | null = null;
 
-type UserSessionInfoType = AuthState['userSessionInfo'];
-
-let authSessionSyncPromise: Promise<AuthSessionState> | null = null;
-
-function getAuthStoreSessionState(sessionState: AuthSessionState) {
-  const userSessionInfo = sessionState.user_id
-    ? ({ user_id: sessionState.user_id } as UserSessionInfoType)
-    : null;
-
-  return {
-    userSessionInfo,
-    isAuthenticated: sessionState.isAuthenticated,
-  };
-}
-
-// useAuthStore Hook
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
-  setIsAuthenticated: (bool: boolean) => set({ isAuthenticated: bool }),
-  setSessionState: (sessionState) => set(getAuthStoreSessionState(sessionState)),
   userSessionInfo: null,
-  autoUpDateSession: async () => {
-    if (!authSessionSyncPromise) {
-      // Share one in-flight auth check across duplicate mounts and rerenders.
-      authSessionSyncPromise = (async () => {
-        const sessionState = await getAuthSessionState();
-
-        set(getAuthStoreSessionState(sessionState));
-
-        return sessionState;
-      })();
-    }
-
-    try {
-      return await authSessionSyncPromise;
-    } finally {
-      authSessionSyncPromise = null;
-    }
+  status: 'unknown',
+  expiresAt: null,
+  setSessionState: (session) => {
+    const authenticated = session.isAuthenticated && Boolean(session.user_id);
+    const id = authenticated ? session.user_id : null;
+    if (id !== (get().userSessionInfo?.user_id ?? null) || authenticated !== get().isAuthenticated)
+      advanceAuthGeneration();
+    set({
+      isAuthenticated: authenticated,
+      userSessionInfo: id ? { user_id: id } : null,
+      expiresAt: session.expiresAt ?? null,
+      status: session.status ?? (authenticated ? 'authenticated' : 'anonymous'),
+    });
+  },
+  refreshAuthState: () => {
+    const generation = getAuthGeneration();
+    if (pending?.generation === generation) return pending.promise;
+    const promise = (async () => {
+      try {
+        const session = await getAuthSessionState();
+        if (getAuthGeneration() === generation) get().setSessionState(session);
+      } catch {
+        if (getAuthGeneration() === generation)
+          get().setSessionState({ isAuthenticated: false, user_id: null, status: 'unavailable' });
+      }
+      return {
+        isAuthenticated: get().isAuthenticated,
+        user_id: get().userSessionInfo?.user_id ?? null,
+        expiresAt: get().expiresAt,
+      };
+    })().finally(() => {
+      if (pending?.generation === generation) pending = null;
+    });
+    pending = { generation, promise };
+    return promise;
   },
 }));
-
 export default useAuthStore;

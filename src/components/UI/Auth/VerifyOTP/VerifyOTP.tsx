@@ -1,110 +1,78 @@
-"use client";
+'use client';
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, SubmitHandler, useForm } from "react-hook-form";
-import { Form } from "@/components/UI/primitives/form";
-import {
-	verifyOTPSchema,
-	verifyOTPSchemaType,
-} from "@/lib/formSchemas/verifyOTPSchema";
-import { useVerifyOTP, useResendOTP } from "@/lib/hooks/authHooks/useVerifyOTP";
-import { useSearchParams } from "next/navigation";
-import {
-	InputOTP,
-	InputOTPGroup,
-	InputOTPSlot,
-} from "@/components/UI/primitives/input-otp";
-import { REGEXP_ONLY_DIGITS } from "input-otp"
-import { SubmitButton } from "@/components/UI/Auth/FormActionButtons";
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Controller, useForm } from 'react-hook-form';
+import { Form } from '@/components/UI/primitives/form';
+import { verifyOTPSchema, type verifyOTPSchemaType } from '@/lib/formSchemas/verifyOTPSchema';
+import { useVerifyOTP, useResendOTP } from '@/lib/hooks/authHooks/useVerifyOTP';
+import { useSearchParams } from 'next/navigation';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/UI/primitives/input-otp';
+import { REGEXP_ONLY_DIGITS } from 'input-otp';
+import { SubmitButton } from '../FormActionButtons';
+import { EmailInput } from '../FormFields';
 
-const VerifyOTP = () => {
-	const { verifyOTP } = useVerifyOTP();
-
-	const { resendOTP } = useResendOTP();
-
-	const searchParams = useSearchParams();
-	const email = searchParams.get("email");
-
-	const verifyOTPForm = useForm<verifyOTPSchemaType>({
-		resolver: zodResolver(verifyOTPSchema),
-		defaultValues: {
-			email: email ?? "",
-			otp: "",
-		},
-		mode: "all",
-		reValidateMode: "onBlur",
-	});
-
-	const { handleSubmit } = verifyOTPForm;
-
-	const verifyOTPSubmitHandler: SubmitHandler<verifyOTPSchemaType> = async (
-		fieldValues,
-	) => {
-		const { email, otp } = fieldValues;
-
-		const userSendData = {
-			email,
-			otp,
-		};
-
-		await verifyOTP(userSendData);
-	};
-
-	return (
-		<Form {...verifyOTPForm}>
-			<form
-				onSubmit={handleSubmit(verifyOTPSubmitHandler)}
-				className="mt-12 px-4 sm:px-0 !font-inter sm:w-[70%] sm:max-w-[400px] md:w-[50%] md:max-w-[410px] lg:w-[100%] lg:max-w-[425px] mx-auto relative"
-			>
-				<div className="flex place-content-center mb-8">
-					<Controller
-						name="otp"
-						control={verifyOTPForm.control}
-						render={({ field }) => (
-							<InputOTP
-								maxLength={6}
-								value={field.value}
-								onChange={field.onChange}
-								pattern={REGEXP_ONLY_DIGITS}
-							>
-								<InputOTPGroup>
-									<InputOTPSlot index={0} />
-									<InputOTPSlot index={1} />
-									<InputOTPSlot index={2} />
-									<InputOTPSlot index={3} />
-									<InputOTPSlot index={4} />
-									<InputOTPSlot index={5} />
-								</InputOTPGroup>
-							</InputOTP>
-						)}
-					/>
-				</div>
-
-				<p className="w-full text-center mb-4">
-					If you didn’t receive a code,{" "}
-					<button
-						className="text-white font-semibold"
-						type="button"
-						onClick={async () => {
-							await resendOTP({
-								email:
-									email ??
-									prompt("Enter email: ")?.trim() ??
-									("" as string),
-							});
-						}}
-					>
-						Resend
-					</button>
-                </p>
-
-				<SubmitButton
-					name="Verify button"
-					textValue="Verify"
-				/>
-			</form>
-		</Form>
-	);
-};
-
-export default VerifyOTP;
+export default function VerifyOTP() {
+  const verify = useVerifyOTP();
+  const resend = useResendOTP();
+  const search = useSearchParams();
+  const form = useForm<verifyOTPSchemaType>({
+    resolver: zodResolver(verifyOTPSchema),
+    defaultValues: { email: search.get('email') ?? '', otp: '' },
+  });
+  return (
+    <Form {...form}>
+      <form
+        noValidate
+        onSubmit={form.handleSubmit((values) => verify.verifyOTP(values))}
+        className='mx-auto my-12 w-4/5 max-w-[425px] space-y-6'
+      >
+        <h1 className='text-center text-2xl font-semibold'>Verify your email</h1>
+        <EmailInput currentZodForm={form} inputName='email' />
+        <Controller
+          name='otp'
+          control={form.control}
+          render={({ field }) => (
+            <InputOTP
+              aria-label='Verification code'
+              maxLength={6}
+              value={field.value}
+              onChange={field.onChange}
+              pattern={REGEXP_ONLY_DIGITS}
+            >
+              <InputOTPGroup>
+                {Array.from({ length: 6 }, (_, index) => (
+                  <InputOTPSlot index={index} key={index} />
+                ))}
+              </InputOTPGroup>
+            </InputOTP>
+          )}
+        />
+        {form.formState.errors.otp && (
+          <p role='alert' className='text-sm text-red-400'>
+            Enter the six-digit code.
+          </p>
+        )}
+        <button
+          type='button'
+          className='text-sm underline disabled:opacity-50'
+          disabled={verify.isLoading || resend.isLoading || resend.retryIn > 0}
+          onClick={async () => {
+            if (await form.trigger('email'))
+              await resend.resendOTP({ email: form.getValues('email') });
+          }}
+        >
+          {resend.retryIn
+            ? `Resend in ${resend.retryIn}s`
+            : resend.isLoading
+              ? 'Sending...'
+              : 'Resend code'}
+        </button>
+        <SubmitButton
+          name='Verify'
+          textValue={verify.isLoading ? 'Verifying...' : 'Verify'}
+          disabled={verify.isLoading || resend.isLoading}
+        />
+      </form>
+    </Form>
+  );
+}

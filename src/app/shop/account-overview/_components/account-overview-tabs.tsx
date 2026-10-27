@@ -3,17 +3,31 @@
 import {
   ArrowLeftIcon,
   HeartIcon,
-  ToggleLeftIcon,
   MapPinIcon,
   TimerResetIcon,
   FilesIcon,
+  LogOut,
 } from 'lucide-react';
 import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
+import { logoutUser } from '@/actions/logout';
+import { useState } from 'react';
+import AccountLoadError from '@/components/UI/Auth/AccountLoadError';
 
 const AccountOverviewTabs = () => {
-  const { userShopProfile, isLoading } = useUserShopProfile((state) => state);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await logoutUser();
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+  const { userShopProfile, isLoading, error, setProfileFromServer } = useUserShopProfile(
+    (state) => state,
+  );
 
   const userMainProfile = useUserMainProfileStore((state) => state.userMainProfile);
 
@@ -25,6 +39,7 @@ const AccountOverviewTabs = () => {
 
   return (
     <>
+      <AccountLoadError message={error} retry={setProfileFromServer} />
       <div className='inline-block w-auto'>
         <CustomShopLink
           className='inline-flex items-center gap-4 transition-all ease-linear duration-200 hover:gap-6 w-auto'
@@ -97,13 +112,18 @@ const AccountOverviewTabs = () => {
         </CustomShopLink>
 
         <button
-          className='text-center border border-l-0 max-md:border-t-0 border-[#F3F3F3] py-4 px-2 grid gap-4 rounded-br-lg place-content-center text-[#F3F3F3]/50 hover:bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] transition-color duration-300 ease-linear'
+          className='text-center border border-l-0 max-md:border-t-0 border-[#F3F3F3] py-4 px-2 grid gap-4 rounded-br-lg place-content-center hover:bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] transition-color duration-300 ease-linear disabled:opacity-50'
           type='button'
+          onClick={() => {
+            void handleLogout();
+          }}
+          disabled={loggingOut}
+          aria-busy={loggingOut}
         >
-          <h3 className='font-semibold text-sm'>Deactivate Account</h3>
+          <span className='font-semibold text-sm'>{loggingOut ? 'Logging out...' : 'Logout'}</span>
 
           <div className='mx-auto'>
-            <ToggleLeftIcon strokeWidth={1.2} />
+            <LogOut strokeWidth={1.2} aria-hidden='true' />
           </div>
         </button>
       </div>

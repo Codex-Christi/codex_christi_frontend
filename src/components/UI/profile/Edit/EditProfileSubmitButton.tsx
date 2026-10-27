@@ -10,8 +10,8 @@ import loadingToast from '@/lib/loading-toast';
 import errorToast from '@/lib/error-toast';
 import successToast from '@/lib/success-toast';
 import { toast } from 'sonner';
-import { getServerAccessToken } from '@/lib/session/server-session';
-import { FetcherError, universalFetcher } from '@/lib/utils/SWRfetcherAdvanced';
+import { updateMyProfile } from '@/actions/account/profile';
+import { getAuthGeneration } from '@/lib/auth/session-generation';
 
 // Interfaces
 interface UserPatchResponse {
@@ -21,26 +21,11 @@ interface UserPatchResponse {
   data: UserProfileDataInterface;
 }
 
-// Patch User Function (universal fetcher)
+// The server owns the Django token and validates this form again.
 const patchUser = async (formData: FormData): Promise<UserPatchResponse> => {
-  const mainAccessToken = (await getServerAccessToken()) ?? undefined;
-
-  const baseURL = process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL;
-  if (!baseURL) {
-    throw new Error('NEXT_PUBLIC_DJANGO_API_BASE_URL is not set');
-  }
-
-  return universalFetcher<UserPatchResponse>(`${baseURL}/account/my-profile-update`, {
-    fetcherOptions: {
-      method: 'PATCH',
-      headers: mainAccessToken
-        ? {
-            Authorization: `Bearer ${mainAccessToken}`,
-          }
-        : {},
-      body: formData,
-    },
-  });
+  const result = await updateMyProfile(formData);
+  if (!result.success) throw new Error(result.error);
+  return { success: true, status: 200, message: 'Profile updated.', data: result.data };
 };
 
 // Main Component
@@ -88,10 +73,12 @@ const EditProfileSubmitButton = ({ onClose }: { onClose?: () => void }) => {
     }
 
     setIsLoading(true);
+    const generation = getAuthGeneration();
     const loadingToastID = loadingToast({ message: 'Updating user details...' });
 
     try {
       const response = await patchUser(formData);
+      if (generation !== getAuthGeneration()) return;
 
       toast.dismiss(loadingToastID);
 
@@ -109,28 +96,11 @@ const EditProfileSubmitButton = ({ onClose }: { onClose?: () => void }) => {
     } catch (error) {
       toast.dismiss(loadingToastID);
       const fallbackMessage = 'Error updating profile. Please try again.';
-      const resolveFetcherErrorMessage = (err: FetcherError) => {
-        const info = err.info as {
-          message?: unknown;
-          errors?: Array<{ message?: string | undefined }>;
-        } | null;
-        const infoMessage = typeof info?.message === 'string' ? info.message : null;
-        const nestedErrorsMessage = info?.errors?.find(
-          (item) => typeof item?.message === 'string',
-        )?.message;
-        const statusLabel = err.status ? `Request failed (${err.status})` : err.message;
-        return infoMessage ?? nestedErrorsMessage ?? statusLabel;
-      };
-
-      const message =
-        error instanceof FetcherError
-          ? resolveFetcherErrorMessage(error)
-          : error instanceof Error
-            ? error.message
-            : fallbackMessage;
+      const message = error instanceof Error ? error.message : fallbackMessage;
 
       errorToast({ message });
     } finally {
+      toast.dismiss(loadingToastID);
       setIsLoading(false);
     }
   }, [clearEditData, onClose, pendingEdits, setUserMainProfile, validate]);

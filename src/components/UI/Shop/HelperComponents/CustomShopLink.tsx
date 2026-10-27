@@ -4,11 +4,8 @@ import Link, { LinkProps } from 'next/link';
 import { CSSProperties, FC, ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { useHasMounted } from '@/lib/hooks/useHasMounted';
-import {
-  getMainSiteBaseUrl,
-  isMainSiteHostname,
-  isShopSiteHostname,
-} from '@/lib/siteBaseUrls';
+import { publicShopPath } from '@/lib/auth/domain-routing';
+import { getMainSiteBaseUrl, isMainSiteHostname, isShopSiteHostname } from '@/lib/siteBaseUrls';
 
 interface ActiveInactiveProps {
   className?: string;
@@ -46,22 +43,20 @@ const CustomShopLink: FC<CustomShopLinkProps> = ({
   const domain = hasMounted ? window.location.hostname : null;
   const isDev = domain === 'localhost';
   const isOnShopRouteParentSite =
-    hasMounted &&
-    window.location.pathname.startsWith('/shop') &&
-    isMainSiteHostname(domain);
+    hasMounted && window.location.pathname.startsWith('/shop') && isMainSiteHostname(domain);
   const isActive =
     typeof href === 'string' ? pathname === href || pathname.startsWith(`${href}/`) : false;
 
   // Adjusted href based on conditions
-  let newHref = href as string;
+  let newHref = href;
 
   if (newHref === '/') {
     if (isOnShopRouteParentSite) {
       newHref = '/shop'; // Ensure "/" keeps them inside the shop
     }
-  } else if (!isDev && isShopSiteHostname(domain)) {
-    if (newHref.startsWith('/shop')) {
-      newHref = newHref.replace('/shop', ''); // Strip "/shop" for shop child routes
+  } else if (typeof newHref === 'string' && !isDev && isShopSiteHostname(domain)) {
+    if (newHref === '/shop' || newHref.startsWith('/shop/') || newHref.startsWith('/shop?')) {
+      newHref = publicShopPath(newHref, domain ?? '');
     } else if (redirectToParentSite) {
       newHref = `${parentSiteProdHref}${newHref}`; // Redirect non-shop links to parent site
     }
@@ -81,7 +76,7 @@ const CustomShopLink: FC<CustomShopLinkProps> = ({
     <Link
       href={newHref}
       className={finalClassName}
-      aria-label={ariaLabel ? ariaLabel : `Go to ${domain}${pathname} page`}
+      aria-label={ariaLabel}
       {...rest}
     >
       {finalChildren}

@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 import { getCookie } from './main-session';
 import {

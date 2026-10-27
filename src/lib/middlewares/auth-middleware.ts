@@ -16,165 +16,93 @@ import {
   getRequestSessionState,
 } from '../session/request-session';
 import {
+  assertSessionRefreshActive,
+  refreshDjangoSessionTokens,
+  SessionRefreshError,
+} from '../session/session-refresh';
+import {
   buildAuthSessionCookies,
+  type AuthCookieDefinition,
   SESSION_REFRESH_GUARD_PARAM,
 } from '../session/session-cookies';
-import { refreshDjangoSessionTokens } from '../session/session-refresh';
+import { getRequestUrl } from '../siteBaseUrls';
 import {
-  getHostnameFromHostHeader,
-  getRequestUrl,
-  isShopSiteHostname,
-} from '../siteBaseUrls';
+  authFlowUrl,
+  getAuthRoutes,
+  publicShopPath,
+  safeAuthReturnPath,
+} from '../auth/domain-routing';
 
-export const redirectLoggedInUserToProfileMiddleware = async (request: NextRequest) => {
-  return await redirectLoggedInUserToProfile(request);
-};
+export const redirectLoggedInUserToProfileMiddleware = (req: NextRequest) =>
+  redirectLoggedInUserToProfile(req);
 
-function hasRefreshGuard(req: NextRequest) {
-  return req.nextUrl.searchParams.has(SESSION_REFRESH_GUARD_PARAM);
-}
-
-function getPathWithSearchWithoutSessionRefreshGuard(req: NextRequest) {
+async function protect(req: NextRequest, admin: boolean) {
+  // Unsafe methods are checked by their own actions/handlers; never replay a POST via redirects.
+  if (req.method !== 'GET' && req.method !== 'HEAD') return NextResponse.next();
+  let state = await getRequestSessionState(req);
+  let freshCookies: AuthCookieDefinition[] = [];
+  let clearCookies = state.shouldClearCookies;
+  if (!state.isAuthenticated) {
+    const token = await getRequestRefreshToken(req);
+    if (token) {
+      try {
+        const tokens = await refreshDjangoSessionTokens(token);
+        const built = await buildAuthSessionCookies({ ...tokens, requestHeaders: req.headers });
+        assertSessionRefreshActive(token);
+        freshCookies = built.cookies;
+        for (const cookie of freshCookies) req.cookies.set(cookie.name, cookie.value);
+        state = await getRequestSessionState(req);
+      } catch (error) {
+        if (!(error instanceof SessionRefreshError && error.invalid)) {
+          return new NextResponse('Sign-in is temporarily unavailable. Please retry this page.', {
+            status: 503,
+            headers: { 'Cache-Control': 'private, no-store', 'Retry-After': '5' },
+          });
+        }
+        clearCookies = true;
+      }
+    } else {
+      clearCookies = true;
+    }
+  }
+  const finish = (response: NextResponse) => {
+    for (const cookie of freshCookies)
+      response.cookies.set(cookie.name, cookie.value, cookie.options);
+    response.headers.set('Cache-Control', 'private, no-store');
+    return clearCookies && freshCookies.length === 0
+      ? clearAuthCookies(response, req.headers)
+      : response;
+  };
+  const host = req.headers.get('host') ?? '';
+  const routes = getAuthRoutes(host, req.nextUrl.pathname.startsWith('/shop/'));
   const cleanUrl = req.nextUrl.clone();
   cleanUrl.searchParams.delete(SESSION_REFRESH_GUARD_PARAM);
-
-  return `${cleanUrl.pathname}${cleanUrl.search}`;
-}
-
-function getRequestPathUrl(req: NextRequest, pathWithSearch: string) {
-  return getRequestUrl(pathWithSearch, req.headers, req.url);
-}
-
-function redirectWithoutSessionRefreshGuard(req: NextRequest) {
-  if (!hasRefreshGuard(req)) return null;
-
-  return NextResponse.redirect(
-    getRequestPathUrl(req, getPathWithSearchWithoutSessionRefreshGuard(req)),
-  );
-}
-
-async function refreshRequestSession(req: NextRequest) {
-  if (hasRefreshGuard(req)) return null;
-
-  const currentRefreshToken = await getRequestRefreshToken(req);
-
-  if (!currentRefreshToken) {
-    return null;
+  const path = publicShopPath(`${cleanUrl.pathname}${cleanUrl.search}`, host);
+  const returnPath = admin
+    ? sanitizeAdminReturnPath(path)
+    : (safeAuthReturnPath(path, routes) ?? routes.account);
+  const redirect = (destination: string) =>
+    finish(NextResponse.redirect(getRequestUrl(destination, req.headers, req.url)));
+  if (!state.isAuthenticated || !state.userID) {
+    const login = admin ? '/auth/sign-in' : routes.login;
+    return redirect(`${authFlowUrl(login, { next: returnPath })}&sessionExp=true`);
   }
-
-  try {
-    const refreshedTokens = await refreshDjangoSessionTokens(currentRefreshToken);
-    const builtCookies = await buildAuthSessionCookies({
-      accessToken: refreshedTokens.accessToken,
-      refreshToken: refreshedTokens.refreshToken,
-      requestHeaders: req.headers,
-    });
-    const refreshUrl = getRequestPathUrl(
-      req,
-      `${req.nextUrl.pathname}${req.nextUrl.search}`,
-    );
-    refreshUrl.searchParams.set(SESSION_REFRESH_GUARD_PARAM, '1');
-
-    const response = NextResponse.redirect(refreshUrl);
-    response.headers.set('Cache-Control', 'no-store');
-
-    for (const cookie of builtCookies.cookies) {
-      response.cookies.set(cookie.name, cookie.value, cookie.options);
+  if (req.nextUrl.searchParams.has(SESSION_REFRESH_GUARD_PARAM)) return redirect(path);
+  if (
+    admin &&
+    req.nextUrl.pathname !== ADMIN_UNLOCK_PATH &&
+    req.nextUrl.pathname !== ADMIN_LOGOUT_PATH
+  ) {
+    const unlocked = await getRequestAdminSessionState(req);
+    if (!unlocked.isAuthenticated || unlocked.userID !== state.userID) {
+      const response = redirect(buildAdminUnlockPath(returnPath));
+      return unlocked.shouldClearCookie ? clearAdminSessionCookie(response) : response;
     }
-
-    return response;
-  } catch (error) {
-    console.warn('[auth.session_refresh_failed]', {
-      path: req.nextUrl.pathname,
-      error: error instanceof Error ? error.message : String(error),
-    });
-
-    return null;
   }
+  const forwarded = new Headers(req.headers);
+  if (freshCookies.length) forwarded.set('cookie', req.cookies.toString());
+  return finish(NextResponse.next({ request: { headers: forwarded } }));
 }
 
-function clearFailedSessionCookiesIfNeeded({
-  req,
-  response,
-  shouldClearCookies,
-}: {
-  req: NextRequest;
-  response: NextResponse;
-  shouldClearCookies: boolean;
-}) {
-  return shouldClearCookies || hasRefreshGuard(req)
-    ? clearAuthCookies(response, req.headers)
-    : response;
-}
-
-export const redirectExpSessionToLoginPage = async (req: NextRequest) => {
-  const hostname = getHostnameFromHostHeader(req.headers.get('host'));
-  const sessionState = await getRequestSessionState(req);
-
-  if (sessionState.isAuthenticated) {
-    const cleanRefreshGuardResponse = redirectWithoutSessionRefreshGuard(req);
-    if (cleanRefreshGuardResponse) return cleanRefreshGuardResponse;
-
-    return NextResponse.next();
-  }
-
-  const refreshResponse = await refreshRequestSession(req);
-  if (refreshResponse) return refreshResponse;
-
-  const response = NextResponse.redirect(
-    getRequestPathUrl(
-      req,
-      `/auth/${isShopSiteHostname(hostname) ? 'login' : 'sign-in'}?sessionExp=true`,
-    ),
-  );
-
-  return clearFailedSessionCookiesIfNeeded({
-    req,
-    response,
-    shouldClearCookies: sessionState.shouldClearCookies,
-  });
-};
-
-export const protectAdminRouteMiddleware = async (req: NextRequest) => {
-  const pathWithSearch = getPathWithSearchWithoutSessionRefreshGuard(req);
-  const safeReturnPath = sanitizeAdminReturnPath(pathWithSearch, '/admin');
-  const sessionState = await getRequestSessionState(req);
-
-  if (!sessionState.isAuthenticated || !sessionState.userID) {
-    const refreshResponse = await refreshRequestSession(req);
-    if (refreshResponse) return refreshResponse;
-
-    const response = NextResponse.redirect(
-      getRequestPathUrl(req, `/auth/sign-in?next=${encodeURIComponent(safeReturnPath)}`),
-    );
-
-    return clearFailedSessionCookiesIfNeeded({
-      req,
-      response,
-      shouldClearCookies: sessionState.shouldClearCookies,
-    });
-  }
-
-  const cleanRefreshGuardResponse = redirectWithoutSessionRefreshGuard(req);
-  if (cleanRefreshGuardResponse) return cleanRefreshGuardResponse;
-
-  if (req.nextUrl.pathname === ADMIN_UNLOCK_PATH || req.nextUrl.pathname === ADMIN_LOGOUT_PATH) {
-    return NextResponse.next();
-  }
-
-  const adminSession = await getRequestAdminSessionState(req);
-
-  if (adminSession.isAuthenticated && adminSession.userID === sessionState.userID) {
-    return NextResponse.next();
-  }
-
-  const response = NextResponse.redirect(
-    getRequestPathUrl(req, buildAdminUnlockPath(safeReturnPath)),
-  );
-
-  if (adminSession.shouldClearCookie) {
-    return clearAdminSessionCookie(response);
-  }
-
-  return response;
-};
+export const redirectExpSessionToLoginPage = (req: NextRequest) => protect(req, false);
+export const protectAdminRouteMiddleware = (req: NextRequest) => protect(req, true);

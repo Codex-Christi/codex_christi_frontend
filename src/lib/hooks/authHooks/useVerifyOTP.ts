@@ -1,100 +1,55 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import errorToast from "@/lib/error-toast";
-import loadingToast from "@/lib/loading-toast";
-import successToast from "@/lib/success-toast";
-import axios, { AxiosResponse } from "axios";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+'use client';
 
-const tokenClient = axios.create({
-	baseURL: `${process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL}`,
-});
-
-type otpType = { email: string; otp: string };
-type resendOTPType = { email: string };
-type UserDataReturnType = {
-	status: number;
-	success: boolean;
-	message: string;
-};
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  verifyAccountCode,
+  resendAccountCode,
+  requestPasswordCode,
+} from '@/actions/account/registration';
+import { useAuthReturnPath, useAuthRoutes } from '@/components/UI/Auth/AuthRoutesProvider';
+import { authFlowUrl } from '@/lib/auth/domain-routing';
+import successToast from '@/lib/success-toast';
+import { useAuthTask } from './useAuthTask';
 
 export const useVerifyOTP = () => {
-    const router = useRouter();
-
-    const verifyOTP = async (userDetails: otpType) => {
-        const loadingToastID = loadingToast({
-			message: "Please wait a moment...",
-        });
-
-		try {
-			const verifyOTPRes: AxiosResponse<UserDataReturnType> =
-				await tokenClient.post(`/account/otp/verify`, {
-					...userDetails,
-				});
-
-			toast.dismiss(loadingToastID);
-
-			if (verifyOTPRes?.data?.success) {
-				successToast({
-					message: "Account verified successfully.",
-					header: "Account Verified!",
-				});
-
-                router.replace(`/auth/sign-in`);
-
-				return verifyOTPRes.data;
-			}
-        } catch (err: any) {
-            toast.dismiss(loadingToastID);
-
-			if (err?.response?.data?.errors) {
-				errorToast({
-					message: err?.response?.data?.errors[0]?.message as string,
-				});
-
-				return;
-			}
-
-			errorToast({
-				message: String(err),
-			});
-		}
-	};
-
-	return { verifyOTP };
-
+  const task = useAuthTask();
+  const router = useRouter();
+  const routes = useAuthRoutes();
+  const next = useAuthReturnPath();
+  const verifyOTP = (input: { email: string; otp: string }) =>
+    task.run(
+      () => verifyAccountCode(input),
+      () => {
+        successToast({ message: 'Email verified. Sign in to continue.' });
+        router.replace(
+          authFlowUrl(routes.login, {
+            email: input.email,
+            next,
+          }),
+        );
+      },
+    );
+  return { ...task, verifyOTP };
 };
 
-export const useResendOTP = () => {
-    const resendOTP = async (userDetails: resendOTPType) => {
-        const loadingToastID = loadingToast({
-			message: "Please wait a moment...",
-        });
-
-		try {
-			const resendOTPRes: AxiosResponse<UserDataReturnType> =
-				await tokenClient.post(`/account/otp/resend`, {
-					...userDetails,
-				});
-
-            if (resendOTPRes?.data?.success) {
-				successToast({
-					message: "OTP resent successfully.",
-					header: "OTP Resent!",
-				});
-
-				return resendOTPRes.data;
-			}
-		} catch (err: unknown) {
-			toast.dismiss(loadingToastID);
-
-			errorToast({
-				message: String(err),
-			});
-
-			return String(err);
-		}
-	};
-
-	return { resendOTP };
+export const useResendOTP = (purpose: 'account' | 'password-reset' = 'account') => {
+  const task = useAuthTask();
+  const [retryIn, setRetryIn] = useState(0);
+  useEffect(() => {
+    if (!retryIn) return;
+    const timer = window.setTimeout(() => setRetryIn((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [retryIn]);
+  const resendOTP = (input: { email: string }) => {
+    if (retryIn) return Promise.resolve(null);
+    return task.run(
+      () => (purpose === 'password-reset' ? requestPasswordCode(input) : resendAccountCode(input)),
+      () => {
+        setRetryIn(30);
+        successToast({ message: 'If an account exists, a code has been sent.' });
+      },
+    );
+  };
+  return { ...task, retryIn, resendOTP };
 };

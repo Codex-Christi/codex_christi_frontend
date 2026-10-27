@@ -1,13 +1,5 @@
 import { z } from 'zod';
+import { emailSchema, loginPasswordSchema } from './auth-fields';
 
-export const signInSchema = z.object({
-  email: z.string().email('Invalid email address.'),
-  password: z
-    .string()
-    .trim()
-    .regex(/^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$/, {
-      message: 'Must also contain an uppercase letter, a number, and a symbol',
-    }),
-});
-
+export const signInSchema = z.object({ email: emailSchema, password: loginPasswordSchema });
 export type signInSchemaType = z.infer<typeof signInSchema>;

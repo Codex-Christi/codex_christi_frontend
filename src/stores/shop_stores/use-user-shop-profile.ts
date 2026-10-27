@@ -1,90 +1,60 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { PersistedStorageWithRehydration } from '@/lib/types/general_store_interfaces';
-import { fetchUserShopProfile } from '@/lib/funcs/user-shop';
-import { getUpdatedKeys } from '@/lib/utils/getUpdatedObjKeys';
-import { IUserShopProfile } from '@/lib/types/user-shop-interface';
-import { createBrowserObfuscatedJSONStorage } from '@/lib/crypto/browserObfuscatedStorage';
+import type { IUserShopProfile } from '@/lib/types/user-shop-interface';
+import { readMyShopProfile } from '@/actions/account/profile';
+import { getAuthGeneration } from '@/lib/auth/session-generation';
+import useAuthStore from '../authStore';
 
-const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_USER_PROFILE_DATA_ENCRYPTION_KEY!;
-const USER_SHOP_PROFILE_STORAGE_NAME = 'user-shop-profile-storage';
-
-interface UserShopProfile extends PersistedStorageWithRehydration {
+interface UserShopProfile {
   userShopProfile: IUserShopProfile | null;
   isLoading: boolean;
-  setUserShopProfile: (userShopProfile: IUserShopProfile | null) => void;
+  error: string | null;
+  setUserShopProfile: (profile: IUserShopProfile | null) => void;
   clearProfile: () => void;
   setProfileFromServer: () => Promise<void>;
 }
-
-const userShopProfileStorage = createBrowserObfuscatedJSONStorage<UserShopProfile>({
-  getStorage: () => window.sessionStorage,
-  publicKey: ENCRYPTION_KEY,
-  purpose: USER_SHOP_PROFILE_STORAGE_NAME,
-  legacyEncryptedStateFields: ['userShopProfile'],
-});
-
-export const useUserShopProfile = create<UserShopProfile>()(
-  persist(
-    (set, get) => {
-      return {
-        userShopProfile: null,
-        isLoading: true,
-        _hydrated: false,
-
-        setProfileFromServer: async () => {
-          const storeData = get().userShopProfile;
-
-          try {
-            const serverData = await fetchUserShopProfile();
-
-            // If no server data, return early
-            if (!serverData) {
-              set({ isLoading: false });
-              return;
-            }
-
-            // If no data is present in the store, fetch from server
-            // This is to ensure that the store is initialized with the latest data
-            if (!storeData) {
-              set({ userShopProfile: serverData, isLoading: false });
-              return;
-            }
-
-            // Check if the data has changed before updating the store
-            const updatedKeys = getUpdatedKeys(serverData, storeData);
-            const isDataDifferent = Object.values(updatedKeys).length > 0;
-
-            if (isDataDifferent) {
-              set({ userShopProfile: serverData, isLoading: false });
-            } else {
-              set({ isLoading: false });
-            }
-          } catch {
-            set({ isLoading: false });
-          }
-        },
-
-        setUserShopProfile: (userShopProfile: IUserShopProfile | null) => set({ userShopProfile }),
-
-        clearProfile: () => set({ userShopProfile: null, isLoading: false }),
-
-        hydrate: () => set({ _hydrated: true }),
-      };
-    },
-    {
-      name: USER_SHOP_PROFILE_STORAGE_NAME,
-      storage: userShopProfileStorage,
-      skipHydration: typeof window === 'undefined',
-      onRehydrateStorage: () => async (state) => {
-        state?.hydrate();
-        await state?.setProfileFromServer();
-      },
-    },
-  ),
-);
-
+let pending: { generation: number; promise: Promise<void> } | null = null;
+export const useUserShopProfile = create<UserShopProfile>((set) => ({
+  userShopProfile: null,
+  isLoading: true,
+  error: null,
+  setUserShopProfile: (userShopProfile) => set({ userShopProfile, isLoading: false, error: null }),
+  clearProfile: () => set({ userShopProfile: null, isLoading: false, error: null }),
+  setProfileFromServer: async () => {
+    if (!useAuthStore.getState().isAuthenticated) {
+      set({ userShopProfile: null, isLoading: false });
+      return;
+    }
+    const generation = getAuthGeneration();
+    if (pending?.generation === generation) return pending.promise;
+    set({ isLoading: true, error: null });
+    const promise = (async () => {
+      const result = await readMyShopProfile().catch(() => null);
+      if (getAuthGeneration() !== generation) return;
+      if (!result?.success) {
+        set({
+          userShopProfile: null,
+          isLoading: false,
+          error: result && !result.success ? result.error : 'Unable to load your shop profile.',
+        });
+        if (result && !result.success && result.code === 'sign_in_required')
+          useAuthStore.getState().setSessionState({ isAuthenticated: false, user_id: null });
+        return;
+      }
+      set({ userShopProfile: result.data, isLoading: false, error: null });
+    })().finally(() => {
+      if (pending?.generation === generation) pending = null;
+    });
+    pending = { generation, promise };
+    return promise;
+  },
+}));
 export const clearUserShopProfile = async () => {
   useUserShopProfile.getState().clearProfile();
-  await userShopProfileStorage.removeItem(USER_SHOP_PROFILE_STORAGE_NAME);
+  if (typeof window !== 'undefined') {
+    try {
+      window.sessionStorage.removeItem('user-shop-profile-storage');
+    } catch {
+      /* Storage may be blocked. */
+    }
+  }
 };

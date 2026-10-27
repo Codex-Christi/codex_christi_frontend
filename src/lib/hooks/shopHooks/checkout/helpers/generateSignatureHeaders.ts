@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 import { hmacSha256Hex } from '@/lib/crypto/hmacSha256';
 

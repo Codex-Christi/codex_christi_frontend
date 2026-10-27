@@ -1,107 +1,93 @@
-"use server";
+'use server';
 
-import { getServerDjangoApiBaseUrl } from "@/lib/django/getServerDjangoApiBaseUrl";
-import { createSession } from "@/lib/session/main-session";
-import { getServerSessionState, getServerUserID } from "@/lib/session/server-session";
-import {
-	asRecord,
-	getDjangoAuthErrorMessage,
-	getNestedAuthToken,
-} from "@/lib/session/django-auth-response";
+import { headers } from 'next/headers';
+import { signInSchema } from '@/lib/formSchemas/signInSchema';
+import { createSession, refreshSession } from '@/lib/session/main-session';
+import { getServerSessionState, getServerUserID } from '@/lib/session/server-session';
+import { asRecord, getNestedAuthToken } from '@/lib/session/django-auth-response';
+import { djangoRequest, readDjangoJson } from '@/lib/django/request';
+import { allowAuthAttempt } from '@/lib/auth/rate-limit';
 
 export interface AuthSessionState {
   isAuthenticated: boolean;
   user_id: string | null;
+  expiresAt?: number | null;
+  status?: 'authenticated' | 'anonymous' | 'unavailable';
 }
-
 export type LoginResult =
-	| {
-			success: true;
-			sessionState: AuthSessionState;
-	  }
-	| {
-			success: false;
-			error: string;
-	  };
+  { success: true; sessionState: AuthSessionState } | { success: false; error: string };
 
-type LoginCredentials = {
-	email: string;
-	password: string;
-};
-
-async function createLoginSession(
-	accessToken: string,
-	refreshToken: string,
-): Promise<LoginResult> {
-	try {
-		const session = await createSession(accessToken, refreshToken);
-
-		return {
-			success: true,
-			sessionState: {
-				isAuthenticated: true,
-				user_id: session.userID,
-			},
-		};
-	} catch (err: Error | unknown) {
-		return {
-			success: false,
-			error: `${err}`,
-		};
-	}
-}
-
-export async function loginUser({
-	email,
-	password,
-}: LoginCredentials): Promise<LoginResult> {
-	try {
-		const response = await fetch(`${getServerDjangoApiBaseUrl()}/auth/user-login`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Accept: "application/json",
-			},
-			body: JSON.stringify({ email, password }),
-			cache: "no-store",
-		});
-		const payload: unknown = await response.json().catch(() => null);
-
-		if (!response.ok || asRecord(payload)?.success !== true) {
-			return {
-				success: false,
-				error: getDjangoAuthErrorMessage(payload, "Login failed. Please try again."),
-			};
-		}
-
-		const accessToken = getNestedAuthToken(payload, "access");
-		const refreshToken = getNestedAuthToken(payload, "refresh");
-
-		if (!accessToken || !refreshToken) {
-			return {
-				success: false,
-				error: "Login response did not include session tokens.",
-			};
-		}
-
-		return createLoginSession(accessToken, refreshToken);
-	} catch (err: Error | unknown) {
-		return {
-			success: false,
-			error: err instanceof Error ? err.message : String(err),
-		};
-	}
+export async function loginUser(input: unknown): Promise<LoginResult> {
+  const parsed = signInSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: 'Enter a valid email and password.' };
+  const h = await headers();
+  if (
+    !allowAuthAttempt('login-ip', h.get('x-real-ip') ?? 'unknown', 30, 60_000) ||
+    !allowAuthAttempt('login-email', parsed.data.email.toLowerCase(), 15, 5 * 60_000)
+  ) {
+    return { success: false, error: 'Too many sign-in attempts. Please wait a few minutes.' };
+  }
+  try {
+    const response = await djangoRequest('/auth/user-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(parsed.data),
+    });
+    const payload = await readDjangoJson(response);
+    if (!response.ok || asRecord(payload)?.success !== true) {
+      return {
+        success: false,
+        error:
+          response.status >= 500
+            ? 'Sign-in is temporarily unavailable. Please try again.'
+            : 'Check your email and password. Your email must be verified before signing in.',
+      };
+    }
+    const access = getNestedAuthToken(payload, 'access');
+    const refresh = getNestedAuthToken(payload, 'refresh');
+    if (!access || !refresh) throw new Error('Missing tokens');
+    await createSession(access, refresh);
+    return { success: true, sessionState: await getAuthSessionState() };
+  } catch {
+    return { success: false, error: 'Sign-in is temporarily unavailable. Please try again.' };
+  }
 }
 
 export async function getUserID() {
-	return (await getServerUserID()) as string;
+  return getServerUserID();
 }
 
 export async function getAuthSessionState(): Promise<AuthSessionState> {
-	const sessionState = await getServerSessionState();
-
-	return {
-		isAuthenticated: sessionState.isAuthenticated,
-		user_id: sessionState.userID,
-	};
+  let session = await getServerSessionState();
+  if (!session.isAuthenticated || session.expiresSoon) {
+    const result = await refreshSession();
+    if (
+      !result.success &&
+      result.unavailable &&
+      session.isAuthenticated &&
+      session.expiresAt &&
+      session.expiresAt > Date.now()
+    ) {
+      return {
+        isAuthenticated: true,
+        user_id: session.userID,
+        expiresAt: session.expiresAt,
+        status: 'authenticated',
+      };
+    }
+    if (!result.success)
+      return {
+        isAuthenticated: false,
+        user_id: null,
+        expiresAt: null,
+        status: result.unavailable ? 'unavailable' : 'anonymous',
+      };
+    session = await getServerSessionState();
+  }
+  return {
+    isAuthenticated: session.isAuthenticated,
+    user_id: session.userID,
+    expiresAt: session.expiresAt,
+    status: session.isAuthenticated ? 'authenticated' : 'anonymous',
+  };
 }

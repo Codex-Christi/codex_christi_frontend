@@ -4,15 +4,12 @@ import EditCountry from '@/components/UI/profile/Edit/EditCountry';
 import loadingToast from '@/lib/loading-toast';
 import errorToast from '@/lib/error-toast';
 import successToast from '@/lib/success-toast';
-import en from 'react-phone-number-input/locale/en';
-import axios, { AxiosError } from 'axios';
 import { toast } from 'sonner';
 import { ArrowLeftIcon } from 'lucide-react';
 import { SetStateAction, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/UI/primitives/button';
-import { getCountries } from 'react-phone-number-input/input';
 import { cn } from '@/lib/utils';
 import {
   Drawer,
@@ -26,27 +23,14 @@ import {
   ShippingAddressFormData,
   shippingAddressSchema,
 } from '@/lib/types/shipping-address-schema';
-import { getServerAccessToken } from '@/lib/session/server-session';
-import { IUserShopProfile } from '@/lib/types/user-shop-interface';
+import { updateMyShippingAddress } from '@/actions/account/profile';
+import { normalizeCountryToIso2 } from '@/lib/utils/shop/checkout/normalizeCountryToIso3';
+import { getAuthGeneration } from '@/lib/auth/session-generation';
 
 const updateShippingAddress = async (formData: ShippingAddressFormData) => {
-  const mainAccessToken = (await getServerAccessToken()) ?? '';
-
-  const client = axios.create({
-    baseURL: `${process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL}`,
-  });
-
-  try {
-    const response = await client.patch<IUserShopProfile>('/shop/shop-profile-update', formData, {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${mainAccessToken}`,
-      },
-    });
-    return response.data;
-  } catch (error: unknown) {
-    throw error;
-  }
+  const result = await updateMyShippingAddress(formData);
+  if (!result.success) throw new Error(result.error);
+  return result.data;
 };
 
 const ShippingAddressModal = ({
@@ -89,7 +73,7 @@ const ShippingAddressModal = ({
         shipping_state: userShopProfile.data.shipping_state || '',
         shipping_city: userShopProfile.data.shipping_city || '',
         shipping_address: userShopProfile.data.shipping_address || '',
-        shipping_country: userShopProfile.data.shipping_country || '',
+        shipping_country: normalizeCountryToIso2(userShopProfile.data.shipping_country) ?? '',
         // directions: userShopProfile.data.directions || '',
       });
 
@@ -98,34 +82,18 @@ const ShippingAddressModal = ({
   }, [isActive, userShopProfile, reset, trigger]);
 
   const onSubmit = async (data: ShippingAddressFormData) => {
+    const generation = getAuthGeneration();
     const loadingToastID = loadingToast({
       message: 'Updating shipping address details...',
     });
 
     try {
-      toast.dismiss(loadingToastID);
-
-      const countries = getCountries()
-        .map((code) => ({
-          code,
-          name: en[code as keyof typeof en],
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      const selectedCountry = countries.find((c) => c.code === data.shipping_country);
-
-      const payload = {
-        ...data,
-        shipping_country: selectedCountry?.name ?? 'United States',
-      };
-
-      const response = await updateShippingAddress(payload);
+      const response = await updateShippingAddress(data);
+      if (generation !== getAuthGeneration()) return;
 
       toast.dismiss(loadingToastID);
 
-      if (userShopProfile && response) {
-        setUserShopProfile(response);
-      }
+      setUserShopProfile(response);
 
       setIsActive(false);
 
@@ -136,20 +104,16 @@ const ShippingAddressModal = ({
     } catch (error) {
       toast.dismiss(loadingToastID);
 
-      const axiosError = error as AxiosError<{
-        errors?: Array<{ message: string }>;
-        message?: string;
-      }>;
-
       const errorMessage =
-        axiosError.response?.data?.errors?.[0]?.message ||
-        axiosError.response?.data?.message ||
-        axiosError.message ||
-        'Error updating shipping address. Please try again.';
+        error instanceof Error
+          ? error.message
+          : 'Error updating shipping address. Please try again.';
 
       errorToast({
         message: errorMessage,
       });
+    } finally {
+      toast.dismiss(loadingToastID);
     }
   };
 

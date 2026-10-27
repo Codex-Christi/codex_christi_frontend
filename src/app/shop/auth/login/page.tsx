@@ -1,7 +1,6 @@
-'use client';
-
 import SignIn from '@/components/UI/Auth/SignIn/SignIn';
 
-export default function Launcher() {
+export const metadata = { title: 'Login | Codex Christi Shop' };
+export default function Page() {
   return <SignIn />;
 }

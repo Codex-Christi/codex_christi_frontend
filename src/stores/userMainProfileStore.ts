@@ -1,114 +1,58 @@
-// src/stores/userMainProfileStore.ts
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
-import { getUser } from '@/lib/funcs/userProfileFetchers/getUser';
-import { getUpdatedKeys } from '@/lib/utils/getUpdatedObjKeys';
-import { createBrowserObfuscatedJSONStorage } from '@/lib/crypto/browserObfuscatedStorage';
-
-// Prevent multiple simultaneous fetches from the server (but allow future refreshes)
-let inFlightUserProfilePromise: Promise<UserProfileDataInterface | null> | null = null;
-
-const fetchUserProfileOnce = async (): Promise<UserProfileDataInterface | null> => {
-  if (!inFlightUserProfilePromise) {
-    inFlightUserProfilePromise = (async () => {
-      try {
-        return (await getUser()) ?? null;
-      } catch (error) {
-        console.error('Failed to fetch user profile from server:', error);
-        return null;
-      } finally {
-        // Reset so a later call can fetch again
-        inFlightUserProfilePromise = null;
-      }
-    })();
-  }
-
-  return inFlightUserProfilePromise;
-};
-
-const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_USER_PROFILE_DATA_ENCRYPTION_KEY!;
-const USER_MAIN_PROFILE_STORAGE_NAME = 'user-main-profile-storage';
+import type { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
+import { readMyProfile } from '@/actions/account/profile';
+import { getAuthGeneration } from '@/lib/auth/session-generation';
+import useAuthStore from './authStore';
 
 interface UserMainProfileStore {
   userMainProfile: UserProfileDataInterface | null;
-  setUserMainProfile: (userMainProfile: UserProfileDataInterface | null) => void;
+  error: string | null;
+  setUserMainProfile: (profile: UserProfileDataInterface | null) => void;
   clearProfile: () => void;
   setProfileFromServer: () => Promise<void>;
 }
-
-const userMainProfileStorage = createBrowserObfuscatedJSONStorage<UserMainProfileStore>({
-  getStorage: () => window.localStorage,
-  publicKey: ENCRYPTION_KEY,
-  purpose: USER_MAIN_PROFILE_STORAGE_NAME,
-});
-
-// This store persists the user profile data in obfuscated localStorage.
-export const useUserMainProfileStore = create<UserMainProfileStore>()(
-  persist(
-    (set, get) => ({
-      userMainProfile: null,
-
-      setProfileFromServer: async () => {
-        const serverData = await fetchUserProfileOnce();
-
-        if (!serverData) return;
-
-        const storeData = get().userMainProfile;
-
-        // If there is no data in the store yet, just set it once
-        if (!storeData) {
-          set({ userMainProfile: serverData });
-          return;
-        }
-
-        // Only update when there are actual changes between server and store
-        const updatedKeys = getUpdatedKeys(serverData, storeData);
-
-        if (Object.keys(updatedKeys).length > 0) {
-          set({ userMainProfile: serverData });
-        }
-      },
-
-      setUserMainProfile: (userMainProfile) => set({ userMainProfile }),
-
-      clearProfile: () => set({ userMainProfile: null }),
-    }),
-    {
-      name: USER_MAIN_PROFILE_STORAGE_NAME,
-      storage: userMainProfileStorage,
-      skipHydration: typeof window === 'undefined',
-    },
-  ),
-);
-
-let userMainProfileHydrationPromise: Promise<void> | null = null;
-
-export function waitForUserMainProfileStoreHydration(): Promise<void> {
-  if (typeof window === 'undefined' || useUserMainProfileStore.persist.hasHydrated()) {
-    return Promise.resolve();
-  }
-
-  if (!userMainProfileHydrationPromise) {
-    userMainProfileHydrationPromise = new Promise<void>((resolve) => {
-      let unsubscribe = () => {};
-      const finish = () => {
-        unsubscribe();
-        resolve();
-      };
-
-      unsubscribe = useUserMainProfileStore.persist.onFinishHydration(finish);
-      if (useUserMainProfileStore.persist.hasHydrated()) finish();
-    }).finally(() => {
-      userMainProfileHydrationPromise = null;
+let pending: { generation: number; promise: Promise<void> } | null = null;
+export const useUserMainProfileStore = create<UserMainProfileStore>((set) => ({
+  userMainProfile: null,
+  error: null,
+  setUserMainProfile: (userMainProfile) => set({ userMainProfile, error: null }),
+  clearProfile: () => set({ userMainProfile: null, error: null }),
+  setProfileFromServer: async () => {
+    const userID = useAuthStore.getState().userSessionInfo?.user_id;
+    if (!userID) {
+      set({ userMainProfile: null });
+      return;
+    }
+    const generation = getAuthGeneration();
+    if (pending?.generation === generation) return pending.promise;
+    const promise = (async () => {
+      const result = await readMyProfile().catch(() => null);
+      if (getAuthGeneration() !== generation) return;
+      if (!result?.success || result.data.id !== userID) {
+        set({
+          userMainProfile: null,
+          error: result && !result.success ? result.error : 'Unable to load your profile.',
+        });
+        if (result && !result.success && result.code === 'sign_in_required')
+          useAuthStore.getState().setSessionState({ isAuthenticated: false, user_id: null });
+        return;
+      }
+      set({ userMainProfile: result.data, error: null });
+    })().finally(() => {
+      if (pending?.generation === generation) pending = null;
     });
-  }
-
-  return userMainProfileHydrationPromise;
-}
+    pending = { generation, promise };
+    return promise;
+  },
+}));
 
 export const clearUserMainProfileStore = async () => {
-  const { clearProfile } = useUserMainProfileStore.getState();
-  clearProfile();
-  await userMainProfileStorage.removeItem(USER_MAIN_PROFILE_STORAGE_NAME);
+  useUserMainProfileStore.getState().clearProfile();
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.removeItem('user-main-profile-storage');
+    } catch {
+      /* Storage may be blocked. */
+    }
+  }
 };

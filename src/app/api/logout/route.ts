@@ -1,50 +1,28 @@
-// app/api/logout/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerDjangoApiBaseUrl } from '@/lib/django/getServerDjangoApiBaseUrl';
-import { deleteSession } from '@/lib/session/main-session';
+import { NextResponse } from 'next/server';
 import { getServerRefreshToken } from '@/lib/session/server-session';
-import {
-  getHostnameFromHostHeader,
-  getRequestUrl,
-  isShopSiteHostname,
-} from '@/lib/siteBaseUrls';
+import { cancelSessionRefresh } from '@/lib/session/session-refresh';
+import { djangoRequest } from '@/lib/django/request';
+import { isSameOriginMutation } from '@/lib/auth/request-origin';
+import { clearLogoutCookies } from '@/lib/auth/logout-cookies';
 
-export async function GET(req: NextRequest) {
-  const hostname = getHostnameFromHostHeader(req.headers.get('host'));
-  const loginPath = isShopSiteHostname(hostname) ? '/auth/login' : '/auth/sign-in';
-  const redirectUrl = getRequestUrl(`${loginPath}?from-logout=true`, req.headers, req.url);
-
+const headers = { 'Cache-Control': 'private, no-store' };
+export async function POST(request: Request) {
+  if (!isSameOriginMutation(request)) return NextResponse.json({ success: false }, { status: 403, headers });
   try {
-    const mainRefreshToken = await getServerRefreshToken();
-
-    if (mainRefreshToken) {
-      const response = await fetch(`${getServerDjangoApiBaseUrl()}/auth/user-logout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({ refresh: mainRefreshToken }),
-        cache: 'no-store',
-      });
-
-      if (!response.ok) {
-        console.warn('[auth.logout.django_failed]', {
-          status: response.status,
-          statusText: response.statusText,
-        });
-      }
+    const refresh = await getServerRefreshToken();
+    if (refresh) {
+      cancelSessionRefresh(refresh);
+      const response = await djangoRequest('/auth/user-logout', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ refresh }),
+      }, 3000);
+      await response.body?.cancel();
     }
-  } catch (err) {
-    console.warn('[auth.logout.failed]', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-  } finally {
-    await deleteSession();
+  } catch {
+    // Django revocation is best effort. Local logout is unconditional.
   }
-
-  const response = NextResponse.redirect(redirectUrl);
-  response.headers.set('Cache-Control', 'no-store');
-
-  return response;
+  return clearLogoutCookies(NextResponse.json({ success: true }, { headers }), request.headers);
+}
+export async function GET() {
+  return NextResponse.json({ success: false, message: 'Use the Logout button to sign out.' }, { status: 405, headers: { ...headers, Allow: 'POST' } });
 }

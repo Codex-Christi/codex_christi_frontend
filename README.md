@@ -4,6 +4,14 @@
 
 [![Push to main](https://github.com/Codex-Christi/codex_christi_frontend/actions/workflows/push-to-main.yml/badge.svg)](https://github.com/Codex-Christi/codex_christi_frontend/actions/workflows/push-to-main.yml)
 
+### Authentication
+
+Both shop addresses use the same Next authentication code. Start with the
+[authentication implementation guide](Future%20Implementation%20Guides/nextjs-auth-shop-integration-hardening-plan.md)
+for routing, server/client boundaries, tests, deployment and remaining proxy work.
+The [original audit index](Future%20Implementation%20Guides/auth-session-shop-domain-audit-and-implementation-plan.md)
+is historical, not a second implementation plan.
+
 ### Storefront Rendering
 
 Product metadata and the gallery render before destination-verified options arrive.

@@ -1,30 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSafeAdminReturnPath } from '@/lib/admin/admin-paths';
 import { getRequestUrl } from '@/lib/siteBaseUrls';
+import { getAuthRoutes, publicShopPath, safeAuthReturnPath } from '../auth/domain-routing';
 import { getRequestSessionState } from './request-session';
 
-export const basicRedirect = (destination: string, req: NextRequest) => {
-  // If the destination is an absolute URL, redirect to that URL
-  return NextResponse.redirect(
-    getRequestUrl(destination.startsWith('/') ? destination : '/', req.headers, req.url),
-  );
-};
+export const basicRedirect = (destination: string, req: NextRequest) =>
+  NextResponse.redirect(getRequestUrl(destination, req.headers, req.url));
 
-export const redirectLoggedInUserToProfile = async (req: NextRequest) => {
-  if (req.method !== 'GET') {
-    return NextResponse.next();
-  }
-
-  // If user is logged in already, send them to profile.
-  const sessionState = await getRequestSessionState(req);
-
-  if (sessionState.isAuthenticated) {
-    return basicRedirect(
-      getSafeAdminReturnPath(req.nextUrl.searchParams.get('next')) ??
-        '/profile?from-login-page=true',
-      req,
-    );
-  }
-
-  return NextResponse.next();
+export const redirectLoggedInUserToProfile = async (req: NextRequest, shop = false) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return NextResponse.next();
+  const state = await getRequestSessionState(req);
+  if (!state.isAuthenticated) return NextResponse.next();
+  const host = req.headers.get('host') ?? '';
+  const routes = getAuthRoutes(host, shop);
+  const requested = req.nextUrl.searchParams.get('next');
+  const path =
+    safeAuthReturnPath(requested ? publicShopPath(requested, host) : null, routes) ??
+    routes.account;
+  const response = basicRedirect(path, req);
+  response.headers.set('Cache-Control', 'private, no-store');
+  return response;
 };

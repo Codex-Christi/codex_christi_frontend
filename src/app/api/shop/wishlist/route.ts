@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getServerSessionState } from '@/lib/session/server-session';
-import { getServerDjangoApiBaseUrl } from '@/lib/django/getServerDjangoApiBaseUrl';
+import { authenticatedDjangoFetch } from '@/lib/auth/authenticated-django-fetch';
+import { AccountRequestError } from '@/lib/auth/errors';
+import { isSameOriginMutation } from '@/lib/auth/request-origin';
 import {
   isRecord,
   normalizeWishlistProductIds,
@@ -15,18 +17,17 @@ function failure(message: string, status: number) {
   return NextResponse.json({ success: false, message }, { status, headers: privateHeaders });
 }
 
-async function requestWishlist(path: string, token: string, body?: { product_ids: string[] }) {
-  const response = await fetch(`${getServerDjangoApiBaseUrl()}/wishlist/${path}`, {
+async function requestWishlist(path: string, body?: { product_ids: string[] }) {
+  const response = await authenticatedDjangoFetch(`/wishlist/${path}`, {
     method: body ? 'POST' : 'GET',
     headers: {
-      Authorization: `Bearer ${token}`,
       Accept: 'application/json',
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
     cache: 'no-store',
     signal: AbortSignal.timeout(15000),
-  });
+  }, { writable: true, retryUnauthorized: true });
 
   if (!response.ok) {
     return {
@@ -50,13 +51,9 @@ async function requestWishlist(path: string, token: string, body?: { product_ids
 
 export async function GET() {
   try {
-    const session = await getServerSessionState();
-    if (!session.isAuthenticated || !session.mainAccessToken || !session.userID) {
-      return failure('Sign in to view and manage your wishlist.', 401);
-    }
-
-    const result = await requestWishlist('get-wishlist', session.mainAccessToken);
+    const result = await requestWishlist('get-wishlist');
     if (result.response) return result.response;
+    const session = await getServerSessionState();
     const ids = normalizeWishlistProductIds(result.payload);
     const data = await Promise.all(ids.map(resolveWishlistProduct));
 
@@ -65,6 +62,7 @@ export async function GET() {
       { headers: privateHeaders },
     );
   } catch (error) {
+    if (error instanceof AccountRequestError) return failure(error.message, error.status);
     return failure(
       error instanceof WishlistPayloadError
         ? error.message
@@ -77,15 +75,10 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     if (
-      request.headers.get('sec-fetch-site') === 'cross-site' ||
+      !isSameOriginMutation(request) ||
       !request.headers.get('content-type')?.toLowerCase().startsWith('application/json')
     ) {
       return failure('Submit wishlist changes from this shop.', 403);
-    }
-
-    const session = await getServerSessionState();
-    if (!session.isAuthenticated || !session.mainAccessToken || !session.userID) {
-      return failure('Sign in to view and manage your wishlist.', 401);
     }
 
     let body;
@@ -97,10 +90,10 @@ export async function POST(request: Request) {
 
     const result = await requestWishlist(
       body.action === 'add' ? 'add-product' : 'remove-products',
-      session.mainAccessToken,
       { product_ids: body.product_ids },
     );
     if (result.response) return result.response;
+    const session = await getServerSessionState();
 
     return NextResponse.json(
       {
@@ -110,7 +103,8 @@ export async function POST(request: Request) {
       },
       { headers: privateHeaders },
     );
-  } catch {
+  } catch (error) {
+    if (error instanceof AccountRequestError) return failure(error.message, error.status);
     return failure('We could not update your wishlist. Please try again.', 502);
   }
 }

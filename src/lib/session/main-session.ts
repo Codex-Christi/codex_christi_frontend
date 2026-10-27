@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 import { cookies, headers } from 'next/headers';
 import {
@@ -8,7 +8,11 @@ import {
   REFRESH_TOKEN_COOKIE_NAME,
   type AuthCookieDefinition,
 } from './session-cookies';
-import { refreshDjangoSessionTokens } from './session-refresh';
+import {
+  assertSessionRefreshActive,
+  refreshDjangoSessionTokens,
+  SessionRefreshError,
+} from './session-refresh';
 
 export interface CreatedSession {
   userID: string;
@@ -22,6 +26,7 @@ export type RefreshSessionResult =
   | {
       success: false;
       error: string;
+      unavailable?: boolean;
     };
 
 async function writeAuthCookies(authCookies: AuthCookieDefinition[]) {
@@ -60,19 +65,26 @@ export async function refreshSession(): Promise<RefreshSessionResult> {
 
   try {
     const refreshedTokens = await refreshDjangoSessionTokens(currentRefreshToken);
-    const session = await createSession(
-      refreshedTokens.accessToken,
-      refreshedTokens.refreshToken,
-    );
+    const built = await buildAuthSessionCookies({
+      ...refreshedTokens,
+      requestHeaders: await headers(),
+    });
+    assertSessionRefreshActive(currentRefreshToken);
+    await writeAuthCookies(built.cookies);
+    const session = { userID: built.userID };
 
     return {
       success: true,
       session,
     };
   } catch (error) {
-    return clearSessionAfterRefreshFailure(
-      error instanceof Error ? error.message : String(error),
-    );
+    if (error instanceof SessionRefreshError && error.invalid)
+      return clearSessionAfterRefreshFailure(error.message);
+    return {
+      success: false,
+      unavailable: true,
+      error: 'Sign-in is temporarily unavailable. Please try again.',
+    };
   }
 }
 

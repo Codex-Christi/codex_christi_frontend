@@ -8,8 +8,6 @@ export interface IUserShopProfile {
     bio: string;
     profile_pic: string;
     username: string;
-    favorite_products: string[];
-    payment_methods: string;
     shipping_address: string | null;
     shipping_city: string | null;
     shipping_state: string | null;

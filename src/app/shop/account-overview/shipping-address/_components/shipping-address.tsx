@@ -6,17 +6,20 @@ import {
   ArrowLeftIcon,
   PenLineIcon,
   Trash2Icon,
-//   PhoneIcon,
+  //   PhoneIcon,
   MapPinIcon,
   UserIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
+import AccountLoadError from '@/components/UI/Auth/AccountLoadError';
 
 const ShippingAddress = () => {
   const [isActive, setIsActive] = useState(false);
 
-  const { userShopProfile, isLoading } = useUserShopProfile((state) => state);
+  const { userShopProfile, isLoading, error, setProfileFromServer } = useUserShopProfile(
+    (state) => state,
+  );
 
   const hasCompleteShippingInfo = (profile: typeof userShopProfile): boolean => {
     if (!profile?.data) return false;
@@ -31,6 +34,8 @@ const ShippingAddress = () => {
       <div className='animate-pulse bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] border border-[#F3F3F3]/50 rounded-[20px] h-32' />
     );
   }
+
+  if (error) return <AccountLoadError message={error} retry={setProfileFromServer} />;
 
   if (!hasCompleteShippingInfo(userShopProfile)) {
     return (

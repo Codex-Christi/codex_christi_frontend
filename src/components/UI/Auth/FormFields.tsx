@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-} from '@/components/UI/primitives/form';
+import { FormControl, FormField, FormItem, FormLabel } from '@/components/UI/primitives/form';
 import { InputWithIcon } from '@/components/UI/auth_pages/forms/InputWithIcon';
 import { ReactNode } from 'react';
 import CustomFormMessage from '../auth_pages/forms/CustomFormMessage';
@@ -21,8 +16,7 @@ export interface BaseZodInputProps<T extends FieldValues> {
 }
 
 // Interfaces
-interface NameInputInterface<T extends FieldValues>
-  extends BaseZodInputProps<T> {
+interface NameInputInterface<T extends FieldValues> extends BaseZodInputProps<T> {
   inputName: 'firstname' | 'lastname';
   currentZodForm: UseFormReturn<T>;
 }
@@ -33,14 +27,13 @@ interface EmailInputProps<T extends FieldValues> extends BaseZodInputProps<T> {
   label?: string;
 }
 
-interface PasswordInputProps<T extends FieldValues>
-  extends BaseZodInputProps<T> {
+interface PasswordInputProps<T extends FieldValues> extends BaseZodInputProps<T> {
   inputName: 'password' | 'confirm_password' | 'otp';
   currentZodForm: UseFormReturn<T>;
+  autoComplete?: 'current-password' | 'new-password';
 }
 
-interface CheckBoxInputProps<T extends FieldValues>
-  extends BaseZodInputProps<T> {
+interface CheckBoxInputProps<T extends FieldValues> extends BaseZodInputProps<T> {
   name: 'terms_and_policy';
   currentZodForm: UseFormReturn<T>;
   children?: ReactNode;
@@ -112,9 +105,7 @@ const EmailIcon: IconType = () => (
 
 // Name Input
 
-export const NameInput = <T extends FieldValues>(
-  props: NameInputInterface<T>
-) => {
+export const NameInput = <T extends FieldValues>(props: NameInputInterface<T>) => {
   //   Props
 
   const { inputName, currentZodForm } = props;
@@ -140,6 +131,9 @@ export const NameInput = <T extends FieldValues>(
               className={`bg-transparent border border-white focus:!outline-0 focus-visible:!ring-0 autofill:!bg-transparent rounded-3xl !mt-0 placeholder:!text-white/75`}
               placeholder={`Enter your ${inPutNamePt1} name...`}
               {...field}
+              autoComplete={inputName === 'firstname' ? 'given-name' : 'family-name'}
+              maxLength={50}
+              required
             />
           </FormControl>
           {/* <FormDescription>This is your full name.</FormDescription> */}
@@ -151,9 +145,7 @@ export const NameInput = <T extends FieldValues>(
 };
 
 // Email Input
-export const EmailInput = <T extends FieldValues>(
-  props: EmailInputProps<T>
-) => {
+export const EmailInput = <T extends FieldValues>(props: EmailInputProps<T>) => {
   // Props
   const { inputName, currentZodForm, label = 'Email' } = props;
 
@@ -171,6 +163,10 @@ export const EmailInput = <T extends FieldValues>(
               className={`bg-transparent border border-white focus:!outline-0 focus-visible:!ring-0 autofill:!bg-transparent rounded-3xl !mt-0 placeholder:!text-white/75`}
               placeholder={`Enter your email`}
               {...field}
+              type='email'
+              autoComplete='email'
+              maxLength={254}
+              required
             />
           </FormControl>
           <CustomFormMessage className='text-red-400' />
@@ -182,11 +178,9 @@ export const EmailInput = <T extends FieldValues>(
 
 // Password Input
 
-export const PasswordInput = <T extends FieldValues>(
-  props: PasswordInputProps<T>
-) => {
+export const PasswordInput = <T extends FieldValues>(props: PasswordInputProps<T>) => {
   // Props
-  const { currentZodForm, inputName } = props;
+  const { currentZodForm, inputName, autoComplete = 'new-password' } = props;
 
   // Bools
   const isConfirmPaswwordField = inputName === 'confirm_password';
@@ -219,6 +213,10 @@ export const PasswordInput = <T extends FieldValues>(
               }
               {...field}
               type={isOTP ? 'text' : 'password'}
+              autoComplete={isOTP ? 'one-time-code' : autoComplete}
+              inputMode={isOTP ? 'numeric' : undefined}
+              maxLength={isOTP ? 6 : 1024}
+              required
             />
           </FormControl>
           <CustomFormMessage className='text-red-400' />
@@ -230,9 +228,7 @@ export const PasswordInput = <T extends FieldValues>(
 
 // CheckBox Input
 
-export const CheckBoxInput = <T extends FieldValues>(
-  props: CheckBoxInputProps<T>
-) => {
+export const CheckBoxInput = <T extends FieldValues>(props: CheckBoxInputProps<T>) => {
   // Props
   const { currentZodForm, name, children } = props;
   const {
@@ -246,7 +242,7 @@ export const CheckBoxInput = <T extends FieldValues>(
       name={name as Path<T>}
       render={({ field }) => (
         <FormItem
-          className={`flex flex-row items-center gap-4 space-y-0 rounded-md py-1 ${
+          className={`grid grid-cols-[auto_1fr] items-center gap-x-4 space-y-0 rounded-md py-1 ${
             isThereError ? `${styles.shakeAnimation}` : ''
           }`}
         >
@@ -259,9 +255,8 @@ export const CheckBoxInput = <T extends FieldValues>(
               onCheckedChange={field.onChange}
             />
           </FormControl>
-          <FormLabel className={`${isThereError && `text-red-400 `}`}>
-            {children}
-          </FormLabel>
+          <FormLabel className={`${isThereError && `text-red-400 `}`}>{children}</FormLabel>
+          <CustomFormMessage className='col-span-2 text-red-400' />
         </FormItem>
       )}
     />

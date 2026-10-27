@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
-import { isShopSiteHostname } from '@/lib/siteBaseUrls';
+import { publicShopPath } from '@/lib/auth/domain-routing';
 
 export const useShopRouter = () => {
   const router = useRouter();
@@ -11,12 +11,7 @@ export const useShopRouter = () => {
     (path: string) => {
       const hostname = typeof window === 'undefined' ? null : window.location.hostname;
 
-      if (isShopSiteHostname(hostname) && path.startsWith('/shop')) {
-        const trimmed = path.split('/shop')[1] || '/';
-        const normalized = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-        return router.push(normalized);
-      }
-      return router.push(path);
+      return router.push(publicShopPath(path, hostname ?? ''));
     },
     [router],
   );
