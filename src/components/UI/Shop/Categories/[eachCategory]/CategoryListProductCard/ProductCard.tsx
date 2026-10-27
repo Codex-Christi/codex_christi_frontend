@@ -1,5 +1,3 @@
-'use client';
-
 import Image from 'next/image';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 import type { CategoryProductDetail } from '@/app/shop/category/[id]/categoryDetailsSSR';
@@ -29,14 +27,12 @@ export default function ProductCard({
                  border-[2px] border-white/50 overflow-hidden mx-auto w-full max-w-[310px]
                  lg:max-w-[350px] hover:scale-[1.03] !select-none'
     >
-      {/* 1) The stretched link overlay that makes the WHOLE card clickable */}
       <CustomShopLink
         href={`/shop/product/${_id}`}
         aria-label={`${title} details`}
         className='absolute inset-0 z-10'
       />
 
-      {/* 2) Card content (sits visually above background but *under* the link overlay by default) */}
       <div className='relative'>
         <div className='relative h-auto'>
           <Image
@@ -60,7 +56,7 @@ export default function ProductCard({
               </Suspense>
             </h4>
 
-            {/* 3) Raise the Popover trigger ABOVE the stretched link (so it’s clickable) */}
+            {/* Keep the picker above the card-wide link. */}
             <div className='relative z-20'>
               {_id && (
                 <SizeAndColorSelectorPopover

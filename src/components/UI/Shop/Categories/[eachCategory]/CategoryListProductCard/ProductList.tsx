@@ -1,41 +1,20 @@
-'use client';
-
-import { useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import ProductCard, { type CategoryProductCardData } from './ProductCard';
-import Skeleton from './Skeleton';
-import { Button } from '@/components/UI/primitives/button';
+import RefreshProductsButton from './RefreshProductsButton';
 
 export default function ProductList({
-  count,
   initialData,
 }: {
-  count: number;
   initialData: CategoryProductCardData[];
 }) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-
   return (
     <>
       <div className='mt-8 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 min-[900px]:grid-cols-3 xl:!grid-cols-4 gap-6'>
-        {isPending && !initialData.length ? (
-          <Skeleton count={count} />
-        ) : (
-          initialData.map((product, index) => (
-            <ProductCard key={product._id} product={product} priority={index === 0} />
-          ))
-        )}
+        {initialData.map((product, index) => (
+          <ProductCard key={product._id} product={product} priority={index === 0} />
+        ))}
       </div>
 
-      <Button
-        name='Refresh Products Button'
-        onClick={() => startTransition(() => router.refresh())}
-        disabled={isPending}
-        className='px-4 py-2 bg-[#0066CC] text-white mx-auto rounded hover:bg-blue-700 disabled:opacity-50'
-      >
-        {isPending ? 'Refreshing...' : 'Refresh Products'}
-      </Button>
+      <RefreshProductsButton />
     </>
   );
 }

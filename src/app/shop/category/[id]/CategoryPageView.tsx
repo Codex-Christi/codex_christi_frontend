@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import dynamic from 'next/dynamic';
 import { notFound } from 'next/navigation';
 import { fetchCategoryProducts, getCategoryMetadataFromMerchize } from './categoryDetailsSSR';
 import { getShopSiteUrl } from '@/lib/siteBaseUrls';
@@ -14,15 +13,8 @@ import { recordShopMetadataSource } from '@/lib/shop/seoManifest/metadataObserva
 import { coerceMerchizeProviderError } from '@/lib/merchizeStorefront/providerErrors';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 import type { CategoryProductCardData } from '@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/ProductCard';
-
-const ProductList = dynamic(
-  () =>
-    import('@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/ProductList'),
-);
-const PaginationControls = dynamic(
-  () =>
-    import('@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/PaginationControls'),
-);
+import ProductList from '@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/ProductList';
+import PaginationControls from '@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/PaginationControls';
 
 export const CATEGORY_PAGE_SIZE = 15;
 const SHOP_SITE_NAME = 'Codex Christi Shop';
@@ -242,7 +234,7 @@ export default async function CategoryPageView({
   const { products, totalPages } = pageData.initialProductFetchResp;
   if (page > 1 && page > totalPages) notFound();
 
-  // Keep full supplier records on the server; only card fields belong in client props.
+  // Keep listing cards limited to the display fields they need.
   const cardProducts: CategoryProductCardData[] = products.map(
     ({ _id, title, slug, image, retail_price }) => ({ _id, title, slug, image, retail_price }),
   );
@@ -257,7 +249,7 @@ export default async function CategoryPageView({
       <main className='px-8 pt-7 flex flex-col gap-16 mb-10'>
         {products.length > 0 ? (
           <>
-            <ProductList count={productLimit} initialData={cardProducts} />
+            <ProductList initialData={cardProducts} />
             <PaginationControls currentPage={page} category={categoryName} totalPages={totalPages} />
           </>
         ) : (
