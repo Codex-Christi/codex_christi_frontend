@@ -7,7 +7,7 @@ import type {
   BasicProductInterface,
   ProductVariantsInterface,
 } from '@/lib/merchizeStorefront/productTypes';
-import { imagePreventDefaults } from './galleryShared';
+import { imagePreventDefaults, mainGalleryImageProps } from './galleryShared';
 import { useCurrentVariant } from '../currentVariantStore';
 import { resolveProductGalleryImages } from './galleryImageUrls';
 import styles from '../ProductDetails.module.css';
@@ -87,16 +87,14 @@ function ProductImageGalleryPreview({
             {firstImageSrc ? (
               <Image
                 {...imagePreventDefaults}
+                {...mainGalleryImageProps}
                 priority
                 fetchPriority='high'
                 loading='eager'
-                decoding='async'
                 className={styles.mediaFill}
                 fill
                 src={firstImageSrc}
                 alt={title}
-                sizes='(max-width: 640px) calc(100vw - 50px), (max-width: 1024px) 620px, (min-width: 1280px) 640px, 600px'
-                quality={80}
               />
             ) : (
               <div className='grid size-full place-items-center text-sm text-white/60'>

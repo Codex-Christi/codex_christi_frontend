@@ -10,6 +10,7 @@ import {
   LoadingOverlay,
   type ImageListLoaderReturnType,
   imagePreventDefaults,
+  mainGalleryImageProps,
 } from './galleryShared';
 import Image from 'next/image';
 import { GalleryPrevButton } from '../GalleryPrevButton';
@@ -67,16 +68,14 @@ function MainStage({
                   {shouldRenderImage ? (
                     <Image
                       {...imagePreventDefaults}
+                      {...mainGalleryImageProps}
                       priority={i === 0}
                       fetchPriority={i === 0 ? 'high' : 'low'}
                       loading={i === 0 ? 'eager' : 'lazy'}
-                      decoding={i === 0 ? 'sync' : 'async'}
                       className={styles.mediaFill}
                       fill
                       src={loader.srcWithRetry(src, i)}
                       alt={metaTitle || 'Product image'}
-                      sizes='(max-width: 640px) calc(100vw - 50px), (max-width: 1024px) 620px, (min-width: 1280px) 640px, 600px'
-                      quality={75}
                       onLoad={() => loader.markLoaded(i, src)}
                       onError={() => loader.markFailed(i)}
                     />

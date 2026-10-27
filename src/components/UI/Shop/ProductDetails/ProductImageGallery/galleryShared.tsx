@@ -1,5 +1,12 @@
 import type { SyntheticEvent } from 'react';
 
+export const mainGalleryImageProps = {
+  quality: 80,
+  sizes:
+    '(max-width: 640px) calc(100vw - 50px), (max-width: 1024px) 620px, (min-width: 1280px) 640px, 600px',
+  decoding: 'async',
+} as const;
+
 export const imagePreventDefaults = {
   onContextMenu: (e: SyntheticEvent) => e.preventDefault(),
   onDragStart: (e: SyntheticEvent) => e.preventDefault(),
