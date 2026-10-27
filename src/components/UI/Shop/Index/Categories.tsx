@@ -2,7 +2,7 @@ import Image from 'next/image';
 import { categoriesObj } from '@/lib/utils/shopHomePageProductsData';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import GlobalProductPrice from '../GlobalShopComponents/GlobalProductPrice';
-import CountryDropdownClientFloating from './CountryDropDownClientFloating';
+import DeferredFloatingCountryDropdown from './DeferredFloatingCountryDropdown';
 
 const Categories = () => {
   const imageQuality = 50;
@@ -60,7 +60,7 @@ const Categories = () => {
         ))}
       </div>
 
-      <CountryDropdownClientFloating initialIso3='USA' />
+      <DeferredFloatingCountryDropdown initialIso3='USA' />
     </div>
   );
 };

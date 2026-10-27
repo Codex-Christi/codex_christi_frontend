@@ -9,7 +9,15 @@ export const useAmIOnShopRoute = (givenPath?: string) => {
   }, [givenPath]);
 
   return useMemo(
-    () => ({ youAreOnDesiredShopRoute: pathToCheck === pathname }),
+    () => {
+      // The shop homepage is public at / and also available at /shop on the parent site.
+      const homePaths = ['/', '/shop', '/shop/'];
+      return {
+        youAreOnDesiredShopRoute:
+          pathToCheck === pathname ||
+          (homePaths.includes(pathToCheck) && homePaths.includes(pathname)),
+      };
+    },
     [pathToCheck, pathname],
   );
 };

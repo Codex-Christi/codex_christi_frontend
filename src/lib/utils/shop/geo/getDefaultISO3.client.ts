@@ -1,16 +1,11 @@
 'use client';
 
 import Cookies from 'js-cookie';
-import { countries } from 'country-data-list';
+import { getCountryISO3FromISO2 } from './storefrontCountryIndex';
 import {
   CURRENCY_COOKIE,
   parseCurrencyCookie,
 } from '../globalFXProductPrice/cookies/currencyCookie';
-
-function iso2ToIso3(iso2: string): string | null {
-  const hit = countries.all.find((c) => c.alpha2?.toUpperCase() === iso2.toUpperCase());
-  return hit?.alpha3?.toUpperCase() ?? null;
-}
 
 function detectISO2FromNavigator(): string | null {
   const lang = (navigator.languages?.[0] || navigator.language || '').toUpperCase();
@@ -31,7 +26,7 @@ export function getDefaultISO3(): string {
   // 2) navigator locale → ISO2 → ISO3
   const iso2 = detectISO2FromNavigator();
   if (iso2) {
-    const iso3 = iso2ToIso3(iso2);
+    const iso3 = getCountryISO3FromISO2(iso2);
     if (iso3) return iso3;
   }
 
