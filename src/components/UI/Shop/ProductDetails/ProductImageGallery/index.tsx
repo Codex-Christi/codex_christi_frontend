@@ -9,7 +9,7 @@ import type {
 } from '@/lib/merchizeStorefront/productTypes';
 import { imagePreventDefaults, mainGalleryImageProps } from './galleryShared';
 import { useCurrentVariant } from '../currentVariantStore';
-import { resolveProductGalleryImages } from './galleryImageUrls';
+import { resolveProductGalleryImages } from '@/lib/merchizeStorefront/imageUrls';
 import styles from '../ProductDetails.module.css';
 
 type ProductImageGalleryProps = {

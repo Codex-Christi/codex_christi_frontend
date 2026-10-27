@@ -44,12 +44,22 @@ loaded after client navigation, so this mainly saves the first browsing download
 | Option selection behavior | [VariantAttributeSelector.tsx](../src/components/UI/Shop/ProductDetails/VariantAttributeSelector.tsx) |
 | Radio-button and loading-placeholder appearance | [RadioButtonGroupWithText.tsx](../src/components/UI/Shop/ProductDetails/RadioButtonGroupWithText.tsx) |
 | Product-gallery image settings | [galleryShared.tsx](../src/components/UI/Shop/ProductDetails/ProductImageGallery/galleryShared.tsx) |
+| Product image source and fallback order | [imageUrls.ts](../src/lib/merchizeStorefront/imageUrls.ts): `resolveProductGalleryImages()` |
 
 `getProductOptionGroups()` groups variant options in one pass for both product
 details and the category quick-selection popover. It preserves the original
 selection objects, group order, and latest metadata for duplicate values.
 `getProductOptionLayout()` turns those groups into display labels for the
 server's loading layout. Neither function decides price or availability.
+
+Product pages show not-found only for confirmed supplier 404/410 responses.
+Temporary failures use a retry screen, or an existing snapshot when available.
+Supplier reads have a 15-second deadline; ISR remains unchanged.
+
+One image resolver serves live data, snapshots, and the gallery. Saved variant
+photos and usable API galleries come first. Known local artwork is only a last
+resort, never a replacement for usable Merchize model photos. Saved images are
+for display only and cannot enable purchases or authorize checkout.
 
 The About page stays a small composition of hero, content, navigation, and footer.
 `AboutHero` is a Server Component, not an extra client-side widget. Its flow height

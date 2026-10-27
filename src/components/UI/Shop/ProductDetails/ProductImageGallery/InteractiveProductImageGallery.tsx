@@ -10,7 +10,10 @@ import MainStage from './MainStage';
 import { type CarouselApi } from '@/components/UI/primitives/carousel';
 import { useLightboxHistory } from './useLightBoxHistory';
 import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
-import { getVariantGalleryImageUrls, resolveProductGalleryImages } from './galleryImageUrls';
+import {
+  getVariantGalleryImageUrls,
+  resolveProductGalleryImages,
+} from '@/lib/merchizeStorefront/imageUrls';
 import styles from '../ProductDetails.module.css';
 
 const ProductLightbox = dynamic(() => import('./ProductLightbox'), { ssr: false });

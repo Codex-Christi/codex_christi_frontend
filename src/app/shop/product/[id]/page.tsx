@@ -9,7 +9,10 @@ import {
   getBasicProductFromSnapshot,
   getProductVariantsFromSnapshot,
 } from '@/lib/merchizeStorefront/snapshot';
-import { fetchMerchizeJson } from '@/lib/merchizeStorefront/providerErrors';
+import {
+  coerceMerchizeProviderError,
+  fetchMerchizeJson,
+} from '@/lib/merchizeStorefront/providerErrors';
 import type { BasicProductInterface } from '@/lib/merchizeStorefront/productTypes';
 import {
   ProductDescriptionSection,
@@ -20,11 +23,9 @@ import { getPublishedShopProductPreview } from '@/lib/utils/shopHomePageProducts
 import { readProductSeoManifestEntry } from '@/lib/shop/seoManifest/read';
 import type { ProductSeoManifestEntry } from '@/lib/shop/seoManifest/types';
 import { recordShopMetadataSource } from '@/lib/shop/seoManifest/metadataObservability';
-import {
-  toMerchizeProductPreviewUrl,
-  toMerchizeThumbnailUrl,
-} from '@/lib/merchizeStorefront/imageUrls';
+import { resolveProductGalleryImages } from '@/lib/merchizeStorefront/imageUrls';
 import { getProductOptionLayout } from '@/lib/merchizeStorefront/productOptionLayout';
+import { STRICT_STOREFRONT_PROVIDER_TIMEOUT_MS } from '@/lib/merchizeStorefront/strictLiveProduct';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -39,10 +40,8 @@ export async function generateStaticParams() {
 }
 
 function resolveProductImageUrl(image: string | undefined | null) {
-  if (!image) return undefined;
-  if (image.startsWith('/')) return getShopSiteUrl(image);
-  const previewUrl = toMerchizeProductPreviewUrl(image);
-  return toMerchizeThumbnailUrl(previewUrl) || previewUrl || undefined;
+  const url = resolveProductGalleryImages({ metadata: { image } })[0];
+  return url?.startsWith('/') ? getShopSiteUrl(url) : url;
 }
 
 function getSnapshotMissProductMetadata(productId: string): Metadata {
@@ -157,6 +156,7 @@ async function getDevLiveProductMetadata(productId: string) {
           'X-API-KEY': `${merchizeAPIKey}`,
         },
       },
+      { timeoutMs: STRICT_STOREFRONT_PROVIDER_TIMEOUT_MS },
     );
     return assertBasicStorefrontProductData(json.data, `Merchize product ${productId}`);
   } catch (error) {
@@ -244,28 +244,27 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return getSnapshotMissProductMetadata(id);
 }
 
-// ✅ 2. Main component for the product details page
 const ProductDetails = async ({ params }: PageProps) => {
   const { id: productID } = await params;
 
-  const productMetaData = await getProductMetaDataOnly(productID)
-    .then((data) => data)
-    .catch((error) => {
-      console.error('Error fetching product details:', error);
-      return notFound(); // or handle the error as needed
-    });
+  const [productMetaData, displayVariants] = await Promise.all([
+    getProductMetaDataOnly(productID).catch((error) => {
+      if (coerceMerchizeProviderError(error)?.kind === 'not_found') notFound();
+      throw error;
+    }),
+    getProductVariantsFromSnapshot(productID).catch(() => null),
+  ]);
 
   const { description, title, retail_price } = productMetaData;
-  const optionLayoutHints = await getProductVariantsFromSnapshot(productID)
-    .then((variants) => getProductOptionLayout(variants ?? []))
-    .catch(() => []);
+  const optionLayoutHints = getProductOptionLayout(displayVariants ?? []);
 
-  const productData = {
-    productMetaData,
-    productVariants: [],
-  };
-  const firstImageUrl = resolveProductImageUrl(productMetaData.image);
-  const initialImageUrls = firstImageUrl ? [firstImageUrl] : [];
+  // Saved images are display hints only; purchase options still require live verification.
+  const initialImageUrls = resolveProductGalleryImages({
+    metadata: productMetaData,
+    variants: displayVariants,
+    fallbackImageUrl: getPublishedShopProductPreview(productID)?.imagePath,
+  });
+  const firstImageUrl = resolveProductImageUrl(initialImageUrls[0]);
   const clientProductMetaData = {
     ...productMetaData,
     description: '',
@@ -298,7 +297,7 @@ const ProductDetails = async ({ params }: PageProps) => {
     <>
       <ProductDetailsShell
         productId={productID}
-        fetchedProductData={{ ...productData, productMetaData: clientProductMetaData }}
+        fetchedProductData={{ productMetaData: clientProductMetaData, productVariants: [] }}
         initialImageUrls={initialImageUrls}
         optionLayoutHints={optionLayoutHints}
         descriptionSection={<ProductDescriptionSection description={description} />}

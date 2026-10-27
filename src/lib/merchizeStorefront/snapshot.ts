@@ -5,12 +5,7 @@ import type {
   ProductResult,
   ProductVariantsInterface,
 } from '@/lib/merchizeStorefront/productTypes';
-import {
-  firstStringValue,
-  toMerchizeImageUrl,
-  toMerchizeProductPreviewUrl,
-  toMerchizeThumbnailUrl,
-} from '@/lib/merchizeStorefront/imageUrls';
+import { resolveProductGalleryImages } from '@/lib/merchizeStorefront/imageUrls';
 import { getCategoryPagePath } from '@/lib/utils/shop/categoryPagePath';
 
 type BasicProductData = BasicProductInterface['data'];
@@ -177,28 +172,14 @@ function toBasicProductData(snapshot: {
     _id: snapshot.merchizeProductId,
     title: snapshot.title ?? 'Product',
     description: snapshot.description ?? '',
-    image: getVariantPreviewImage(snapshot.variantsJson) ?? toMerchizeImageUrl(snapshot.image),
+    image:
+      resolveProductGalleryImages({
+        metadata: { ...rawProduct, image: snapshot.image },
+        variants: isProductVariantsData(snapshot.variantsJson) ? snapshot.variantsJson : null,
+      })[0] ?? '',
     retail_price: String(snapshot.retailPrice ?? 0),
     slug: snapshot.slug ?? snapshot.merchizeProductId,
   };
-}
-
-function getProductImageFromRawProduct(product: BasicProductData) {
-  const galleryImage = firstStringValue((product as { gallery_uris?: unknown }).gallery_uris);
-  return galleryImage
-    ? toMerchizeThumbnailUrl(galleryImage)
-    : toMerchizeProductPreviewUrl(product.image);
-}
-
-function getVariantPreviewImage(variantsJson: unknown) {
-  if (!isProductVariantsData(variantsJson)) return null;
-
-  const previewVariant =
-    variantsJson.find((variant) => firstStringValue(variant.image_uris) && variant.is_default) ??
-    variantsJson.find((variant) => firstStringValue(variant.image_uris));
-  const imageUri = firstStringValue(previewVariant?.image_uris);
-
-  return imageUri ? toMerchizeThumbnailUrl(imageUri) : null;
 }
 
 function isProductVariantsData(value: unknown): value is ProductVariantsData {
@@ -236,6 +217,7 @@ export async function upsertStorefrontProductSnapshot(
   });
 
   if (!opts.force && isFresh(existing?.lastProductFetchAt, now)) return;
+  const image = resolveProductGalleryImages({ metadata: validProduct })[0] ?? null;
 
   await merchizeCatalogPrisma.storefrontProductSnapshot.upsert({
     where: { merchizeProductId: validProduct._id },
@@ -244,7 +226,7 @@ export async function upsertStorefrontProductSnapshot(
       slug: validProduct.slug ?? null,
       title: validProduct.title ?? null,
       description: validProduct.description ?? null,
-      image: getProductImageFromRawProduct(validProduct) || null,
+      image,
       retailPrice,
       rawProductJson: toJsonValue(validProduct),
       lastSeenAt: now,
@@ -254,7 +236,7 @@ export async function upsertStorefrontProductSnapshot(
       slug: validProduct.slug ?? null,
       title: validProduct.title ?? null,
       description: validProduct.description ?? null,
-      image: getProductImageFromRawProduct(validProduct) || null,
+      image,
       retailPrice,
       rawProductJson: toJsonValue(validProduct),
       lastSeenAt: now,
@@ -281,6 +263,7 @@ export async function upsertStorefrontProductVariantsSnapshot(
   });
 
   if (!opts.force && isFresh(existing?.lastVariantsFetchAt, now)) return;
+  const image = resolveProductGalleryImages({ variants })[0];
 
   await merchizeCatalogPrisma.storefrontProductSnapshot.upsert({
     where: { merchizeProductId: parentProductId },
@@ -289,9 +272,7 @@ export async function upsertStorefrontProductVariantsSnapshot(
       slug: parentProductId === productIDorSlug ? null : productIDorSlug,
       title: defaultVariant.title ?? null,
       description: '',
-      image: defaultVariant.image_uris?.[0]
-        ? toMerchizeThumbnailUrl(defaultVariant.image_uris[0])
-        : null,
+      image: image ?? null,
       retailPrice: parseRetailPrice(defaultVariant.retail_price),
       variantsJson: toJsonValue(variants),
       variantCount: variants.length,
@@ -299,9 +280,7 @@ export async function upsertStorefrontProductVariantsSnapshot(
       lastVariantsFetchAt: now,
     },
     update: {
-      image: defaultVariant.image_uris?.[0]
-        ? toMerchizeThumbnailUrl(defaultVariant.image_uris[0])
-        : undefined,
+      image,
       variantsJson: toJsonValue(variants),
       variantCount: variants.length,
       lastSeenAt: now,

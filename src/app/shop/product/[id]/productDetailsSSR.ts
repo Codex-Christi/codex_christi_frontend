@@ -1,4 +1,3 @@
-// utils/getProductDetailsSSR.ts
 import { cache } from 'react';
 import {
   fetchMerchizeJson,
@@ -13,9 +12,9 @@ import {
 } from '@/lib/merchizeStorefront/snapshot';
 import type { BasicProductInterface, ProductResult } from '@/lib/merchizeStorefront/productTypes';
 import { resolveProviderStorefrontProductCompatibility } from '@/lib/merchizeStorefront/currentProductLineCompatibility';
+import { STRICT_STOREFRONT_PROVIDER_TIMEOUT_MS } from '@/lib/merchizeStorefront/strictLiveProduct';
+import { resolveProductGalleryImages } from '@/lib/merchizeStorefront/imageUrls';
 
-// --- Env Config ---
-// const merchizeToken = process.env.MERCHIZE_TOKEN!;
 export const merchizeBaseURL = process.env.MERCHIZE_BASE_URL!;
 export const merchizeAPIKey = process.env.MERCHIZE_API_KEY!;
 
@@ -27,51 +26,56 @@ export const storefrontSnapshotCacheSeconds = () => {
 };
 
 // --- Fetch Base Product Info ---
-export const fetchBaseProduct = cache((externalProductID: string, forceRefresh = false) => {
-  return (async () => {
-    const snapshot = await getBasicProductSnapshotState(externalProductID).catch((err) => {
-      console.warn('[storefrontSnapshot] product snapshot read failed:', err);
-      return null;
-    });
-    if (!forceRefresh && snapshot?.isFresh) {
-      return snapshot.product;
-    }
+export const fetchBaseProduct = cache(async (externalProductID: string, forceRefresh = false) => {
+  const snapshot = await getBasicProductSnapshotState(externalProductID).catch((err) => {
+    console.warn('[storefrontSnapshot] product snapshot read failed:', err);
+    return null;
+  });
+  if (!forceRefresh && snapshot?.isFresh) {
+    return snapshot.product;
+  }
 
-    try {
-      const json = await fetchMerchizeJson<BasicProductInterface>(
-        `${merchizeBaseURL}/product/products/${externalProductID}`,
-        {
-          headers: {
-            'X-API-KEY': `${merchizeAPIKey}`,
-            // Authorization: `Bearer ${merchizeToken}`,
-          },
-          ...(forceRefresh
-            ? { cache: 'no-store' as const }
-            : { next: { revalidate: storefrontSnapshotCacheSeconds() } }),
+  try {
+    const json = await fetchMerchizeJson<BasicProductInterface>(
+      `${merchizeBaseURL}/product/products/${externalProductID}`,
+      {
+        headers: {
+          'X-API-KEY': `${merchizeAPIKey}`,
         },
-      );
+        ...(forceRefresh
+          ? { cache: 'no-store' as const }
+          : { next: { revalidate: storefrontSnapshotCacheSeconds() } }),
+      },
+      { timeoutMs: STRICT_STOREFRONT_PROVIDER_TIMEOUT_MS },
+    );
 
-      const product = assertBasicStorefrontProductData(
-        json.data,
-        `Merchize product ${externalProductID}`,
-      );
+    const product = assertBasicStorefrontProductData(
+      json.data,
+      `Merchize product ${externalProductID}`,
+    );
 
-      await upsertStorefrontProductSnapshot(product, { force: forceRefresh }).catch((err) => {
-        if (forceRefresh) throw err;
-        console.warn('[storefrontSnapshot] product snapshot upsert failed:', err);
-      });
-
-      return { ...product };
-    } catch (err) {
+    await upsertStorefrontProductSnapshot(product, { force: forceRefresh }).catch((err) => {
       if (forceRefresh) throw err;
-      if (!shouldUseStorefrontSnapshot(err) && !isInvalidStorefrontProductPayloadError(err)) {
-        throw err;
-      }
+      console.warn('[storefrontSnapshot] product snapshot upsert failed:', err);
+    });
 
-      if (!snapshot) throw err;
-      return snapshot.product;
+    return {
+      ...product,
+      image:
+        resolveProductGalleryImages({
+          metadata: product,
+          fallbackImageUrl: snapshot?.product.image,
+        })[0] ?? '',
+    };
+  } catch (err) {
+    if (forceRefresh) throw err;
+    if (!shouldUseStorefrontSnapshot(err) && !isInvalidStorefrontProductPayloadError(err)) {
+      throw err;
     }
-  })();
+
+    if (!snapshot) throw err;
+    return snapshot.product;
+  }
 });
 
 const fetchLiveProductVariantCompatibility = cache((productIDorSlug: string) =>
@@ -114,10 +118,6 @@ export const getProductDetailsSSR = cache(
   },
 );
 
-// --- Metadata-Only Fetch ---
-export const getProductMetaDataOnly = cache(
-  async (productIDorSlug: string): Promise<BasicProductInterface['data']> => {
-    // const { external_product_id, image, slug } = await fetchExternalProductID(productIDorSlug);
-    return fetchBaseProduct(productIDorSlug);
-  },
-);
+export const getProductMetaDataOnly: (
+  productIDorSlug: string,
+) => Promise<BasicProductInterface['data']> = fetchBaseProduct;
