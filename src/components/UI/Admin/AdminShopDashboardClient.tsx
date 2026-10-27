@@ -179,10 +179,10 @@ function getImplementedShopMetricCards({
       tone: paypalWebhookAttentionCount ? 'amber' : 'emerald',
     },
     {
-      title: 'Storefront Data Health',
+      title: 'Storefront Health',
       metric: 'Open',
-      caption: 'catalog, snapshots, SEO',
-      action: 'Open Data Health',
+      caption: 'availability, delivery, search previews',
+      action: 'Open Storefront Health',
       href: '/admin/shop/storefront-data-health',
       icon: Store,
       state: 'ready',

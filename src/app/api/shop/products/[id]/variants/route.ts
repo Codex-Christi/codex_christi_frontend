@@ -1,5 +1,6 @@
 // app/api/shop/products/[id]/variants/route.ts
-import { fetchCurrentProductVariantCompatibility } from '@/app/shop/product/[id]/productDetailsSSR';
+import { verifyProductForDestination } from '@/lib/merchizeStorefront/productDestinationVerification';
+import { normalizeCountryToIso3 } from '@/lib/utils/shop/checkout/normalizeCountryToIso3';
 import { merchizeErrorStatus } from '@/lib/merchizeStorefront/providerErrors';
 import { NextResponse } from 'next/server';
 
@@ -7,15 +8,19 @@ type Params = Promise<{ id: string }>;
 
 export async function GET(req: Request, ctx: { params: Params }) {
   const { id } = await ctx.params; // ✅ await params
-  void req;
-
-  try {
-    const compatibility = await fetchCurrentProductVariantCompatibility(id);
-    const verificationIncomplete = compatibility.results.some(
-      (result) => result.status === 'unverified',
+  const rawCountry = new URL(req.url).searchParams.get('country') ?? 'USA';
+  const country = normalizeCountryToIso3(rawCountry);
+  if (!country)
+    return NextResponse.json(
+      { error: 'Choose a valid delivery country.' },
+      { status: 400, headers: { 'Cache-Control': 'private, no-store' } },
     );
 
-    if (verificationIncomplete && compatibility.sellableVariants.length === 0) {
+  try {
+    const result = await verifyProductForDestination(id, country);
+    const verificationIncomplete = result.check.unverifiedCount > 0;
+
+    if (verificationIncomplete && result.variants.length === 0) {
       return NextResponse.json(
         { error: 'Product availability could not be verified. Please try again.' },
         {
@@ -27,7 +32,9 @@ export async function GET(req: Request, ctx: { params: Params }) {
 
     return NextResponse.json(
       {
-        data: compatibility.sellableVariants,
+        data: result.variants,
+        countryName: result.countryName,
+        unavailabilityReason: result.reason,
         verificationIncomplete,
       },
       {
@@ -37,9 +44,13 @@ export async function GET(req: Request, ctx: { params: Params }) {
       },
     );
   } catch (err) {
+    console.warn('[shop.productOptions] supplier verification failed', {
+      productId: id,
+      status: merchizeErrorStatus(err),
+    });
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
-      { status: merchizeErrorStatus(err) },
+      { error: 'Options are temporarily unavailable. Please try again shortly.' },
+      { status: merchizeErrorStatus(err), headers: { 'Cache-Control': 'private, no-store' } },
     );
   }
 }

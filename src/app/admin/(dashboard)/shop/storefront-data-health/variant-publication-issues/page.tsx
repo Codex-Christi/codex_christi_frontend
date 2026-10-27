@@ -12,7 +12,7 @@ type VariantPublicationIssuesAdminPageProps = {
 };
 
 export const metadata: Metadata = {
-  title: 'Variant Publication Issues | Codex Christi Admin',
+  title: 'Product Options Needing Attention | Codex Christi Admin',
   description: 'Detailed Merchize variant publication compatibility incidents and repair evidence.',
 };
 
@@ -28,18 +28,19 @@ export default async function VariantPublicationIssuesAdminPage({
     returnPath: ROUTE,
   });
 
-  const queue = await getVariantPublicationIssueQueue(requestedPage);
+  const productId = typeof params.product === 'string' ? params.product : undefined;
+  const queue = await getVariantPublicationIssueQueue(requestedPage, productId);
 
   return (
     <div className='px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-5'>
       <section className='mx-auto max-w-[1600px] space-y-4' aria-labelledby='page-title'>
         <Link
           href='/admin/shop/storefront-data-health'
-          aria-label='Return to storefront data health'
+          aria-label='Return to storefront health'
           className='inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-200 transition hover:border-cyan-300/30 hover:text-cyan-100'
         >
           <ArrowLeft size={14} aria-hidden='true' />
-          Storefront data health
+          Storefront Health
         </Link>
 
         <header>
@@ -47,11 +48,11 @@ export default async function VariantPublicationIssuesAdminPage({
             Merchize catalog operations
           </p>
           <h2 id='page-title' className='mt-2 text-xl font-semibold text-white sm:text-2xl'>
-            Variant publication issues
+            Product Options Needing Attention
           </h2>
           <p className='mt-2 max-w-3xl text-sm leading-6 text-slate-400'>
-            Review the complete manual-repair queue and the supplier evidence captured for each
-            storefront variant. Catalog statistics and SKU lookup remain on the data-health page.
+            Saved option problems and their supplier evidence. Repair the product in Merchize, then
+            recheck it from Storefront Health.
           </p>
         </header>
 

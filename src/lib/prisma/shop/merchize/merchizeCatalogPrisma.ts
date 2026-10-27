@@ -43,7 +43,10 @@ function ensureCatalogDbDirectory(dbUrl: ':memory:' | (string & {})) {
 declare global {
   // Re-use the client between HMR reloads in dev
   var merchizeCatalogPrisma: PrismaClient | undefined;
+  var merchizeCatalogPrismaSchemaRevision: string | undefined;
 }
+
+const CATALOG_SCHEMA_REVISION = 'request-driven-product-and-destination-evidence-v2';
 
 let merchizeCatalogPrismaSingleton: PrismaClient | undefined;
 
@@ -52,8 +55,14 @@ function supportsCurrentCatalogSchema(client: PrismaClient) {
   // changed while `next dev` was running, discard that pre-generation client so newly added model
   // delegates are available without requiring a manual server restart.
   return (
+    globalThis.merchizeCatalogPrismaSchemaRevision === CATALOG_SCHEMA_REVISION &&
     typeof (client as unknown as Record<string, unknown>).storefrontVariantCompatibility ===
-    'object'
+      'object' &&
+    typeof (client as unknown as Record<string, unknown>).supplierCatalogProductEvidence ===
+      'object' &&
+    typeof (client as unknown as Record<string, unknown>).storefrontProductCheck === 'object' &&
+    typeof (client as unknown as Record<string, unknown>).storefrontProductDestinationCheck ===
+      'object'
   );
 }
 
@@ -78,6 +87,7 @@ export function getMerchizeCatalogPrisma() {
     const prisma = new PrismaClient({ adapter });
 
     merchizeCatalogPrismaSingleton = prisma;
+    globalThis.merchizeCatalogPrismaSchemaRevision = CATALOG_SCHEMA_REVISION;
 
     if (process.env.NODE_ENV !== 'production') {
       globalThis.merchizeCatalogPrisma = prisma;

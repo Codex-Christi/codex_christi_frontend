@@ -112,16 +112,15 @@ The alpha must support a smooth real-customer flow:
   taken-down/draft/retired/unapproved selections, but `all-variants` membership does not prove
   sellability. With a `Product` option, require one exact current product-line name plus complete
   option-map match and use the resolved supplier SKU. Without a `Product` option, require exact
-  current SKU membership from a completed supplier-catalog generation. Missing, ambiguous, partial,
+  current SKU membership from complete product-scoped supplier evidence. Missing, ambiguous, partial,
   stale, or unverified evidence fails closed; storefront and supplier SKU namespaces stay separate.
   Compatibility reads time out after 15 seconds. The same verdict fails closed at public variant
   display, add-to-cart, stale-cart hydration/revalidation, quantity increase, checkout entry, direct
   checkout, and PayPal intent creation. A stale cart row remains visible and removable but cannot be
-  increased or purchased. Base-product, `all-variants`, and current-price trust reads are strict
-  `no-store` calls; storefront snapshots remain display-only fallback. Exact product-line supplier
-  product/variant IDs and SKU must equal the completed catalog row. Strict catalog proof requires
-  both parent and variant generation IDs to equal `SyncState.lastCompletedRunId`, with bounded writes
-  and generation finalization fenced inside the active lease transaction.
+  increased or purchased. Base-product and `all-variants` trust reads are strict `no-store` calls;
+  retail prices reuse that same variants response. Storefront snapshots remain display-only
+  fallback. Exact product-line supplier IDs/SKU must equal fresh scoped catalog evidence. Expiry
+  renews only the needed supplier product; the full-sync generation is not the runtime gate.
 - Selection input remains bounded to 25 rows, 128 characters per ID, 25 units per merged line, and
   100 total units; duplicate selectors are merged/rechecked and provider work remains concurrency-
   bounded. The correction must preserve those request-amplification limits.
@@ -147,7 +146,7 @@ The alpha must support a smooth real-customer flow:
   completed PayPal capture, and a difference from the canonical total is flagged for review.
 - P0.2 preserves existing currencies and destination behavior. The snapshot and PayPal request
   contain merchandise plus shipping only; there is no tax amount or tax line.
-- The correction is locally verified: the additive local SQLite `db push` completed; a complete
+- Historical full-catalog verification: the additive local SQLite `db push` completed; a complete
   current-catalog generation contains 905 products and 19,885 variants; the pre-final live baseline
   audit returned 141 total, 138 available, 3 unavailable, and 0 unverified across 13 products; and
   the final dual-source catalog gate has six focused regressions. The full local suite passed 195/195
@@ -159,11 +158,24 @@ The alpha must support a smooth real-customer flow:
   aggregate operational condition and do not fan out into incidents. Confirmed incidents accumulate
   in the detailed Storefront Data Health admin queue. P0.2 does not add a catalog email/outbox path;
   any later outbound escalation belongs with the explicitly scoped notification work.
-- The main `/admin/shop/storefront-data-health` page keeps only compact incident counts. Detailed
-  repair evidence is isolated at
+- The main `/admin/shop/storefront-data-health` page is labeled Storefront Health and groups issues
+  by product, separately from temporary verification failures. Detailed repair evidence is isolated at
   `/admin/shop/storefront-data-health/variant-publication-issues` in responsive, collapsed-per-issue
-  rows with server-side pagination, so every open incident remains reachable while catalog statistics
-  and SKU lookup stay easy to reach. A storage failure is shown as unavailable counts, never as zero.
+  rows with product-scoped server-side pagination. Bulk catalog sync and SKU lookup are under
+  Maintenance. Product evidence now renews inline in the existing SQLite database after expiry,
+  independently of the full catalog generation, without cron or `after()`. Retail prices reuse the
+  live complete variants response. See the release guide for the additive schema deployment steps.
+  A storage failure is shown as unavailable counts, never as zero.
+- Delivery Checker (`/admin/shop/storefront-data-health/products`) starts automatic bounded checks
+  on load and country/name changes for all matching products, not only the visible page. Fresh
+  SQLite evidence appears immediately; missing/stale/unverified evidence renews through one
+  authenticated, same-origin streaming POST per batch (100 products maximum, four workers,
+  two-minute deadline). Skeletons, actual progress, Stop Checks, Retry Remaining, Refresh All,
+  and Check Live share that request path. Pagination does not restart the queue. Provider reads
+  cancel on navigation; cancellation is not persisted as a supplier outage. Shared catalog reads
+  keep their own deadline to avoid cancelling another customer's checkout. No cron, `after()`,
+  polling, full supplier traversal, or per-product Server Action/page reload is used. This remains
+  diagnostic data; canonical checkout safeguards and product/category ISR are unchanged.
 - The apparent development migration-name divergence was a lost legitimate migration file.
   Development has both the original `20260622190000_add_paypal_ledger_transaction_webhook_bindings`
   migration and the later `20260622190331_add_paypal_ledger_transaction_webhook_bindings` index
@@ -233,8 +245,8 @@ Do not jump to Merchize webhook implementation until the P0 gates in the release
   new destination allowlist.
 - Treat storefront `all-variants` rows as identity only. For variants with a `Product` option,
   require one exact current product-line name plus complete option-map match, then require its
-  supplier product ID, supplier variant ID, and SKU to match the latest completed catalog generation.
-  For variants without one, require exact current SKU membership from that completed generation.
+  supplier product ID, supplier variant ID, and SKU to match fresh product-scoped catalog evidence.
+  For variants without one, require exact current SKU membership from a complete scoped response.
 - Keep storefront and supplier IDs/SKUs in separate namespaces. Never substitute, assume equality,
   accept a fuzzy/nearest option, or treat partial provider data as positive sellability evidence.
 - Bound compatibility reads to 15 seconds and apply the same fail-closed verdict at public variant

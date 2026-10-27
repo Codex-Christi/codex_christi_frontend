@@ -29,12 +29,12 @@ function normalizeProductLookup(value: string) {
   return lookup;
 }
 
-async function fetchStrictLiveStorefrontProduct(productLookup: string) {
+async function fetchStrictLiveStorefrontProduct(productLookup: string, signal?: AbortSignal) {
   const lookup = normalizeProductLookup(productLookup);
   const { baseUrl, apiKey } = getStorefrontCredentials();
   const response = await fetchMerchizeJson<BasicProductInterface>(
     `${baseUrl}/product/products/${encodeURIComponent(lookup)}`,
-    { headers: { 'X-API-KEY': apiKey }, cache: 'no-store' },
+    { headers: { 'X-API-KEY': apiKey }, cache: 'no-store', signal },
     { timeoutMs: STRICT_STOREFRONT_PROVIDER_TIMEOUT_MS },
   );
   const product = assertBasicStorefrontProductData(response.data, `Merchize product ${lookup}`);
@@ -44,12 +44,12 @@ async function fetchStrictLiveStorefrontProduct(productLookup: string) {
   return product;
 }
 
-async function fetchStrictLiveStorefrontVariants(productLookup: string) {
+async function fetchStrictLiveStorefrontVariants(productLookup: string, signal?: AbortSignal) {
   const lookup = normalizeProductLookup(productLookup);
   const { baseUrl, apiKey } = getStorefrontCredentials();
   const response = await fetchMerchizeJson<unknown>(
     `${baseUrl}/product/products/${encodeURIComponent(lookup)}/all-variants`,
-    { headers: { 'X-API-KEY': apiKey }, cache: 'no-store' },
+    { headers: { 'X-API-KEY': apiKey }, cache: 'no-store', signal },
     { timeoutMs: STRICT_STOREFRONT_PROVIDER_TIMEOUT_MS },
   );
   return parseStorefrontAllVariantsResponse(response);
@@ -61,10 +61,11 @@ async function fetchStrictLiveStorefrontVariants(productLookup: string) {
  */
 export async function fetchStrictLiveStorefrontProductDetails(
   productLookup: string,
+  signal?: AbortSignal,
 ): Promise<StrictLiveStorefrontProductDetails> {
   const [product, variants] = await Promise.all([
-    fetchStrictLiveStorefrontProduct(productLookup),
-    fetchStrictLiveStorefrontVariants(productLookup),
+    fetchStrictLiveStorefrontProduct(productLookup, signal),
+    fetchStrictLiveStorefrontVariants(productLookup, signal),
   ]);
 
   if (variants.some((variant) => variant.product !== product._id)) {

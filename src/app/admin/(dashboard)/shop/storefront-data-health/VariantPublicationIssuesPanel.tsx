@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
-import AdminGlassPanel from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 import type { VariantPublicationIssueQueue } from './variantPublicationIssuesData';
+import { describeStorefrontIssue } from './issuePresentation';
+import { adminGlassPanelClass } from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 
 type Props = {
   queue: VariantPublicationIssueQueue;
@@ -10,11 +11,11 @@ type Props = {
 
 export default function VariantPublicationIssuesPanel({ queue }: Props) {
   return (
-    <AdminGlassPanel className='overflow-hidden'>
+    <section className={`${adminGlassPanelClass} overflow-hidden`}>
       <div className='border-b border-white/10 px-4 py-4 sm:px-5'>
         <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
           <div>
-            <h2 className='text-base font-semibold text-white'>Variant publication issue queue</h2>
+            <h2 className='text-base font-semibold text-white'>Saved Option Problems</h2>
             <p className='mt-1 max-w-3xl text-xs leading-5 text-slate-500'>
               These storefront variants were returned by Merchize but could not be reconciled to one
               exact current production-line variant or a current supplier-catalog SKU. They are
@@ -40,7 +41,6 @@ export default function VariantPublicationIssuesPanel({ queue }: Props) {
           <dl className='mt-4 grid grid-cols-3 gap-2 text-xs sm:gap-3'>
             <IssueMetric label='Unavailable' value={queue.unavailableIssueCount} />
             <IssueMetric label='Unverified' value={queue.unverifiedIssueCount} />
-            <IssueMetric label='Resolved' value={queue.recentlyResolvedIssues.length} />
           </dl>
         ) : null}
       </div>
@@ -67,7 +67,7 @@ export default function VariantPublicationIssuesPanel({ queue }: Props) {
           {queue.openIssues.map((issue) => (
             <details key={issue.id} name='variant-publication-issue' className='group'>
               <summary className='cursor-pointer list-none px-4 py-2.5 outline-none transition hover:bg-white/[0.025] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300/50 sm:px-5 [&::-webkit-details-marker]:hidden'>
-                <div className='grid min-w-0 gap-2 min-[480px]:grid-cols-[minmax(0,1.5fr)_minmax(11rem,1fr)] min-[480px]:items-center xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_auto]'>
+                <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3'>
                   <div className='min-w-0'>
                     <div className='flex flex-wrap items-center gap-2'>
                       <span
@@ -79,11 +79,11 @@ export default function VariantPublicationIssuesPanel({ queue }: Props) {
                       >
                         {issue.status}
                       </span>
-                      <span className='min-w-0 truncate font-mono text-[10px] text-slate-500'>
-                        {issue.reasonCode}
+                      <span className='min-w-0 text-xs text-slate-400'>
+                        {describeStorefrontIssue(issue.reasonCode)}
                       </span>
                     </div>
-                    <h3 className='mt-1.5 truncate text-sm font-semibold text-white'>
+                    <h3 className='mt-1.5 text-sm font-semibold text-white'>
                       {issue.storefrontProductTitle || issue.storefrontProductId}
                     </h3>
                     <p className='mt-0.5 truncate text-xs leading-5 text-slate-400'>
@@ -91,24 +91,9 @@ export default function VariantPublicationIssuesPanel({ queue }: Props) {
                     </p>
                   </div>
 
-                  <div className='flex min-w-0 flex-wrap items-end gap-x-4 gap-y-1 min-[480px]:justify-end xl:contents'>
-                    <SummaryDetail
-                      label='Storefront SKU'
-                      value={issue.storefrontSku || 'Unavailable'}
-                      mono
-                      className='max-w-full flex-1 min-[480px]:flex-none'
-                    />
-                    <SummaryDetail
-                      label='Last observed'
-                      value={formatAdminDate(issue.lastObservedAt)}
-                      className='hidden lg:block'
-                    />
-                    <SummaryDetail
-                      label='Occurrences'
-                      value={`${issue.occurrenceCount} · episode ${issue.incidentEpisode}`}
-                    />
-                    <span className='ml-auto inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-cyan-100 min-[480px]:ml-0'>
-                      Evidence
+                  <div className='flex items-center gap-2'>
+                    <span className='inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-cyan-100'>
+                      Details
                       <ChevronDown
                         size={14}
                         aria-hidden='true'
@@ -121,6 +106,20 @@ export default function VariantPublicationIssuesPanel({ queue }: Props) {
 
               <div className='border-t border-white/10 bg-slate-950/20 px-4 py-4 sm:px-5'>
                 <dl className='grid gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4'>
+                  <CompatibilityDetail label='Technical reason' value={issue.reasonCode} mono />
+                  <CompatibilityDetail
+                    label='Storefront SKU'
+                    value={issue.storefrontSku || 'Unavailable'}
+                    mono
+                  />
+                  <CompatibilityDetail
+                    label='Last observed'
+                    value={formatAdminDate(issue.lastObservedAt)}
+                  />
+                  <CompatibilityDetail
+                    label='Occurrences'
+                    value={`${issue.occurrenceCount} · episode ${issue.incidentEpisode}`}
+                  />
                   <CompatibilityDetail label='Product ID' value={issue.storefrontProductId} mono />
                   <CompatibilityDetail label='Variant ID' value={issue.storefrontVariantId} mono />
                   <CompatibilityDetail
@@ -158,7 +157,7 @@ export default function VariantPublicationIssuesPanel({ queue }: Props) {
                   <p className='rounded-lg border border-amber-300/20 bg-amber-300/8 px-3 py-2 text-xs leading-5 text-amber-100'>
                     In Merchize, remap this storefront variant to one exact current product-line
                     variant, or delete the obsolete storefront variant. If the supplier identity
-                    changed intentionally, refresh price and shipping before rechecking. Do not
+                    changed intentionally, recheck this product from Storefront Health. Do not
                     auto-apply a fuzzy or suggested replacement.
                   </p>
                   <CustomShopLink
@@ -177,12 +176,16 @@ export default function VariantPublicationIssuesPanel({ queue }: Props) {
         </div>
       ) : !queue.storageError ? (
         <p className='px-4 py-5 text-sm text-slate-400 sm:px-5'>
-          No storefront variant currently needs manual catalog repair.
+          No saved option problems in this view. This is not a live availability guarantee.
         </p>
       ) : null}
 
       {!queue.storageError && queue.totalPages > 1 ? (
-        <IssueQueuePagination currentPage={queue.currentPage} totalPages={queue.totalPages} />
+        <IssueQueuePagination
+          currentPage={queue.currentPage}
+          totalPages={queue.totalPages}
+          productId={queue.productId}
+        />
       ) : null}
 
       {queue.recentlyResolvedIssues.length ? (
@@ -206,7 +209,7 @@ export default function VariantPublicationIssuesPanel({ queue }: Props) {
           </div>
         </details>
       ) : null}
-    </AdminGlassPanel>
+    </section>
   );
 }
 
@@ -215,10 +218,14 @@ const ISSUE_QUEUE_ROUTE = '/admin/shop/storefront-data-health/variant-publicatio
 function IssueQueuePagination({
   currentPage,
   totalPages,
+  productId,
 }: {
   currentPage: number;
   totalPages: number;
+  productId?: string;
 }) {
+  const pageHref = (page: number) =>
+    `${ISSUE_QUEUE_ROUTE}?${new URLSearchParams({ page: String(page), ...(productId ? { product: productId } : {}) })}`;
   return (
     <nav
       aria-label='Variant publication issue pages'
@@ -226,7 +233,7 @@ function IssueQueuePagination({
     >
       {currentPage > 1 ? (
         <Link
-          href={`${ISSUE_QUEUE_ROUTE}?page=${currentPage - 1}`}
+          href={pageHref(currentPage - 1)}
           className='inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 font-medium text-slate-200 transition hover:border-cyan-300/30 hover:text-cyan-100'
         >
           <ChevronLeft size={14} aria-hidden='true' />
@@ -245,7 +252,7 @@ function IssueQueuePagination({
 
       {currentPage < totalPages ? (
         <Link
-          href={`${ISSUE_QUEUE_ROUTE}?page=${currentPage + 1}`}
+          href={pageHref(currentPage + 1)}
           className='inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 font-medium text-slate-200 transition hover:border-cyan-300/30 hover:text-cyan-100'
         >
           Next
@@ -338,7 +345,7 @@ function formatVariantCompatibilityEvidence(value: unknown) {
       : null,
     presetSupplierIdentity ? `Product-line identity: ${presetSupplierIdentity}` : null,
     hasCurrentCatalogIdentity
-      ? `Completed catalog identity: ${currentCatalogIdentity || 'no matching SKU row'}`
+      ? `Verified supplier identity: ${currentCatalogIdentity || 'no matching SKU row'}`
       : null,
     storefrontOptions.length ? `Storefront options: ${storefrontOptions.join(', ')}` : null,
     candidateSummaries.length ? `Current candidate sample: ${candidateSummaries.join('; ')}` : null,
@@ -379,9 +386,7 @@ function CompatibilityDetail({
   className?: string;
 }) {
   return (
-    <div
-      className={`min-w-0 rounded-lg border border-white/10 bg-slate-950/30 px-3 py-2 ${className}`}
-    >
+    <div className={`min-w-0 ${className}`}>
       <dt className='text-[10px] uppercase tracking-[0.12em] text-slate-500'>{label}</dt>
       <dd className={`mt-1 break-words text-slate-200 ${mono ? 'font-mono text-[11px]' : ''}`}>
         {value}
@@ -390,34 +395,9 @@ function CompatibilityDetail({
   );
 }
 
-function SummaryDetail({
-  label,
-  value,
-  mono = false,
-  className = '',
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-  className?: string;
-}) {
-  return (
-    <span className={`min-w-0 ${className}`}>
-      <span className='block text-[10px] uppercase tracking-[0.12em] text-slate-500'>{label}</span>
-      <span
-        className={`mt-1 block break-words text-xs text-slate-200 ${
-          mono ? 'font-mono text-[11px]' : ''
-        }`}
-      >
-        {value}
-      </span>
-    </span>
-  );
-}
-
 function IssueMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className='rounded-lg border border-white/10 bg-white/[0.035] p-3'>
+    <div>
       <dt className='text-slate-500'>{label}</dt>
       <dd className='mt-1 truncate font-medium text-slate-100'>{value}</dd>
     </div>

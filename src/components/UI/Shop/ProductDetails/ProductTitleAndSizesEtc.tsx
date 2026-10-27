@@ -11,6 +11,7 @@ import {
   ProductVariantOptions,
 } from '@/lib/merchizeStorefront/productTypes';
 import styles from './ProductDetails.module.css';
+import CustomShopLink from '../HelperComponents/CustomShopLink';
 
 const AddToCart = dynamic(() => import('./AddToCart').then((mod) => mod.AddToCart));
 const BuyNow = dynamic(() => import('./BuyNow').then((mod) => mod.BuyNow));
@@ -20,6 +21,7 @@ const DeliveryandPaymentsBanner = dynamic(() =>
 const VariantAttributeSelector = dynamic(() =>
   import('./VariantAttributeSelector').then((mod) => mod.default),
 );
+const DeliveryCountryDropdown = dynamic(() => import('../Index/CountryDropDownClientFloating'));
 const GlobalProductPrice = dynamic(() =>
   import('../GlobalShopComponents/GlobalProductPrice').then((mod) => mod.default),
 );
@@ -100,13 +102,43 @@ const ProductTitleAndSizesEtc = () => {
             </div>
           </div>
         ) : variantsFailed ? (
-          <p className='rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-white/80'>
-            Product options could not load. Refresh the page and try again.
-          </p>
+          <div
+            role='status'
+            className='rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-white/80'
+          >
+            <p>Options are temporarily unavailable. Please try again shortly.</p>
+            <button
+              type='button'
+              onClick={productDetailsContext.retryVariants}
+              className='mt-2 underline underline-offset-4'
+            >
+              Try again
+            </button>
+          </div>
         ) : productDetailsContext.productVariants.length === 0 ? (
-          <p className='rounded-lg border border-amber-300/30 bg-amber-950/20 p-3 text-sm text-amber-100'>
-            This item has no production-ready options right now.
-          </p>
+          <div className='rounded-lg border border-white/10 p-3 text-sm text-white/80'>
+            <p>
+              {productDetailsContext.unavailabilityReason === 'shipping_unavailable'
+                ? `Unfortunately, this product isn't available for delivery to ${productDetailsContext.deliveryCountryName}.`
+                : 'This product is currently unavailable.'}
+            </p>
+            {productDetailsContext.unavailabilityReason === 'shipping_unavailable' && (
+              <fieldset className='mt-3 min-w-0'>
+                <legend className='text-sm'>Delivery country</legend>
+                <DeliveryCountryDropdown
+                  initialIso3={productDetailsContext.deliveryCountry}
+                  wrapperClassName='mt-2'
+                  classNames={{
+                    trigger:
+                      'inline-flex min-h-10 max-w-full items-center gap-2 rounded-md border border-white/20 bg-black/40 px-3 text-white',
+                  }}
+                />
+              </fieldset>
+            )}
+            <CustomShopLink href='/shop' className='mt-2 inline-block underline underline-offset-4'>
+              Browse other products
+            </CustomShopLink>
+          </div>
         ) : (
           <>
             {sizeAttrList.length > 0 && (

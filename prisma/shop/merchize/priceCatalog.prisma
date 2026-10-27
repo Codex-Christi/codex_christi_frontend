@@ -97,6 +97,54 @@ model SyncState {
   activeRunHeartbeatAt DateTime?
 }
 
+// Request-driven supplier proof is independent from whole-catalog sync generations.
+model SupplierCatalogProductEvidence {
+  id          String                           @id
+  storeScope  String
+  productSku  String
+  payloadJson Json
+  verifiedAt  DateTime
+  variants    SupplierCatalogVariantEvidence[]
+
+  @@unique([storeScope, productSku])
+}
+
+model SupplierCatalogVariantEvidence {
+  id                String                         @id
+  storeScope        String
+  sku               String
+  productEvidenceId String
+  productEvidence   SupplierCatalogProductEvidence @relation(fields: [productEvidenceId], references: [id], onDelete: Cascade)
+
+  @@unique([storeScope, sku])
+}
+
+model StorefrontProductCheck {
+  merchizeProductId   String   @id
+  title               String
+  checkedAt           DateTime
+  availableCount      Int
+  unavailableCount    Int
+  unverifiedCount     Int
+  productAvailable    Boolean
+  completed           Boolean  @default(true)
+  errorMessage        String?
+  supplierOptionsJson Json?
+}
+
+model StorefrontProductDestinationCheck {
+  merchizeProductId String
+  countryIso3       String
+  checkedAt         DateTime
+  availableCount    Int
+  unsupportedCount  Int
+  unverifiedCount   Int
+  reason            String?
+  completed         Boolean  @default(true)
+
+  @@id([merchizeProductId, countryIso3])
+}
+
 model StorefrontVariantCompatibility {
   id                     String    @id @default(cuid())
   storefrontProductId    String

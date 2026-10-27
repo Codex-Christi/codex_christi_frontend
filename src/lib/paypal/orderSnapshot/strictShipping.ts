@@ -1,5 +1,6 @@
 import type { CatalogItem } from '@/lib/datasetSearchers/merchize/catalog';
 import { iso3ToDest } from '@/lib/datasetSearchers/merchize/dest-map';
+import { selectSupplierShippingBand } from '@/lib/merchizeCatalog/shippingBands';
 
 export type StrictShippingLineInput = {
   lineId: string;
@@ -35,7 +36,18 @@ export class StrictShippingResolutionError extends Error {
 type ExtrasBySku = ReadonlyMap<string, Record<string, unknown> | undefined>;
 type ShippingPair = { first: number | null | undefined; additional: number | null | undefined };
 
-function shippingPair(row: CatalogItem, destination: ReturnType<typeof iso3ToDest>): ShippingPair {
+function shippingPair(
+  row: CatalogItem,
+  destination: ReturnType<typeof iso3ToDest>,
+  countryIso3: string,
+): ShippingPair {
+  if (row.shippingBands) {
+    const band = selectSupplierShippingBand(row.shippingBands, destination, countryIso3);
+    return {
+      first: band?.first_item ?? band?.first_item_price,
+      additional: band?.additional_item ?? band?.additional_item_price,
+    };
+  }
   switch (destination) {
     case 'US':
       return { first: row.US_shipping_fee, additional: row.US_additional_shipping_fee };
@@ -60,15 +72,16 @@ function resolveStrictBand(
   row: CatalogItem,
   destination: ReturnType<typeof iso3ToDest>,
   sku: string,
+  countryIso3: string,
 ) {
-  const direct = shippingPair(row, destination);
+  const direct = shippingPair(row, destination, countryIso3);
   if (isValidFee(direct.first) && isValidFee(direct.additional)) {
     return { first: direct.first, additional: direct.additional, usedRowFallback: false };
   }
 
   // Preserve checkout's existing region-to-ROW fallback, but never invent the historical $7/$5
   // band. A missing ROW band is an order-integrity failure.
-  const rowBand = shippingPair(row, 'ROW');
+  const rowBand = shippingPair(row, 'ROW', countryIso3);
   if (destination !== 'ROW' && isValidFee(rowBand.first) && isValidFee(rowBand.additional)) {
     return { first: rowBand.first, additional: rowBand.additional, usedRowFallback: true };
   }
@@ -166,7 +179,7 @@ export function calculateStrictShippingQuoteUsd(input: {
       );
     }
 
-    const band = resolveStrictBand(catalogRow, destination, sku);
+    const band = resolveStrictBand(catalogRow, destination, sku, input.countryIso3);
     if (band.usedRowFallback) rowFallbackSkus.push(sku);
 
     const surchargeValue = input.extrasBySku?.get(sku)?.['us_post_service_added_fee'];

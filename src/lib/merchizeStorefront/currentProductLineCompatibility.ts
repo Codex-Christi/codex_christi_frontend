@@ -1,7 +1,10 @@
 import 'server-only';
 
 import { createHash } from 'node:crypto';
-import { getCurrentCatalogVariantsBySku } from '@/lib/datasetSearchers/merchize/catalog';
+import {
+  createDemandCatalogResolver,
+  supplierEvidenceStoreScope,
+} from '@/lib/merchizeCatalog/currentEvidence';
 import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
 import { fetchMerchizeJson } from './providerErrors';
 import type { BasicProductInterface, ProductVariantsInterface } from './productTypes';
@@ -46,6 +49,7 @@ type ProductMetadata = Partial<Pick<BasicProductInterface['data'], '_id' | 'slug
 
 type CurrentCatalogBatch = {
   generationAvailable: boolean;
+  unverifiedSkus?: string[];
   variants: ProductLineSupplierIdentity[];
 };
 
@@ -55,11 +59,14 @@ export type CurrentProductLineCompatibilityDependencies = {
 };
 
 export type ResolveCurrentProductLineCompatibilityOptions = {
+  signal?: AbortSignal;
   productMetaData?: ProductMetadata;
   persist?: boolean;
   /** Scheduled/admin scans use this to fail the product scan if its incident write fails. */
   requirePersistence?: boolean;
   dependencies?: CurrentProductLineCompatibilityDependencies;
+  selectedVariantIds?: readonly string[];
+  loadProduct?: (lookup: string) => Promise<StrictLiveStorefrontProductDetails>;
 };
 
 export type CompatibilityPersistenceResult = {
@@ -142,18 +149,24 @@ function buildResult({
   };
 }
 
-function createDefaultDependencies(): CurrentProductLineCompatibilityDependencies {
+export function createStorefrontVerificationContext(
+  options: { forceRefresh?: boolean; signal?: AbortSignal } = {},
+) {
+  const catalog = createDemandCatalogResolver(options);
+  const products = new Map<string, Promise<StrictLiveStorefrontProductDetails>>();
   const presetPromises = new Map<string, Promise<CurrentProductLinePreset[]>>();
   const runPresetRequest = createConcurrencyLimiter(
     STOREFRONT_VARIANT_COMPATIBILITY_SCAN_LIMITS.maxConcurrentPresetRequests,
   );
 
-  return {
+  const dependencies: CurrentProductLineCompatibilityDependencies = {
     fetchCurrentPresets(productLineName) {
+      options.signal?.throwIfAborted();
       const existing = presetPromises.get(productLineName);
       if (existing) return existing;
 
       const request = runPresetRequest(async () => {
+        options.signal?.throwIfAborted();
         const response = await fetchMerchizeJson<unknown>(
           CURRENT_PRESET_SEARCH_URL,
           {
@@ -169,24 +182,43 @@ function createDefaultDependencies(): CurrentProductLineCompatibilityDependencie
               source_screen: 'order-detail',
             }),
             cache: 'no-store',
+            signal: options.signal,
           },
           { timeoutMs: STRICT_STOREFRONT_PROVIDER_TIMEOUT_MS },
         );
-        return parseCurrentProductLinePresetSearchResponse(response);
+        const presets = parseCurrentProductLinePresetSearchResponse(response);
+        for (const preset of presets) catalog.remember(preset);
+        return presets;
       });
       presetPromises.set(productLineName, request);
       return request;
     },
     async resolveCurrentCatalogVariants(skus) {
-      const result = await getCurrentCatalogVariantsBySku(skus);
+      options.signal?.throwIfAborted();
+      const result = await catalog.resolve(skus);
       return {
         generationAvailable: result.generationAvailable,
+        unverifiedSkus: result.unverifiedSkus,
         variants: result.variants.map((variant) => ({
           supplierProductId: variant.supplierProductId,
           supplierVariantId: variant.supplierVariantId,
           supplierSku: variant.sku,
         })),
       };
+    },
+  };
+  return {
+    signal: options.signal,
+    dependencies,
+    resolveCatalogVariants: catalog.resolve,
+    loadProduct(lookup: string) {
+      options.signal?.throwIfAborted();
+      let result = products.get(lookup);
+      if (!result) {
+        result = fetchStrictLiveStorefrontProductDetails(lookup, options.signal);
+        products.set(lookup, result);
+      }
+      return result;
     },
   };
 }
@@ -216,11 +248,12 @@ export async function resolveCurrentProductLineCompatibility(
   variants: ProductVariantsInterface['data'],
   options: ResolveCurrentProductLineCompatibilityOptions = {},
 ): Promise<CurrentProductLineCompatibilityResolution> {
+  options.signal?.throwIfAborted();
   if (variants.length > STOREFRONT_VARIANT_COMPATIBILITY_SCAN_LIMITS.maxVariantsPerProduct) {
     throw new Error('Storefront product exceeded its bounded variant compatibility limit.');
   }
   assertStorefrontVariantCompatibilityInputBounds(variants);
-  const dependencies = options.dependencies ?? createDefaultDependencies();
+  const dependencies = options.dependencies ?? createStorefrontVerificationContext().dependencies;
   const resultsByVariantId = new Map<string, StorefrontVariantCompatibilityResult>();
   const variantsWithLine = new Map<string, StorefrontVariant[]>();
   const variantsWithoutLine: StorefrontVariant[] = [];
@@ -267,6 +300,7 @@ export async function resolveCurrentProductLineCompatibility(
           );
         }
       } catch (error) {
+        options.signal?.throwIfAborted();
         console.warn('[storefrontVariantCompatibility.current_preset_failed]', {
           productLineName,
           error: error instanceof Error ? error.message : String(error),
@@ -306,8 +340,7 @@ export async function resolveCurrentProductLineCompatibility(
 
   if (catalogSkus.length) {
     try {
-      // Use one bounded lookup so both SKU-only fallbacks and preset matches are checked against
-      // the exact same completed supplier-catalog generation.
+      // Share product-scoped evidence between SKU-only fallbacks and exact preset matches.
       const catalog = await dependencies.resolveCurrentCatalogVariants(catalogSkus);
       const currentBySku = new Map(
         catalog.variants.map((variant) => [variant.supplierSku, variant]),
@@ -318,7 +351,9 @@ export async function resolveCurrentProductLineCompatibility(
           resultFromCurrentCatalogSku(
             variant,
             currentBySku.get(variant.sku.trim()) ?? null,
-            catalog.generationAvailable,
+            catalog.unverifiedSkus
+              ? !catalog.unverifiedSkus.includes(variant.sku.trim())
+              : catalog.generationAvailable,
           ),
         );
       }
@@ -328,11 +363,14 @@ export async function resolveCurrentProductLineCompatibility(
           crossCheckCurrentPresetMatchAgainstCatalog(
             result,
             result.supplierSku ? (currentBySku.get(result.supplierSku) ?? null) : null,
-            catalog.generationAvailable,
+            catalog.unverifiedSkus
+              ? !catalog.unverifiedSkus.includes(result.supplierSku ?? '')
+              : catalog.generationAvailable,
           ),
         );
       }
     } catch (error) {
+      options.signal?.throwIfAborted();
       console.warn('[storefrontVariantCompatibility.current_catalog_lookup_failed]', {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -358,6 +396,7 @@ export async function resolveCurrentProductLineCompatibility(
     }
   }
 
+  options.signal?.throwIfAborted();
   const results = variants.map(
     (variant) =>
       resultsByVariantId.get(variant._id) ??
@@ -470,8 +509,64 @@ export async function resolveProviderStorefrontProductCompatibility(
   productLookup: string,
   options: ResolveCurrentProductLineCompatibilityOptions = {},
 ): Promise<ProviderStorefrontProductCompatibilityResolution> {
-  const details = await fetchStrictLiveStorefrontProductDetails(productLookup);
-  return resolveStrictLiveProductCompatibility(details, options);
+  options.signal?.throwIfAborted();
+  const fetched = await (options.loadProduct ?? fetchStrictLiveStorefrontProductDetails)(
+    productLookup,
+  );
+  const selected = options.selectedVariantIds ? new Set(options.selectedVariantIds) : null;
+  const details = {
+    ...fetched,
+    variants: selected
+      ? fetched.variants.filter((variant) => selected.has(variant._id))
+      : fetched.variants,
+  };
+  const result = await resolveStrictLiveProductCompatibility(details, options);
+  options.signal?.throwIfAborted();
+  if (!selected && options.persist !== false) {
+    await recordProductCheck(result.productMetaData, result.compatibility.results).catch(() => {
+      console.warn('[storefrontProductCheck] summary write failed');
+    });
+  }
+  return result;
+}
+
+async function recordProductCheck(
+  product: BasicProductInterface['data'],
+  results: StorefrontVariantCompatibilityResult[],
+) {
+  const data = {
+    completed: true,
+    errorMessage: null,
+    title: product.title,
+    checkedAt: new Date(),
+    productAvailable: isMerchizeStorefrontProductAvailable(product),
+    availableCount: results.filter((r) => r.status === 'available').length,
+    unavailableCount: results.filter((r) => r.status === 'unavailable').length,
+    unverifiedCount: results.filter((r) => r.status === 'unverified').length,
+    supplierOptionsJson: {
+      storeScope: supplierEvidenceStoreScope(),
+      options: results.flatMap((result) =>
+        result.status === 'available' &&
+        result.supplierSku &&
+        result.supplierProductId &&
+        result.supplierVariantId
+          ? [
+              {
+                variantId: result.storefrontVariantId,
+                sku: result.supplierSku,
+                supplierProductId: result.supplierProductId,
+                supplierVariantId: result.supplierVariantId,
+              },
+            ]
+          : [],
+      ),
+    },
+  };
+  await merchizeCatalogPrisma.storefrontProductCheck.upsert({
+    where: { merchizeProductId: product._id },
+    create: { merchizeProductId: product._id, ...data },
+    update: data,
+  });
 }
 
 /**
@@ -496,7 +591,10 @@ export async function resolveProviderStorefrontVariantCompatibility(
     throw new Error('Storefront compatibility identity is invalid.');
   }
 
-  const providerProduct = await resolveProviderStorefrontProductCompatibility(productId, options);
+  const providerProduct = await resolveProviderStorefrontProductCompatibility(productId, {
+    ...options,
+    selectedVariantIds: [variantId],
+  });
   const trustedVariant = providerProduct.productVariants.find(
     (variant) => variant._id === variantId,
   );
@@ -538,19 +636,33 @@ async function persistCompatibilityResults(
   let incidentChanges = 0;
 
   await merchizeCatalogPrisma.$transaction(async (tx) => {
+    const existingRows = await tx.storefrontVariantCompatibility.findMany({
+      where: {
+        storefrontProductId: { in: [...new Set(results.map((r) => r.storefrontProductId))] },
+        storefrontVariantId: { in: results.map((r) => r.storefrontVariantId) },
+      },
+      select: {
+        id: true,
+        storefrontProductId: true,
+        storefrontVariantId: true,
+        status: true,
+        incidentEpisode: true,
+      },
+    });
+    const byIdentity = new Map(
+      existingRows.map((row) => [
+        JSON.stringify([row.storefrontProductId, row.storefrontVariantId]),
+        row,
+      ]),
+    );
     for (const result of results) {
       // Provider outages and incomplete evidence are request/scan health signals, not repair
       // incidents. In particular, they must not replace a durable manual-repair diagnosis.
       if (isTransientProductLineReason(result.reasonCode)) continue;
 
-      const existing = await tx.storefrontVariantCompatibility.findUnique({
-        where: {
-          storefrontProductId_storefrontVariantId: {
-            storefrontProductId: result.storefrontProductId,
-            storefrontVariantId: result.storefrontVariantId,
-          },
-        },
-      });
+      const existing =
+        byIdentity.get(JSON.stringify([result.storefrontProductId, result.storefrontVariantId])) ??
+        null;
       const mutation = planCompatibilityIncidentMutation(result, existing);
       if (mutation.action === 'none') continue;
       const providerEvidence = {
@@ -678,12 +790,12 @@ export async function scanPublishedStorefrontVariantCompatibility(
     throw new Error('Storefront compatibility scan input exceeds its bounded product limits.');
   }
 
-  const dependencies = createDefaultDependencies();
+  const { dependencies } = createStorefrontVerificationContext({ forceRefresh: true });
   const results: StorefrontVariantCompatibilityResult[] = [];
   const errors: Array<{ productId: string; message: string }> = [];
   const resolvedProducts: Array<{
     productId: string;
-    productMetaData: ProductMetadata;
+    productMetaData: BasicProductInterface['data'];
     returnedVariantIds: Set<string>;
     results: StorefrontVariantCompatibilityResult[];
   }> = [];
@@ -728,11 +840,36 @@ export async function scanPublishedStorefrontVariantCompatibility(
   );
   await Promise.all(workers);
 
+  for (const error of errors) {
+    await merchizeCatalogPrisma.storefrontProductCheck
+      .upsert({
+        where: { merchizeProductId: error.productId },
+        create: {
+          merchizeProductId: error.productId,
+          title: error.productId,
+          checkedAt: new Date(),
+          availableCount: 0,
+          unavailableCount: 0,
+          unverifiedCount: 0,
+          productAvailable: false,
+          completed: false,
+          errorMessage: 'The supplier could not be reached or returned incomplete product data.',
+        },
+        update: {
+          checkedAt: new Date(),
+          completed: false,
+          errorMessage: 'The supplier could not be reached or returned incomplete product data.',
+        },
+      })
+      .catch(() => console.warn('[storefrontProductCheck] failed check could not be recorded'));
+  }
+
   // Provider reads can run concurrently, but SQLite incident writes are intentionally serialized.
   // A product is included in the successful result set only after its incident transaction lands.
   for (const product of resolvedProducts) {
     try {
       await persistCompatibilityResults(product.results, product.productMetaData);
+      await recordProductCheck(product.productMetaData, product.results);
       autoResolvedCount += await resolveNoLongerReturnedCompatibilityRows(
         product.productId,
         product.returnedVariantIds,

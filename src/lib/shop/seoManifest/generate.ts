@@ -28,6 +28,31 @@ import {
   type ShopSeoManifestIndex,
   type ShopSeoManifestWarning,
 } from './types';
+import { readProductSeoManifestEntry, readCategorySeoManifestEntry } from './read';
+
+export async function hasChangedShopSearchPreviews() {
+  const products = buildProductEntries(await getProductSnapshotRows(), 'comparison');
+  const categories = buildCategoryEntries(await getCategorySnapshotRows(), 'comparison');
+  for (const [id, expected] of products) {
+    const actual = await readProductSeoManifestEntry(id);
+    if (
+      !actual ||
+      JSON.stringify([actual.title, actual.description, actual.image, actual.price]) !==
+        JSON.stringify([expected.title, expected.description, expected.image, expected.price])
+    )
+      return true;
+  }
+  for (const [slug, expected] of categories) {
+    const actual = await readCategorySeoManifestEntry(slug);
+    if (
+      !actual ||
+      JSON.stringify([actual.name, actual.description, actual.cover, actual.totalPages]) !==
+        JSON.stringify([expected.name, expected.description, expected.cover, expected.totalPages])
+    )
+      return true;
+  }
+  return false;
+}
 
 const DEFAULT_RETAINED_SEO_MANIFEST_GENERATIONS = 5;
 const DEFAULT_GENERATION_LOCK_STALE_MS = 15 * 60 * 1000;

@@ -7,6 +7,7 @@ import {
   Settings,
   ShoppingBag,
   Store,
+  Truck,
   Webhook,
 } from 'lucide-react';
 import type {
@@ -67,12 +68,20 @@ export const adminDashboardNavigationGroups: AdminDashboardNavigationGroup[] = [
         section: 'shop-paypal-webhooks',
       },
       {
-        title: 'Storefront Data Health',
-        description: 'Catalog, snapshots, and SEO metadata',
+        title: 'Storefront Health',
+        description: 'Product availability and search previews',
         href: '/admin/shop/storefront-data-health',
         icon: Store,
         requiredAccess: 'canAccessShopTools',
         section: 'shop-storefront-data-health',
+      },
+      {
+        title: 'Delivery Checker',
+        description: 'Product delivery by country',
+        href: '/admin/shop/storefront-data-health/products',
+        icon: Truck,
+        requiredAccess: 'canAccessShopTools',
+        section: 'shop-delivery-checker',
       },
     ],
   },
@@ -153,11 +162,20 @@ const pageConfigs: Array<[prefix: string, config: AdminDashboardPageConfig]> = [
     },
   ],
   [
+    '/admin/shop/storefront-data-health/products',
+    {
+      section: 'shop-delivery-checker',
+      title: 'Delivery Checker',
+      subtitle: 'Product images and delivery availability by country',
+      searchPlaceholder: 'Find storefront products',
+    },
+  ],
+  [
     '/admin/shop/storefront-data-health/variant-publication-issues',
     {
       section: 'shop-storefront-data-health',
-      title: 'Variant Publication Issues',
-      subtitle: 'Manual repair queue and supplier evidence for unsafe storefront variants',
+      title: 'Product Options Needing Attention',
+      subtitle: 'Saved option problems and supplier evidence',
       searchPlaceholder: 'Search product IDs, variant IDs, SKUs, issue evidence...',
     },
   ],
@@ -165,8 +183,8 @@ const pageConfigs: Array<[prefix: string, config: AdminDashboardPageConfig]> = [
     '/admin/shop/storefront-data-health',
     {
       section: 'shop-storefront-data-health',
-      title: 'Storefront Data Health',
-      subtitle: 'Merchize catalog, storefront snapshots, and SEO metadata coverage',
+      title: 'Storefront Health',
+      subtitle: 'Product availability and search previews',
       searchPlaceholder: 'Search SKUs, product titles, catalog records...',
     },
   ],

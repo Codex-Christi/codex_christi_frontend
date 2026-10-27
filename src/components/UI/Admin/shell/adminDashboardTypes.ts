@@ -8,6 +8,7 @@ export type AdminDashboardSection =
   | 'admin-security-records'
   | 'shop'
   | 'shop-storefront-data-health'
+  | 'shop-delivery-checker'
   | 'shop-paid-order-recovery'
   | 'shop-paypal-webhooks'
   | 'shop-payment-reconciliation';

@@ -3,6 +3,7 @@
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import type { CartVariant } from '@/stores/shop_stores/cartStore';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { FaAngleRight } from 'react-icons/fa6';
 import CustomShopLink from '../../HelperComponents/CustomShopLink';
@@ -15,18 +16,27 @@ type OrderSummaryProps = {
   countryIso3?: string;
   cartItemsOverride?: CartVariant[];
   checkoutBlocked?: boolean;
+  shippingUsd?: number | null;
+  quotePending?: boolean;
+  quoteError?: string | null;
+  onRetryQuote?: () => void;
 };
 
 type ShippingEstimate = {
   /** USD amount for FX conversions */
   max: number;
 };
+const DeliveryCountryDropdown = dynamic(() => import('../../Index/CountryDropDownClientFloating'));
 
 // Main Component
 const OrderSummary: FC<OrderSummaryProps> = ({
   countryIso3 = 'USA',
   cartItemsOverride,
   checkoutBlocked = false,
+  shippingUsd,
+  quotePending = false,
+  quoteError,
+  onRetryQuote,
 }) => {
   // Hooks
   const { variants: storeCartItems } = useCartStore();
@@ -46,6 +56,7 @@ const OrderSummary: FC<OrderSummaryProps> = ({
   //   Funcs
   const getShippingEstimates = useCallback(async () => {
     if (!cartItems.length || checkoutBlocked) return null;
+    if (shippingUsd !== undefined) return shippingUsd === null ? null : { max: shippingUsd };
 
     try {
       const res = await fetch('/next-api/shop/cart/shipping-estimate', {
@@ -80,7 +91,7 @@ const OrderSummary: FC<OrderSummaryProps> = ({
       console.error('[OrderSummary] Failed to fetch shipping estimates:', error);
       return null;
     }
-  }, [cartItems, checkoutBlocked, country, countryIso3, shippingState]);
+  }, [cartItems, checkoutBlocked, country, countryIso3, shippingState, shippingUsd]);
 
   //   UseEffects
   useEffect(() => {
@@ -154,11 +165,29 @@ const OrderSummary: FC<OrderSummaryProps> = ({
         <GlobalProductPrice className='flex-1 min-w-[35%] text-right' usdAmount={estimatedTotal} />
       </div>
 
-      {checkoutBlocked ? (
+      {checkoutBlocked || quotePending || quoteError ? (
         <>
-          <p role='alert' className='pt-6 text-sm font-semibold text-amber-200'>
-            Remove unavailable items or choose another available option before checkout.
+          <p role='status' className='pt-6 text-sm text-white/80'>
+            {quotePending
+              ? 'Updating delivery options...'
+              : (quoteError ??
+                'Please remove unavailable items or choose another option before checkout.')}
           </p>
+          {quoteError && !quotePending && (
+            <div className='mt-3 space-y-3'>
+              <button type='button' className='underline underline-offset-4' onClick={onRetryQuote}>
+                Try again
+              </button>
+              <DeliveryCountryDropdown
+                initialIso3={country || countryIso3}
+                wrapperClassName=''
+                classNames={{
+                  trigger:
+                    'inline-flex min-h-10 max-w-full items-center gap-2 rounded-md border border-white/20 bg-black/40 px-3 text-white',
+                }}
+              />
+            </div>
+          )}
           <Button
             name='Proceed to Checkout'
             type='button'

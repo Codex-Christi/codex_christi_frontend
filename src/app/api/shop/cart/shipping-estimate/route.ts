@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getMerchizeTotalWIthShipping } from '@/actions/merchize/getMerchizeTotalWithShipping';
 import type { CartVariant } from '@/stores/shop_stores/cartStore';
-import { hydrateCartDisplayFromMerchizeOfflineCatalog } from '@/actions/shop/cart/hydrateCartDisplayFromMerchizeOfflineCatalog';
+import { resolveCartOverview } from '@/lib/merchizeStorefront/cartOverview';
 import { hasCheckoutBlockingCartItems } from '@/components/UI/Shop/Cart/cartAvailability';
 
 type ShippingEstimatePayload = {
@@ -26,11 +25,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const stateIso2 =
-      typeof body?.stateIso2 === 'string' && body.stateIso2.length > 0 ? body.stateIso2 : undefined;
-
     const normalizedIso3 = countryIso3.toUpperCase();
-    const verifiedCart = await hydrateCartDisplayFromMerchizeOfflineCatalog(cart);
+    const verifiedCart = await resolveCartOverview(cart, normalizedIso3);
     if (hasCheckoutBlockingCartItems(cart, verifiedCart.availabilityByVariantId)) {
       return NextResponse.json(
         { success: false, error: 'One or more cart variants are unavailable or unverified.' },
@@ -38,9 +34,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const totals = await getMerchizeTotalWIthShipping(verifiedCart.cartItems, normalizedIso3, {
-      state_iso2: stateIso2,
-    });
+    const totals = verifiedCart.totals;
+    if (!totals)
+      return NextResponse.json({ success: false, error: verifiedCart.quoteError }, { status: 503 });
 
     return NextResponse.json({ success: true, totals });
   } catch (error) {

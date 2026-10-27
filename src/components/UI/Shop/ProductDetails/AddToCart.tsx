@@ -122,16 +122,12 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
       });
 
       if (!lineCheckResp?.ok) {
-        await fail(
-          'We could not verify availability for production. Please try again in a moment.',
-        );
+        await fail('This option is temporarily unavailable. Please try again in a moment.');
         return;
       }
 
       if (!lineCheckResp.isAvailable) {
-        await fail(
-          'This exact variant is not available for production right now. Please pick a different available option.',
-        );
+        await fail('This option is no longer available. Please choose another option.');
         return;
       }
 
@@ -146,10 +142,9 @@ export const AddToCart: FC<OptionalProductVariantProps> = (props) => {
       await cartSuccessToast({ message: 'Item added to cart successfully.' });
 
       setMatchingVariant(null);
-    } catch (err: unknown) {
+    } catch {
       await showAddToCartErrorToast({
-        message:
-          typeof err === 'string' ? err : err instanceof Error ? err.message : JSON.stringify(err),
+        message: 'We could not add this item right now. Please try again shortly.',
       });
     } finally {
       setIsBusy(false);

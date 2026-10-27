@@ -4,9 +4,10 @@ import { getStorefrontSnapshotStats } from './actions';
 import { getVariantPublicationIssueSummary } from './variantPublicationIssuesData';
 import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
 import { requireAdminPage } from '@/lib/admin/require-admin';
+import { getManagedStorefrontProductIds } from '@/lib/merchizeStorefront/managedProducts';
 
 export const metadata: Metadata = {
-  title: 'Storefront Data Health | Codex Christi Admin',
+  title: 'Storefront Health | Codex Christi Admin',
   description:
     'Shop admin tooling for Merchize catalog sync, storefront snapshots, and search metadata health.',
 };
@@ -15,27 +16,25 @@ export const dynamic = 'force-dynamic';
 
 async function getStorefrontDataHealthPageData() {
   try {
-    const [
-      syncState,
-      sampleVariants,
-      storefrontSnapshotStats,
-      variantPublicationIssueSummary,
-    ] = await Promise.all([
-      merchizeCatalogPrisma.syncState.findUnique({
-        where: { id: 'merchize_catalog' },
-      }),
-      merchizeCatalogPrisma.variant.findMany({
-        include: { product: true, shippingBands: true },
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-      }),
-      getStorefrontSnapshotStats(),
-      getVariantPublicationIssueSummary(),
-    ]);
+    const managedIds = await getManagedStorefrontProductIds();
+    const [syncState, productChecks, storefrontSnapshotStats, variantPublicationIssueSummary] =
+      await Promise.all([
+        merchizeCatalogPrisma.syncState.findUnique({
+          where: { id: 'merchize_catalog' },
+        }),
+        merchizeCatalogPrisma.storefrontProductCheck.findMany({
+          where: { merchizeProductId: { in: managedIds } },
+          orderBy: { checkedAt: 'desc' },
+          omit: { supplierOptionsJson: true },
+        }),
+        getStorefrontSnapshotStats(),
+        getVariantPublicationIssueSummary(),
+      ]);
 
     return {
+      managedProductCount: managedIds.length,
       syncState,
-      sampleVariants,
+      productChecks,
       storefrontSnapshotStats,
       variantPublicationIssueSummary,
     };
@@ -58,7 +57,8 @@ export default async function StorefrontDataHealthAdminPage() {
       {pageData ? (
         <StorefrontDataHealthAdminClient
           initialSyncState={pageData.syncState}
-          initialSamples={pageData.sampleVariants}
+          productChecks={pageData.productChecks}
+          managedProductCount={pageData.managedProductCount}
           initialStorefrontSnapshotStats={pageData.storefrontSnapshotStats}
           initialVariantPublicationIssueSummary={pageData.variantPublicationIssueSummary}
         />

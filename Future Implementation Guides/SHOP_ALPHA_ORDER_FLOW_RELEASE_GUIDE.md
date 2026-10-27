@@ -103,7 +103,7 @@ The server must prove all of this for the selected variant:
   normalized non-Product option map resolves to exactly one variant in the current product-line
   response; that result owns the supplier product/variant identity and supplier SKU;
 - when the storefront variant has no `Product` option, the supplier-facing SKU used by that path is
-  an exact member of a completed current supplier-catalog generation, not a partial page or stale
+  an exact member of fresh, complete product-scoped supplier evidence, not a partial page or stale
   local snapshot;
 - storefront and supplier SKUs are kept in separate fields/namespaces. They may differ and must not
   be equated, copied over one another, or used as an implicit fallback;
@@ -122,13 +122,18 @@ read is `unverified`, never positive availability evidence. A stale cart row rem
 customer can remove it (or reduce its quantity), but it cannot be increased, checked out, silently
 substituted, or deferred for post-payment adjustment.
 
-Sellability and canonical-order reads for the base product, `all-variants`, and current price are
-strict `no-store` provider reads; the durable storefront snapshot is display fallback only and must
-never become positive availability evidence. The supplier product ID, supplier variant ID, and SKU
-from the exact product-line proof must all equal the completed catalog row before snapshot creation.
-Strict catalog reads require both the variant and parent product to belong to
-`SyncState.lastCompletedRunId`; catalog write batches and generation finalization are fenced by the
-same database lease transaction so a superseded refresh cannot become checkout proof.
+Sellability and canonical-order reads for the base product and `all-variants` are strict `no-store`
+provider reads. Retail prices come from that same complete variants response, not the paginated
+`variants/search` endpoint. The durable storefront snapshot is display fallback only and never
+positive availability evidence. Exact current product-line IDs and SKU must match fresh supplier
+product evidence in SQLite. Expired or missing evidence is renewed inline with a bounded
+`GET /product/catalog?search=<product SKU prefix>` lookup; a full variant SKU is not a supported
+catalog search. Full-catalog generation age no longer blocks individual products. Complete scoped
+responses replace their SKU links atomically; incomplete responses never prove removal or availability.
+The default evidence TTL is 48 hours (`MERCHIZE_CATALOG_CURRENT_MAX_AGE_HOURS`). Requests share scoped
+queries, with bounded concurrency, deadlines, and a short failure cooldown. No cron or `after()` is
+needed. A cache write failure may use validated live evidence for that request, never stale proof.
+Country-specific supplier shipping bands retain `to_country`; conflicting rates fail closed.
 
 Only confirmed drift or unavailability from complete current evidence creates or updates a
 per-variant catalog-data-health incident. Its evidence includes the storefront product/variant IDs,
@@ -141,10 +146,70 @@ customer attempt. Confirmed incidents accumulate in the persistent Storefront Da
 queue. P0.2 does not add a catalog email/outbox path; outbound escalation belongs to the separately
 scoped notification phase if it is later required.
 
-`/admin/shop/storefront-data-health` shows only compact incident counts so catalog statistics and
-SKU lookup remain immediately reachable. The detailed, mobile-first disclosure queue lives at
-`/admin/shop/storefront-data-health/variant-publication-issues`; each issue stays collapsed until an
-admin opens its IDs, supplier evidence, and manual repair instruction.
+`/admin/shop/storefront-data-health` is labeled **Storefront Health**. It groups saved option problems
+by known storefront product, separately shows temporary check failures, and leads with **Check
+Storefront** and per-product **Recheck**. Manual checks force fresh supplier evidence. Search-preview
+status compares content rather than observation timestamps. Page refresh, preview rebuild, full
+supplier sync, and SKU lookup live under Maintenance; page refresh and full sync no longer run a
+hidden duplicate availability audit. The option details route stays unchanged and supports a
+`product` filter with pagination; technical IDs and evidence remain collapsed.
+Maintenance is the first panel, with storage/sync details folded inside it. The attention list is
+capped and keyboard-scrollable. Panels and confirmation dialogs reuse the site's dark glass theme.
+`/admin/shop/storefront-data-health/products` is labeled **Delivery Checker**, linked directly from
+Maintenance and the admin Shop Ops navigation. It provides thumbnails, delivery-country/name filters,
+a needs-review filter, pagination, and per-product **Check Live** actions. A fresh visit uses the
+signed-in admin's profile country; an explicit URL country takes precedence, with USA only as the
+fallback for a missing/invalid profile country. Country changes immediately re-read SQLite without
+an extra Filter click. Name searches submit one local query.
+Each complete product verification saves a compact, store-scoped exact supplier-option mapping in
+`StorefrontProductCheck.supplierOptionsJson`. The checker combines that mapping with saved scoped
+supplier evidence to calculate delivery for any country using checkout's shipping rules. Evidence
+and mappings must both be within the configured TTL; stale/missing/mismatched data cannot appear
+verified available. Rows show evidence time and validity. A newer failed live check is not hidden
+by an older positive preview. These fields remain server-only.
+
+Opening the checker automatically renews missing, stale, legacy, or unverified product evidence,
+including products on later pages. Fresh local results appear immediately. Pending rows use
+skeletons; each completed result streams into the existing list without a page reload. Country or
+name changes start a new scoped check. Pagination and the needs-review toggle retain the same
+active check rather than restarting it. All matching products are included before pagination;
+the needs-review list/count updates as results arrive.
+
+`POST /admin/shop/storefront-data-health/products/check` keeps the path-scoped admin cookie,
+requires same-origin `shop.catalog.refresh` authorization, validates known storefront IDs and the
+country, and streams private/no-store newline-delimited JSON. There is one authorization and one
+aggregate audit pair per batch, not per product. Requests contain at most 100 products; larger
+selections run sequential batches. Each batch has at most four product workers, shares preset and
+supplier lookups, and has a two-minute deadline. There is no full supplier traversal, cron,
+`after()`, or polling loop. Read-only admins see saved results without starting supplier reads.
+Stop Checks, country/name navigation, and leaving the page cancel pending work and abort private
+provider reads. Already shared supplier reads retain their own bounded deadline so cancellation
+cannot abort another customer's checkout lookup. Cancellation does not create availability-failure
+records. Retry Remaining only retries unfinished/unverified products; Refresh All and Check Live
+explicitly force renewal. Genuine unsupported destinations/mapping problems remain review items,
+not automatic retry loops. The old per-product Server Action and repeated router refreshes were
+removed. No bulk reseed or manual initial check is required.
+
+Customer option failures use
+plain retry/unavailable wording rather than supplier diagnostics. Product options renew when the
+customer changes delivery country. Supported options use checkout's existing strict shipping rules;
+confirmed missing destination bands offer a country picker, while unavailable evidence remains a
+retry state. Destination summaries are display/diagnostic data, never positive checkout proof.
+The admin country picker reuses the project's `CountryDropdown`; it does not change the customer's
+storefront currency or delivery-country cookie. Country, name, and review filters persist across
+pagination.
+
+Deployment requires the additive SQLite schema update and generated client before starting the new
+application: `yarn merchize-offline-catalog:generate`, then
+`yarn merchize-offline-catalog:db:push`. Keep the existing catalog volume; do not reset or purge it.
+The existing Docker `migrate` service already runs generation and `db push` before the app starts;
+no extra scheduled job is needed. The commands above are for deployments outside that flow.
+The new tables are `SupplierCatalogProductEvidence`, `SupplierCatalogVariantEvidence`, and
+`StorefrontProductCheck`, and `StorefrontProductDestinationCheck`, including the nullable
+`StorefrontProductCheck.supplierOptionsJson` column. They use the existing local SQLite
+database, not a new remote Prisma store.
+Normal product/category ISR and metadata source order are unchanged. Per-product demand checks do
+not rebuild every search-preview shard or trigger a whole-catalog scan.
 
 ---
 
@@ -185,7 +250,7 @@ admin opens its IDs, supplier evidence, and manual repair instruction.
 - Product publication and storefront variant identity are checked from trusted Merchize responses,
   but `all-variants` membership is not current sellability proof. A product-line/options match is
   provisional until its supplier product ID, supplier variant ID, and SKU also match one row in the
-  latest completed catalog generation; variants without a Product option require exact current-
+  fresh product-scoped catalog response; variants without a Product option require exact current-
   catalog SKU membership. This dual-source proof is enforced at public variant display, add-to-cart,
   stale-cart revalidation, quantity increase, checkout, direct checkout, and PayPal intent creation.
   Compatibility reads time out after 15 seconds and fail closed as `unverified`.
@@ -226,7 +291,7 @@ admin opens its IDs, supplier evidence, and manual repair instruction.
   label describing money paid always shows the actual completed PayPal capture, never the expected
   canonical total; any difference is surfaced for review.
 
-The current-sellability implementation is locally complete. An additive local SQLite `db push` was
+Historical full-catalog verification: an additive local SQLite `db push` was
 completed, followed by a complete current-catalog generation covering 905 products and 19,885
 variants. The pre-final live baseline audit found 141 variants across 13 products: 138 available, 3
 confirmed unavailable, and 0 unverified. The final dual-source catalog cross-check is covered by six
@@ -394,9 +459,8 @@ The following remains the acceptance contract.
 2. Prove current supplier sellability exactly and without substitution:
    - with a `Product` option, require exactly one current product-line variant whose line name and
      complete normalized non-Product option map match, then require that preset's supplier product
-     ID, supplier variant ID, and SKU to match one row in the latest completed catalog generation;
-   - without a `Product` option, require exact current SKU membership from a completed supplier-
-     catalog generation;
+     ID, supplier variant ID, and SKU to match fresh product-scoped supplier evidence;
+   - without a `Product` option, require exact current SKU membership in a complete scoped response;
    - keep storefront IDs/SKU and supplier IDs/SKU in separate namespaces;
    - fail closed on missing, ambiguous, fuzzy, partial, stale, or unavailable evidence.
 3. Bound compatibility reads to 15 seconds and use the same fail-closed verdict at public variant

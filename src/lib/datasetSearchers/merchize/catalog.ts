@@ -1,5 +1,9 @@
 // src/lib/datasetSearchers/merchize/catalog.ts
 import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
+import {
+  createDemandCatalogResolver,
+  type SupplierShippingBand,
+} from '@/lib/merchizeCatalog/currentEvidence';
 import type {
   Prisma,
   Product,
@@ -9,6 +13,7 @@ import type {
 
 // Shape compatible with your old JSON catalog
 export type CatalogItem = {
+  shippingBands?: SupplierShippingBand[];
   SKU_product: string;
   SKU_variant: string;
 
@@ -58,7 +63,7 @@ export class CurrentMerchizeCatalogGenerationUnavailableError extends Error {
   readonly code = 'CURRENT_MERCHIZE_CATALOG_GENERATION_UNAVAILABLE' as const;
 
   constructor() {
-    super('A complete current Merchize catalog generation is unavailable.');
+    super('Current product-scoped Merchize supplier evidence is unavailable.');
     this.name = 'CurrentMerchizeCatalogGenerationUnavailableError';
     Object.setPrototypeOf(this, new.target.prototype);
   }
@@ -71,6 +76,7 @@ export type CurrentCatalogVariantLookup = {
 
 export type CurrentCatalogVariantBatchLookup = {
   generationAvailable: boolean;
+  unverifiedSkus?: string[];
   variants: StrictCatalogVariantRecord[];
 };
 
@@ -258,54 +264,20 @@ export async function getStrictCatalogVariantsBySku(
   const uniqueSkus = [...new Set(skus.map((sku) => sku.trim()).filter(Boolean))].sort();
   if (!uniqueSkus.length) return [];
 
-  const completedGeneration = await getCurrentCompletedCatalogGeneration();
-  if (!completedGeneration) {
+  const result = await createDemandCatalogResolver().resolve(uniqueSkus);
+  if (!result.generationAvailable) {
     throw new CurrentMerchizeCatalogGenerationUnavailableError();
   }
-  const completedRunId = completedGeneration.lastCompletedRunId!.trim();
-
-  const variants = await merchizeCatalogPrisma.variant.findMany({
-    where: buildStrictCatalogGenerationWhere(uniqueSkus, completedRunId),
-    include: { product: true, shippingBands: true },
-  });
-  const currentVariants = variants.filter((variant) =>
-    isCatalogRowInCompletedGeneration(variant, variant.product, completedRunId),
-  );
-  const confirmedGeneration = await getCurrentCompletedCatalogGeneration();
-  if (confirmedGeneration?.lastCompletedRunId?.trim() !== completedRunId) {
-    throw new CurrentMerchizeCatalogGenerationUnavailableError();
-  }
-  const bySku = new Map(currentVariants.map((variant) => [variant.sku, variant]));
+  const bySku = new Map(result.variants.map((variant) => [variant.sku, variant]));
   const missingSkus = uniqueSkus.filter((sku) => !bySku.has(sku));
   if (missingSkus.length) throw new MissingMerchizeCatalogSkuError(missingSkus);
 
-  return uniqueSkus.map((sku) => {
-    const variant = bySku.get(sku)!;
-    if (!variant.product?.merchizeId || !variant.merchizeId) {
-      throw new MissingMerchizeCatalogSkuError([sku]);
-    }
-
-    return {
-      sku,
-      supplierProductId: variant.product.merchizeId,
-      supplierVariantId: variant.merchizeId,
-      catalogRow: toCatalogItemFromDb(variant),
-    };
-  });
-}
-
-async function getCurrentCompletedCatalogGeneration() {
-  const syncState = await merchizeCatalogPrisma.syncState.findUnique({
-    where: { id: 'merchize_catalog' },
-    select: { lastCompletedRunId: true, lastCompletedAt: true, activeRunId: true },
-  });
-
-  return isMerchizeCatalogGenerationCurrent(syncState) ? syncState : null;
+  return uniqueSkus.map((sku) => bySku.get(sku)!);
 }
 
 /**
- * Missing-Product storefront variants can be sold only when their SKU is present in the latest
- * complete catalog generation. Historical upsert-only rows never count as positive evidence.
+ * Missing-Product variants require exact SKU membership in fresh product-scoped supplier evidence.
+ * Historical full-catalog rows supply search hints only, never positive sellability evidence.
  */
 export async function getCurrentCatalogVariantBySku(
   rawSku: string,
@@ -321,37 +293,5 @@ export async function getCurrentCatalogVariantBySku(
 export async function getCurrentCatalogVariantsBySku(
   rawSkus: string[],
 ): Promise<CurrentCatalogVariantBatchLookup> {
-  const skus = [...new Set(rawSkus.map((sku) => sku.trim()).filter(Boolean))].sort();
-  const completedGeneration = await getCurrentCompletedCatalogGeneration();
-  if (!completedGeneration) return { generationAvailable: false, variants: [] };
-  if (!skus.length) return { generationAvailable: true, variants: [] };
-  const completedRunId = completedGeneration.lastCompletedRunId!.trim();
-
-  const rows = await merchizeCatalogPrisma.variant.findMany({
-    where: buildStrictCatalogGenerationWhere(skus, completedRunId),
-    include: { product: true, shippingBands: true },
-  });
-  const variants = rows
-    .filter(
-      (variant) =>
-        isCatalogRowInCompletedGeneration(variant, variant.product, completedRunId) &&
-        !!variant.product.merchizeId &&
-        !!variant.merchizeId,
-    )
-    .map((variant) => ({
-      sku: variant.sku,
-      supplierProductId: variant.product!.merchizeId,
-      supplierVariantId: variant.merchizeId,
-      catalogRow: toCatalogItemFromDb(variant),
-    }));
-
-  const confirmedGeneration = await getCurrentCompletedCatalogGeneration();
-  if (confirmedGeneration?.lastCompletedRunId?.trim() !== completedRunId) {
-    return { generationAvailable: false, variants: [] };
-  }
-
-  return {
-    generationAvailable: true,
-    variants,
-  };
+  return createDemandCatalogResolver().resolve(rawSkus);
 }

@@ -21,7 +21,11 @@ import {
   PUBLISHED_SHOP_PRODUCT_IDS,
   getPublishedShopProductPreview,
 } from '@/lib/utils/shopHomePageProductsData';
-import { generateShopSeoManifest } from '@/lib/shop/seoManifest/generate';
+import {
+  generateShopSeoManifest,
+  hasChangedShopSearchPreviews,
+} from '@/lib/shop/seoManifest/generate';
+import { getManagedStorefrontProductIds } from '@/lib/merchizeStorefront/managedProducts';
 import {
   readCategorySeoManifestEntry,
   readProductSeoManifestEntry,
@@ -129,20 +133,6 @@ function getFailedSeoManifestResult(message: string) {
   };
 }
 
-// const v = await merchizeCatalogPrisma.variant.findUnique({
-//   where: { sku: 'FBJSVN000000AA02' },
-//   select: {
-//     sku: true,
-//     tier1Price: true,
-//     tier2Price: true,
-//     tier3Price: true,
-//     shippingBands: true,
-//     tiersJson: true,
-//   },
-// });
-
-// console.log('>>> Inspect variant FBJSVN000000AA02', v);
-
 export async function getStorefrontSnapshotStats() {
   await requireAdminAction('shop.view');
 
@@ -184,7 +174,8 @@ export async function getStorefrontSnapshotStats() {
     lastPrunedGenerationCount: 0,
     warnings: [],
   };
-  const manifestIsStale = isSeoManifestStale(seoManifestStats.generatedAt, latestSnapshotAt);
+  const manifestIsStale =
+    !!seoManifestStats.generatedAt && (await hasChangedShopSearchPreviews().catch(() => true));
   const healthWarnings = buildStorefrontDataHealthWarnings({
     latestSnapshotAt,
     snapshotTtlExpired,
@@ -251,7 +242,7 @@ function buildStorefrontDataHealthWarnings({
     warnings.push({
       code: 'seo_manifest_stale',
       severity: 'warning',
-      message: 'The search metadata manifest is older than the latest storefront snapshot.',
+      message: 'Search preview content differs from the saved storefront page details.',
     });
   }
 
@@ -291,13 +282,34 @@ function isSnapshotTtlExpired(latestSnapshotAt: Date | null, ttlDays: string) {
   return Date.now() - latestSnapshotAt.getTime() > days * 24 * 60 * 60 * 1000;
 }
 
-function isSeoManifestStale(generatedAt: string | null, latestSnapshotAt: Date | null) {
-  if (!generatedAt || !latestSnapshotAt) return false;
-
-  const generatedAtMs = Date.parse(generatedAt);
-  if (!Number.isFinite(generatedAtMs)) return false;
-
-  return latestSnapshotAt.getTime() > generatedAtMs;
+export async function checkStorefrontAction(productId?: string) {
+  const admin = await requireAdminAction('shop.catalog.refresh');
+  const managed = await getManagedStorefrontProductIds();
+  if (productId && !managed.includes(productId))
+    throw new Error('Choose a product currently listed in this storefront.');
+  const productIds = productId ? [productId] : managed;
+  await writeAdminAuditLog({
+    actor: admin,
+    action: 'shop.catalog.check_storefront',
+    outcome: 'started',
+    metadata: { products: productIds.length },
+  });
+  const availability = await runPublishedVariantCompatibilityAudit(productIds);
+  const metadata = productId ? null : await runStorefrontMetadataDiagnosticsAction();
+  const ok =
+    availability.ok &&
+    availability.scanErrors.length === 0 &&
+    availability.unverifiedCount === 0 &&
+    (metadata?.ok ?? true);
+  await writeAdminAuditLog({
+    actor: admin,
+    action: 'shop.catalog.check_storefront',
+    outcome: ok ? 'success' : 'failure',
+    metadata: { products: productIds.length },
+  });
+  revalidatePath('/admin/shop/storefront-data-health');
+  revalidatePath('/admin/shop/storefront-data-health/variant-publication-issues');
+  return { ok, availability, metadata };
 }
 
 export async function runStorefrontMetadataDiagnosticsAction() {
@@ -586,9 +598,6 @@ export async function refreshPriceShippingCatalogAction() {
     });
 
     const result = await refreshMerchizeCatalog();
-    const variantCompatibilityAudit = result.completedFullTraversal
-      ? await runPublishedVariantCompatibilityAudit()
-      : null;
 
     const syncState = await merchizeCatalogPrisma.syncState.findUnique({
       where: { id: 'merchize_catalog' },
@@ -603,7 +612,6 @@ export async function refreshPriceShippingCatalogAction() {
       ingestedVariants: result.ingestedVariants,
       totalProducts: result.totalProducts,
       completedFullTraversal: result.completedFullTraversal,
-      variantCompatibilityAudit,
       syncState,
     };
   } catch (e: unknown) {
@@ -643,7 +651,7 @@ export async function refreshStorefrontSnapshotsAction() {
 
     for (const productId of PUBLISHED_SHOP_PRODUCT_IDS) {
       try {
-        await fetchBaseProduct(productId);
+        await fetchBaseProduct(productId, true);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error('[merchizeCatalogSnapshots.refreshStorefrontSnapshots] product:failed', {
@@ -670,7 +678,7 @@ export async function refreshStorefrontSnapshotsAction() {
       });
 
       try {
-        await getCategoryMetadataFromMerchize(category);
+        await getCategoryMetadataFromMerchize(category, true);
         const firstPage = await fetchCategoryProducts({
           category,
           page: 1,
@@ -747,7 +755,6 @@ export async function refreshStorefrontSnapshotsAction() {
         error: message,
       };
     });
-    const variantCompatibilityAudit = await runPublishedVariantCompatibilityAudit([...productIds]);
     revalidatePath('/admin/shop/storefront-data-health');
     revalidatePath('/admin/shop/storefront-data-health/variant-publication-issues');
     const revalidatedPaths = revalidateStorefrontSnapshotPaths({
@@ -766,7 +773,6 @@ export async function refreshStorefrontSnapshotsAction() {
       failures,
       stats,
       seoManifest,
-      variantCompatibilityAudit,
       revalidatedPaths,
     };
 
@@ -790,15 +796,6 @@ export async function refreshStorefrontSnapshotsAction() {
             : 0,
         warnings: result.seoManifest.warnings.length,
       },
-      variantCompatibilityAudit:
-        result.variantCompatibilityAudit.ok
-          ? {
-              ok: true,
-              unavailableCount: result.variantCompatibilityAudit.unavailableCount,
-              unverifiedCount: result.variantCompatibilityAudit.unverifiedCount,
-              scanErrors: result.variantCompatibilityAudit.scanErrors.length,
-            }
-          : result.variantCompatibilityAudit,
       revalidatedPaths: result.revalidatedPaths.length,
       elapsedMs: Date.now() - refreshStartedAt,
     });
@@ -820,10 +817,6 @@ export async function refreshStorefrontSnapshotsAction() {
       failures: [],
       stats: await getStorefrontSnapshotStats().catch(() => getEmptyStorefrontSnapshotStats()),
       seoManifest: getFailedSeoManifestResult(message),
-      variantCompatibilityAudit: {
-        ok: false as const,
-        error: 'Compatibility audit was not run because storefront snapshot refresh failed.',
-      },
       revalidatedPaths: [],
     };
   }

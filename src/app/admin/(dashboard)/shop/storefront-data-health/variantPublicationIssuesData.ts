@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { Prisma } from '@/lib/prisma/shop/merchize/generated/merchizeCatalog/client';
 import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
+import { getManagedStorefrontProductIds } from '@/lib/merchizeStorefront/managedProducts';
 
 const OPEN_VARIANT_PUBLICATION_STATUSES = ['unavailable', 'unverified'] as const;
 const VARIANT_PUBLICATION_ISSUE_PAGE_SIZE = 50;
@@ -36,9 +37,17 @@ export type VariantPublicationIssueSummary = {
   unavailableIssueCount: number;
   unverifiedIssueCount: number;
   storageError: string | null;
+  products: Array<{
+    productId: string;
+    title: string;
+    optionCount: number;
+    reasons: string[];
+    lastObservedAt: Date;
+  }>;
 };
 
-export type VariantPublicationIssueQueue = VariantPublicationIssueSummary & {
+export type VariantPublicationIssueQueue = Omit<VariantPublicationIssueSummary, 'products'> & {
+  productId?: string;
   openIssues: VariantPublicationIssue[];
   recentlyResolvedIssues: VariantPublicationIssue[];
   currentPage: number;
@@ -49,9 +58,13 @@ export type VariantPublicationIssueQueue = VariantPublicationIssueSummary & {
 };
 
 async function getIssueCounts() {
+  const managedIds = await getManagedStorefrontProductIds();
   const statusCounts = await merchizeCatalogPrisma.storefrontVariantCompatibility.groupBy({
     by: ['status'],
-    where: { status: { in: [...OPEN_VARIANT_PUBLICATION_STATUSES] } },
+    where: {
+      status: { in: [...OPEN_VARIANT_PUBLICATION_STATUSES] },
+      storefrontProductId: { in: managedIds },
+    },
     _count: { _all: true },
   });
   const unavailableIssueCount =
@@ -72,16 +85,45 @@ function unavailableSummary(): VariantPublicationIssueSummary {
     unavailableIssueCount: 0,
     unverifiedIssueCount: 0,
     storageError: 'Variant compatibility storage is unavailable.',
+    products: [],
   };
 }
 
 export async function getVariantPublicationIssueSummary(): Promise<VariantPublicationIssueSummary> {
   try {
     const counts = await getIssueCounts();
+    const managedIds = await getManagedStorefrontProductIds();
+    const rows = await merchizeCatalogPrisma.storefrontVariantCompatibility.findMany({
+      where: {
+        storefrontProductId: { in: managedIds },
+        status: { in: [...OPEN_VARIANT_PUBLICATION_STATUSES] },
+      },
+      select: {
+        storefrontProductId: true,
+        storefrontProductTitle: true,
+        reasonCode: true,
+        lastObservedAt: true,
+      },
+      orderBy: { lastObservedAt: 'desc' },
+    });
+    const products = new Map<string, VariantPublicationIssueSummary['products'][number]>();
+    for (const row of rows) {
+      const product = products.get(row.storefrontProductId) ?? {
+        productId: row.storefrontProductId,
+        title: row.storefrontProductTitle ?? row.storefrontProductId,
+        optionCount: 0,
+        reasons: [],
+        lastObservedAt: row.lastObservedAt,
+      };
+      product.optionCount += 1;
+      if (!product.reasons.includes(row.reasonCode)) product.reasons.push(row.reasonCode);
+      products.set(product.productId, product);
+    }
 
     return {
       ...counts,
       storageError: null,
+      products: [...products.values()].sort((a, b) => b.optionCount - a.optionCount),
     };
   } catch (error) {
     console.error('Failed to fetch storefront variant publication issue summary:', error);
@@ -91,9 +133,13 @@ export async function getVariantPublicationIssueSummary(): Promise<VariantPublic
 
 export async function getVariantPublicationIssueQueue(
   requestedPage = 1,
+  productId?: string,
 ): Promise<VariantPublicationIssueQueue> {
   try {
-    const counts = await getIssueCounts();
+    if (productId && !(await getManagedStorefrontProductIds()).includes(productId))
+      throw new Error('Product is outside the managed storefront.');
+    const counts = productId ? await getIssueCountsForProduct(productId) : await getIssueCounts();
+    const scopeIds = productId ? [productId] : await getManagedStorefrontProductIds();
     const totalPages = Math.max(
       1,
       Math.ceil(counts.openIssueCount / VARIANT_PUBLICATION_ISSUE_PAGE_SIZE),
@@ -103,14 +149,21 @@ export async function getVariantPublicationIssueQueue(
     const currentPage = Math.min(normalizedRequestedPage, totalPages);
     const [openIssues, recentlyResolvedIssues] = await Promise.all([
       merchizeCatalogPrisma.storefrontVariantCompatibility.findMany({
-        where: { status: { in: [...OPEN_VARIANT_PUBLICATION_STATUSES] } },
+        where: {
+          status: { in: [...OPEN_VARIANT_PUBLICATION_STATUSES] },
+          storefrontProductId: { in: scopeIds },
+        },
         select: variantPublicationIssueSelect,
         orderBy: [{ lastObservedAt: 'desc' }, { id: 'desc' }],
         skip: (currentPage - 1) * VARIANT_PUBLICATION_ISSUE_PAGE_SIZE,
         take: VARIANT_PUBLICATION_ISSUE_PAGE_SIZE,
       }),
       merchizeCatalogPrisma.storefrontVariantCompatibility.findMany({
-        where: { status: 'resolved', resolvedAt: { not: null } },
+        where: {
+          status: 'resolved',
+          resolvedAt: { not: null },
+          storefrontProductId: { in: scopeIds },
+        },
         select: variantPublicationIssueSelect,
         orderBy: [{ resolvedAt: 'desc' }, { id: 'desc' }],
         take: 20,
@@ -125,6 +178,7 @@ export async function getVariantPublicationIssueQueue(
     );
 
     return {
+      productId,
       openIssues,
       recentlyResolvedIssues,
       ...counts,
@@ -148,4 +202,22 @@ export async function getVariantPublicationIssueQueue(
       pageEnd: 0,
     };
   }
+}
+
+async function getIssueCountsForProduct(productId: string) {
+  const groups = await merchizeCatalogPrisma.storefrontVariantCompatibility.groupBy({
+    by: ['status'],
+    where: {
+      storefrontProductId: productId,
+      status: { in: [...OPEN_VARIANT_PUBLICATION_STATUSES] },
+    },
+    _count: { _all: true },
+  });
+  const unavailableIssueCount = groups.find((g) => g.status === 'unavailable')?._count._all ?? 0;
+  const unverifiedIssueCount = groups.find((g) => g.status === 'unverified')?._count._all ?? 0;
+  return {
+    openIssueCount: unavailableIssueCount + unverifiedIssueCount,
+    unavailableIssueCount,
+    unverifiedIssueCount,
+  };
 }

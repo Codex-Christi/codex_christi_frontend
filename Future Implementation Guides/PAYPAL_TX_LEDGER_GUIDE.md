@@ -45,17 +45,17 @@ ledger or creating a standalone order database:
 - current sellability must be proved independently: a variant with a `Product` option requires one
   exact current product-line name plus complete normalized option-map match and uses that result's
   supplier IDs/SKU; a variant without `Product` requires exact current SKU membership from a
-  completed supplier-catalog generation. Missing, ambiguous, partial, stale, or unverified evidence
+  fresh product-scoped supplier response. Missing, ambiguous, partial, stale, or unverified evidence
   fails closed;
 - storefront and supplier IDs/SKUs remain separate namespaces. They may differ and must not be
   equated, substituted, or copied over one another;
-- base-product, `all-variants`, and current-price trust reads are strict `no-store` calls with the
-  bounded deadline; storefront snapshots are display-only fallback. An exact product-line/options
-  match remains provisional until its supplier product ID, variant ID, and SKU all equal the latest
-  completed catalog row, before public selection, cart admission, or snapshot creation;
-- strict catalog proof requires both the variant and parent product generation IDs to equal
-  `SyncState.lastCompletedRunId`. Bounded row writes and generation finalization are fenced inside
-  the active database-lease transaction so a stale writer cannot overwrite checkout proof;
+- base-product and `all-variants` trust reads are strict `no-store` calls with bounded deadlines.
+  Current retail prices come from the same complete variants response. Storefront snapshots remain
+  display-only fallback. Exact product-line IDs/SKU must match fresh product-scoped catalog evidence;
+- scoped evidence lives in the existing SQLite store and renews inline after expiry or a cache miss,
+  using a filtered product-SKU catalog query. Full-catalog sync expiry no longer blocks every product.
+  Complete responses atomically replace SKU links; incomplete responses never prove availability or
+  removal. No cron or `after()` is required. Full-sync writer fencing remains for the legacy bulk sync;
 - selector input is bounded before provider work to 25 rows, 128 characters per identifier, 25
   units per merged line, and 100 units total. Duplicate selectors are merged and rechecked; each
   unique product resolves once with at most four concurrent workers, then catalog SKUs resolve in
@@ -74,7 +74,13 @@ ledger or creating a standalone order database:
   unverified evidence stay aggregate and do not fan out into per-variant incidents. Confirmed
   incidents accumulate in the Storefront Data Health admin queue; P0.2 does not couple them to the
   PayPal notification outbox or send catalog email;
-- the main Storefront Data Health page shows compact counts only; the detailed responsive repair
+- the main Storefront Health page groups issues by product and separates temporary verification
+  failures. Maintenance is first, with technical storage/sync details folded away. Delivery Checker
+  automatically renews missing/stale/unverified evidence for all matching storefront products,
+  including later pages, with four concurrent workers, streamed progress, cancellation and targeted
+  retry. Fresh local evidence is reused; no cron, `after()`, full supplier scan, or per-result page
+  reload is involved. These diagnostic results never replace canonical checkout verification.
+  The detailed responsive repair
   queue is `/admin/shop/storefront-data-health/variant-publication-issues`, with each issue collapsed
   until an admin requests its IDs, provider evidence, and manual repair action. Server-side
   pagination keeps every open issue reachable, and a storage failure never renders as a zero count;

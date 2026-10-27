@@ -2,6 +2,8 @@
 import { ProductResult, ProductVariantsInterface } from '@/lib/merchizeStorefront/productTypes';
 import { createContext, useContext, FC, ReactNode, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore';
+import type { ProductUnavailabilityReason } from '@/lib/merchizeStorefront/destinationAvailability';
 
 const ProductTitleAndSizesEtc = dynamic(() => import('./ProductTitleAndSizesEtc'));
 
@@ -21,6 +23,7 @@ export interface OptionalProductVariantProps {
 }
 
 type VariantLoadState = 'loading' | 'ready' | 'error';
+const EMPTY_VARIANTS: ProductVariantsInterface['data'] = [];
 type IdleWindow = Window & {
   requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
   cancelIdleCallback?: (handle: number) => void;
@@ -32,6 +35,10 @@ export type ProductDetailsContextValue = ProductResult & {
   initialImageUrls: string[];
   variantLoadState: VariantLoadState;
   variantLoadError: string | null;
+  retryVariants: () => void;
+  deliveryCountry: string;
+  deliveryCountryName: string;
+  unavailabilityReason: ProductUnavailabilityReason;
 };
 
 export const ProductDetailsContext = createContext<ProductDetailsContextValue | undefined>(
@@ -52,30 +59,45 @@ export const ProductDetailsProvider: FC<ProductDetailsProps> = ({
   initialImageUrls,
   children,
 }) => {
-  const [productVariants, setProductVariants] = useState<ProductVariantsInterface['data']>(
-    fetchedProductData.productVariants,
-  );
-  const [variantLoadState, setVariantLoadState] = useState<VariantLoadState>(
-    fetchedProductData.productVariants.length > 0 ? 'ready' : 'loading',
-  );
-  const [variantLoadError, setVariantLoadError] = useState<string | null>(null);
+  const country = useCurrencyCookie((state) => state.iso3) || 'USA';
+  const requestKey = `${productId}:${country}`;
+  const [response, setResponse] = useState<{
+    key: string;
+    variants: ProductVariantsInterface['data'];
+    state: VariantLoadState;
+    error: string | null;
+    countryName: string;
+    reason: ProductUnavailabilityReason;
+  } | null>(null);
+  const currentResponse = response?.key === requestKey ? response : null;
+  const productVariants = currentResponse?.variants ?? EMPTY_VARIANTS;
+  const variantLoadState = currentResponse?.state ?? 'loading';
+  const variantLoadError = currentResponse?.error ?? null;
+  const deliveryCountryName = currentResponse?.countryName ?? country;
+  const unavailabilityReason = currentResponse?.reason ?? null;
+  const [retrySequence, setRetrySequence] = useState(0);
 
   useEffect(() => {
-    if (productVariants.length > 0) return;
-
     let cancelled = false;
     let timeoutId: ReturnType<typeof window.setTimeout> | null = null;
     let idleId: number | null = null;
     const controller = new AbortController();
     const idleWindow = window as IdleWindow;
 
-    const loadVariants = async () => {
-      setVariantLoadState('loading');
-      setVariantLoadError(null);
+    const loadVariants = async (attempt = 0) => {
+      setResponse({
+        key: requestKey,
+        variants: EMPTY_VARIANTS,
+        state: 'loading',
+        error: null,
+        countryName: country,
+        reason: null,
+      });
+      let retryable = true;
 
       try {
         const res = await fetch(
-          `/next-api/shop/products/${encodeURIComponent(productId)}/variants`,
+          `/next-api/shop/products/${encodeURIComponent(productId)}/variants?country=${encodeURIComponent(country)}`,
           {
             credentials: 'same-origin',
             signal: controller.signal,
@@ -85,9 +107,12 @@ export const ProductDetailsProvider: FC<ProductDetailsProps> = ({
           data?: ProductVariantsInterface['data'];
           error?: string;
           verificationIncomplete?: boolean;
+          countryName?: string;
+          unavailabilityReason?: ProductUnavailabilityReason;
         };
 
         if (!res.ok || !Array.isArray(json.data)) {
+          retryable = res.status === 429 || res.status >= 500;
           throw new Error(json.error || 'Unable to load product options.');
         }
 
@@ -97,13 +122,30 @@ export const ProductDetailsProvider: FC<ProductDetailsProps> = ({
 
         if (cancelled) return;
 
-        setProductVariants(json.data);
-        setVariantLoadState('ready');
+        setResponse({
+          key: requestKey,
+          variants: json.data,
+          state: 'ready',
+          error: null,
+          countryName: json.countryName ?? country,
+          reason: json.unavailabilityReason ?? null,
+        });
       } catch (err) {
         if (cancelled || controller.signal.aborted) return;
 
-        setVariantLoadState('error');
-        setVariantLoadError(err instanceof Error ? err.message : 'Unable to load product options.');
+        if (retryable && attempt < 1) {
+          timeoutId = globalThis.setTimeout(() => void loadVariants(attempt + 1), 5_000);
+          return;
+        }
+
+        setResponse({
+          key: requestKey,
+          variants: EMPTY_VARIANTS,
+          state: 'error',
+          error: err instanceof Error ? err.message : 'Unable to load product options.',
+          countryName: country,
+          reason: 'verification_unavailable',
+        });
       }
     };
 
@@ -123,7 +165,7 @@ export const ProductDetailsProvider: FC<ProductDetailsProps> = ({
       if (idleId !== null) idleWindow.cancelIdleCallback?.(idleId);
       if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
     };
-  }, [productId, productVariants.length]);
+  }, [productId, country, requestKey, retrySequence]);
 
   const contextValue = useMemo<ProductDetailsContextValue>(
     () => ({
@@ -133,6 +175,10 @@ export const ProductDetailsProvider: FC<ProductDetailsProps> = ({
       productVariants,
       variantLoadState,
       variantLoadError,
+      retryVariants: () => setRetrySequence((sequence) => sequence + 1),
+      deliveryCountry: country,
+      deliveryCountryName,
+      unavailabilityReason,
     }),
     [
       fetchedProductData.productMetaData,
@@ -141,6 +187,9 @@ export const ProductDetailsProvider: FC<ProductDetailsProps> = ({
       productVariants,
       variantLoadError,
       variantLoadState,
+      country,
+      deliveryCountryName,
+      unavailabilityReason,
     ],
   );
 

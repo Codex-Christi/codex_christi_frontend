@@ -4,7 +4,9 @@ import { useCartStore } from '@/stores/shop_stores/cartStore';
 import type { CartVariant } from '@/stores/shop_stores/cartStore';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { hydrateCartDisplayFromMerchizeOfflineCatalog } from '@/actions/shop/cart/hydrateCartDisplayFromMerchizeOfflineCatalog';
+import { getCartOverview } from '@/actions/shop/cart/getCartOverview';
+import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
+import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore';
 import {
   createCartAvailabilityMap,
   getCartVerificationIdentity,
@@ -17,6 +19,10 @@ type CartDisplayState = {
   cartIdentity: string | null;
   cartItems: CartVariant[];
   availabilityByVariantId: CartItemAvailabilityMap;
+  shippingUsd?: number | null;
+  quoteCountry?: string;
+  quoteError?: string | null;
+  quoteSequence?: number;
 };
 
 // Dynamic Imports
@@ -38,7 +44,11 @@ const CartMainComponent = () => {
   // Hooks
   // Hooks
   const { variants } = useCartStore((state) => state);
+  const checkoutCountry = useShopCheckoutStore((state) => state.delivery_address.shipping_country);
+  const selectedCountry = useCurrencyCookie((state) => state.iso3);
+  const country = selectedCountry || checkoutCountry || 'USA';
   const cartIdentity = useMemo(() => getCartVerificationIdentity(variants), [variants]);
+  const [quoteSequence, setQuoteSequence] = useState(0);
   const [cartDisplayState, setCartDisplayState] = useState<CartDisplayState>({
     cartIdentity: null,
     cartItems: [],
@@ -88,13 +98,17 @@ const CartMainComponent = () => {
 
     if (variants.length === 0) return;
 
-    hydrateCartDisplayFromMerchizeOfflineCatalog(variants)
-      .then(({ cartItems, availabilityByVariantId: availability }) => {
+    getCartOverview(variants, country)
+      .then(({ cartItems, availabilityByVariantId: availability, totals, quoteError }) => {
         if (!active) return;
         setCartDisplayState({
           cartIdentity,
           cartItems,
           availabilityByVariantId: availability,
+          shippingUsd: totals?.shippingUsd ?? null,
+          quoteCountry: country,
+          quoteError,
+          quoteSequence,
         });
       })
       .catch((error) => {
@@ -104,13 +118,17 @@ const CartMainComponent = () => {
           cartIdentity,
           cartItems: variants,
           availabilityByVariantId: createCartAvailabilityMap(variants, 'unverified'),
+          quoteCountry: country,
+          quoteSequence,
+          quoteError:
+            'We could not confirm availability and delivery right now. Please try again shortly.',
         });
       });
 
     return () => {
       active = false;
     };
-  }, [cartIdentity, variants]);
+  }, [cartIdentity, variants, country, quoteSequence]);
 
   // JSX
   return (
@@ -147,7 +165,24 @@ const CartMainComponent = () => {
 
       {/* Conatiner for Order Summary */}
       {!isCartEmpty && variants && (
-        <OrderSummary cartItemsOverride={cartItemsForDisplay} checkoutBlocked={checkoutBlocked} />
+        <OrderSummary
+          cartItemsOverride={cartItemsForDisplay}
+          checkoutBlocked={checkoutBlocked}
+          quotePending={
+            !displayStateIsCurrent ||
+            cartDisplayState.quoteCountry !== country ||
+            cartDisplayState.quoteSequence !== quoteSequence
+          }
+          quoteError={
+            cartDisplayState.quoteCountry === country ? cartDisplayState.quoteError : null
+          }
+          onRetryQuote={() => setQuoteSequence((sequence) => sequence + 1)}
+          shippingUsd={
+            displayStateIsCurrent && cartDisplayState.quoteCountry === country
+              ? (cartDisplayState.shippingUsd ?? null)
+              : null
+          }
+        />
       )}
     </div>
   );

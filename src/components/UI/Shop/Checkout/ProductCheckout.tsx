@@ -1,7 +1,14 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { Accordion, AccordionContent, AccordionItem } from '@/components/UI/primitives/accordion';
 import { ServerOrderDetailsComponent } from './ServerOrderDetailsComponent';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
@@ -9,12 +16,10 @@ import { useCartStore } from '@/stores/shop_stores/cartStore';
 import errorToast from '@/lib/error-toast';
 import { useShopRouter } from '@/lib/hooks/useShopRouter';
 import { useHasMounted } from '@/lib/hooks/useHasMounted';
-import { hydrateCartDisplayFromMerchizeOfflineCatalog } from '@/actions/shop/cart/hydrateCartDisplayFromMerchizeOfflineCatalog';
-import {
-  getCartVerificationIdentity,
-  hasCheckoutBlockingCartItems,
-} from '../Cart/cartAvailability';
+import { getOrderFinalDetails } from '@/actions/shop/checkout/getOrderFinalDetails';
+import { getCartVerificationIdentity } from '../Cart/cartAvailability';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
+import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore';
 
 // Dynamic Imports
 const CheckoutPageOrderSummary = dynamic(
@@ -43,9 +48,23 @@ const CheckoutPage = () => {
   const { push } = useShopRouter();
   const hasMounted = useHasMounted();
   const [cartHydrated, setCartHydrated] = useState(false);
+  const checkoutHydrated = useSyncExternalStore(
+    useShopCheckoutStore.persist.onFinishHydration,
+    useShopCheckoutStore.persist.hasHydrated,
+    () => false,
+  );
   const [hasRedirected, setHasRedirected] = useState(false);
   const cartCount = useMemo(() => cartVariants.length, [cartVariants]);
   const cartIdentity = useMemo(() => getCartVerificationIdentity(cartVariants), [cartVariants]);
+  const checkoutCountry = useShopCheckoutStore((state) => state.delivery_address.shipping_country);
+  const selectedCountry = useCurrencyCookie((state) => state.iso3);
+  const country = selectedCountry || checkoutCountry || 'USA';
+  const quoteIdentity = `${country}:${cartIdentity}`;
+  const [orderDetails, setOrderDetails] = useState<{
+    identity: string;
+    value: Awaited<ReturnType<typeof getOrderFinalDetails>>;
+  } | null>(null);
+  const currentOrderDetails = orderDetails?.identity === quoteIdentity ? orderDetails.value : null;
   const [availabilityGate, setAvailabilityGate] = useState<{
     cartIdentity: string | null;
     status: 'available' | 'blocked';
@@ -68,7 +87,7 @@ const CheckoutPage = () => {
     setHasRedirected(true);
     errorToast({
       header: 'Cart needs attention',
-      message: 'Remove unavailable items or choose another available option before checkout.',
+      message: 'Please review availability and delivery options in your cart before checking out.',
     });
     push('/shop/cart');
   }, [hasRedirected, push]);
@@ -76,7 +95,7 @@ const CheckoutPage = () => {
   // useEffects
   // Manually rehydrate the useShopCheckoutStore
   useEffect(() => {
-    useShopCheckoutStore.persist.rehydrate();
+    if (!useShopCheckoutStore.persist.hasHydrated()) void useShopCheckoutStore.persist.rehydrate();
   }, []);
 
   useEffect(() => {
@@ -91,19 +110,17 @@ const CheckoutPage = () => {
   }, [cartHydrated, cartCount, hasRedirected, triggerEmptyCartRedirect]);
 
   useEffect(() => {
-    if (!cartHydrated || hasRedirected || cartVariants.length === 0) return;
+    if (!cartHydrated || !checkoutHydrated || hasRedirected || cartVariants.length === 0) return;
 
     let active = true;
-    hydrateCartDisplayFromMerchizeOfflineCatalog(cartVariants)
-      .then(({ availabilityByVariantId }) => {
+    getOrderFinalDetails(cartVariants, country, 'merchize')
+      .then((details) => {
         if (!active) return;
-
-        const isBlocked = hasCheckoutBlockingCartItems(cartVariants, availabilityByVariantId);
+        setOrderDetails({ identity: quoteIdentity, value: details });
         setAvailabilityGate({
           cartIdentity,
-          status: isBlocked ? 'blocked' : 'available',
+          status: 'available',
         });
-        if (isBlocked) triggerUnavailableCartRedirect();
       })
       .catch((error) => {
         console.warn('[CheckoutPage] Cart availability verification failed:', error);
@@ -115,7 +132,16 @@ const CheckoutPage = () => {
     return () => {
       active = false;
     };
-  }, [cartHydrated, cartIdentity, cartVariants, hasRedirected, triggerUnavailableCartRedirect]);
+  }, [
+    cartHydrated,
+    checkoutHydrated,
+    cartIdentity,
+    quoteIdentity,
+    country,
+    cartVariants,
+    hasRedirected,
+    triggerUnavailableCartRedirect,
+  ]);
 
   useEffect(() => {
     if (cartHydrated) return;
@@ -146,7 +172,12 @@ const CheckoutPage = () => {
     setOpenItem(''); // Update the state to close the accordion
   };
 
-  if (!cartHydrated || cartCount === 0 || availabilityGateStatus !== 'available') {
+  if (
+    !cartHydrated ||
+    !checkoutHydrated ||
+    cartCount === 0 ||
+    availabilityGateStatus !== 'available'
+  ) {
     return (
       <section
         className='mx-auto my-12 w-[min(92vw,42rem)] rounded-2xl border border-white/10 bg-[#4C3D3D3D] p-8 text-center text-white backdrop-blur-[10px]'
@@ -173,7 +204,7 @@ const CheckoutPage = () => {
 
   // JSX
   return (
-    <ServerOrderDetailsComponent>
+    <ServerOrderDetailsComponent details={currentOrderDetails}>
       <CheckoutAccordionContext.Provider value={{ handleCloseAccordion, handleOpenItem }}>
         <div className='grid grid-cols-1 gap-8 items-start px-2 py-12 md:px-[20px] lg:px-[24px] min-h-dvh lg:grid-cols-12'>
           <div className='bg-[#4C3D3D3D] backdrop-blur-[10px] pt-10 !px-2 rounded-[10px] md:p-10 space-y-8 lg:col-span-7'>
@@ -191,7 +222,11 @@ const CheckoutPage = () => {
                 <AccordionItem value='payment-section' className='border-none px-4'>
                   {/* Note: AccordionTrigger is not needed if you only want programmable control */}
                   <AccordionContent>
-                    <PaymentSection />
+                    {currentOrderDetails ? (
+                      <PaymentSection />
+                    ) : (
+                      <p role='status'>Updating shipping and availability...</p>
+                    )}
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>

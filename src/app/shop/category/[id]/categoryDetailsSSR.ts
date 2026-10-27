@@ -104,67 +104,72 @@ const getCategoryIDFromMerchize = cache(async (categoryName: string) => {
 });
 
 // Get tCategory's Metadata from Merchize
-export const getCategoryMetadataFromMerchize = cache(async (categoryName: string) => {
-  const snapshotState = await getCategoryMetadataSnapshotState(categoryName).catch((err) => {
-    console.warn('[storefrontSnapshot] category metadata snapshot read failed:', err);
-    return null;
-  });
-  if (snapshotState?.isFresh) return snapshotState.category;
-
-  try {
-    const categoryID = await getCategoryIDFromMerchize(categoryName);
-
-    // Make second request to extract all metadata
-    const { data: metaDataObj } = (await fetchFromMerchizeWithNextCache(
-      `${merchizeBaseURL}/product/v2/collections/${categoryID}`,
-      'GET',
-      null,
-      1,
-    )) as {
-      data: { cover: { url: string } | null | undefined; description: string; name: string };
-    };
-
-    const { description, name } = metaDataObj || {};
-
-    const categoryMeta = {
-      ...metaDataObj,
-      name: name.charAt(0).toUpperCase() + name.slice(1),
-      description: description
-        ? description.split('.')[0].replace(/<[^>]*>/g, '')
-        : `Buy ${name} now. Limited edition.`,
-      categoryID,
-    };
-
-    await upsertStorefrontCategorySnapshot({
-      categorySlug: categoryName,
-      merchizeCategoryId: categoryID,
-      name: categoryMeta.name,
-      description: categoryMeta.description,
-      coverUrl: categoryMeta.cover?.url ?? null,
-      rawCategoryJson: categoryMeta,
-    }).catch((err) => {
-      console.warn('[storefrontSnapshot] category snapshot upsert failed:', err);
+export const getCategoryMetadataFromMerchize = cache(
+  async (categoryName: string, forceRefresh = false) => {
+    const snapshotState = await getCategoryMetadataSnapshotState(categoryName).catch((err) => {
+      console.warn('[storefrontSnapshot] category metadata snapshot read failed:', err);
+      return null;
     });
+    if (!forceRefresh && snapshotState?.isFresh) return snapshotState.category;
 
-    return categoryMeta;
+    try {
+      const categoryID = await getCategoryIDFromMerchize(categoryName);
 
-    //  Catch errors
-  } catch (err) {
-    if (shouldUseStorefrontSnapshot(err)) {
-      const snapshot = await getCategoryMetadataFromSnapshot(categoryName);
-      if (snapshot) {
-        console.info('[merchizeOfflineCatalog.categoryMetadata] snapshot:fallback', {
-          category: categoryName,
-          providerError: formatProviderErrorForLog(err),
-        });
-        return snapshot;
+      // Make second request to extract all metadata
+      const { data: metaDataObj } = (await fetchFromMerchizeWithNextCache(
+        `${merchizeBaseURL}/product/v2/collections/${categoryID}`,
+        'GET',
+        null,
+        forceRefresh ? 0 : 1,
+      )) as {
+        data: { cover: { url: string } | null | undefined; description: string; name: string };
+      };
+
+      const { description, name } = metaDataObj || {};
+
+      const categoryMeta = {
+        ...metaDataObj,
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        description: description
+          ? description.split('.')[0].replace(/<[^>]*>/g, '')
+          : `Buy ${name} now. Limited edition.`,
+        categoryID,
+      };
+
+      await upsertStorefrontCategorySnapshot({
+        categorySlug: categoryName,
+        merchizeCategoryId: categoryID,
+        name: categoryMeta.name,
+        description: categoryMeta.description,
+        coverUrl: categoryMeta.cover?.url ?? null,
+        rawCategoryJson: categoryMeta,
+        force: forceRefresh,
+      }).catch((err) => {
+        if (forceRefresh) throw err;
+        console.warn('[storefrontSnapshot] category snapshot upsert failed:', err);
+      });
+
+      return categoryMeta;
+
+      //  Catch errors
+    } catch (err) {
+      if (forceRefresh) throw err;
+      if (shouldUseStorefrontSnapshot(err)) {
+        const snapshot = await getCategoryMetadataFromSnapshot(categoryName);
+        if (snapshot) {
+          console.info('[merchizeOfflineCatalog.categoryMetadata] snapshot:fallback', {
+            category: categoryName,
+            providerError: formatProviderErrorForLog(err),
+          });
+          return snapshot;
+        }
       }
-    }
 
-    console.log(err);
-    throw err;
-  }
-});
+      console.log(err);
+      throw err;
+    }
+  },
+);
 
 // Fetch from Merchize with Next.js Cache
 // This function is used to fetch data from Merchize API with caching enabled
@@ -183,7 +188,9 @@ const fetchFromMerchizeWithNextCache = cache(
         'X-API-KEY': `${merchizeAPIKey}`,
         'Content-Type': isFormBody ? 'application/x-www-form-urlencoded' : 'application/json',
       },
-      next: { revalidate: daysToCache ? cacheForDays(daysToCache) : undefined },
+      next: {
+        revalidate: daysToCache === 0 ? 0 : daysToCache ? cacheForDays(daysToCache) : undefined,
+      },
 
       body: body,
     });
@@ -213,7 +220,7 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
       `${merchizeBaseURL}/product/products?limit=${page_size}&page=${page}&title=&collectionId[]=${catID}&minPrice=&maxPrice=`,
       'GET',
       null,
-      0.3,
+      forceSnapshotRefresh ? 0 : 0.3,
     )) as CategoryProductsResponse;
 
     if ('data' in categoryProductsResponse && categoryProductsResponse.success) {
@@ -230,6 +237,7 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
         products: normalizedProducts,
         force: forceSnapshotRefresh,
       }).catch((err) => {
+        if (forceSnapshotRefresh) throw err;
         console.warn('[storefrontSnapshot] category page snapshot upsert failed:', err);
       });
 
@@ -256,6 +264,7 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
       );
     }
   } catch (err) {
+    if (forceSnapshotRefresh) throw err;
     if (shouldUseStorefrontSnapshot(err)) {
       const snapshot = await getCategoryProductsFromSnapshot({ category, page, page_size });
       if (snapshot) {
