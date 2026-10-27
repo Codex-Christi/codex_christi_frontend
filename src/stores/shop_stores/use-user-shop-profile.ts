@@ -21,7 +21,11 @@ export const useUserShopProfile = create<UserShopProfile>((set) => ({
   clearProfile: () => set({ userShopProfile: null, isLoading: false, error: null }),
   setProfileFromServer: async () => {
     if (!useAuthStore.getState().isAuthenticated) {
-      set({ userShopProfile: null, isLoading: false });
+      set(
+        useAuthStore.getState().status === 'unavailable'
+          ? { isLoading: false }
+          : { userShopProfile: null, isLoading: false },
+      );
       return;
     }
     const generation = getAuthGeneration();
@@ -32,7 +36,7 @@ export const useUserShopProfile = create<UserShopProfile>((set) => ({
       if (getAuthGeneration() !== generation) return;
       if (!result?.success) {
         set({
-          userShopProfile: null,
+          ...(!result || result.code === 'unavailable' ? {} : { userShopProfile: null }),
           isLoading: false,
           error: result && !result.success ? result.error : 'Unable to load your shop profile.',
         });

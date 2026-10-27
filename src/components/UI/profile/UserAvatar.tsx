@@ -7,6 +7,7 @@ import Image, { StaticImageData } from 'next/image';
 import { User } from 'lucide-react';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { cn } from '@/lib/utils';
+import useAuthStore from '@/stores/authStore';
 
 const UserAvatar: FC<{
   height?: number;
@@ -16,7 +17,9 @@ const UserAvatar: FC<{
   alt?: string;
   [key: string]: any;
 }> = ({ height = 50, width = 50, className, src, alt, ...rest }) => {
-  const userMainProfile = useUserMainProfileStore((state) => state.userMainProfile);
+  const authenticated = useAuthStore((state) => state.isAuthenticated);
+  const cachedProfile = useUserMainProfileStore((state) => state.userMainProfile);
+  const userMainProfile = authenticated ? cachedProfile : null;
   const imageSrc =
     src ??
     (userMainProfile?.profile_pic && typeof userMainProfile.profile_pic === 'string'

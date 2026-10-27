@@ -1,12 +1,12 @@
 import ProfileSidebar from '@/components/UI/profile/ProfileSidebar';
-import RequireAccount from '@/components/UI/Auth/RequireAccount';
+import ServerAccountBoundary from '@/components/UI/Auth/ServerAccountBoundary';
 import '../route-utilities.css';
 import dynamic from 'next/dynamic';
 const CometsContainer = dynamic(() => import('@/components/UI/general/CometsContainer'));
 
 const ProfileLayout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <RequireAccount>
+    <ServerAccountBoundary>
       <CometsContainer>
         <div className='md:flex md:items-start'>
           <div className='hidden lg:contents'>
@@ -16,7 +16,7 @@ const ProfileLayout = ({ children }: { children: React.ReactNode }) => {
           {children}
         </div>
       </CometsContainer>
-    </RequireAccount>
+    </ServerAccountBoundary>
   );
 };
 

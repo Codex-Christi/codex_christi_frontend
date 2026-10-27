@@ -40,6 +40,8 @@ Nginx maps public shop paths into Next's `/shop` subtree. The supplied file also
 | POST logout, origin validation and both admin-cookie Paths | `src/app/api/logout/route.ts`, `src/lib/auth/request-origin.ts`, `logout-cookies.ts` |
 | Client logout and private-state cleanup | `src/actions/logout.ts`, `src/lib/auth/client-session.ts` |
 | Account identity, stale-request guards and tab checks | `src/stores/authStore.ts`, profile stores, `src/lib/auth/session-generation.ts`, `LoggedinProvider.tsx` |
+| Safe client session shape, bounded retry/expiry scheduling | `src/lib/auth/session-snapshot.ts`, `session-monitor.ts` |
+| Protected server bootstrap and private-view/draft retention | `ServerAccountBoundary.tsx`, `RequireAccount.tsx`, `AccountAccessContext.tsx` under `src/components/UI/Auth/`; `src/lib/auth/account-view-state.ts` |
 | Shared pending/toast behavior | `src/lib/hooks/authHooks/useAuthTask.ts` |
 | Safe failure metadata without profile values/tokens | `src/lib/auth/account-diagnostics.ts` |
 | Reused production admin database client | `src/lib/prisma/adminOpsLedger/adminOpsLedgerPrisma.ts` |
@@ -56,6 +58,8 @@ Nginx maps public shop paths into Next's `/shop` subtree. The supplied file also
 6. Confirmed invalid refresh clears cookies. Timeout, 429, 5xx, 403 and malformed refresh responses preserve the refresh cookie and return a retry state. A proactive-refresh outage does not discard still-valid access.
 7. `getUser()` and `fetchUserShopProfile()` are read-only rendering helpers. Only browser-invoked actions opt into cookie writes. Their account parsing/error handling is shared with the server actions.
 8. Concurrent refreshes share a bounded in-process promise cache. Logout cancels matching in-process refreshes; this does not coordinate multiple processes or eliminate every late Set-Cookie race.
+9. A transient session-check failure schedules three additional automatic attempts, after 2, 5 and 15 seconds. Exhausting this budget stops retries; Retry or a throttled focus/resume check can start a new budget. There is no continuous polling. Still-valid access remains usable after a proactive-refresh failure, but its actual expiry independently hides private UI even if another check is pending.
+10. Only the protected `/profile` and shop account layouts bootstrap the browser from `getServerAuthSnapshot()`. The read-only projection includes identity, expiry and status, never tokens. It removes the redundant startup session action on a cold protected-page load. Public catalog/root layouts do not gain cookie reads. A stale prefetched snapshot cannot overwrite a known logout or different login, and rendering does not seed a shared server-side Zustand store.
 
 ### Logout And Account State
 
@@ -63,8 +67,10 @@ Nginx maps public shop paths into Next's `/shop` subtree. The supplied file also
 - Send separate Set-Cookie expiry headers for `session`, `refreshToken`, and `admin_session` at both `/admin` and legacy `/`. A map keyed only by cookie name would lose one admin Path.
 - The old Deactivate tile is now Logout with the Lucide LogOut icon and a disabled pending state. It does not deactivate/delete the Django account.
 - Main/shop profiles live in memory, not persisted browser storage. Cleanup removes legacy keys and resets private edit/address/email/verification/payment-recovery state, deliberately keeping guest cart items.
-- Account-generation checks ignore late requests from the previous user. Session checks are shared, focus/resume is throttled, and one expiry timer replaces continuous polling. Same-origin tab notices clear/reload private state; they do not notify another domain.
+- Late responses cannot restore the previous account after logout or an account switch. Tabs on the same domain notify each other about login/logout; this does not notify the other domain.
 - `refreshAuthState()` is the store's session-check method. Obsolete persist-hydration stubs, an unused initializer and the empty refresh hook were removed. The avatar waits for confirmed identity instead of issuing another session check.
+- If a check fails temporarily, hide account details and keep unsaved edits in this tab. A successful check for the same person restores them. Confirmed logout or a different account discards them. `accountOwnerId` remembers whose hidden draft it is; it never grants access. Drafts do not survive a full reload.
+- Edit drawers and discard dialogs also hide during that outage, including those rendered outside the page container. Address forms fill saved values once per open, so a background reload cannot replace an unsaved draft. Explicit close discards the address draft. The avatar shows cached personal details only while sign-in is verified.
 
 ### Forms, Address And Uploads
 
@@ -95,21 +101,27 @@ Read-only source: [production Swagger supplied by the user](http://5.78.101.86:8
 
 ## Verification
 
-Installed Next is 16.3.0. Read its bundled docs before changing these boundaries. Tests use installed Next request stores to enforce cookie-write restrictions, existing node:test/tsx, and synthetic data.
+Read the installed Next documentation in `node_modules/next/dist/docs/` before changing these boundaries. Tests use its real request stores to enforce cookie-write restrictions, existing node:test/tsx, and fake data.
 
 ```sh
-node --require next/dist/server/node-environment --conditions=react-server --import tsx --test src/lib/auth/auth-hardening.test.ts src/lib/auth/server-boundaries.test.ts src/lib/session/session-hardening.test.ts src/stores/shop_stores/use-wishlist.test.ts src/lib/wishlist/normalize.test.ts
+node --require next/dist/server/node-environment --conditions=react-server --import tsx --test src/lib/auth/auth-hardening.test.ts src/lib/auth/server-boundaries.test.ts src/lib/auth/session-recovery.test.ts src/lib/session/session-hardening.test.ts src/stores/shop_stores/use-wishlist.test.ts src/lib/wishlist/normalize.test.ts
 npx tsc --noEmit --incremental false
 npm run build:webpack
 ```
 
-The 46 focused tests cover route/origin validation, plus-addresses, form rules, matching client/server profile validation, upload overhead, DTO filtering, cookie kinds/legacy rejection, refresh classification/coalescing/cancellation, GET logout refusal, both admin-cookie Paths during an outage, independent admin unlock, read-only rendering, stale profile responses, 403/404 behavior and Prisma reuse without database queries. Existing wishlist tests remain included.
+Current checks, 2026-10-27:
 
-Browser checks in the implementation pass verified invalid login/reset submissions, synthetic login/account redirect, the Logout tile, logout returning to shop login, and main-site Register destinations. The user retried their own real account fetch and confirmed it loads. No production credentials, account creation, reset email or profile/address write were submitted by the agent.
+| Check | Coverage / result |
+| --- | --- |
+| 60 regression tests | Forms, safe redirects, cookies, refresh/retry timing, logout, account switching, hidden-tab recovery, read-only server code, profile validation, upload limits and wishlist behavior. Tests use fake data, not a live database. |
+| TypeScript and targeted ESLint | Pass for the auth changes; TypeScript also passes in the shared checkout. |
+| Isolated production webpack build | Pass over the committed baseline with only the auth changes. Checked private session helpers are absent from its public action manifest. Public catalog pages remain static. |
+| Production-build browser checks | Account loading skips the extra startup session request. During a simulated refresh outage, expiry hides account details and edit drawers. Retry restores the same unsaved address; explicit close/reopen restores the saved address. No console errors/warnings. |
+| Earlier form/login browser checks | Invalid submissions, return destinations, Register links and Logout passed. The user also confirmed their real account page loads. |
 
-Before committing, test the staged tree separately from the unrelated dirty working tree and inspect its action manifest for exposed private helpers. Do not run a verification server against a build directory another task is overwriting. Local tests do not establish production proxy/cache/token behavior or a measured latency improvement.
+Keep the regression tests. Temporary browser fixtures and demo data are not application files and must not be committed. No real credentials, account creation, reset email or profile/address write were submitted by the agent.
 
-Auth commit verification on 2026-10-27: all 46 tests, TypeScript and targeted ESLint passed in an exported staged tree. Its production webpack build also passed with the separate storefront CSS changes included as verification dependencies. Those styles and their route imports are maintained by the [Storefront CSS guide](../README.md#storefront-css), not by the auth implementation. Keep both CSS files in deployments; the storefront regression test checks their route imports and rule coverage. The storefront changes were also verified in a full isolated Turbopack production build.
+Before committing, test the staged files in a separate copy and inspect the action manifest for exposed private helpers. Do not share a build directory with another running task. The copy reuses local dependencies; it is not a test of a self-contained container package. These checks do not prove production Nginx behavior or a measured speed increase. Keep the existing route CSS imports described in the [Storefront CSS guide](../README.md#storefront-css).
 
 ## Deployment Checklist
 
@@ -119,6 +131,7 @@ Auth commit verification on 2026-10-27: all 46 tests, TypeScript and targeted ES
 - [ ] Keep `/next-api` routed to Next on both hosts and preserve trusted public Host/protocol headers. Do not disable same-origin checks to work around proxy errors.
 - [ ] Apply the Nginx recommendations below separately, run nginx -t in the actual container, reload in a controlled deployment and purge affected old HTML cache entries.
 - [ ] With disposable accounts behind HTTPS, verify both shop addresses, recovery, profile/address save past access expiry, invalid refresh, outages, two same-origin tabs and two independent devices.
+- [ ] During an outage, leave a dirty profile/address drawer open through access expiry: it must disappear while unverified and return unchanged after same-account recovery. Confirm actual logout and switching accounts discard the previous draft. Confirm hidden tabs do not retry continuously and exhausted retries require Retry or a later focus check.
 - [ ] Confirm actual Django lifetimes, refresh rotation, logout scope and password-reset revocation before claiming those behaviors. Verify parallel refresh in every deployed Next process/container.
 
 ## Nginx Follow-Up

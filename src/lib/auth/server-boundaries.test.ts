@@ -22,6 +22,8 @@ import useAuthStore from '@/stores/authStore';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
 import { getUser } from '@/lib/funcs/userProfileFetchers/getUser';
+import { getServerAuthSnapshot } from '../session/server-session';
+import { useEditUserMainProfileStore } from '@/stores/editUserProfileStore';
 
 function env(t: TestContext, key: string, value: string) {
   const previous = process.env[key];
@@ -160,6 +162,27 @@ test('the admin render profile reader does not call a writable action on upstrea
   assert.equal(mock.mock.callCount(), 1);
 });
 
+test('account layout snapshot is read-only, contains no tokens and makes no upstream request', async (t) => {
+  setup(t);
+  const mock = t.mock.method(globalThis, 'fetch', async () => {
+    throw new Error('No upstream request expected');
+  });
+  await inRequest(request('/profile', await cookieHeader('bootstrap-user')), async (store) => {
+    store.phase = 'render';
+    const snapshot = await getServerAuthSnapshot();
+    assert.equal(snapshot.user_id, 'bootstrap-user');
+    assert.equal(snapshot.status, 'authenticated');
+    assert.deepEqual(Object.keys(snapshot).sort(), [
+      'expiresAt',
+      'isAuthenticated',
+      'status',
+      'user_id',
+    ]);
+    assert.equal(store.mutableCookies.get('session')?.value === '', false);
+  });
+  assert.equal(mock.mock.callCount(), 0);
+});
+
 test('authenticated reads refresh once after 401 and forward only the server token', async (t) => {
   setup(t);
   const calls: string[] = [];
@@ -250,5 +273,30 @@ test('a missing shop profile or backend outage leaves the login intact', async (
     assert.ok(useUserShopProfile.getState().error);
     mock.mock.restore();
   }
+  useAuthStore.getState().setSessionState({ isAuthenticated: false, user_id: null });
+});
+
+test('temporary profile failures preserve the same owner cache and unsaved edits', async (t) => {
+  setup(t);
+  useAuthStore.getState().setSessionState({ isAuthenticated: true, user_id: 'user-a' });
+  const profile = { id: 'user-a', email: 'a@example.com', first_name: 'Original' };
+  const edits = { first_name: 'Unsaved' };
+  useUserMainProfileStore.getState().setUserMainProfile(profile);
+  useEditUserMainProfileStore.getState().setUserEditData(edits);
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json({ success: false }, { status: 503 }),
+  );
+  await inRequest(request('/profile', await cookieHeader()), () =>
+    useUserMainProfileStore.getState().setProfileFromServer(),
+  );
+  useAuthStore
+    .getState()
+    .setSessionState({ isAuthenticated: false, user_id: null, status: 'unavailable' });
+  await useUserMainProfileStore.getState().setProfileFromServer();
+  assert.deepEqual(useUserMainProfileStore.getState().userMainProfile, profile);
+  assert.deepEqual(useEditUserMainProfileStore.getState().userEditData, edits);
+  assert.equal(useAuthStore.getState().accountOwnerId, 'user-a');
+  useEditUserMainProfileStore.getState().clearEditData();
+  useUserMainProfileStore.getState().clearProfile();
   useAuthStore.getState().setSessionState({ isAuthenticated: false, user_id: null });
 });

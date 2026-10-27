@@ -20,7 +20,7 @@ export const useUserMainProfileStore = create<UserMainProfileStore>((set) => ({
   setProfileFromServer: async () => {
     const userID = useAuthStore.getState().userSessionInfo?.user_id;
     if (!userID) {
-      set({ userMainProfile: null });
+      if (useAuthStore.getState().status !== 'unavailable') set({ userMainProfile: null });
       return;
     }
     const generation = getAuthGeneration();
@@ -30,7 +30,9 @@ export const useUserMainProfileStore = create<UserMainProfileStore>((set) => ({
       if (getAuthGeneration() !== generation) return;
       if (!result?.success || result.data.id !== userID) {
         set({
-          userMainProfile: null,
+          ...(!result || (!result.success && result.code === 'unavailable')
+            ? {}
+            : { userMainProfile: null }),
           error: result && !result.success ? result.error : 'Unable to load your profile.',
         });
         if (result && !result.success && result.code === 'sign_in_required')

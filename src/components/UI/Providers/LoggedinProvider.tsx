@@ -13,22 +13,20 @@ import {
   clearUserShopProfile,
   useUserShopProfile,
 } from '@/stores/shop_stores/use-user-shop-profile';
+import { startSessionMonitor } from '@/lib/auth/session-monitor';
+import { isBootstrappedAccountPath } from '@/lib/auth/session-snapshot';
 
 export default function LoggedinProvider({ children }: { children?: ReactNode }) {
   const path = usePathname();
   const id = useAuthStore((state) => state.userSessionInfo?.user_id ?? null);
-  const status = useAuthStore((state) => state.status);
-  const expiresAt = useAuthStore((state) => state.expiresAt);
+  const ownerId = useAuthStore((state) => state.accountOwnerId);
   const previous = useRef<string | null>(null);
 
   useEffect(() => {
-    let lastCheck = 0;
-    const sync = (force = false) => {
-      if (!force && (document.visibilityState === 'hidden' || Date.now() - lastCheck < 15_000))
-        return;
-      lastCheck = Date.now();
-      void useAuthStore.getState().refreshAuthState();
-    };
+    const monitor = startSessionMonitor(useAuthStore, {
+      isVisible: () => document.visibilityState !== 'hidden',
+      checkOnStart: !isBootstrappedAccountPath(window.location.pathname),
+    });
     const receive = async (message: unknown) => {
       if (
         !message ||
@@ -44,7 +42,7 @@ export default function LoggedinProvider({ children }: { children?: ReactNode })
       useAuthStore.getState().setSessionState({ isAuthenticated: false, user_id: null });
       window.location.reload();
     };
-    const onFocus = () => sync();
+    const onFocus = monitor.resume;
     const onStorage = (event: StorageEvent) => {
       if (event.key === 'codex-auth-event') {
         try {
@@ -63,11 +61,11 @@ export default function LoggedinProvider({ children }: { children?: ReactNode })
     } catch {
       /* storage/focus are fallbacks */
     }
-    sync(true);
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onFocus);
     window.addEventListener('storage', onStorage);
     return () => {
+      monitor.stop();
       channel?.close();
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onFocus);
@@ -76,22 +74,11 @@ export default function LoggedinProvider({ children }: { children?: ReactNode })
   }, []);
 
   useEffect(() => {
-    if (!expiresAt || status !== 'authenticated') return;
-    const timer = window.setTimeout(
-      () => {
-        if (document.visibilityState !== 'hidden') void useAuthStore.getState().refreshAuthState();
-      },
-      Math.min(2_147_000_000, Math.max(1000, expiresAt - Date.now() - 15_000)),
-    );
-    return () => window.clearTimeout(timer);
-  }, [expiresAt, status]);
-
-  useEffect(() => {
     let cancelled = false;
     const update = async () => {
-      if (previous.current !== id) {
+      if (previous.current !== ownerId) {
         const hadUser = Boolean(previous.current);
-        previous.current = id;
+        previous.current = ownerId;
         if (hadUser) await clearPrivateClientState();
         else
           await Promise.allSettled([
@@ -101,11 +88,7 @@ export default function LoggedinProvider({ children }: { children?: ReactNode })
           ]);
       }
       if (!id || cancelled) return;
-      if (
-        /^\/(?:profile|shop\/(?:account-overview|checkout))/.test(path) ||
-        path.startsWith('/account-overview') ||
-        path === '/checkout'
-      ) {
+      if (isBootstrappedAccountPath(path) || /^\/(?:shop\/)?checkout(?:\/|$)/.test(path)) {
         await Promise.all([
           useUserMainProfileStore.getState().setProfileFromServer(),
           ...(!path.startsWith('/profile')
@@ -118,6 +101,6 @@ export default function LoggedinProvider({ children }: { children?: ReactNode })
     return () => {
       cancelled = true;
     };
-  }, [id, path]);
+  }, [ownerId, id, path]);
   return children ?? null;
 }

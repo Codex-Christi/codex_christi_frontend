@@ -1,12 +1,10 @@
-// import PhoneInput from 'react-phone-number-input';
-// import 'react-phone-number-input/style.css';
 import EditCountry from '@/components/UI/profile/Edit/EditCountry';
 import loadingToast from '@/lib/loading-toast';
 import errorToast from '@/lib/error-toast';
 import successToast from '@/lib/success-toast';
 import { toast } from 'sonner';
 import { ArrowLeftIcon } from 'lucide-react';
-import { SetStateAction, useEffect } from 'react';
+import { type SetStateAction, useEffect, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/UI/primitives/button';
@@ -20,18 +18,19 @@ import {
 } from '@/components/UI/primitives/drawer';
 import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
 import {
-  ShippingAddressFormData,
+  type ShippingAddressFormData,
   shippingAddressSchema,
 } from '@/lib/types/shipping-address-schema';
 import { updateMyShippingAddress } from '@/actions/account/profile';
 import { normalizeCountryToIso2 } from '@/lib/utils/shop/checkout/normalizeCountryToIso3';
 import { getAuthGeneration } from '@/lib/auth/session-generation';
+import { useAccountAccess } from '@/components/UI/Auth/AccountAccessContext';
 
-const updateShippingAddress = async (formData: ShippingAddressFormData) => {
-  const result = await updateMyShippingAddress(formData);
-  if (!result.success) throw new Error(result.error);
-  return result.data;
-};
+const ADDRESS_FIELDS = [
+  { name: 'shipping_state', label: 'State', placeholder: 'Enter state' },
+  { name: 'shipping_city', label: 'City', placeholder: 'Enter city' },
+  { name: 'shipping_address', label: 'Street address', placeholder: 'Enter street address' },
+] as const;
 
 const ShippingAddressModal = ({
   isActive,
@@ -40,6 +39,8 @@ const ShippingAddressModal = ({
   isActive: boolean;
   setIsActive: React.Dispatch<SetStateAction<boolean>>;
 }) => {
+  const accountAccessible = useAccountAccess();
+  const initialized = useRef(false);
   const userShopProfile = useUserShopProfile((state) => state.userShopProfile);
 
   const setUserShopProfile = useUserShopProfile((state) => state.setUserShopProfile);
@@ -50,36 +51,43 @@ const ShippingAddressModal = ({
     control,
     reset,
     trigger,
-    formState: { errors, isSubmitting, isValid },
+    formState: { errors, isSubmitting, isValid, isDirty },
   } = useForm<ShippingAddressFormData>({
     resolver: zodResolver(shippingAddressSchema),
     mode: 'onChange',
     reValidateMode: 'onChange',
     defaultValues: {
-      //   phone_number: '',
       shipping_state: '',
       shipping_city: '',
       shipping_address: '',
       shipping_country: '',
-      //   directions: '',
     },
   });
 
-  // Populate form with existing data when modal opens
+  // Rechecking the account must not replace an open, unsaved draft.
   useEffect(() => {
-    if (isActive && userShopProfile?.data) {
+    if (!isActive) {
+      if (initialized.current || isDirty) reset();
+      initialized.current = false;
+      return;
+    }
+    if (initialized.current) return;
+    if (isDirty) {
+      initialized.current = true;
+      return;
+    }
+    if (userShopProfile?.data) {
+      initialized.current = true;
       reset({
-        // phone_number: userShopProfile.data.phone_number || '',
         shipping_state: userShopProfile.data.shipping_state || '',
         shipping_city: userShopProfile.data.shipping_city || '',
         shipping_address: userShopProfile.data.shipping_address || '',
         shipping_country: normalizeCountryToIso2(userShopProfile.data.shipping_country) ?? '',
-        // directions: userShopProfile.data.directions || '',
       });
 
-      trigger();
+      void trigger();
     }
-  }, [isActive, userShopProfile, reset, trigger]);
+  }, [isActive, userShopProfile, reset, trigger, isDirty]);
 
   const onSubmit = async (data: ShippingAddressFormData) => {
     const generation = getAuthGeneration();
@@ -88,12 +96,11 @@ const ShippingAddressModal = ({
     });
 
     try {
-      const response = await updateShippingAddress(data);
+      const result = await updateMyShippingAddress(data);
       if (generation !== getAuthGeneration()) return;
+      if (!result.success) throw new Error(result.error);
 
-      toast.dismiss(loadingToastID);
-
-      setUserShopProfile(response);
+      setUserShopProfile(result.data);
 
       setIsActive(false);
 
@@ -102,7 +109,7 @@ const ShippingAddressModal = ({
         header: 'Shipping Address Updated',
       });
     } catch (error) {
-      toast.dismiss(loadingToastID);
+      if (generation !== getAuthGeneration()) return;
 
       const errorMessage =
         error instanceof Error
@@ -119,15 +126,14 @@ const ShippingAddressModal = ({
 
   return (
     <>
-      <Drawer direction='right' open={isActive} onOpenChange={setIsActive}>
+      <Drawer direction='right' open={isActive && accountAccessible} onOpenChange={setIsActive}>
         <DrawerOverlay className='bg-black/[0.01] !backdrop-blur-[10px]'>
           <DrawerContent
             className='!rounded-none h-full bg-black/80 !border-none
                 !fixed !bottom-0 !right-0 !z-[500] w-full flex flex-col place-content-center'
           >
-            <DrawerTitle className='!invisible'>
-              <DrawerDescription>Shipping Address</DrawerDescription>
-            </DrawerTitle>
+            <DrawerTitle className='sr-only'>Shipping address</DrawerTitle>
+            <DrawerDescription className='sr-only'>Edit your delivery address.</DrawerDescription>
 
             <div
               className={cn(
@@ -152,29 +158,6 @@ const ShippingAddressModal = ({
                 onSubmit={handleSubmit(onSubmit)}
                 className='grid gap-4 md:grid-cols-2 pb-8 px-6 w-full'
               >
-                {/* <label className='grid gap-2 w-full' htmlFor='phone_number'>
-                  <span className='text-[#F3F3F399] text-sm'>Phone Number</span>
-
-                  <Controller
-                    name='phone_number'
-                    control={control}
-                    render={({ field }) => (
-                      <PhoneInput
-                        placeholder='Enter phone number'
-                        international
-                        defaultCountry={undefined}
-                        value={field.value}
-                        onChange={field.onChange}
-                        className='input rounded-xl w-full max-w-full'
-                      />
-                    )}
-                                  />
-
-                  {errors?.phone_number && (
-                    <span className='text-red-500 text-xs'>{errors?.phone_number.message}</span>
-                  )}
-                </label> */}
-
                 <label className='grid gap-2' htmlFor='shipping_country'>
                   <span className='text-[#F3F3F399] text-sm'>Country</span>
                   <Controller
@@ -195,71 +178,28 @@ const ShippingAddressModal = ({
                   )}
                 </label>
 
-                <label className='grid gap-2' htmlFor='shipping_state'>
-                  <span className='text-[#F3F3F399] text-sm'>State</span>
-
-                  <input
-                    {...register('shipping_state')}
-                    className='input rounded-xl'
-                    placeholder='Enter state'
-                    id='shipping_state'
-                  />
-
-                  {errors?.shipping_state && (
-                    <span className='text-red-500 text-xs'>{errors?.shipping_state.message}</span>
-                  )}
-                </label>
-
-                <label className='grid gap-2' htmlFor='shipping_city'>
-                  <span className='text-[#F3F3F399] text-sm'>City</span>
-
-                  <input
-                    {...register('shipping_city')}
-                    className='input rounded-xl'
-                    placeholder='Enter city'
-                    id='shipping_city'
-                  />
-
-                  {errors?.shipping_city && (
-                    <span className='text-red-500 text-xs'>{errors?.shipping_city.message}</span>
-                  )}
-                </label>
-
-                <label className='grid gap-2' htmlFor='shipping_address'>
-                  <span className='text-[#F3F3F399] text-sm'>Street Address</span>
-
-                  <input
-                    {...register('shipping_address')}
-                    className='input rounded-xl'
-                    placeholder='Enter street address'
-                    id='shipping_address'
-                  />
-
-                  {errors?.shipping_address && (
-                    <span className='text-red-500 text-xs'>{errors?.shipping_address.message}</span>
-                  )}
-                </label>
-
-                {/* <label className='grid gap-2 md:col-span-2' htmlFor='directions'>
-                  <span className='text-[#F3F3F399] text-sm'>Directions (Optional)</span>
-
-                  <textarea
-                    {...register('directions')}
-                    className='input rounded-xl'
-                    placeholder='Enter directions (optional)'
-                    id='directions'
-                    rows={5}
-                  ></textarea>
-
-                  {errors?.directions && (
-                    <span className='text-red-500 text-xs'>{errors?.directions.message}</span>
-                  )}
-                </label> */}
+                {ADDRESS_FIELDS.map(({ name, label, placeholder }) => (
+                  <label key={name} className='grid gap-2' htmlFor={name}>
+                    <span className='text-[#F3F3F399] text-sm'>{label}</span>
+                    <input
+                      {...register(name)}
+                      className='input rounded-xl'
+                      placeholder={placeholder}
+                      id={name}
+                      aria-invalid={Boolean(errors[name])}
+                      aria-describedby={errors[name] ? `${name}-error` : undefined}
+                    />
+                    {errors[name] && (
+                      <span id={`${name}-error`} className='text-red-500 text-xs'>
+                        {errors[name].message}
+                      </span>
+                    )}
+                  </label>
+                ))}
 
                 <Button
                   name='Save Changes'
                   id='save-changes'
-                  aria-label='Edit Profile'
                   className={cn(
                     'bg-[#0085FF] text-white font-semibold rounded pt-1.5 pb-2 px-5 md:mx-auto block md:col-span-2',
                     {

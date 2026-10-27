@@ -21,7 +21,8 @@ export default function ShopProfileAvatarHydrated({
   const setProfileFromServer = useUserMainProfileStore((state) => state.setProfileFromServer);
 
   useEffect(() => {
-    if (userID) void setProfileFromServer();
+    if (userID && useUserMainProfileStore.getState().userMainProfile?.id !== userID)
+      void setProfileFromServer();
   }, [userID, setProfileFromServer]);
 
   return (

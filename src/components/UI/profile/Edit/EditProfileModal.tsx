@@ -21,6 +21,7 @@ import {
 import EditModalFields from './EditModalFields';
 import { useEditUserMainProfileStore } from '@/stores/editUserProfileStore';
 import { useHistoryStateClose } from '@/lib/hooks/useHistoryStateClose';
+import { useAccountAccess } from '@/components/UI/Auth/AccountAccessContext';
 
 const EDIT_PROFILE_HISTORY_KEY = '__editProfileModal';
 
@@ -31,6 +32,7 @@ const EditProfileModal = ({
   isActive: boolean;
   setIsActive: React.Dispatch<SetStateAction<boolean>>;
 }) => {
+  const accountAccessible = useAccountAccess();
   const pendingEdits = useEditUserMainProfileStore((state) => state.userEditData);
   const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false);
 
@@ -76,7 +78,10 @@ const EditProfileModal = ({
 
   return (
     <>
-      <AlertDialog open={isDiscardDialogOpen} onOpenChange={setIsDiscardDialogOpen}>
+      <AlertDialog
+        open={isDiscardDialogOpen && accountAccessible}
+        onOpenChange={setIsDiscardDialogOpen}
+      >
         <AlertDialogContent className='bg-black/80 backdrop-blur-xl border border-white/10 text-white shadow-2xl shadow-black/70 rounded-2xl max-w-md w-[90vw]'>
           <AlertDialogHeader>
             <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
@@ -101,18 +106,15 @@ const EditProfileModal = ({
 
       <Drawer
         direction='right'
-        open={isActive}
+        open={isActive && accountAccessible}
         onOpenChange={handleDrawerOpenChange}
         shouldScaleBackground
       >
         <DrawerOverlay className='bg-black/[0.01] !backdrop-blur-[10px]' />
 
         <DrawerContent className='!fixed !inset-0 !z-[500] flex items-center justify-center !border-none !bg-transparent pointer-events-none'>
-          <DrawerTitle className='sr-only'>
-            <DrawerDescription data-vaul-no-drag className='select-text'>
-              Edit Profile Modal
-            </DrawerDescription>
-          </DrawerTitle>
+          <DrawerTitle className='sr-only'>Edit profile</DrawerTitle>
+          <DrawerDescription className='sr-only'>Update your profile details.</DrawerDescription>
 
           <div className='pointer-events-auto w-[92%] max-w-[720px] mt-0 md:-mt-8 lg:-mt-16'>
             <div

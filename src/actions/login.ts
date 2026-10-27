@@ -7,13 +7,9 @@ import { getServerSessionState, getServerUserID } from '@/lib/session/server-ses
 import { asRecord, getNestedAuthToken } from '@/lib/session/django-auth-response';
 import { djangoRequest, readDjangoJson } from '@/lib/django/request';
 import { allowAuthAttempt } from '@/lib/auth/rate-limit';
+import type { AuthSessionState } from '@/lib/auth/session-snapshot';
+export type { AuthSessionState } from '@/lib/auth/session-snapshot';
 
-export interface AuthSessionState {
-  isAuthenticated: boolean;
-  user_id: string | null;
-  expiresAt?: number | null;
-  status?: 'authenticated' | 'anonymous' | 'unavailable';
-}
 export type LoginResult =
   { success: true; sessionState: AuthSessionState } | { success: false; error: string };
 
@@ -73,6 +69,7 @@ export async function getAuthSessionState(): Promise<AuthSessionState> {
         user_id: session.userID,
         expiresAt: session.expiresAt,
         status: 'authenticated',
+        retryable: true,
       };
     }
     if (!result.success)
@@ -81,6 +78,7 @@ export async function getAuthSessionState(): Promise<AuthSessionState> {
         user_id: null,
         expiresAt: null,
         status: result.unavailable ? 'unavailable' : 'anonymous',
+        retryable: Boolean(result.unavailable),
       };
     session = await getServerSessionState();
   }

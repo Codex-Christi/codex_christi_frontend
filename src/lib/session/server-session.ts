@@ -8,6 +8,18 @@ import {
   SESSION_COOKIE_NAME,
 } from './session-cookies';
 import { deriveSessionState, SessionPayload, SessionState } from './session-state';
+import type { AuthSessionState } from '../auth/session-snapshot';
+
+// Explicit safe projection: never serialize the token-bearing SessionState itself.
+export async function getServerAuthSnapshot(): Promise<AuthSessionState> {
+  const { isAuthenticated, userID, expiresAt } = await getServerSessionState();
+  return {
+    isAuthenticated,
+    user_id: userID,
+    expiresAt,
+    status: isAuthenticated ? 'authenticated' : 'anonymous',
+  };
+}
 
 export async function getServerSessionState(): Promise<SessionState> {
   const sessionCookie = await getCookie(SESSION_COOKIE_NAME);
