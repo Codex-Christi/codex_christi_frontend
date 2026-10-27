@@ -9,7 +9,7 @@ set -euo pipefail
 # - Starts stack with up -d (migrate + the single app runtime)
 ##############################################################################
 
-APP_DIR="/root/apps/codexchristi"          # <-- adjust if needed
+APP_DIR="${APP_DIR:-/root/apps/codexchristi}"
 COMPOSE_FILE="$APP_DIR/docker-compose.yml"
 PREFERRED_BUILDER="codex-builder-codexchristi"
 
@@ -18,6 +18,8 @@ export COMPOSE_DOCKER_CLI_BUILD=1
 
 echo "== deploy start $(date -u +%FT%TZ) =="
 cd "$APP_DIR"
+export DEPLOY_REVISION
+DEPLOY_REVISION="$(git rev-parse HEAD)"
 
 if [ ! -f "$APP_DIR/.env.production" ]; then
   echo "Missing required env file: $APP_DIR/.env.production" >&2
@@ -64,11 +66,18 @@ docker compose --progress=plain -f "$COMPOSE_FILE" build --parallel
 # Remove/recreate it so the SQLite schema setup and volume permission repair always run.
 echo "Running one-off catalog migration/volume permission repair…"
 docker compose -f "$COMPOSE_FILE" rm -fsv migrate
-docker compose -f "$COMPOSE_FILE" up --force-recreate --no-deps migrate
+docker compose -f "$COMPOSE_FILE" up --force-recreate --no-deps --exit-code-from migrate migrate
 
 # Recreate the runtime container after the shared catalog volume is repaired.
 echo "Starting runtime services…"
-docker compose -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans app
+docker compose -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans --wait --wait-timeout 120 app
+
+running_revision="$(docker compose -f "$COMPOSE_FILE" exec -T app printenv APP_REVISION)"
+if [ "$running_revision" != "$DEPLOY_REVISION" ]; then
+  echo "The running container does not match release $DEPLOY_REVISION" >&2
+  exit 1
+fi
+echo "Release $DEPLOY_REVISION is healthy."
 
 # Aggressively clean unused Docker objects after deploy to protect small VPS disks.
 # Set SKIP_DOCKER_PRUNE=1 only when you intentionally want to keep old images/cache.

@@ -74,6 +74,7 @@ type ClassNames = {
 
 // Dropdown props
 interface CountryDropdownProps {
+  'aria-label'?: string;
   options?: Country[];
   onChange?: (country: Country) => void;
   defaultValue?: string; // ISO3

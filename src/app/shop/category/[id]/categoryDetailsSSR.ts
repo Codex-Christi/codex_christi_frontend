@@ -9,6 +9,7 @@ import { cache } from 'react';
 import {
   coerceMerchizeProviderError,
   fetchMerchizeJson,
+  MerchizeProviderError,
   shouldUseStorefrontSnapshot,
 } from '@/lib/merchizeStorefront/providerErrors';
 import {
@@ -52,8 +53,6 @@ type PaginationParams = {
   forceSnapshotRefresh?: boolean;
 };
 
-// const baseURL = process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL!;
-
 type CategorySearchResponse = {
   data?: {
     collections?: Array<{ _id: string }>;
@@ -86,9 +85,19 @@ const getCategoryIDFromMerchize = cache(async (categoryName: string) => {
       true,
     )) as CategorySearchResponse;
 
-    const categoryID = res.data?.collections?.[0]?._id;
+    if (!Array.isArray(res.data?.collections)) {
+      throw new Error('Merchize returned an invalid category search response.');
+    }
+    const categoryID = res.data.collections[0]?._id;
     if (!categoryID) {
-      throw new Error(`No Merchize category found for "${categoryName}"`);
+      if (res.data.collections.length > 0) {
+        throw new Error('Merchize returned a category without an ID.');
+      }
+      throw new MerchizeProviderError({
+        url: `${merchizeBaseURL}/product/v2/collections/search`,
+        status: 404,
+        message: `No Merchize category found for "${categoryName}"`,
+      });
     }
 
     return categoryID;
@@ -98,7 +107,6 @@ const getCategoryIDFromMerchize = cache(async (categoryName: string) => {
       if (snapshot?.categoryID) return snapshot.categoryID;
     }
 
-    console.log(`Error while getting category ID from Merchize`, err);
     throw err;
   }
 });
@@ -165,7 +173,6 @@ export const getCategoryMetadataFromMerchize = cache(
         }
       }
 
-      console.log(err);
       throw err;
     }
   },
@@ -280,8 +287,6 @@ export const fetchCategoryProducts = cache(async (params: PaginationParams) => {
         return snapshot;
       }
     }
-
-    console.error(err);
 
     throw err;
   }

@@ -5,13 +5,17 @@ import { getDefaultISO3 } from '@/lib/utils/shop/geo/getDefaultISO3.client';
 
 export default function NavCountryDropdownLoaded({
   initiallyOpen = false,
+  onCountryChange,
 }: {
   initiallyOpen?: boolean;
+  onCountryChange?: () => void;
 }) {
   const defaultISO3 = getDefaultISO3();
 
   return (
     <CountryDropdown
+      triggerLabel='Choose storefront country'
+      onCountryChange={onCountryChange}
       initialIso3={defaultISO3}
       initiallyOpen={initiallyOpen}
       slim

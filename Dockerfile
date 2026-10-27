@@ -84,6 +84,7 @@ RUN --mount=type=cache,target=/root/.cache/yarn \
 ########################
 FROM node:lts-bookworm-slim AS runtime
 WORKDIR /app
+ARG APP_REVISION=unknown
 
 # Prisma query engine needs OpenSSL at runtime
 RUN apt-get update -y \
@@ -94,12 +95,14 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV APP_REVISION=${APP_REVISION}
 
 # Next.js standalone output already includes the minimal node_modules it needs.
 # Copy only what the running server needs.
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+COPY scripts/check-deployment-health.mjs ./scripts/check-deployment-health.mjs
 
 # Next config may still be read at runtime (images/rewrites)
 COPY --from=builder /app/next.config.* ./

@@ -14,7 +14,7 @@ const SignUpMainComponent: FC = () => {
     <>
       <aside
         aria-label='Shop alpha notice'
-        className='mx-auto mt-8 w-[80%] max-w-[425px] rounded-xl border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-center text-sm leading-6 text-amber-50 sm:w-[70%] md:w-[50%] lg:w-full'
+        className='mx-auto mt-8 w-[80%] max-w-[425px] rounded-xl border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-center text-sm leading-6 text-amber-50 shadow-lg shadow-black/20 backdrop-blur-xl sm:w-[70%] md:w-[50%] lg:w-full'
       >
         <span className='font-semibold text-amber-200'>Shop alpha:</span> Creating your Codex
         Christi account also joins the shop alpha waitlist. Some shop features are still being

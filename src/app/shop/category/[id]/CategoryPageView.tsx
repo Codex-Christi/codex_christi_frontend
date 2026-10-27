@@ -11,6 +11,8 @@ import { STOREFRONT_SNAPSHOT_CATEGORY_SLUGS } from '@/lib/merchizeStorefront/cat
 import { readCategorySeoManifestEntry } from '@/lib/shop/seoManifest/read';
 import type { CategorySeoManifestEntry } from '@/lib/shop/seoManifest/types';
 import { recordShopMetadataSource } from '@/lib/shop/seoManifest/metadataObservability';
+import { coerceMerchizeProviderError } from '@/lib/merchizeStorefront/providerErrors';
+import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 
 const ProductList = dynamic(
   () =>
@@ -109,6 +111,7 @@ async function getDevLiveCategoryMetadata(categoryName: string) {
   try {
     return await getCategoryMetadataFromMerchize(categoryName);
   } catch (error) {
+    if (coerceMerchizeProviderError(error)?.kind === 'not_found') return null;
     const message = error instanceof Error ? error.message : String(error);
     console.warn('[category.generateMetadata] dev live metadata fetch failed:', message);
     return null;
@@ -216,8 +219,8 @@ async function getCategoryPageData(categoryName: string, page: number, productLi
       initialProductFetchResp,
     };
   } catch (err) {
-    console.log(err);
-    return null;
+    if (coerceMerchizeProviderError(err)?.kind === 'not_found') return null;
+    throw err;
   }
 }
 
@@ -231,11 +234,12 @@ export default async function CategoryPageView({
   const productLimit = CATEGORY_PAGE_SIZE;
   const pageData = await getCategoryPageData(categoryName, page, productLimit);
   if (!pageData) {
-    return notFound();
+    notFound();
   }
 
   const { name, description } = pageData.categoryMetaData;
   const { products, totalPages } = pageData.initialProductFetchResp;
+  if (page > 1 && page > totalPages) notFound();
 
   return (
     <div className='min-h-[60vh]'>
@@ -245,9 +249,19 @@ export default async function CategoryPageView({
       </header>
 
       <main className='px-8 pt-7 flex flex-col gap-16 mb-10'>
-        <ProductList count={productLimit} initialData={products} />
-
-        <PaginationControls currentPage={page} category={categoryName} totalPages={totalPages} />
+        {products.length > 0 ? (
+          <>
+            <ProductList count={productLimit} initialData={products} />
+            <PaginationControls currentPage={page} category={categoryName} totalPages={totalPages} />
+          </>
+        ) : (
+          <div className='space-y-4 py-12 text-center'>
+            <p>No products in this category yet.</p>
+            <CustomShopLink href='/shop/categories' className='underline underline-offset-4'>
+              Browse other categories
+            </CustomShopLink>
+          </div>
+        )}
       </main>
     </div>
   );

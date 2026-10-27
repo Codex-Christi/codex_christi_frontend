@@ -18,3 +18,8 @@ Start with the [storefront rendering and images guide](Future%20Implementation%2
 It explains the shared and page-specific CSS, product-option loading layout,
 mobile/desktop artwork, safe editing points, and measurement records. Original
 images are retained. Run `yarn test:storefront` for the existing regression checks.
+
+### Release Checks
+
+The [deployment guide](devScripts/README.md) covers release verification and
+production readiness checks.

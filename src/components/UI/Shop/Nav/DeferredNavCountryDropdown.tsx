@@ -3,7 +3,10 @@
 import { useEffect, useState, type ComponentType } from 'react';
 import { useDeferredClientEnhancement } from '@/lib/hooks/useDeferredClientEnhancement';
 
-type LoadedCountryDropdown = ComponentType<{ initiallyOpen?: boolean }>;
+type LoadedCountryDropdown = ComponentType<{
+  initiallyOpen?: boolean;
+  onCountryChange?: () => void;
+}>;
 
 export default function DeferredNavCountryDropdown({ disabled }: { disabled?: boolean }) {
   const { ready, requestReady } = useDeferredClientEnhancement({
@@ -29,7 +32,12 @@ export default function DeferredNavCountryDropdown({ disabled }: { disabled?: bo
   if (disabled) return null;
 
   if (LoadedDropdown) {
-    return <LoadedDropdown initiallyOpen={openWhenReady} />;
+    return (
+      <LoadedDropdown
+        initiallyOpen={openWhenReady}
+        onCountryChange={() => setOpenWhenReady(false)}
+      />
+    );
   }
 
   return (

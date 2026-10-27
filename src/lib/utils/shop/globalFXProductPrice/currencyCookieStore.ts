@@ -24,6 +24,7 @@ function convert(usdCents: number, fx?: Fx) {
 }
 
 function createCurrencyCookieStore(initial: CookieStateV1) {
+  let countryRequest = 0;
   const store = createStore<State>((set, get) => ({
     ...initial,
 
@@ -32,7 +33,8 @@ function createCurrencyCookieStore(initial: CookieStateV1) {
     },
 
     setISO3(iso3) {
-      set({ iso3, updatedAt: Date.now() });
+      countryRequest += 1;
+      set({ iso3, fx: undefined, updatedAt: Date.now() });
       writeCurrencyCookieClient(get());
     },
 
@@ -42,16 +44,20 @@ function createCurrencyCookieStore(initial: CookieStateV1) {
     },
 
     async changeCountry(iso3) {
-      set({ iso3, updatedAt: Date.now() }); // optimistic
+      const request = ++countryRequest;
+      set({ iso3, fx: undefined, updatedAt: Date.now() });
+      // Persist before awaiting FX so deferred locale detection cannot undo this choice.
+      writeCurrencyCookieClient(get());
       try {
         const res = await fetch(`/next-api/currency/multiplier?code=${iso3}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const fx = await res.json();
+        if (request !== countryRequest) return;
         set({ fx: { ...fx, ts: Date.now() }, updatedAt: Date.now() });
       } catch (e) {
         console.error('[currency] changeCountry failed', e);
       } finally {
-        writeCurrencyCookieClient(get());
+        if (request === countryRequest) writeCurrencyCookieClient(get());
       }
     },
   }));

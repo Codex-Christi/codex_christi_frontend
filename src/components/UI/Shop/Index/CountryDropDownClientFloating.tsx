@@ -16,6 +16,8 @@ export type FloatingDropdownProps = {
   portalContainer?: HTMLElement | null | undefined;
   isMobileOverride?: boolean;
   initiallyOpen?: boolean;
+  triggerLabel?: string;
+  onCountryChange?: () => void;
   /** Optional: control the outer wrapper when slim=true or to override defaults */
   wrapperClassName?: string;
   /** Optional: extra classes to style the chevron icon on the trigger (spacing/visibility). */
@@ -36,6 +38,8 @@ export default function CountryDropdownClientFloating({
   mobileBlockAutoFocus,
   portalContainer,
   initiallyOpen,
+  triggerLabel,
+  onCountryChange,
 }: FloatingDropdownProps) {
   const iso3 = useCurrencyCookie((s) => s.iso3);
   const changeCountry = useCurrencyCookie((s) => s.changeCountry);
@@ -57,9 +61,11 @@ export default function CountryDropdownClientFloating({
   return (
     <div className={wrapperClasses}>
       <CountryDropdown
+        aria-label={triggerLabel}
         key={key}
         defaultValue={defaultValue}
         onChange={(c: Country) => {
+          onCountryChange?.();
           if (c.alpha3 && c.alpha3 !== iso3) {
             changeCountry(c.alpha3);
             setCheckoutStoreCountry(c.alpha3);

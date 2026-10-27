@@ -38,6 +38,10 @@ test('scoped SQLite evidence renews on demand while checkout rechecks live price
     ],
     { env: process.env, stdio: 'pipe' },
   );
+  const { GET: readiness } = await import('@/app/api/health/ready/route');
+  const ready = await readiness();
+  assert.equal(ready.status, 200, 'an empty, migrated local database is ready');
+  assert.equal(ready.headers.get('Cache-Control'), 'no-store');
   const supplier = {
     _id: 'supplier-product',
     sku: '6014US',
@@ -58,7 +62,9 @@ test('scoped SQLite evidence renews on demand while checkout rechecks live price
     const url = String(input);
     calls.push({ url, init });
     let body: unknown;
-    if (url.includes('catalog.example')) {
+    if (url === 'https://open.er-api.com/v6/latest/USD') {
+      body = { result: 'success', rates: { USD: 1, NGN: 1600 } };
+    } else if (url.includes('catalog.example')) {
       assert.equal(new URL(url).searchParams.get('search'), '6014US');
       body = {
         success: true,
@@ -218,6 +224,10 @@ test('scoped SQLite evidence renews on demand while checkout rechecks live price
   const internationalBody = await international.json();
   assert.deepEqual(internationalBody.data, []);
   assert.equal(internationalBody.unavailabilityReason, 'shipping_unavailable');
+  await assert.rejects(() => resolveCanonicalOrderSnapshotFromMerchize({
+    ...input, destination: { countryIso3: 'NGA' },
+  }), error => error instanceof Error && 'code' in error && error.code === 'INVALID_SHIPPING_BAND',
+  'an unsupported country cannot be purchased through a direct checkout request');
   assert.equal(international.headers.get('Cache-Control'), 'private, no-store');
   const callsBeforeInvalidCountry = calls.length;
   assert.equal((await requestOptions('INVALID')).status, 400);
@@ -324,6 +334,7 @@ test('scoped SQLite evidence renews on demand while checkout rechecks live price
   globalThis.fetch = async () => new Response('Supplier internal diagnostic', { status: 503 });
   const outage = await requestOptions('USA');
   assert.equal(outage.status, 503);
+  await assert.rejects(resolve, 'saved display data must not authorize checkout during an outage');
   assert.doesNotMatch(JSON.stringify(await outage.json()), /Supplier internal diagnostic/);
   const failedCheck = await db.storefrontProductDestinationCheck.findUnique({
     where: {
@@ -398,4 +409,24 @@ test('scoped SQLite evidence renews on demand while checkout rechecks live price
     countBeforeCancellation,
     'cancelling a dashboard request must not persist provider-unavailable failures',
   );
+
+  const { getCategoryMetadataFromMerchize, fetchCategoryProducts } =
+    await import('@/app/shop/category/[id]/categoryDetailsSSR');
+  const { coerceMerchizeProviderError } = await import('@/lib/merchizeStorefront/providerErrors');
+  globalThis.fetch = async () => Response.json({ data: { collections: [] } });
+  for (const read of [
+    () => getCategoryMetadataFromMerchize('missing-fixture'),
+    () => fetchCategoryProducts({ category: 'missing-fixture', page: 1, page_size: 15 }),
+  ]) {
+    await assert.rejects(read, error => coerceMerchizeProviderError(error)?.kind === 'not_found');
+  }
+  globalThis.fetch = async () => Response.json({ data: {} });
+  await assert.rejects(() => getCategoryMetadataFromMerchize('malformed-fixture'),
+    error => coerceMerchizeProviderError(error)?.kind !== 'not_found');
+  globalThis.fetch = async () => new Response('Unavailable', { status: 503 });
+  await assert.rejects(() => getCategoryMetadataFromMerchize('outage-fixture'),
+    error => coerceMerchizeProviderError(error)?.status === 503);
+
+  await db.$executeRawUnsafe('DROP TABLE "SupplierCatalogProductEvidence"');
+  assert.equal((await readiness()).status, 503, 'an incomplete local schema is not ready');
 });
