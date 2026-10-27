@@ -1,7 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { requestPasswordCode, resetAccountPassword } from '@/actions/account/registration';
+import { requestPasswordCode } from '@/actions/account/registration';
+import { resetPasswordAndSignOut } from '@/lib/auth/password-reset-client';
 import { useAuthReturnPath, useAuthRoutes } from '@/components/UI/Auth/AuthRoutesProvider';
 import { authFlowUrl } from '@/lib/auth/domain-routing';
 import successToast from '@/lib/success-toast';
@@ -22,10 +23,14 @@ export const usePasswordReset = () => {
     );
   const resetPassword = (input: { email: string; otp: string; password: string }) =>
     task.run(
-      () => resetAccountPassword(input),
+      () => resetPasswordAndSignOut(input),
       () => {
-        successToast({ message: 'Password changed. Sign in with your new password.' });
-        router.replace(authFlowUrl(routes.login, { email: input.email, next }));
+        const destination = new URL(
+          authFlowUrl(routes.login, { email: input.email, next }),
+          window.location.origin,
+        );
+        destination.searchParams.set('from-password-reset', 'true');
+        window.location.replace(`${destination.pathname}${destination.search}`);
       },
     );
   return { ...task, passwordResetOTP, resetPassword };

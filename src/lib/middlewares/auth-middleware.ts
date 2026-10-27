@@ -39,6 +39,14 @@ export const redirectLoggedInUserToProfileMiddleware = (req: NextRequest) =>
 async function protect(req: NextRequest, admin: boolean) {
   // Unsafe methods are checked by their own actions/handlers; never replay a POST via redirects.
   if (req.method !== 'GET' && req.method !== 'HEAD') return NextResponse.next();
+  const host = req.headers.get('host') ?? '';
+  const routes = getAuthRoutes(host, req.nextUrl.pathname.startsWith('/shop/'));
+  const cleanUrl = req.nextUrl.clone();
+  cleanUrl.searchParams.delete(SESSION_REFRESH_GUARD_PARAM);
+  const path = publicShopPath(`${cleanUrl.pathname}${cleanUrl.search}`, host);
+  const returnPath = admin
+    ? sanitizeAdminReturnPath(path)
+    : (safeAuthReturnPath(path, routes) ?? routes.account);
   let state = await getRequestSessionState(req);
   let freshCookies: AuthCookieDefinition[] = [];
   let clearCookies = state.shouldClearCookies;
@@ -54,8 +62,14 @@ async function protect(req: NextRequest, admin: boolean) {
         state = await getRequestSessionState(req);
       } catch (error) {
         if (!(error instanceof SessionRefreshError && error.invalid)) {
-          return new NextResponse('Sign-in is temporarily unavailable. Please retry this page.', {
-            status: 503,
+          const destination = getRequestUrl(
+            `${routes.prefix}/auth/session-unavailable`,
+            req.headers,
+            req.url,
+          );
+          destination.searchParams.set('next', returnPath);
+          return NextResponse.redirect(destination, {
+            status: 307,
             headers: { 'Cache-Control': 'private, no-store', 'Retry-After': '5' },
           });
         }
@@ -73,14 +87,6 @@ async function protect(req: NextRequest, admin: boolean) {
       ? clearAuthCookies(response, req.headers)
       : response;
   };
-  const host = req.headers.get('host') ?? '';
-  const routes = getAuthRoutes(host, req.nextUrl.pathname.startsWith('/shop/'));
-  const cleanUrl = req.nextUrl.clone();
-  cleanUrl.searchParams.delete(SESSION_REFRESH_GUARD_PARAM);
-  const path = publicShopPath(`${cleanUrl.pathname}${cleanUrl.search}`, host);
-  const returnPath = admin
-    ? sanitizeAdminReturnPath(path)
-    : (safeAuthReturnPath(path, routes) ?? routes.account);
   const redirect = (destination: string) =>
     finish(NextResponse.redirect(getRequestUrl(destination, req.headers, req.url)));
   if (!state.isAuthenticated || !state.userID) {

@@ -24,6 +24,12 @@ type AuthNotice = {
 
 const AUTH_REDIRECT_NOTICES: AuthNotice[] = [
   {
+    key: 'from-password-reset',
+    title: 'Password changed',
+    description: 'Sign in with your new password.',
+    tone: 'success',
+  },
+  {
     key: 'from-logout',
     title: 'Logged out',
     description: 'You have been signed out.',

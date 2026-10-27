@@ -2,7 +2,6 @@
 
 import { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { RotateCw } from 'lucide-react';
 import useAuthStore from '@/stores/authStore';
 import {
   authFlowUrl,
@@ -13,6 +12,7 @@ import {
 import { accountViewState } from '@/lib/auth/account-view-state';
 import type { AuthSessionState } from '@/lib/auth/session-snapshot';
 import { AccountAccessContext } from './AccountAccessContext';
+import AuthUnavailable from './AuthUnavailable';
 
 export default function RequireAccount({
   children,
@@ -54,21 +54,12 @@ export default function RequireAccount({
         </div>
       </AccountAccessContext.Provider>
       {view.status === 'unavailable' ? (
-        <div role='alert' className='mx-auto min-h-40 py-8 text-center space-y-4'>
-          <p>Sign-in is temporarily unavailable. Please try again.</p>
-          <button
-            type='button'
-            disabled={state.isRefreshing}
-            aria-busy={state.isRefreshing}
-            className='inline-flex items-center gap-2 underline disabled:opacity-50'
-            onClick={() => {
-              void useAuthStore.getState().refreshAuthState({ resetRetries: true });
-            }}
-          >
-            <RotateCw size={16} aria-hidden='true' />
-            {state.isRefreshing ? 'Retrying...' : 'Retry'}
-          </button>
-        </div>
+        <AuthUnavailable
+          isRetrying={state.isRefreshing}
+          onRetry={() => {
+            void useAuthStore.getState().refreshAuthState({ resetRetries: true });
+          }}
+        />
       ) : !view.visible ? (
         <div role='status' className='mx-auto min-h-40 py-8 text-center'>
           Checking sign-in...

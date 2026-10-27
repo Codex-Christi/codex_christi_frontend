@@ -28,6 +28,8 @@ jobs:
           yarn tsc --noEmit --incremental false --pretty false
       - name: Storefront and checkout safeguards
         run: yarn test:storefront
+      - name: Authentication safeguards
+        run: yarn test:auth
   deploy:
     needs: verify
     if: github.event_name == 'push'

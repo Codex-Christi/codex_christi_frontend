@@ -24,6 +24,9 @@ import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
 import { getUser } from '@/lib/funcs/userProfileFetchers/getUser';
 import { getServerAuthSnapshot } from '../session/server-session';
 import { useEditUserMainProfileStore } from '@/stores/editUserProfileStore';
+import { POST as resetPassword } from '@/app/api/auth/password-reset/route';
+import { getServerRefreshToken } from '../session/server-session';
+import { assertSessionRefreshActive } from '../session/session-refresh';
 
 function env(t: TestContext, key: string, value: string) {
   const previous = process.env[key];
@@ -117,6 +120,130 @@ test('protected profile children retain destination; POST is never redirected/re
   assert.equal(url.searchParams.get('next'), '/profile/edit?tab=photo');
   const post = await redirectExpSessionToLoginPage(request('/profile/edit', '', 'POST'));
   assert.equal(post.headers.has('Location'), false);
+});
+
+test('cold-page refresh outages redirect to retry/logout UI, preserving safe destinations and cookies', async (t) => {
+  setup(t);
+  t.mock.method(globalThis, 'fetch', async () => Response.json({}, { status: 503 }));
+  const refreshOnly = (await cookieHeader('outage-rewrite'))
+    .split('; ')
+    .filter((value) => value.startsWith('refreshToken='))
+    .join('; ');
+  for (const [host, path, destination, next] of [
+    [
+      'codexchristi.org',
+      '/profile/edit?tab=photo',
+      '/auth/session-unavailable',
+      '/profile/edit?tab=photo',
+    ],
+    [
+      'codexchristi.org',
+      '/shop/account-overview?tab=address',
+      '/shop/auth/session-unavailable',
+      '/shop/account-overview?tab=address',
+    ],
+    [
+      'codexchristi.shop',
+      '/shop/account-overview?tab=address',
+      '/auth/session-unavailable',
+      '/account-overview?tab=address',
+    ],
+    ['codexchristi.org', '/admin/shop', '/auth/session-unavailable', '/admin/shop'],
+  ]) {
+    const req = new NextRequest(`https://${host}${path}`, {
+      headers: { host, cookie: refreshOnly },
+    });
+    const response = path.startsWith('/admin')
+      ? await protectAdminRouteMiddleware(req)
+      : await redirectExpSessionToLoginPage(req);
+    assert.equal(response.status, 307);
+    assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
+    assert.equal(response.headers.get('Retry-After'), '5');
+    assert.equal(response.headers.has('Set-Cookie'), false);
+    assert.equal(response.headers.has('x-middleware-rewrite'), false);
+    const location = new URL(response.headers.get('Location')!);
+    assert.equal(location.pathname, destination);
+    assert.equal(location.searchParams.get('next'), next);
+    assert.equal(location.host, host);
+  }
+});
+
+function passwordRequest(input: unknown, cookie = '', origin = 'https://codexchristi.org') {
+  return new NextRequest('https://codexchristi.org/next-api/auth/password-reset', {
+    method: 'POST',
+    headers: { host: 'codexchristi.org', origin, cookie, 'Content-Type': 'application/json' },
+    body: typeof input === 'string' ? input : JSON.stringify(input),
+  });
+}
+const resetInput = (name: string) => ({
+  email: `${name}@example.test`,
+  otp: '123456',
+  password: 'Synthetic-only-Password9!',
+});
+
+test('successful password reset clears access, refresh and BOTH admin paths and cancels old refresh', async (t) => {
+  setup(t);
+  const mock = t.mock.method(globalThis, 'fetch', async (url: string, init?: RequestInit) => {
+    assert.ok(url.endsWith('/account/forgotten-password-reset'));
+    assert.equal(init?.method, 'POST');
+    assert.equal(init?.cache, 'no-store');
+    return Response.json({ success: true, data: { unused: 'must not be returned' } });
+  });
+  const req = passwordRequest(resetInput('reset-success'), await cookieHeader('reset-browser'));
+  const response = await inRequest(req, async () => {
+    const refresh = await getServerRefreshToken();
+    assert.ok(refresh);
+    const result = await resetPassword(req);
+    assert.throws(() => assertSessionRefreshActive(refresh), /session expired/);
+    return result;
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
+  assert.deepEqual(await response.json(), { success: true });
+  const expired = response.headers.getSetCookie();
+  assert.equal(expired.length, 4);
+  for (const name of ['session', 'refreshToken'])
+    assert.ok(expired.some((value) => value.startsWith(`${name}=`) && value.includes('Max-Age=0')));
+  const admin = expired.filter((value) => value.startsWith('admin_session='));
+  assert.ok(admin.some((value) => /Path=\/admin;/.test(value)));
+  assert.ok(admin.some((value) => /Path=\/;/.test(value)));
+  assert.equal(mock.mock.callCount(), 1);
+});
+
+test('invalid, cross-origin and oversized password resets never reach Django or clear cookies', async (t) => {
+  setup(t);
+  const mock = t.mock.method(globalThis, 'fetch', async () => {
+    throw new Error('Unexpected fetch');
+  });
+  for (const [req, status] of [
+    [passwordRequest(resetInput('cross-origin'), '', 'https://evil.test'), 403],
+    [passwordRequest({ ...resetInput('invalid-code'), otp: 'bad' }), 400],
+    [passwordRequest('not json'), 400],
+    [passwordRequest('x'.repeat(8193)), 413],
+  ] as const) {
+    const response = await resetPassword(req);
+    assert.equal(response.status, status);
+    assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
+    assert.equal(response.headers.has('Set-Cookie'), false);
+  }
+  assert.equal(mock.mock.callCount(), 0);
+});
+
+test('rejected or unavailable password reset preserves the current browser login', async (t) => {
+  setup(t);
+  for (const status of [400, 503]) {
+    const mock = t.mock.method(globalThis, 'fetch', async () =>
+      Response.json({ success: false }, { status }),
+    );
+    const req = passwordRequest(
+      resetInput(`reset-failure-${status}`),
+      await cookieHeader(`reset-${status}`),
+    );
+    const response = await inRequest(req, () => resetPassword(req));
+    assert.equal(response.status, status);
+    assert.equal(response.headers.has('Set-Cookie'), false);
+    mock.mock.restore();
+  }
 });
 
 test('shop protected destinations use public paths on .shop and prefixes on .org', async (t) => {

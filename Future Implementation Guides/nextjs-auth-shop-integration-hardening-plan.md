@@ -32,6 +32,7 @@ Nginx maps public shop paths into Next's `/shop` subtree. The supplied file also
 | Shared editable profile fields and basic photo checks | `src/lib/formSchemas/profile-fields.ts`; `editUserProfileSchema.ts` composes the same rules |
 | Login and safe session status | `src/actions/login.ts` |
 | Registration, verification and recovery actions | `src/actions/account/registration.ts` |
+| Shared registration API requests / password-reset POST and browser cleanup | `src/lib/auth/registration-request.ts`, `src/app/api/auth/password-reset/route.ts`, `src/lib/auth/password-reset-client.ts` |
 | Profile/address actions and server-only account service | `src/actions/account/profile.ts`, `src/lib/auth/account-service.ts` |
 | Minimal response shapes / multipart and country validation | `src/lib/auth/account-data.ts`, `account-validation.ts`, `profile-limits.ts` |
 | Bounded, uncached Django requests and response reading | `src/lib/django/request.ts`, `src/lib/auth/authenticated-django-fetch.ts` |
@@ -42,6 +43,7 @@ Nginx maps public shop paths into Next's `/shop` subtree. The supplied file also
 | Account identity, stale-request guards and tab checks | `src/stores/authStore.ts`, profile stores, `src/lib/auth/session-generation.ts`, `LoggedinProvider.tsx` |
 | Safe client session shape, bounded retry/expiry scheduling | `src/lib/auth/session-snapshot.ts`, `session-monitor.ts` |
 | Protected server bootstrap and private-view/draft retention | `ServerAccountBoundary.tsx`, `RequireAccount.tsx`, `AccountAccessContext.tsx` under `src/components/UI/Auth/`; `src/lib/auth/account-view-state.ts` |
+| Shared Retry/Logout screen and cold-load outage pages | `src/components/UI/Auth/AuthUnavailable.tsx`, `SessionUnavailablePage.tsx`; `/auth/session-unavailable` and `/shop/auth/session-unavailable` |
 | Shared pending/toast behavior | `src/lib/hooks/authHooks/useAuthTask.ts` |
 | Safe failure metadata without profile values/tokens | `src/lib/auth/account-diagnostics.ts` |
 | Reused production admin database client | `src/lib/prisma/adminOpsLedger/adminOpsLedgerPrisma.ts` |
@@ -60,6 +62,7 @@ Nginx maps public shop paths into Next's `/shop` subtree. The supplied file also
 8. Concurrent refreshes share a bounded in-process promise cache. Logout cancels matching in-process refreshes; this does not coordinate multiple processes or eliminate every late Set-Cookie race.
 9. A transient session-check failure schedules three additional automatic attempts, after 2, 5 and 15 seconds. Exhausting this budget stops retries; Retry or a throttled focus/resume check can start a new budget. There is no continuous polling. Still-valid access remains usable after a proactive-refresh failure, but its actual expiry independently hides private UI even if another check is pending.
 10. Only the protected `/profile` and shop account layouts bootstrap the browser from `getServerAuthSnapshot()`. The read-only projection includes identity, expiry and status, never tokens. It removes the redundant startup session action on a cold protected-page load. Public catalog/root layouts do not gain cookie reads. A stale prefetched snapshot cannot overwrite a known logout or different login, and rendering does not seed a shared server-side Zustand store.
+11. Both opening an account page and leaving one open through an outage offer Retry and Logout. When opening a page, Proxy uses a temporary, uncached redirect (307) and saves the validated destination in `next`; cookies stay intact. Retry returns there, with no automatic redirect loop. On an already-open page, Retry checks the session without discarding the hidden draft. Logout uses the existing POST endpoint even during a pending retry. The redirect is intentional: this Next version changes a rewritten page's 503 status to 200.
 
 ### Logout And Account State
 
@@ -75,6 +78,9 @@ Nginx maps public shop paths into Next's `/shop` subtree. The supplied file also
 ### Forms, Address And Uploads
 
 - Shared validators give field-level errors in login/signup/verification/reset and validate action inputs again. New passwords must match; codes are six digits. Password reset resends through its own endpoint. Pending guards and bounded process-local limits prevent rapid duplicate submissions.
+- Password changes use POST `/next-api/auth/password-reset`. Same-origin checks, an 8 KiB body limit, shared validators and existing request limits run before Django; the old reset server action is removed.
+- Only a confirmed successful reset expires this browser's access, refresh and both admin-cookie Paths in that response, and cancels matching in-process refresh. The browser clears private details, notifies same-domain tabs and fully reloads login with the validated return path and a password-changed notice. Other-device revocation still depends on Django.
+- Failed resets leave the login alone. If the network result is uncertain, do not resubmit automatically; ask the user to try their new password before requesting another reset.
 - Query values use URLSearchParams, preserving emails containing `+`. A missing verification/reset email has an editable validated field.
 - Saved country names/ISO2/ISO3 values normalize through the existing country helpers. Unknown values are rejected, never silently replaced with USA. A successful address save updates an initially empty store.
 - The 900 KiB photo limit leaves room for multipart overhead under the existing 1 MiB proxy limit. Server checks include size, extension, MIME and file signature. Client/server profile fields share one strict schema; read-only fields are rejected.
@@ -104,7 +110,7 @@ Read-only source: [production Swagger supplied by the user](http://5.78.101.86:8
 Read the installed Next documentation in `node_modules/next/dist/docs/` before changing these boundaries. Tests use its real request stores to enforce cookie-write restrictions, existing node:test/tsx, and fake data.
 
 ```sh
-node --require next/dist/server/node-environment --conditions=react-server --import tsx --test src/lib/auth/auth-hardening.test.ts src/lib/auth/server-boundaries.test.ts src/lib/auth/session-recovery.test.ts src/lib/session/session-hardening.test.ts src/stores/shop_stores/use-wishlist.test.ts src/lib/wishlist/normalize.test.ts
+yarn test:auth
 npx tsc --noEmit --incremental false
 npm run build:webpack
 ```
@@ -113,11 +119,14 @@ Current checks, 2026-10-27:
 
 | Check | Coverage / result |
 | --- | --- |
-| 60 regression tests | Forms, safe redirects, cookies, refresh/retry timing, logout, account switching, hidden-tab recovery, read-only server code, profile validation, upload limits and wishlist behavior. Tests use fake data, not a live database. |
-| TypeScript and targeted ESLint | Pass for the auth changes; TypeScript also passes in the shared checkout. |
+| Auth regression tests | The auth-only copy passes 68 tests, including reset cookie expiry/client cleanup, unchanged sessions on failure, cold-load outage routing and the deployment test gate. The command discovers all auth/session tests automatically and includes existing wishlist checks. Tests use fake data, not a live database. |
+| TypeScript and targeted ESLint | Pass for the auth-only copy. The shared checkout has separate, concurrent checkout work; its validation results must be checked independently. |
 | Isolated production webpack build | Pass over the committed baseline with only the auth changes. Checked private session helpers are absent from its public action manifest. Public catalog pages remain static. |
 | Production-build browser checks | Account loading skips the extra startup session request. During a simulated refresh outage, expiry hides account details and edit drawers. Retry restores the same unsaved address; explicit close/reopen restores the saved address. No console errors/warnings. |
+| Reset and outage integration checks | The local fake API confirms successful reset expires four cookie headers and requires login; GET reset returns 405. Opening an account during an outage redirects to an uncached outage page. Browser Retry returns to the saved destination; Logout reaches login even when Django logout fails. |
 | Earlier form/login browser checks | Invalid submissions, return destinations, Register links and Logout passed. The user also confirmed their real account page loads. |
+
+The `verify` job in `.github/workflows/push-to-main.yml` now runs `yarn test:auth` before deployment. The deploy job depends on that job succeeding; no production credentials or backend/database access are needed by the auth tests. Keep this test step when changing the workflow.
 
 Keep the regression tests. Temporary browser fixtures and demo data are not application files and must not be committed. No real credentials, account creation, reset email or profile/address write were submitted by the agent.
 
@@ -132,6 +141,7 @@ Before committing, test the staged files in a separate copy and inspect the acti
 - [ ] Apply the Nginx recommendations below separately, run nginx -t in the actual container, reload in a controlled deployment and purge affected old HTML cache entries.
 - [ ] With disposable accounts behind HTTPS, verify both shop addresses, recovery, profile/address save past access expiry, invalid refresh, outages, two same-origin tabs and two independent devices.
 - [ ] During an outage, leave a dirty profile/address drawer open through access expiry: it must disappear while unverified and return unchanged after same-account recovery. Confirm actual logout and switching accounts discard the previous draft. Confirm hidden tabs do not retry continuously and exhausted retries require Retry or a later focus check.
+- [ ] Also open an expired session directly during an outage: confirm the temporary redirect preserves the requested destination, both responses prohibit caching, and Retry/Logout work on both shop addresses and the main profile. After a successful password reset, confirm the same browser lands on login, its other same-domain tabs clear private details, and its former admin unlock is gone. Failed resets must leave its current session intact.
 - [ ] Confirm actual Django lifetimes, refresh rotation, logout scope and password-reset revocation before claiming those behaviors. Verify parallel refresh in every deployed Next process/container.
 
 ## Nginx Follow-Up
