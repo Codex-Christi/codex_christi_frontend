@@ -50,7 +50,7 @@ const AccountOverviewTabs = () => {
 
         <CustomShopLink
           className='text-center border border-l-0 border-[#F3F3F3] py-4 px-2 grid gap-4 rounded-tr-lg md:rounded-tr-none md:border-r-0 place-content-center hover:bg-[linear-gradient(180deg,_rgba(243,_243,_243,_0.08)_0%,_rgba(141,_141,_141,_0.08)_100%)] transition-color duration-300 ease-linear'
-          href='/shop/account-overview/wishlist'
+          href='/shop/my-wishlist'
         >
           <h3 className='font-semibold text-sm'>Wishlist</h3>
 

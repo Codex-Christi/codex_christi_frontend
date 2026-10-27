@@ -1,15 +1,8 @@
-import WishlistItems from "./_components/wishlist-items";
-import { Metadata } from 'next';
+import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { isShopSiteHostname } from '@/lib/siteBaseUrls';
 
-export const metadata: Metadata = {
-  title: 'Wishlist | Codex Christi Shop',
-  description: 'Manage your shopping wishlist',
-};
-
-const Wishlist = () => {
-    return (
-        <WishlistItems />
-    );
-};
-
-export default Wishlist;
+export default async function WishlistRedirect() {
+  const requestHeaders = await headers();
+  redirect(isShopSiteHostname(requestHeaders.get('host')) ? '/my-wishlist' : '/shop/my-wishlist');
+}

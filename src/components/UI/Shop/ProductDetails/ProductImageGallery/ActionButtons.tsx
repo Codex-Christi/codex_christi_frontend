@@ -22,9 +22,17 @@ export default function ActionButtons({
   setOpen: (bool: boolean) => void;
 }) {
   const { id } = useParams();
+  const productId = typeof id === 'string' ? id : null;
 
   const addWishlistItem = useWishlist((state) => state.addWishlistItem);
+  const removeWishlistItem = useWishlist((state) => state.removeWishlistItem);
   const getWishlist = useWishlist((state) => state.getWishlist);
+  const isSaved = useWishlist((state) =>
+    Boolean(productId && state.wishlist?.data.some((item) => item.productId === productId)),
+  );
+  const wishlistPending = useWishlist((state) =>
+    Boolean(productId && state.pendingProductIds.includes(productId)),
+  );
   const hasMounted = useHasMounted();
 
   // Hooks
@@ -100,14 +108,29 @@ export default function ActionButtons({
       {/* Favorite Button */}
       {isAuthenticated && (
         <Button
-          name='Add to favorites'
+          name={isSaved ? 'Remove from wishlist' : 'Add to wishlist'}
+          aria-label={isSaved ? 'Remove from wishlist' : 'Add to wishlist'}
+          aria-pressed={isSaved}
+          aria-busy={wishlistPending}
+          disabled={!productId || wishlistPending}
           type='button'
           className='h-10 w-[30px] p-0 bg-transparent'
           onClick={async () => {
-            await addWishlistItem(id as string);
+            if (!productId) return;
+            if (isSaved) {
+              await removeWishlistItem(productId);
+            } else {
+              await addWishlistItem(productId);
+            }
           }}
         >
-          <svg width='30' height='26' viewBox='0 0 30 26' fill='none'>
+          <svg
+            width='30'
+            height='26'
+            viewBox='0 0 30 26'
+            fill={isSaved ? 'white' : 'none'}
+            aria-hidden='true'
+          >
             <path
               d='M15.8468 24.41C15.4671 24.7464 14.8958 24.7453 14.5175 24.4075L13.2477 23.2736C6.38099 17.1657 1.84766 13.1373 1.84766 8.19346C1.84766 4.16512 5.07432 1 9.18099 1C11.1006 1 12.9564 1.72531 14.363 2.92401C14.8259 3.31848 15.5361 3.31848 15.999 2.92402C17.4056 1.72531 19.2614 1 21.181 1C25.2877 1 28.5143 4.16512 28.5143 8.19346C28.5143 13.1373 23.981 17.1657 17.1143 23.2866L15.8468 24.41Z'
               stroke='white'

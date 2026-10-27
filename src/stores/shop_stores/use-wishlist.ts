@@ -1,98 +1,129 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { PersistedStorageWithRehydration } from '@/lib/types/general_store_interfaces';
-import { fetchUserWishlist, addToWishlist, removeFromWishlist } from '@/lib/funcs/user-wishlist';
-import { getUpdatedKeys } from '@/lib/utils/getUpdatedObjKeys';
-import { createBrowserObfuscatedJSONStorage } from '@/lib/crypto/browserObfuscatedStorage';
+import {
+  fetchUserWishlist,
+  addToWishlist,
+  removeFromWishlist,
+  WishlistRequestError,
+} from '@/lib/funcs/user-wishlist';
+import errorToast from '@/lib/error-toast';
+import successToast from '@/lib/success-toast';
+import type { WishlistResponse } from '@/lib/wishlist/types';
 
-interface IWishlist {
-  status: number;
-  success: boolean;
-  message: string;
-  data: Record<string, string | number | boolean>[];
-}
-
-const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_USER_PROFILE_DATA_ENCRYPTION_KEY!;
-const WISHLIST_STORAGE_NAME = 'user-wishlist';
-
-// ✅ Define the shape of your Zustand store
-interface WishlistStore extends PersistedStorageWithRehydration {
-  wishlist: IWishlist | null;
+interface WishlistStore {
+  wishlist: WishlistResponse | null;
   isLoading: boolean;
+  error: string | null;
+  authRequired: boolean;
+  pendingProductIds: string[];
   getWishlist: () => Promise<void>;
   addWishlistItem: (id: string) => Promise<void>;
   removeWishlistItem: (id: string) => Promise<void>;
-  setWishlist: (wishlist: IWishlist | null) => void;
   clearWishlist: () => void;
 }
 
-const wishlistStorage = createBrowserObfuscatedJSONStorage<WishlistStore>({
-  getStorage: () => window.sessionStorage,
-  publicKey: ENCRYPTION_KEY,
-  purpose: WISHLIST_STORAGE_NAME,
-  legacyEncryptedStateFields: ['wishlist'],
-});
+// Account data stays in memory; old sessionStorage values are never hydrated into this store.
+let epoch = 0;
+let requestVersion = 0;
+let activeFetch: { epoch: number; version: number; promise: Promise<void> } | null = null;
 
-export const useWishlist = create<WishlistStore>()(
-  persist(
-    (set, get) => ({
-      wishlist: null,
-      isLoading: true,
-      _hydrated: false,
+function requestFailure(error: unknown) {
+  return {
+    error:
+      error instanceof Error ? error.message : 'We could not load your wishlist. Please try again.',
+    authRequired: error instanceof WishlistRequestError && error.status === 401,
+  };
+}
 
-      getWishlist: async () => {
-        const storeData = get().wishlist;
+export const useWishlist = create<WishlistStore>((set, get) => {
+  const mutate = async (id: string, action: 'add' | 'remove') => {
+    if (get().pendingProductIds.includes(id)) return;
+    const mutationEpoch = epoch;
+    requestVersion += 1;
+    activeFetch = null;
+    set({ error: null, isLoading: false, pendingProductIds: [...get().pendingProductIds, id] });
 
+    try {
+      const result = await (action === 'add' ? addToWishlist([id]) : removeFromWishlist([id]));
+      if (mutationEpoch !== epoch) return;
+
+      // A refresh started by another mutation may describe the list before this change.
+      requestVersion += 1;
+      activeFetch = null;
+
+      const current = get().wishlist;
+      if (current && current.userId !== result.userId) {
+        get().clearWishlist();
+        await get().getWishlist();
+        return;
+      }
+      if (action === 'remove' && current) {
+        set({
+          wishlist: { ...current, data: current.data.filter((item) => item.productId !== id) },
+        });
+      }
+      set({ authRequired: false });
+      successToast({ message: result.message });
+      await get().getWishlist();
+    } catch (error) {
+      if (mutationEpoch !== epoch) return;
+      const failure = requestFailure(error);
+      set({ ...failure, ...(failure.authRequired ? { wishlist: null } : {}) });
+      errorToast({ message: failure.error });
+    } finally {
+      if (mutationEpoch === epoch) {
+        set({ pendingProductIds: get().pendingProductIds.filter((productId) => productId !== id) });
+      }
+    }
+  };
+
+  return {
+    wishlist: null,
+    isLoading: true,
+    error: null,
+    authRequired: false,
+    pendingProductIds: [],
+
+    getWishlist: () => {
+      if (activeFetch?.epoch === epoch && activeFetch.version === requestVersion) {
+        return activeFetch.promise;
+      }
+      const fetchEpoch = epoch;
+      const version = ++requestVersion;
+      set({ isLoading: true, error: null });
+      const promise = (async () => {
         try {
-          const serverData = await fetchUserWishlist();
-
-          if (!serverData) {
-            set({ isLoading: false });
-            return;
-          }
-
-          if (!storeData) {
-            set({ wishlist: serverData, isLoading: false });
-            return;
-          }
-
-          const updatedKeys = getUpdatedKeys(serverData, storeData);
-          const isDataDifferent = Object.values(updatedKeys).length > 0;
-
-          set({ wishlist: isDataDifferent ? serverData : storeData, isLoading: false });
-        } catch {
-          set({ isLoading: false });
+          const wishlist = await fetchUserWishlist();
+          if (fetchEpoch !== epoch || version !== requestVersion) return;
+          set({ wishlist, isLoading: false, error: null, authRequired: false });
+        } catch (error) {
+          if (fetchEpoch !== epoch || version !== requestVersion) return;
+          const failure = requestFailure(error);
+          set({
+            ...failure,
+            isLoading: false,
+            ...(failure.authRequired ? { wishlist: null } : {}),
+          });
+        } finally {
+          if (activeFetch?.epoch === fetchEpoch && activeFetch.version === version)
+            activeFetch = null;
         }
-      },
-
-      addWishlistItem: async (productId: string) => {
-        const data = await addToWishlist([productId]);
-        if (data?.success) await get().getWishlist();
-      },
-
-      removeWishlistItem: async (productId: string) => {
-        const data = await removeFromWishlist([productId]);
-        if (data?.success) await get().getWishlist();
-      },
-
-      setWishlist: (wishlist: IWishlist | null) => set({ wishlist }),
-
-      clearWishlist: () => set({ wishlist: null, isLoading: false }),
-
-      hydrate: () => set({ _hydrated: true }),
-    }),
-    {
-      name: WISHLIST_STORAGE_NAME,
-      storage: wishlistStorage,
-      skipHydration: typeof window === 'undefined',
-      onRehydrateStorage: () => (state) => {
-        state?.hydrate();
-      },
+      })();
+      activeFetch = { epoch: fetchEpoch, version, promise };
+      return promise;
     },
-  ),
-);
-
-export const clearWishlistStorage = async () => {
-  useWishlist.getState().clearWishlist();
-  await wishlistStorage.removeItem(WISHLIST_STORAGE_NAME);
-};
+    addWishlistItem: (id) => mutate(id, 'add'),
+    removeWishlistItem: (id) => mutate(id, 'remove'),
+    clearWishlist: () => {
+      epoch += 1;
+      requestVersion += 1;
+      activeFetch = null;
+      set({
+        wishlist: null,
+        isLoading: false,
+        error: null,
+        authRequired: false,
+        pendingProductIds: [],
+      });
+    },
+  };
+});

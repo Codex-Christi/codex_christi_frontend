@@ -29,6 +29,9 @@ const NavTopRightLinks: FC = () => {
           return (
             <CustomShopLink
               href={href}
+              ariaLabel={
+                str === 'my-wishlist' ? 'Wishlist' : str === 'cart' ? 'Cart' : 'Account overview'
+              }
               prefetch={false}
               className='min-w-[30px]'
               key={str + index}
