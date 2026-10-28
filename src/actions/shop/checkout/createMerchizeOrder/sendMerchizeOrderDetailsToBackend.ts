@@ -131,7 +131,7 @@ export const sendMerchizeOrderDetailsToBackend = async (encProps: string) => {
     // Django names this route segment `{custom_id}`. Locally it is always the
     // payment-save custom ID returned by /orders/order-payment.
     const response = await universalFetcher<OrderProcessingAPIResponse, typeof payload>(
-      `${baseURL}/orders/process/${djangoPaymentSaveCustomId}`,
+      `${baseURL}/orders/process/${encodeURIComponent(djangoPaymentSaveCustomId)}`,
       {
         arg: payload,
         fetcherOptions: {

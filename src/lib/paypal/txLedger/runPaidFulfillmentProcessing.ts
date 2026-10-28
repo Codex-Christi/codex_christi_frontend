@@ -678,6 +678,8 @@ export async function runPaidFulfillmentProcessing(
       }
 
       const djangoPaymentSaveCustomId = paymentSave.data?.custom_id ?? null;
+      if (!djangoPaymentSaveCustomId)
+        throw new Error('Missing verified Django payment save custom_id.');
 
       await updateLockedRow(orderToken, lockId, {
         status: PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,

@@ -1460,3 +1460,134 @@ heartbeats, notifications, and lifecycle reconciliation satisfy the acceptance p
 - broad Django modernization;
 - promotional email campaigns beyond alpha operational announcements;
 - real-time SSE/pub-sub order updates until polling load proves the need.
+
+---
+
+## 16. Order History: Django Contract Review
+
+Read-only review of the [live Swagger UI](http://5.78.101.86:8282/swagger) and its
+[OpenAPI schema](http://5.78.101.86:8282/swagger?format=openapi), compared with the local checkout
+code on 2026-10-27. No authenticated requests, order creation, payment, retry, or backend writes
+were performed. Schema declarations do not prove the deployed database's retention or behavior.
+
+### What the API supplies
+
+The documented order operations are all POST: `/orders/intent`, `/orders/intent/resend-otp`,
+`/orders/intent/verify`, `/orders/order-payment`, `/orders/process/{custom_id}`, and
+`/orders/{id}/retry`. There is no documented customer order-list/detail GET, ownership filter,
+or paginated order-history response. An undocumented backend capability remains possible.
+
+| Stage              | Documented response                                                                                                               | Already retained locally                                                                                 |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Intent             | UUID `id`, human `order_id`, OTP state, customer/address fields, timestamps                                                       | `PaypalIntent.djangoOrderIntentUuid`, `djangoOrderIntentOrderId`, proof/request JSON                     |
+| Payment save       | UUID `id`, `custom_id`, nullable `user`, intent links, PayPal IDs, string amount, `payment_data`, payment status, timestamps      | `djangoPaymentSaveCustomId`, `djangoPaymentSaveResponsePayload`, original capture/authorization payloads |
+| Processing         | UUID `id`, intent/payment links, provider identifiers, `processing_status`, request/response JSON, error, retry count, timestamps | `merchizeFulfillmentProcessingId`, fulfillment request/response payloads, provider ID/code fields        |
+| Supplier follow-up | Merchize detail, progress, tracking, and operational history reads                                                                | Separate Fulfillment Ops rows correlated by `orderToken`, with per-operation sync timestamps             |
+
+These are different identifiers. The PayPal purchase-unit `customId` is the local `orderToken`;
+the payment save's returned `custom_id` addresses Django processing; `order_id` is the human
+intent reference. The actual Merchize platform ID is resolved from the supplier's external-number
+lookup, not assumed to be Django's processing UUID or a nested ID in its wrapped response.
+
+The current ledger is already Prisma-backed PostgreSQL, separate from the storefront's local
+SQLite catalog. `canonicalOrderSnapshot` preserves purchased titles, selected options, image,
+quantity, seller/supplier identifiers, and decimal-string merchandise/shipping/total amounts.
+A missing Django history GET therefore does not prevent history for purchases retained here.
+
+### Implemented Read-Only Account History
+
+1. Authenticate on the server and paginate ledger purchases by `userId === session.userID`.
+   Include captured-but-unresolved purchases and completed/refunded purchases, not every abandoned
+   intent. The supplied `(userId, createdAt, id)` index supports stable pagination; deploy its
+   migration through the normal reviewed database release process, not during verification.
+2. Render the saved canonical purchase details and verified capture evidence/receipt. Distinguish
+   expected order value from actual captured money; never reconstruct old prices from today's catalog.
+3. The account order-detail page reads saved Fulfillment Ops rows by the owned `orderToken`.
+   These databases are separate. Missing enrichment must not hide a paid purchase. Listing pages
+   do not issue per-order enrichment queries.
+4. Return a customer-safe projection, not raw payment/provider JSON, with private/no-store caching.
+   Keep read-only status/history access separate from payment authorization and ownership changes.
+5. Show fulfillment status with its last progress/tracking sync time. Local ledger `completed`
+   means the verified post-payment/fulfillment workflow completed, not that the parcel was delivered.
+   Check split-package aggregation before presenting one overall delivery label.
+
+Do not use `isCustomerProtectionVisible` as the history filter: it intentionally excludes resolved
+purchases. Use ledger ownership, not submitted email or a possibly stale recovery projection.
+Guest recovery/status access alone does not assign account ownership; retain the existing
+authenticated, capability-checked claim flow and never silently claim by email match.
+
+This uses no new database or order table. It will not recover purchases made outside
+this storefront or lost ledger rows. Legacy rows without complete canonical details need an honest
+details-unavailable state. Existing snapshots are not an immutable event-by-event timeline; that
+would require a separate event/audit design. A successful upstream operation with a lost reply or
+checkpoint needs reconciliation, not a blind POST replay. A history read must not restart payment
+or fulfillment. No cron, `after()`, supplier calls, or lifecycle scheduler is added to history.
+The freshness of existing lifecycle synchronization still needs deployment verification.
+
+Routes and maintenance:
+
+- `/shop/account-overview/order-history`: 20 records per page, keyset pagination by date and ID,
+  and All Purchases/Refunds Recorded filters. No fabricated ongoing, delivered, or return counts.
+- `/shop/account-overview/order-history/[orderToken]`: account-owned, read-only purchase details;
+  no checkout-confirmation/cart cleanup or recovery mutations. Supplier shipment references retain
+  their saved progress/tracking labels and sync time, not an invented whole-order delivery status.
+- `/next-api/shop/account/orders/[orderToken]/receipt`: authenticated ownership check followed by
+  a private/no-store redirect to an allowlisted existing receipt URL. This does not change the
+  receipt storage service's own access policy or make an already public object private.
+- `src/lib/shop/orderHistory/`: server-authenticated data access and customer-safe projections.
+  The client owner boundary hides prior results on logout/account switching. Account routes remain
+  request-rendered and noindex; public shop/product/category ISR is unchanged.
+- Refresh reads saved data only. It does not resynchronize supplier tracking or retry processing.
+- `20261028000000_add_account_order_history_index`: index-only migration; no migration is applied
+  as part of local verification. Regenerating the Prisma client is unnecessary for this index-only change.
+
+Run `yarn test:checkout`, `yarn test:storefront`, targeted ESLint, and TypeScript without a production
+build. The account tests use isolated request cookies and mocked read-only storage/provider responses;
+they create no payments, guest claims, or supplier orders. The receipt tests cover anonymous/foreign
+accounts and reject unapproved redirect hosts. Check the signed-in local list, refund empty state,
+order detail, long references, narrow screens, and the unchanged active cart in the in-app browser.
+
+The signed-in local list, refund empty state, saved-data refresh, and detail page were verified
+at desktop and 390px mobile width. Anonymous requests returned a private/no-store sign-in redirect
+for history and a private/no-store 401 for receipts, without exposing purchase details. The index
+migration remains unapplied. Regression tests stay in the checkout suite; no disposable demo routes
+or temporary receipt/database fixtures are shipped with this feature.
+
+### Implemented Payment-Save Validation
+
+`paymentSaveResponse.ts` checks business success, documented success status, payment UUID, nonempty
+custom ID, and `recipient_email` before returning a successful result. Recipient, PayPal, and intent
+references are checked against the request when available. Unknown response fields are retained
+server-side; legacy nested request keys such as `orderReceipient` are unchanged. The runner cannot
+write `payment_saved` with a missing verified custom ID. Django's custom ID is not assumed to equal
+the local token and is encoded as one path segment when passed to fulfillment processing.
+
+Malformed JSON, a business-failure payload inside an HTTP success, missing identifiers, and
+mismatched references fail closed. Tests exercise the real action with stubbed API responses;
+no live payment POST or supplier order is created. A 409 is not replayed or treated as success.
+
+### Contract Gaps To Resolve Before Extending Checkout
+
+- **Validation lengths:** Swagger requires both nonempty names (255), address (255), city/state
+  (100), ZIP (20), optional phone (20), and order ID (100). The current intent proxy accepts broader
+  generic lengths and treats last name as optional; align validation without truncating data silently.
+- **Payment JSON:** `paypal_payload` and nested response objects lack a detailed schema. The current
+  body sends nested objects, not double-encoded JSON, and `amountReceived` is a formatted string such
+  as `12.34 USD`. That does not prove Django persists every nested field or derives the intended amount.
+- **Processing fields:** item `price` is documented as a number and quantity as a positive integer;
+  product IDs/SKUs are strings, not necessarily UUIDs. The local canonical money remains decimal
+  strings and is validated before conversion for the processing request. Processing items do not
+  carry all canonical titles/options/variant identifiers/shipping allocations. Use the local snapshot
+  for those details; backend retention of raw nested PayPal data is unverified.
+- **Destination and phone:** intent uses ISO3 and fulfillment uses ISO2; Swagger's country strings do
+  not establish a normalization rule. The ordinary form-to-intent path does not forward phone, and
+  the runner does not provide a customer phone to the fulfillment builder. Confirm the desired
+  field mapping and backend storage before changing it.
+- **Security and retry:** the schema declares Bearer security plus HMAC headers, while the inspected
+  order proxy signs requests without a Bearer header. Deployed requirements were not tested over
+  this HTTP documentation host. The retry endpoint's UUID semantics and 409 reconciliation contract
+  need clarification; its existence is not a reason to replace checkpoint-aware local retries.
+
+Checkout OTP and account-claim helpers changed separately during this review. Recheck their current
+contracts before extending those flows. `intentUuid` is a local proof selector excluded from the
+upstream request, not an undocumented field being posted.

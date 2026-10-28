@@ -63,6 +63,7 @@ model PaypalIntent {
   updatedAt                          DateTime  @updatedAt
 
   @@index([customerEmail])
+  @@index([userId, createdAt, id])
   @@index([djangoOrderIntentUuid])
   @@index([djangoOrderIntentOrderId])
   @@index([djangoPaymentSaveCustomId])

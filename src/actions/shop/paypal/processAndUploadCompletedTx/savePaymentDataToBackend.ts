@@ -11,6 +11,10 @@ import { getServerDjangoApiBaseUrl } from '@/lib/django/getServerDjangoApiBaseUr
 import type { CanonicalOrderSnapshot } from '@/lib/paypal/orderSnapshot/types';
 import { parseCanonicalOrderSnapshot } from '@/lib/paypal/orderSnapshot/canonicalize';
 import { getCanonicalPaymentAmountReceived } from '@/lib/paypal/orderSnapshot/consumerData';
+import {
+  InvalidPaymentSaveResponseError,
+  parsePaymentSaveResponse,
+} from '@/lib/paypal/txLedger/paymentSaveResponse';
 
 const baseURL = getServerDjangoApiBaseUrl();
 
@@ -42,19 +46,6 @@ interface ReqBody {
   };
 }
 
-export interface PaymentSaveResponse {
-  status: number;
-  success: boolean;
-  message: string;
-  data: {
-    id: string;
-    // Django payment-save custom ID. This is the value used for /orders/process/{custom_id}.
-    custom_id: string;
-    receipient_email: string;
-    user: string | null;
-  };
-}
-
 export interface PaymentSavingActionProps extends Omit<CompletedTxInterface, 'cart'> {
   pdfReceiptLink: string;
   receiptFileName: string;
@@ -64,7 +55,6 @@ export interface PaymentSavingActionProps extends Omit<CompletedTxInterface, 'ca
 }
 
 export async function savePaymentDataToBackend(encProps: string) {
-  // Main Destructuring (original comment)
   const {
     authData,
     capturedOrderPaypalID,
@@ -84,23 +74,28 @@ export async function savePaymentDataToBackend(encProps: string) {
     ? getCanonicalPaymentAmountReceived(parseCanonicalOrderSnapshot(canonicalOrderSnapshot))
     : null;
 
-  // Sub-destructuring (original comment)
   // The ledger stores PayPal server-SDK payloads, which use camelCase.
   // Keep snake_case fallbacks so older browser-shaped payloads still deserialize safely.
   const purchaseUnits =
-    (authData as OrderResponseBody & {
-      purchaseUnits?: unknown[];
-      purchase_units?: unknown[];
-    }).purchaseUnits ??
-    (authData as OrderResponseBody & {
-      purchase_units?: unknown[];
-    }).purchase_units ??
+    (
+      authData as OrderResponseBody & {
+        purchaseUnits?: unknown[];
+        purchase_units?: unknown[];
+      }
+    ).purchaseUnits ??
+    (
+      authData as OrderResponseBody & {
+        purchase_units?: unknown[];
+      }
+    ).purchase_units ??
     [];
 
   const payer =
-    (authData as OrderResponseBody & {
-      payer?: OrderResponseBody['payer'];
-    }).payer ?? null;
+    (
+      authData as OrderResponseBody & {
+        payer?: OrderResponseBody['payer'];
+      }
+    ).payer ?? null;
 
   const payerEmail =
     (payer as { emailAddress?: string; email_address?: string } | null)?.emailAddress ??
@@ -110,22 +105,25 @@ export async function savePaymentDataToBackend(encProps: string) {
     (payer as { name?: { givenName?: string; surname?: string; given_name?: string } } | null)
       ?.name ?? null;
 
-  // Safe array access with defaults (DeepSeek's improvement)
   const [firstPurchaseUnit = {}] = purchaseUnits;
   const amount =
-    (firstPurchaseUnit as {
-      amount?: { currencyCode?: string; currency_code?: string; value?: string };
-    }).amount ?? null;
+    (
+      firstPurchaseUnit as {
+        amount?: { currencyCode?: string; currency_code?: string; value?: string };
+      }
+    ).amount ?? null;
   const paypalPurchaseUnitCustomId =
     (firstPurchaseUnit as { customId?: string; custom_id?: string }).customId ??
     (firstPurchaseUnit as { customId?: string; custom_id?: string }).custom_id ??
     null;
   const shipping =
-    (firstPurchaseUnit as {
-      shipping?: {
-        name?: { fullName?: string; full_name?: string };
-      };
-    }).shipping ?? null;
+    (
+      firstPurchaseUnit as {
+        shipping?: {
+          name?: { fullName?: string; full_name?: string };
+        };
+      }
+    ).shipping ?? null;
   const recepientName = shipping?.name ?? null;
   const recepientEmail = customer?.email;
   const currencyCode = amount?.currencyCode ?? amount?.currency_code ?? null;
@@ -148,7 +146,8 @@ export async function savePaymentDataToBackend(encProps: string) {
         payer: payer
           ? {
               payerEmail: payerEmail!,
-              payerName: `${payerName?.givenName ?? payerName?.given_name ?? ''} ${payerName?.surname ?? ''}`.trim(),
+              payerName:
+                `${payerName?.givenName ?? payerName?.given_name ?? ''} ${payerName?.surname ?? ''}`.trim(),
             }
           : null,
         orderReceipient: {
@@ -166,29 +165,26 @@ export async function savePaymentDataToBackend(encProps: string) {
     },
   };
 
-  // console.dir(body, { depth: null });
-
   try {
-    const data = await universalFetcher<PaymentSaveResponse, ReqBody>(
-      `${baseURL}/orders/order-payment`,
-      {
-        arg: body satisfies ReqBody, // <- becomes JSON body (POST by default in your fetcher)
-        fetcherOptions: {
-          // You can override anything here if needed:
-          method: 'POST', // your fetcher auto-POSTs when arg is present—this is optional
-          headers: { ...(await generateSignatureHeaders()) },
-          // cache: 'no-store', // if you want to force no caching on server
-        } satisfies FetcherOptions,
-      },
-    );
+    const data = await universalFetcher<unknown, ReqBody>(`${baseURL}/orders/order-payment`, {
+      arg: body satisfies ReqBody,
+      fetcherOptions: {
+        method: 'POST',
+        headers: { ...(await generateSignatureHeaders()) },
+      } satisfies FetcherOptions,
+    });
 
-    // console.log(`Response on Server:`);
-    // console.dir(data, { depth: null });
-    // console.log('\n');
-
-    return { ok: true as const, ...data };
+    return {
+      ...parsePaymentSaveResponse(data, {
+        recipientEmail: customer?.email,
+        paypalOrderId: capturedOrderPaypalID,
+        orderId: ORD_string,
+      }),
+      ok: true as const,
+    };
   } catch (err: FetcherError | { message: string } | unknown) {
-    // Leverage your FetcherError for rich error info
+    if (err instanceof InvalidPaymentSaveResponseError)
+      return { ok: false as const, error: { code: err.code, message: err.message } };
     if (err instanceof FetcherError) {
       return {
         ok: false as const,
