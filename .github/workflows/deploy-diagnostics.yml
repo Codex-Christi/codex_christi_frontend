@@ -1,0 +1,58 @@
+name: Deployment diagnostics
+
+on:
+  push:
+    branches: [codex/deploy-repair]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect VPS checkout and running release
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_HOST_KEYS: ${{ secrets.VPS_SSH_HOST_KEYS }}
+          VPS_SSH_USERNAME: ${{ secrets.VPS_SSH_USERNAME }}
+          VPS_IP: ${{ secrets.VPS_IP }}
+        run: |
+          set -euo pipefail
+          key_file="$RUNNER_TEMP/vps_key"
+          known_hosts_file="$RUNNER_TEMP/vps_known_hosts"
+          trap 'rm -f "$key_file" "$known_hosts_file"' EXIT
+          umask 077
+          printf '%s' "$VPS_SSH_KEY" | base64 -d > "$key_file"
+          printf '%s' "$VPS_SSH_HOST_KEYS" | base64 -d > "$known_hosts_file"
+          ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$known_hosts_file" -o ConnectTimeout=15 \
+            -i "$key_file" "$VPS_SSH_USERNAME@$VPS_IP" bash -s <<'REMOTE'
+          set -euo pipefail
+          cd "$HOME/apps/codexchristi"
+          echo '== Checkout revision =='
+          git rev-parse HEAD
+          echo '== Changed file names (contents excluded) =='
+          git status --short --untracked-files=no
+          echo '== Recent checkout commits =='
+          git log -3 --oneline
+          echo '== Production environment file =='
+          if test -f .env.production; then echo present; else echo missing; fi
+          echo '== Docker Compose version =='
+          docker compose version
+          echo '== Buildx builders =='
+          docker buildx ls
+          echo '== App container state =='
+          if docker container inspect codex-con-app-start >/dev/null 2>&1; then
+            docker container inspect --format 'image={{.Config.Image}} status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}unconfigured{{end}}' codex-con-app-start
+            docker exec codex-con-app-start printenv APP_REVISION || true
+          else
+            echo 'App container is absent.'
+          fi
+          REMOTE
