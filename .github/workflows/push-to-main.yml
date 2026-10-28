@@ -45,29 +45,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Prepare SSH key
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
-          echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > vps_key.pem
-          chmod 0600 vps_key.pem
+          umask 077
+          printf '%s' "$VPS_SSH_KEY" | base64 -d > "$RUNNER_TEMP/vps_key.pem"
       - name: Prepare the known_hosts
+        env:
+          VPS_SSH_HOST_KEYS: ${{ secrets.VPS_SSH_HOST_KEYS }}
         run: |
-          mkdir ~/.ssh/ && touch ~/.ssh/known_hosts
-          echo "${{ secrets.VPS_SSH_HOST_KEYS }}" | base64 -d >> ~/.ssh/known_hosts
+          umask 077
+          printf '%s' "$VPS_SSH_HOST_KEYS" | base64 -d > "$RUNNER_TEMP/vps_known_hosts"
       - name: Deploy the verified commit and wait for readiness
+        env:
+          VPS_SSH_USERNAME: ${{ secrets.VPS_SSH_USERNAME }}
+          VPS_IP: ${{ secrets.VPS_IP }}
         run: |
           set -euo pipefail
-          DATE=$(date "+%Y%m%d%H%M%S")
-          COMMIT_SHA="${GITHUB_SHA:-unknown}"
-
-          ssh -i vps_key.pem "${{ secrets.VPS_SSH_USERNAME }}@${{ secrets.VPS_IP }}" <<EOF
-          set -eo pipefail
-
-          cd apps/codexchristi
-          git diff --quiet
-          git diff --cached --quiet
-          git fetch origin main
-          git merge --ff-only "${COMMIT_SHA}"
-          test "\$(git rev-parse HEAD)" = "${COMMIT_SHA}"
-
-          echo "Starting deploy for commit: ${COMMIT_SHA}" > "deploy-${DATE}.log"
-          bash ./devScripts/production.sh 2>&1 | tee -a "deploy-${DATE}.log"
-          EOF
+          ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$RUNNER_TEMP/vps_known_hosts" -o ConnectTimeout=15 \
+            -i "$RUNNER_TEMP/vps_key.pem" "$VPS_SSH_USERNAME@$VPS_IP" \
+            bash -s -- "$GITHUB_SHA" < devScripts/deploy-verified-release.sh
+      - name: Remove deployment credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/vps_key.pem" "$RUNNER_TEMP/vps_known_hosts"

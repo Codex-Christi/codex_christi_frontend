@@ -1,4 +1,4 @@
-name: Deployment diagnostics
+name: Recover verified deployment
 
 on:
   push:
@@ -13,11 +13,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  inspect:
+  recover:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     steps:
-      - name: Inspect VPS checkout and running release
+      - uses: actions/checkout@v6
+      - name: Recover the already verified release
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_SSH_HOST_KEYS: ${{ secrets.VPS_SSH_HOST_KEYS }}
@@ -33,26 +34,5 @@ jobs:
           printf '%s' "$VPS_SSH_HOST_KEYS" | base64 -d > "$known_hosts_file"
           ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$known_hosts_file" -o ConnectTimeout=15 \
-            -i "$key_file" "$VPS_SSH_USERNAME@$VPS_IP" bash -s <<'REMOTE'
-          set -euo pipefail
-          cd "$HOME/apps/codexchristi"
-          echo '== Checkout revision =='
-          git rev-parse HEAD
-          echo '== Changed file names (contents excluded) =='
-          git status --short --untracked-files=no
-          echo '== Recent checkout commits =='
-          git log -3 --oneline
-          echo '== Production environment file =='
-          if test -f .env.production; then echo present; else echo missing; fi
-          echo '== Docker Compose version =='
-          docker compose version
-          echo '== Buildx builders =='
-          docker buildx ls
-          echo '== App container state =='
-          if docker container inspect codex-con-app-start >/dev/null 2>&1; then
-            docker container inspect --format 'image={{.Config.Image}} status={{.State.Status}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}unconfigured{{end}}' codex-con-app-start
-            docker exec codex-con-app-start printenv APP_REVISION || true
-          else
-            echo 'App container is absent.'
-          fi
-          REMOTE
+            -i "$key_file" "$VPS_SSH_USERNAME@$VPS_IP" \
+            bash -s -- ddf8b2b5286ea23adeb69e2a8f217b0f37769518 < devScripts/deploy-verified-release.sh
