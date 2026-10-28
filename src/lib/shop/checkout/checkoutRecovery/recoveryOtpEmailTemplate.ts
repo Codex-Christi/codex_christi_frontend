@@ -4,6 +4,7 @@ type RecoveryOtpEmailTemplateProps = {
   otp: string;
   recipientName?: string;
   expiresInMinutes?: number;
+  purpose?: 'checkout-recovery' | 'order-link';
 };
 
 function escapeHtml(value: string) {
@@ -19,6 +20,7 @@ export function buildRecoveryOtpEmailHtml({
   otp,
   recipientName,
   expiresInMinutes = 10,
+  purpose = 'checkout-recovery',
 }: RecoveryOtpEmailTemplateProps) {
   const safeOtp = escapeHtml(otp);
   const safeName = recipientName?.trim() ? escapeHtml(recipientName.trim()) : 'there';
@@ -42,9 +44,9 @@ export function buildRecoveryOtpEmailHtml({
                     </tr>
                     <tr>
                         <td style="border:1px solid rgba(148,163,184,0.22);border-radius:24px;background:#0b1020;padding:34px 26px;text-align:center;">
-                            <div style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#38bdf8;font-weight:700;">Checkout Recovery</div>
+                            <div style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#38bdf8;font-weight:700;">${purpose === 'order-link' ? 'Guest Order Linking' : 'Checkout Recovery'}</div>
                             <h1 style="margin:14px 0 10px;font-size:28px;line-height:1.18;color:#ffffff;">Verify your email</h1>
-                            <p style="margin:0 auto 24px;max-width:470px;font-size:15px;line-height:1.65;color:#cbd5e1;">Hi ${safeName}, use this code to view the latest status of your Codex Christi checkout recovery.</p>
+                            <p style="margin:0 auto 24px;max-width:470px;font-size:15px;line-height:1.65;color:#cbd5e1;">Hi ${safeName}, ${purpose === 'order-link' ? 'use this code to link a guest purchase to the Codex Christi account where you requested it. Only enter it if you made this request.' : 'use this code to view the latest status of your Codex Christi checkout recovery.'}</p>
                             <div style="margin:0 auto 24px;max-width:360px;border-radius:20px;background:#111827;border:1px solid rgba(56,189,248,0.35);padding:18px 14px;">
                                 <div style="font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:#93c5fd;margin-bottom:10px;">One-time code</div>
                                 <div style="font-size:38px;line-height:1;letter-spacing:0.22em;color:#ffffff;font-weight:800;">${safeOtp}</div>

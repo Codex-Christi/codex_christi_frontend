@@ -14,6 +14,7 @@ import Orders, {
 import HistoryOwnerBoundary from './_components/history-owner-boundary';
 import styles from './orderHistory.module.css';
 import { orderHistoryMetadata } from './metadata';
+import { LinkGuestOrder } from './_components/history-actions';
 
 export const metadata = orderHistoryMetadata;
 
@@ -36,6 +37,7 @@ export default async function OrderHistory({
   return (
     <HistoryOwnerBoundary session={result.session}>
       <HistoryHeader />
+      <LinkGuestOrder />
       <nav aria-label='Purchase filters' className={styles.filters}>
         <CustomShopLink
           href={historyPath}

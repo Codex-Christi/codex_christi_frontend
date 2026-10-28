@@ -1517,12 +1517,14 @@ Guest recovery/status access alone does not assign account ownership; retain the
 authenticated, capability-checked claim flow and never silently claim by email match.
 
 This uses no new database or order table. It will not recover purchases made outside
-this storefront or lost ledger rows. Legacy rows without complete canonical details need an honest
-details-unavailable state. Existing snapshots are not an immutable event-by-event timeline; that
+this storefront or lost ledger rows. All-null legacy snapshot envelopes may recover item names,
+quantities, and unit prices from the original saved PayPal items, never today's catalog. Partially
+populated or damaged canonical envelopes do not gain that fallback. Unavailable fields remain explicit.
+Existing snapshots are not an immutable event-by-event timeline; that
 would require a separate event/audit design. A successful upstream operation with a lost reply or
 checkpoint needs reconciliation, not a blind POST replay. A history read must not restart payment
-or fulfillment. No cron, `after()`, supplier calls, or lifecycle scheduler is added to history.
-The freshness of existing lifecycle synchronization still needs deployment verification.
+or fulfillment. History GETs make no supplier calls. No cron, `after()`, or lifecycle scheduler is
+added; the separate, explicit tracking command below reads the supplier on request.
 
 Routes and maintenance:
 
@@ -1532,14 +1534,81 @@ Routes and maintenance:
   no checkout-confirmation/cart cleanup or recovery mutations. Supplier shipment references retain
   their saved progress/tracking labels and sync time, not an invented whole-order delivery status.
 - `/next-api/shop/account/orders/[orderToken]/receipt`: authenticated ownership check followed by
-  a private/no-store redirect to an allowlisted existing receipt URL. This does not change the
-  receipt storage service's own access policy or make an already public object private.
+  a private/no-store redirect to a fresh 60-second R2 S3 download URL. It resolves only the owned
+  row's known receipt object, not a caller-supplied URL, bucket, or key.
+- `/next-api/shop/orders/[orderToken]/receipt`: the same download for the existing account-owner
+  or verified guest checkout-access policy. Reading it does not claim the order or mint payment
+  grants. Durable confirmation-page links can reverify access after old grants expire.
+- `/admin/shop/paid-order-recovery/[orderToken]/receipt`: unlocked, scoped support/admin access,
+  excluding viewer roles, with an admin audit entry. Keep this path under `/admin` so the admin
+  session cookie is sent; do not widen that cookie's path.
 - `src/lib/shop/orderHistory/`: server-authenticated data access and customer-safe projections.
   The client owner boundary hides prior results on logout/account switching. Account routes remain
   request-rendered and noindex; public shop/product/category ISR is unchanged.
-- Refresh reads saved data only. It does not resynchronize supplier tracking or retry processing.
+- The header refresh reloads saved data only. "Check tracking" is an explicit owner-authorized
+  same-origin POST to `/next-api/shop/account/orders/[orderToken]/tracking`; it never retries payment
+  or fulfillment. It reserves one database-backed refresh per order per minute, across tabs and
+  workers. It reads only external progress and tracking for at most five saved supplier references
+  (normally one reference/two reads), never invoices, catalog creation, or production push.
+- `/next-api/shop/account/orders/link`: a signed-in user can explicitly link one past guest order
+  using its full reference and checkout email. Send-code does not query order existence. The OTP
+  scope binds account, email, reference, and purpose; existing expiry, cooldown and attempt limits
+  apply. Claim uses compare-and-set `userId: null` and cannot move an already owned purchase.
+  It adds no checkout grant, cart cleanup, Django write, or payment/fulfillment action.
 - `20261028000000_add_account_order_history_index`: index-only migration; no migration is applied
   as part of local verification. Regenerating the Prisma client is unnecessary for this index-only change.
+
+Tracking adapters distinguish the parsed response snapshot (`merchizeTrackingPayload`) from its
+lossy `deliveryStatus` summary. Only supported snapshot fields reach the customer projection.
+All displayed packages must have explicit delivery evidence and verified package-count coverage
+before saying the whole shipment is delivered. Unknown shapes stay unavailable; `fulfilled`,
+tracking-number creation, internal progress `done`, and ledger `completed` do not prove delivery.
+Carrier links are HTTPS and restricted to recognized tracking domains.
+
+External progress/tracking snapshots carry a local `_nextFetchedAt` stamp, written with the
+matching response. Internal-progress success no longer updates `lastProgressSyncAt`; failed reads
+never refresh a displayed source's time. Legacy external-progress times without matching stamped
+evidence show "Not yet checked" rather than presenting the old shared timestamp as trustworthy.
+Paid dates come from completed capture timestamps; older missing dates say "Checkout started".
+
+### Receipt Storage And Rollout
+
+This pass reuses the existing R2 bucket, credentials, and objects. It does not provision storage,
+copy historical files, change permissions, alter billing, or require a second bucket. Signing a
+URL is a local operation; downloading still uses the existing storage service's normal GET.
+New receipt filenames are opaque UUIDs without names/emails. Audited regeneration reuses an
+existing opaque filename. New ledger links are protected application endpoints, not permanent
+public PDF URLs; customer emails retain the protected order-reference page instead of an expiring
+download. Native browser attachment downloads avoid CORS-dependent PDF buffering in checkout.
+
+**Deployment prerequisite, not performed here:** the existing receipt bucket's public custom
+domain and any `r2.dev` public access must be disabled (or otherwise protected) before claiming
+that all PDFs are private. Signing cannot revoke an old public URL. Both exposure paths must be
+reviewed, because they are independent. This access change needs the operator's approval and may
+break historical direct PDF links; protected application links will continue to work with
+credentials permitting `GetObject`. No paid WAF feature or new storage service is introduced.
+See Cloudflare's [public bucket](https://developers.cloudflare.com/r2/buckets/public-buckets/)
+and [presigned URL](https://developers.cloudflare.com/r2/api/s3/presigned-urls/) documentation.
+
+Verify owner/foreign/anonymous access, staff scope and unlock expiry, the signed URL's 60-second
+expiry, guest-code reuse across accounts/references, failed-source timestamps, concurrent refresh
+deduplication, and partial-package delivery. Tests use isolated cookies, in-memory claims/storage,
+and stubbed supplier/email calls; they do not create real orders, claims, uploads, or messages.
+The localhost:3001 sandbox and its disabled processing switches are unchanged.
+
+Verification checkpoint, 2026-10-27: 307 checkout/history tests and 126 storefront tests passed;
+the 25 history checks cover package correlation/coverage, guest-code boundaries and claim races,
+owner/guest receipt authorization, offline signing, and a mocked existing-bucket upload. Targeted
+ESLint, diff checks, and workspace TypeScript passed after concurrent admin edits settled;
+no unrelated admin files were changed by this pass. An isolated export of the staged commit also
+passed 274 checkout/history tests, 126 storefront tests, and TypeScript using the installed
+dependencies and existing ignored catalog Prisma client. The lower test count excludes other
+unstaged checkout/Django work. The disposable export was removed after verification.
+Earlier local saved-order desktop/mobile checks passed, but the last browser recheck remained
+on loading skeletons with repeated aborted Suspense renders on the shared development server.
+No restart or build was performed. No successful real tracking response was available in the
+configured development data; carrier-shape acceptance remains unverified beyond supported fixture
+shapes. No live email, supplier refresh, guest claim, receipt upload/download, or migration was run.
 
 Run `yarn test:checkout`, `yarn test:storefront`, targeted ESLint, and TypeScript without a production
 build. The account tests use isolated request cookies and mocked read-only storage/provider responses;

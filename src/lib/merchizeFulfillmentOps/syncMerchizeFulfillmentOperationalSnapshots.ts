@@ -26,6 +26,7 @@ import {
 import { safeLogErrorMessage } from './redaction';
 import { MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS } from './status';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
+import { stampShipmentSnapshot } from './customerTracking';
 
 type SnapshotAction =
   | 'external_order_progress'
@@ -275,7 +276,7 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
         await prisma.merchizeFulfillmentOrder.update({
           where: { id: orderRow.id },
           data: {
-            merchizeProgressPayload: toOptionalPrismaJson(payload),
+            merchizeProgressPayload: toOptionalPrismaJson(stampShipmentSnapshot(payload)),
             progressStatus: summarizeProgressStatus(payload),
             lastProgressSyncAt: new Date(),
           },
@@ -289,7 +290,7 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
         await prisma.merchizeFulfillmentOrder.update({
           where: { id: orderRow.id },
           data: {
-            merchizeTrackingPayload: toOptionalPrismaJson(payload),
+            merchizeTrackingPayload: toOptionalPrismaJson(stampShipmentSnapshot(payload)),
             deliveryStatus: summarizeDeliveryStatus(payload),
             lastTrackingSyncAt: new Date(),
           },
@@ -335,7 +336,6 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
             where: { id: orderRow.id },
             data: {
               merchizeInternalProgressPayload: toOptionalPrismaJson(payload),
-              lastProgressSyncAt: new Date(),
             },
           });
         },

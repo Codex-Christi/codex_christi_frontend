@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import { accountViewState } from '@/lib/auth/account-view-state';
 import type { AuthSessionState } from '@/lib/auth/session-snapshot';
+import styles from '../orderHistory.module.css';
 
 export default function HistoryOwnerBoundary({
   session,
@@ -19,5 +20,9 @@ export default function HistoryOwnerBoundary({
   useEffect(() => {
     if (view.visible && !matches) router.refresh();
   }, [matches, router, view.visible]);
-  return matches ? children : <p role='status'>Checking account access...</p>;
+  return matches ? (
+    <div className={styles.surface}>{children}</div>
+  ) : (
+    <p role='status'>Checking account access...</p>
+  );
 }

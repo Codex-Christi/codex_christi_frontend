@@ -620,6 +620,8 @@ export async function runPaidFulfillmentProcessing(
       await processingLease.assertOwned();
       const receiptRes = await savePaymentReceiptToCloud(
         buildPaymentReceiptPayload({
+          orderToken: row.orderToken,
+          receiptFileName: row.receiptFile,
           authData,
           cart: canonicalOrderSnapshot ? undefined : (row.cartSnapshot as CartVariant[]),
           canonicalOrderSnapshot,

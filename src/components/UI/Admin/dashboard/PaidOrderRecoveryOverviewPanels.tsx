@@ -275,7 +275,7 @@ export function PaidOrderRecoveryPaymentEvidencePanel({
             <dd className='mt-2'>
               {detail.receiptLink ? (
                 <a
-                  href={detail.receiptLink}
+                  href={`/admin/shop/paid-order-recovery/${encodeURIComponent(recovery.orderToken)}/receipt`}
                   target='_blank'
                   rel='noreferrer'
                   className='inline-flex items-center gap-2 text-sm font-medium text-cyan-100 underline decoration-cyan-300/30 underline-offset-4 hover:text-cyan-50'

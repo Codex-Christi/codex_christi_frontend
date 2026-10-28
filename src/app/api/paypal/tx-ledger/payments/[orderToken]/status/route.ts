@@ -6,6 +6,7 @@ import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { getCanonicalPaymentProjectionState } from '@/lib/paypal/txLedger/canonicalPaymentProjectionState';
 import { getCapturedCartPurchase } from '@/lib/cart/purchase';
+import { receiptObjectKey, receiptDownloadPath } from '@/lib/shop/orderHistory/receiptReference';
 
 type PageProps = {
   params: Promise<{ orderToken: string }>;
@@ -101,14 +102,15 @@ export async function GET(_req: Request, { params }: PageProps) {
   const recoveryReason = paymentFailure
     ? 'Your payment was received, but its amount requires review before fulfillment.'
     : getCustomerRecoveryReason(effectiveStatus);
+  const receiptLink = receiptObjectKey(row) ? receiptDownloadPath(row.orderToken) : null;
 
   return NextResponse.json(
     {
       orderToken: row.orderToken,
       status: effectiveStatus,
       lastEventType: row.lastEventType,
-      receiptLink: row.receiptLink,
-      receiptFile: row.receiptFile,
+      receiptLink,
+      receiptFile: receiptLink ? 'Codex-Christi-receipt' : null,
       djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
       processingCompletedAt: row.processingCompletedAt,
       paidAmountLabel: getPaidAmountLabel(row.capturePayload),

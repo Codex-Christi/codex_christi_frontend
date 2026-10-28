@@ -377,6 +377,7 @@ async function regeneratePaidOrderReceiptFromLedger(row: {
   customerEmail: string;
   djangoOrderIntentOrderId: string | null;
   fulfillmentAddressOverride: unknown;
+  receiptFile?: string | null;
 }) {
   if (!row.authorizePayload) {
     throw new Error('The PayPal authorization snapshot is missing; receipt cannot be regenerated.');
@@ -386,6 +387,8 @@ async function regeneratePaidOrderReceiptFromLedger(row: {
   const canonicalOrderSnapshot = paymentGate.paymentChain.snapshot;
 
   const payload: PaymentReceiptProps = {
+    orderToken: row.orderToken,
+    receiptFileName: row.receiptFile,
     authData: row.authorizePayload as PaymentReceiptProps['authData'],
     cart: canonicalOrderSnapshot ? undefined : (row.cartSnapshot as CartVariant[]),
     canonicalOrderSnapshot,

@@ -38,8 +38,6 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
   const [cartError, setCartError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const consumed = useRef(new Set<string>());
   const consumePurchase = useCartStore((state) => state.consumePurchase);
@@ -141,26 +139,14 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
     };
   }, [orderToken, retry, consumeConfirmedPurchase, authenticatedOwner, viewingEarlierOrder]);
 
-  const downloadReceipt = async () => {
+  const downloadReceipt = () => {
     if (!state?.receiptLink || !state.receiptFileName) return;
-    setDownloading(true);
-    setDownloadError(null);
-    try {
-      const response = await fetch(state.receiptLink);
-      if (!response.ok) throw new Error('Receipt unavailable');
-      const url = URL.createObjectURL(await response.blob());
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${state.receiptFileName}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      setDownloadError('We couldn’t download the receipt. You can open it using the link below.');
-    } finally {
-      setDownloading(false);
-    }
+    // Native attachment downloads follow the authorized redirect without CORS or PDF buffering.
+    const link = document.createElement('a');
+    link.href = state.receiptLink;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.click();
   };
 
   return (
@@ -174,8 +160,6 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
       lookupError={lookupError}
       cartError={viewingEarlierOrder ? null : cartError}
       refreshing={refreshing}
-      downloading={downloading}
-      downloadError={downloadError}
       copied={copied}
       storageNotice={<CheckoutStorageNotice />}
       recovery={<CheckoutAccessRecovery orderToken={orderToken} onVerified={refresh} />}
