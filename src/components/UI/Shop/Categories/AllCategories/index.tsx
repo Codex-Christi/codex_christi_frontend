@@ -1,5 +1,3 @@
-'use client';
-
 import { categories as subNavCategoriesWithIcons } from '@/components/UI/Shop/ShopSubNav/SubNavObj';
 import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink';
 import { STOREFRONT_SNAPSHOT_CATEGORY_SLUGS } from '@/lib/merchizeStorefront/categories';

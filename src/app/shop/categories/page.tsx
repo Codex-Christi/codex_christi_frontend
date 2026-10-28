@@ -1,4 +1,4 @@
-import AllCategoriesClientComponent from '@/components/UI/Shop/Categories/AllCategories';
+import AllCategories from '@/components/UI/Shop/Categories/AllCategories';
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -7,8 +7,7 @@ export const metadata: Metadata = {
 };
 
 const AllCategoriesPage = () => {
-  //   Main JSX
-  return <AllCategoriesClientComponent />;
+  return <AllCategories />;
 };
 
 export default AllCategoriesPage;
