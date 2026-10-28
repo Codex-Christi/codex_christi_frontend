@@ -59,7 +59,7 @@ export const ProductDetailsProvider: FC<ProductDetailsProps> = ({
     countryName: deliveryCountryName,
     unavailabilityReason,
     retry: retryVariants,
-  } = useProductVariants(productId, true, { defer: true });
+  } = useProductVariants(productId, true);
   const variantLoadState: VariantLoadState = isLoading ? 'loading' : error ? 'error' : 'ready';
   const variantLoadError = error?.message ?? null;
 
