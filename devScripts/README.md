@@ -7,17 +7,32 @@ storefront, authentication and checkout regression suites. Deployment starts
 only after those pass.
 The production Docker build uses Turbopack.
 
-The deployment job waits for the VPS script instead of starting it in the
-background. It fast-forwards to the exact verified commit and refuses to deploy
-from a different revision or over tracked local edits. Production deployments
-are serialized. The VPS needs Docker Compose v2 with `up --wait` support.
+The deployment job waits for the VPS script. `deploy-verified-release.sh` fetches
+the exact verified commit into a detached worktree beside the original checkout,
+under `codexchristi-releases/<commit>`. It preserves edits and local history in
+the original VPS checkout and links that checkout's `.env.production` into the
+release. Old tracked log files therefore cannot silently block a release.
+All output is saved to `deploy-YYYYMMDDHHMMSS.log` in the original VPS checkout
+and mirrored to Actions. The timestamp uses UTC. Failures identify their
+deployment stage in both logs. Commands run with closed stdin so a Compose
+process cannot consume the remainder of the script sent over SSH.
+
+The existing app container supplies the Compose project name. Recovery refuses
+to continue if its `/app/data` mount differs from that project's
+`merchize_price_catalog_data` volume. A first deployment without an app container
+requires an explicit `COMPOSE_PROJECT_NAME`. Production deployments are serialized
+in Actions and protected by a VPS lock. The VPS needs Git, `flock`, and Docker
+Compose with `up --wait` support.
 
 The VPS script builds the images, waits for database setup to succeed,
 and waits up to 120 seconds for the new app container to become healthy. The
 running image must identify itself with the expected Git revision. A failed
 migration, readiness check, or revision check fails the job before Docker pruning.
+The wrapper retains the previous runtime image as
+`codexchristi-next:before-<first 12 commit characters>` and disables pruning.
 An unhealthy deployment does **not** automatically roll back the container;
-inspect its logs and restore the previous release manually when needed.
+inspect its logs and restore the previous release manually when needed. Database
+migrations can limit whether an older runtime remains compatible.
 
 ### Database Setup
 
@@ -81,5 +96,6 @@ yarn tsc --noEmit --incremental false --pretty false
 yarn test:storefront
 yarn test:auth
 yarn test:checkout
+node --test scripts/deploy-verified-release.test.mjs
 yarn build
 ```

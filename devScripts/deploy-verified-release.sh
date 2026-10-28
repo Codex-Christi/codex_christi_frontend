@@ -15,6 +15,11 @@ fi
 source_dir="${APP_DIR:-$HOME/apps/codexchristi}"
 cd "$source_dir"
 source_dir="$(pwd -P)"
+log_file="$source_dir/deploy-$(date -u +%Y%m%d%H%M%S).log"
+(umask 077; : >> "$log_file")
+exec > >(tee -a "$log_file") 2>&1
+echo "Starting deploy for commit: $revision"
+echo "Deployment log: $log_file"
 test -f "$source_dir/.env.production"
 
 # Serialize manual recovery with any other invocation of this script.
@@ -49,7 +54,7 @@ export COMPOSE_PROJECT_NAME="$project"
 echo "Using existing Compose project: $COMPOSE_PROJECT_NAME"
 
 stage='fetching the verified release'
-git fetch origin main
+GIT_SSH_COMMAND='ssh -o BatchMode=yes -o ConnectTimeout=15' git fetch origin main </dev/null
 git cat-file -e "$revision^{commit}"
 git merge-base --is-ancestor "$revision" refs/remotes/origin/main
 
@@ -58,7 +63,7 @@ release_root="$(dirname "$source_dir")/codexchristi-releases"
 release_dir="$release_root/$revision"
 mkdir -p "$release_root"
 if [ ! -e "$release_dir" ]; then
-  git worktree add --detach "$release_dir" "$revision"
+  git worktree add --detach "$release_dir" "$revision" </dev/null
 fi
 test "$(git -C "$release_dir" rev-parse --show-toplevel)" = "$release_dir"
 test "$(git -C "$release_dir" rev-parse HEAD)" = "$revision"
@@ -81,5 +86,5 @@ if [ -n "${previous_image:-}" ]; then
   echo "Previous runtime retained as $rollback_tag."
 fi
 # Keep the previous images available while recovering this deployment.
-APP_DIR="$release_dir" SKIP_DOCKER_PRUNE=1 bash "$release_dir/devScripts/production.sh"
+APP_DIR="$release_dir" SKIP_DOCKER_PRUNE=1 bash "$release_dir/devScripts/production.sh" </dev/null
 echo "Verified release $revision is running from $release_dir."

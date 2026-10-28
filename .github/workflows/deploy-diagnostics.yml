@@ -1,38 +1,62 @@
-name: Recover verified deployment
+name: Restore recovery deployment log
 
 on:
   push:
     branches: [codex/deploy-repair]
-  workflow_dispatch:
+    paths: [.github/workflows/deploy-diagnostics.yml]
 
 permissions:
   contents: read
-
-concurrency:
-  group: production-deploy
-  cancel-in-progress: false
+  actions: read
 
 jobs:
-  recover:
+  restore-log:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
-      - name: Recover the already verified release
+      - name: Restore the successful recovery log on the VPS
         env:
+          GH_TOKEN: ${{ github.token }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_SSH_HOST_KEYS: ${{ secrets.VPS_SSH_HOST_KEYS }}
           VPS_SSH_USERNAME: ${{ secrets.VPS_SSH_USERNAME }}
           VPS_IP: ${{ secrets.VPS_IP }}
         run: |
           set -euo pipefail
+          umask 077
           key_file="$RUNNER_TEMP/vps_key"
           known_hosts_file="$RUNNER_TEMP/vps_known_hosts"
           trap 'rm -f "$key_file" "$known_hosts_file"' EXIT
-          umask 077
           printf '%s' "$VPS_SSH_KEY" | base64 -d > "$key_file"
           printf '%s' "$VPS_SSH_HOST_KEYS" | base64 -d > "$known_hosts_file"
-          ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$known_hosts_file" -o ConnectTimeout=15 \
-            -i "$key_file" "$VPS_SSH_USERNAME@$VPS_IP" \
-            bash -s -- ddf8b2b5286ea23adeb69e2a8f217b0f37769518 < devScripts/deploy-verified-release.sh
+          gh api "repos/$GITHUB_REPOSITORY/actions/jobs/122608015276/logs" > "$RUNNER_TEMP/raw.log"
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          lines = [re.sub(r'^\ufeff?\d{4}-\d\d-\d\dT\S+ ', '', line) for line in (root / 'raw.log').read_text().splitlines()]
+          start = next(index for index, line in enumerate(lines) if line.startswith('== deploy start '))
+          end = next(index for index in range(start, len(lines)) if lines[index] == 'Post job cleanup.')
+          output = '\n'.join(lines[start:end])
+          assert 'Release ddf8b2b5286ea23adeb69e2a8f217b0f37769518 is healthy.' in output
+          output = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', output)
+          header = 'Starting deploy for commit: ddf8b2b5286ea23adeb69e2a8f217b0f37769518\nRecovered from Actions run 40625097223 after VPS file logging was omitted.\n'
+          (root / 'recovered.log').write_text(header + output + '\n')
+          PY
+          expected_hash="$(sha256sum "$RUNNER_TEMP/recovered.log" | cut -d ' ' -f 1)"
+          ssh_options=(-o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known_hosts_file" -o ConnectTimeout=15 -i "$key_file")
+          scp "${ssh_options[@]}" "$RUNNER_TEMP/recovered.log" "$VPS_SSH_USERNAME@$VPS_IP:apps/codexchristi/deploy-20261028030948.log.recovered"
+          ssh -T "${ssh_options[@]}" "$VPS_SSH_USERNAME@$VPS_IP" bash -s -- "$expected_hash" <<'REMOTE'
+          set -euo pipefail
+          cd "$HOME/apps/codexchristi"
+          log_file=deploy-20261028030948.log
+          if [ ! -e "$log_file" ]; then
+            mv "$log_file.recovered" "$log_file"
+          fi
+          chmod 600 "$log_file"
+          printf '%s  %s\n' "$1" "$log_file" | sha256sum --check
+          echo "Restored log: $PWD/$log_file"
+          wc -l "$log_file"
+          tail -n 7 "$log_file"
+          REMOTE

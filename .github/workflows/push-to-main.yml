@@ -32,6 +32,8 @@ jobs:
         run: yarn test:auth
       - name: Checkout state and payment safeguards
         run: yarn test:checkout
+      - name: Deployment safeguards
+        run: node --test scripts/deploy-verified-release.test.mjs
   deploy:
     needs: verify
     if: github.event_name == 'push'
