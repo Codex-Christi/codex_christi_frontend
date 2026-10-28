@@ -112,7 +112,7 @@ COPY --from=builder /app/src/datasets /app/src/datasets
 
 # Next may write prerender/image/cache files at runtime.
 # The app runs as `node`, so prepare writable cache folders before dropping privileges.
-RUN mkdir -p /app/.next/cache \
+RUN mkdir -p /app/.next/cache/images \
   && chown -R node:node /app/.next
 
 EXPOSE 3000

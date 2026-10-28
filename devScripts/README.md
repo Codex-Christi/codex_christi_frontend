@@ -57,6 +57,34 @@ Prisma migration history (for example, P3005), stop, back it up and reconcile it
 schema/history before retrying. Do not reset production or mark every migration
 applied without checking what the database contains.
 
+## Persistent Optimized Images
+
+The app mounts the `next_image_cache` named volume at `/app/.next/cache/images`.
+Only prepared images are persisted, not the `.next` application build or HTML/ISR
+cache. The runtime image creates this directory with `node` ownership before the
+volume is first mounted. The existing deployment wrapper preserves the Compose
+project name, so subsequent releases reuse the same image volume.
+
+Next's image disk cache is capped at 256 MiB and evicts older entries as needed.
+The existing image quality, responsive sizes, AVIF/WebP formats and TTL are
+unchanged. A new source URL, size, quality or format can still need its first
+optimization. This is expected; persistence avoids repeating that work merely
+because the app container was replaced. No warm-up job or extra supplier fetch
+is added.
+
+Keep the named volume when replacing containers. Do not use `docker compose
+down -v` or remove the volume during ordinary deployments. If a pre-existing
+image volume is not writable by the runtime `node` user, repair that volume's
+ownership before serving traffic; do not run the app as root to work around it.
+
+Image freshness remains separate from product snapshot/HTML refresh. The current
+minimum image TTL is one year. Updated images should use a new/versioned source
+URL; overwriting an image at the same URL can retain the old optimized image.
+If such an overwrite requires a targeted cache purge, coordinate it with any
+Nginx/CDN image cache too. Do not clear the catalog database or whole `.next`
+directory to refresh an image. Clearing image entries deliberately makes their
+next requests cold again.
+
 ## Deferred Cloudflare Web Analytics
 
 The root layout loads one analytics beacon after the page-load event, during
