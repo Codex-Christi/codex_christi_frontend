@@ -27,10 +27,16 @@ export type AggregateAdminMasterTransferChallenge = {
 }
 
 export type AdminMasterTransferChallengeAvgAggregateOutputType = {
+  acceptanceVersion: number | null
+  sourceSessionVersion: number | null
+  targetAdminSessionVersion: number | null
   attemptCount: number | null
 }
 
 export type AdminMasterTransferChallengeSumAggregateOutputType = {
+  acceptanceVersion: number | null
+  sourceSessionVersion: number | null
+  targetAdminSessionVersion: number | null
   attemptCount: number | null
 }
 
@@ -41,6 +47,10 @@ export type AdminMasterTransferChallengeMinAggregateOutputType = {
   targetCodexUserId: string | null
   targetEmail: string | null
   targetPasswordHash: string | null
+  acceptanceVersion: number | null
+  sourceSessionVersion: number | null
+  targetAdminUserId: string | null
+  targetAdminSessionVersion: number | null
   otpHash: string | null
   expiresAt: Date | null
   consumedAt: Date | null
@@ -55,6 +65,10 @@ export type AdminMasterTransferChallengeMaxAggregateOutputType = {
   targetCodexUserId: string | null
   targetEmail: string | null
   targetPasswordHash: string | null
+  acceptanceVersion: number | null
+  sourceSessionVersion: number | null
+  targetAdminUserId: string | null
+  targetAdminSessionVersion: number | null
   otpHash: string | null
   expiresAt: Date | null
   consumedAt: Date | null
@@ -69,6 +83,10 @@ export type AdminMasterTransferChallengeCountAggregateOutputType = {
   targetCodexUserId: number
   targetEmail: number
   targetPasswordHash: number
+  acceptanceVersion: number
+  sourceSessionVersion: number
+  targetAdminUserId: number
+  targetAdminSessionVersion: number
   otpHash: number
   expiresAt: number
   consumedAt: number
@@ -79,10 +97,16 @@ export type AdminMasterTransferChallengeCountAggregateOutputType = {
 
 
 export type AdminMasterTransferChallengeAvgAggregateInputType = {
+  acceptanceVersion?: true
+  sourceSessionVersion?: true
+  targetAdminSessionVersion?: true
   attemptCount?: true
 }
 
 export type AdminMasterTransferChallengeSumAggregateInputType = {
+  acceptanceVersion?: true
+  sourceSessionVersion?: true
+  targetAdminSessionVersion?: true
   attemptCount?: true
 }
 
@@ -93,6 +117,10 @@ export type AdminMasterTransferChallengeMinAggregateInputType = {
   targetCodexUserId?: true
   targetEmail?: true
   targetPasswordHash?: true
+  acceptanceVersion?: true
+  sourceSessionVersion?: true
+  targetAdminUserId?: true
+  targetAdminSessionVersion?: true
   otpHash?: true
   expiresAt?: true
   consumedAt?: true
@@ -107,6 +135,10 @@ export type AdminMasterTransferChallengeMaxAggregateInputType = {
   targetCodexUserId?: true
   targetEmail?: true
   targetPasswordHash?: true
+  acceptanceVersion?: true
+  sourceSessionVersion?: true
+  targetAdminUserId?: true
+  targetAdminSessionVersion?: true
   otpHash?: true
   expiresAt?: true
   consumedAt?: true
@@ -121,6 +153,10 @@ export type AdminMasterTransferChallengeCountAggregateInputType = {
   targetCodexUserId?: true
   targetEmail?: true
   targetPasswordHash?: true
+  acceptanceVersion?: true
+  sourceSessionVersion?: true
+  targetAdminUserId?: true
+  targetAdminSessionVersion?: true
   otpHash?: true
   expiresAt?: true
   consumedAt?: true
@@ -221,7 +257,11 @@ export type AdminMasterTransferChallengeGroupByOutputType = {
   actorCodexUserId: string
   targetCodexUserId: string
   targetEmail: string
-  targetPasswordHash: string
+  targetPasswordHash: string | null
+  acceptanceVersion: number
+  sourceSessionVersion: number | null
+  targetAdminUserId: string | null
+  targetAdminSessionVersion: number | null
   otpHash: string
   expiresAt: Date
   consumedAt: Date | null
@@ -258,7 +298,11 @@ export type AdminMasterTransferChallengeWhereInput = {
   actorCodexUserId?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
   targetCodexUserId?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
   targetEmail?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
-  targetPasswordHash?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
+  targetPasswordHash?: Prisma.StringNullableFilter<"AdminMasterTransferChallenge"> | string | null
+  acceptanceVersion?: Prisma.IntFilter<"AdminMasterTransferChallenge"> | number
+  sourceSessionVersion?: Prisma.IntNullableFilter<"AdminMasterTransferChallenge"> | number | null
+  targetAdminUserId?: Prisma.StringNullableFilter<"AdminMasterTransferChallenge"> | string | null
+  targetAdminSessionVersion?: Prisma.IntNullableFilter<"AdminMasterTransferChallenge"> | number | null
   otpHash?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
   expiresAt?: Prisma.DateTimeFilter<"AdminMasterTransferChallenge"> | Date | string
   consumedAt?: Prisma.DateTimeNullableFilter<"AdminMasterTransferChallenge"> | Date | string | null
@@ -273,7 +317,11 @@ export type AdminMasterTransferChallengeOrderByWithRelationInput = {
   actorCodexUserId?: Prisma.SortOrder
   targetCodexUserId?: Prisma.SortOrder
   targetEmail?: Prisma.SortOrder
-  targetPasswordHash?: Prisma.SortOrder
+  targetPasswordHash?: Prisma.SortOrderInput | Prisma.SortOrder
+  acceptanceVersion?: Prisma.SortOrder
+  sourceSessionVersion?: Prisma.SortOrderInput | Prisma.SortOrder
+  targetAdminUserId?: Prisma.SortOrderInput | Prisma.SortOrder
+  targetAdminSessionVersion?: Prisma.SortOrderInput | Prisma.SortOrder
   otpHash?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   consumedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -291,7 +339,11 @@ export type AdminMasterTransferChallengeWhereUniqueInput = Prisma.AtLeast<{
   actorCodexUserId?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
   targetCodexUserId?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
   targetEmail?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
-  targetPasswordHash?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
+  targetPasswordHash?: Prisma.StringNullableFilter<"AdminMasterTransferChallenge"> | string | null
+  acceptanceVersion?: Prisma.IntFilter<"AdminMasterTransferChallenge"> | number
+  sourceSessionVersion?: Prisma.IntNullableFilter<"AdminMasterTransferChallenge"> | number | null
+  targetAdminUserId?: Prisma.StringNullableFilter<"AdminMasterTransferChallenge"> | string | null
+  targetAdminSessionVersion?: Prisma.IntNullableFilter<"AdminMasterTransferChallenge"> | number | null
   otpHash?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
   expiresAt?: Prisma.DateTimeFilter<"AdminMasterTransferChallenge"> | Date | string
   consumedAt?: Prisma.DateTimeNullableFilter<"AdminMasterTransferChallenge"> | Date | string | null
@@ -306,7 +358,11 @@ export type AdminMasterTransferChallengeOrderByWithAggregationInput = {
   actorCodexUserId?: Prisma.SortOrder
   targetCodexUserId?: Prisma.SortOrder
   targetEmail?: Prisma.SortOrder
-  targetPasswordHash?: Prisma.SortOrder
+  targetPasswordHash?: Prisma.SortOrderInput | Prisma.SortOrder
+  acceptanceVersion?: Prisma.SortOrder
+  sourceSessionVersion?: Prisma.SortOrderInput | Prisma.SortOrder
+  targetAdminUserId?: Prisma.SortOrderInput | Prisma.SortOrder
+  targetAdminSessionVersion?: Prisma.SortOrderInput | Prisma.SortOrder
   otpHash?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   consumedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -328,7 +384,11 @@ export type AdminMasterTransferChallengeScalarWhereWithAggregatesInput = {
   actorCodexUserId?: Prisma.StringWithAggregatesFilter<"AdminMasterTransferChallenge"> | string
   targetCodexUserId?: Prisma.StringWithAggregatesFilter<"AdminMasterTransferChallenge"> | string
   targetEmail?: Prisma.StringWithAggregatesFilter<"AdminMasterTransferChallenge"> | string
-  targetPasswordHash?: Prisma.StringWithAggregatesFilter<"AdminMasterTransferChallenge"> | string
+  targetPasswordHash?: Prisma.StringNullableWithAggregatesFilter<"AdminMasterTransferChallenge"> | string | null
+  acceptanceVersion?: Prisma.IntWithAggregatesFilter<"AdminMasterTransferChallenge"> | number
+  sourceSessionVersion?: Prisma.IntNullableWithAggregatesFilter<"AdminMasterTransferChallenge"> | number | null
+  targetAdminUserId?: Prisma.StringNullableWithAggregatesFilter<"AdminMasterTransferChallenge"> | string | null
+  targetAdminSessionVersion?: Prisma.IntNullableWithAggregatesFilter<"AdminMasterTransferChallenge"> | number | null
   otpHash?: Prisma.StringWithAggregatesFilter<"AdminMasterTransferChallenge"> | string
   expiresAt?: Prisma.DateTimeWithAggregatesFilter<"AdminMasterTransferChallenge"> | Date | string
   consumedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"AdminMasterTransferChallenge"> | Date | string | null
@@ -341,7 +401,11 @@ export type AdminMasterTransferChallengeCreateInput = {
   actorCodexUserId: string
   targetCodexUserId: string
   targetEmail: string
-  targetPasswordHash: string
+  targetPasswordHash?: string | null
+  acceptanceVersion?: number
+  sourceSessionVersion?: number | null
+  targetAdminUserId?: string | null
+  targetAdminSessionVersion?: number | null
   otpHash: string
   expiresAt: Date | string
   consumedAt?: Date | string | null
@@ -356,7 +420,11 @@ export type AdminMasterTransferChallengeUncheckedCreateInput = {
   actorCodexUserId: string
   targetCodexUserId: string
   targetEmail: string
-  targetPasswordHash: string
+  targetPasswordHash?: string | null
+  acceptanceVersion?: number
+  sourceSessionVersion?: number | null
+  targetAdminUserId?: string | null
+  targetAdminSessionVersion?: number | null
   otpHash: string
   expiresAt: Date | string
   consumedAt?: Date | string | null
@@ -369,7 +437,11 @@ export type AdminMasterTransferChallengeUpdateInput = {
   actorCodexUserId?: Prisma.StringFieldUpdateOperationsInput | string
   targetCodexUserId?: Prisma.StringFieldUpdateOperationsInput | string
   targetEmail?: Prisma.StringFieldUpdateOperationsInput | string
-  targetPasswordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  targetPasswordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  acceptanceVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  sourceSessionVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  targetAdminUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetAdminSessionVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   otpHash?: Prisma.StringFieldUpdateOperationsInput | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -384,7 +456,11 @@ export type AdminMasterTransferChallengeUncheckedUpdateInput = {
   actorCodexUserId?: Prisma.StringFieldUpdateOperationsInput | string
   targetCodexUserId?: Prisma.StringFieldUpdateOperationsInput | string
   targetEmail?: Prisma.StringFieldUpdateOperationsInput | string
-  targetPasswordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  targetPasswordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  acceptanceVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  sourceSessionVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  targetAdminUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetAdminSessionVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   otpHash?: Prisma.StringFieldUpdateOperationsInput | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -398,7 +474,11 @@ export type AdminMasterTransferChallengeCreateManyInput = {
   actorCodexUserId: string
   targetCodexUserId: string
   targetEmail: string
-  targetPasswordHash: string
+  targetPasswordHash?: string | null
+  acceptanceVersion?: number
+  sourceSessionVersion?: number | null
+  targetAdminUserId?: string | null
+  targetAdminSessionVersion?: number | null
   otpHash: string
   expiresAt: Date | string
   consumedAt?: Date | string | null
@@ -411,7 +491,11 @@ export type AdminMasterTransferChallengeUpdateManyMutationInput = {
   actorCodexUserId?: Prisma.StringFieldUpdateOperationsInput | string
   targetCodexUserId?: Prisma.StringFieldUpdateOperationsInput | string
   targetEmail?: Prisma.StringFieldUpdateOperationsInput | string
-  targetPasswordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  targetPasswordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  acceptanceVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  sourceSessionVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  targetAdminUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetAdminSessionVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   otpHash?: Prisma.StringFieldUpdateOperationsInput | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -425,7 +509,11 @@ export type AdminMasterTransferChallengeUncheckedUpdateManyInput = {
   actorCodexUserId?: Prisma.StringFieldUpdateOperationsInput | string
   targetCodexUserId?: Prisma.StringFieldUpdateOperationsInput | string
   targetEmail?: Prisma.StringFieldUpdateOperationsInput | string
-  targetPasswordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  targetPasswordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  acceptanceVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  sourceSessionVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  targetAdminUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetAdminSessionVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   otpHash?: Prisma.StringFieldUpdateOperationsInput | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -450,6 +538,10 @@ export type AdminMasterTransferChallengeCountOrderByAggregateInput = {
   targetCodexUserId?: Prisma.SortOrder
   targetEmail?: Prisma.SortOrder
   targetPasswordHash?: Prisma.SortOrder
+  acceptanceVersion?: Prisma.SortOrder
+  sourceSessionVersion?: Prisma.SortOrder
+  targetAdminUserId?: Prisma.SortOrder
+  targetAdminSessionVersion?: Prisma.SortOrder
   otpHash?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   consumedAt?: Prisma.SortOrder
@@ -458,6 +550,9 @@ export type AdminMasterTransferChallengeCountOrderByAggregateInput = {
 }
 
 export type AdminMasterTransferChallengeAvgOrderByAggregateInput = {
+  acceptanceVersion?: Prisma.SortOrder
+  sourceSessionVersion?: Prisma.SortOrder
+  targetAdminSessionVersion?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
 }
 
@@ -468,6 +563,10 @@ export type AdminMasterTransferChallengeMaxOrderByAggregateInput = {
   targetCodexUserId?: Prisma.SortOrder
   targetEmail?: Prisma.SortOrder
   targetPasswordHash?: Prisma.SortOrder
+  acceptanceVersion?: Prisma.SortOrder
+  sourceSessionVersion?: Prisma.SortOrder
+  targetAdminUserId?: Prisma.SortOrder
+  targetAdminSessionVersion?: Prisma.SortOrder
   otpHash?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   consumedAt?: Prisma.SortOrder
@@ -482,6 +581,10 @@ export type AdminMasterTransferChallengeMinOrderByAggregateInput = {
   targetCodexUserId?: Prisma.SortOrder
   targetEmail?: Prisma.SortOrder
   targetPasswordHash?: Prisma.SortOrder
+  acceptanceVersion?: Prisma.SortOrder
+  sourceSessionVersion?: Prisma.SortOrder
+  targetAdminUserId?: Prisma.SortOrder
+  targetAdminSessionVersion?: Prisma.SortOrder
   otpHash?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   consumedAt?: Prisma.SortOrder
@@ -490,6 +593,9 @@ export type AdminMasterTransferChallengeMinOrderByAggregateInput = {
 }
 
 export type AdminMasterTransferChallengeSumOrderByAggregateInput = {
+  acceptanceVersion?: Prisma.SortOrder
+  sourceSessionVersion?: Prisma.SortOrder
+  targetAdminSessionVersion?: Prisma.SortOrder
   attemptCount?: Prisma.SortOrder
 }
 
@@ -535,12 +641,24 @@ export type AdminMasterTransferChallengeUncheckedUpdateManyWithoutActorAdminUser
   deleteMany?: Prisma.AdminMasterTransferChallengeScalarWhereInput | Prisma.AdminMasterTransferChallengeScalarWhereInput[]
 }
 
+export type NullableIntFieldUpdateOperationsInput = {
+  set?: number | null
+  increment?: number
+  decrement?: number
+  multiply?: number
+  divide?: number
+}
+
 export type AdminMasterTransferChallengeCreateWithoutActorAdminUserInput = {
   id?: string
   actorCodexUserId: string
   targetCodexUserId: string
   targetEmail: string
-  targetPasswordHash: string
+  targetPasswordHash?: string | null
+  acceptanceVersion?: number
+  sourceSessionVersion?: number | null
+  targetAdminUserId?: string | null
+  targetAdminSessionVersion?: number | null
   otpHash: string
   expiresAt: Date | string
   consumedAt?: Date | string | null
@@ -553,7 +671,11 @@ export type AdminMasterTransferChallengeUncheckedCreateWithoutActorAdminUserInpu
   actorCodexUserId: string
   targetCodexUserId: string
   targetEmail: string
-  targetPasswordHash: string
+  targetPasswordHash?: string | null
+  acceptanceVersion?: number
+  sourceSessionVersion?: number | null
+  targetAdminUserId?: string | null
+  targetAdminSessionVersion?: number | null
   otpHash: string
   expiresAt: Date | string
   consumedAt?: Date | string | null
@@ -596,7 +718,11 @@ export type AdminMasterTransferChallengeScalarWhereInput = {
   actorCodexUserId?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
   targetCodexUserId?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
   targetEmail?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
-  targetPasswordHash?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
+  targetPasswordHash?: Prisma.StringNullableFilter<"AdminMasterTransferChallenge"> | string | null
+  acceptanceVersion?: Prisma.IntFilter<"AdminMasterTransferChallenge"> | number
+  sourceSessionVersion?: Prisma.IntNullableFilter<"AdminMasterTransferChallenge"> | number | null
+  targetAdminUserId?: Prisma.StringNullableFilter<"AdminMasterTransferChallenge"> | string | null
+  targetAdminSessionVersion?: Prisma.IntNullableFilter<"AdminMasterTransferChallenge"> | number | null
   otpHash?: Prisma.StringFilter<"AdminMasterTransferChallenge"> | string
   expiresAt?: Prisma.DateTimeFilter<"AdminMasterTransferChallenge"> | Date | string
   consumedAt?: Prisma.DateTimeNullableFilter<"AdminMasterTransferChallenge"> | Date | string | null
@@ -609,7 +735,11 @@ export type AdminMasterTransferChallengeCreateManyActorAdminUserInput = {
   actorCodexUserId: string
   targetCodexUserId: string
   targetEmail: string
-  targetPasswordHash: string
+  targetPasswordHash?: string | null
+  acceptanceVersion?: number
+  sourceSessionVersion?: number | null
+  targetAdminUserId?: string | null
+  targetAdminSessionVersion?: number | null
   otpHash: string
   expiresAt: Date | string
   consumedAt?: Date | string | null
@@ -622,7 +752,11 @@ export type AdminMasterTransferChallengeUpdateWithoutActorAdminUserInput = {
   actorCodexUserId?: Prisma.StringFieldUpdateOperationsInput | string
   targetCodexUserId?: Prisma.StringFieldUpdateOperationsInput | string
   targetEmail?: Prisma.StringFieldUpdateOperationsInput | string
-  targetPasswordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  targetPasswordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  acceptanceVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  sourceSessionVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  targetAdminUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetAdminSessionVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   otpHash?: Prisma.StringFieldUpdateOperationsInput | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -635,7 +769,11 @@ export type AdminMasterTransferChallengeUncheckedUpdateWithoutActorAdminUserInpu
   actorCodexUserId?: Prisma.StringFieldUpdateOperationsInput | string
   targetCodexUserId?: Prisma.StringFieldUpdateOperationsInput | string
   targetEmail?: Prisma.StringFieldUpdateOperationsInput | string
-  targetPasswordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  targetPasswordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  acceptanceVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  sourceSessionVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  targetAdminUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetAdminSessionVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   otpHash?: Prisma.StringFieldUpdateOperationsInput | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -648,7 +786,11 @@ export type AdminMasterTransferChallengeUncheckedUpdateManyWithoutActorAdminUser
   actorCodexUserId?: Prisma.StringFieldUpdateOperationsInput | string
   targetCodexUserId?: Prisma.StringFieldUpdateOperationsInput | string
   targetEmail?: Prisma.StringFieldUpdateOperationsInput | string
-  targetPasswordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  targetPasswordHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  acceptanceVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  sourceSessionVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  targetAdminUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetAdminSessionVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   otpHash?: Prisma.StringFieldUpdateOperationsInput | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   consumedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -665,6 +807,10 @@ export type AdminMasterTransferChallengeSelect<ExtArgs extends runtime.Types.Ext
   targetCodexUserId?: boolean
   targetEmail?: boolean
   targetPasswordHash?: boolean
+  acceptanceVersion?: boolean
+  sourceSessionVersion?: boolean
+  targetAdminUserId?: boolean
+  targetAdminSessionVersion?: boolean
   otpHash?: boolean
   expiresAt?: boolean
   consumedAt?: boolean
@@ -680,6 +826,10 @@ export type AdminMasterTransferChallengeSelectCreateManyAndReturn<ExtArgs extend
   targetCodexUserId?: boolean
   targetEmail?: boolean
   targetPasswordHash?: boolean
+  acceptanceVersion?: boolean
+  sourceSessionVersion?: boolean
+  targetAdminUserId?: boolean
+  targetAdminSessionVersion?: boolean
   otpHash?: boolean
   expiresAt?: boolean
   consumedAt?: boolean
@@ -695,6 +845,10 @@ export type AdminMasterTransferChallengeSelectUpdateManyAndReturn<ExtArgs extend
   targetCodexUserId?: boolean
   targetEmail?: boolean
   targetPasswordHash?: boolean
+  acceptanceVersion?: boolean
+  sourceSessionVersion?: boolean
+  targetAdminUserId?: boolean
+  targetAdminSessionVersion?: boolean
   otpHash?: boolean
   expiresAt?: boolean
   consumedAt?: boolean
@@ -710,6 +864,10 @@ export type AdminMasterTransferChallengeSelectScalar = {
   targetCodexUserId?: boolean
   targetEmail?: boolean
   targetPasswordHash?: boolean
+  acceptanceVersion?: boolean
+  sourceSessionVersion?: boolean
+  targetAdminUserId?: boolean
+  targetAdminSessionVersion?: boolean
   otpHash?: boolean
   expiresAt?: boolean
   consumedAt?: boolean
@@ -717,7 +875,7 @@ export type AdminMasterTransferChallengeSelectScalar = {
   createdAt?: boolean
 }
 
-export type AdminMasterTransferChallengeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "actorAdminUserId" | "actorCodexUserId" | "targetCodexUserId" | "targetEmail" | "targetPasswordHash" | "otpHash" | "expiresAt" | "consumedAt" | "attemptCount" | "createdAt", ExtArgs["result"]["adminMasterTransferChallenge"]>
+export type AdminMasterTransferChallengeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "actorAdminUserId" | "actorCodexUserId" | "targetCodexUserId" | "targetEmail" | "targetPasswordHash" | "acceptanceVersion" | "sourceSessionVersion" | "targetAdminUserId" | "targetAdminSessionVersion" | "otpHash" | "expiresAt" | "consumedAt" | "attemptCount" | "createdAt", ExtArgs["result"]["adminMasterTransferChallenge"]>
 export type AdminMasterTransferChallengeInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   actorAdminUser?: boolean | Prisma.AdminMasterTransferChallenge$actorAdminUserArgs<ExtArgs>
 }
@@ -739,7 +897,11 @@ export type $AdminMasterTransferChallengePayload<ExtArgs extends runtime.Types.E
     actorCodexUserId: string
     targetCodexUserId: string
     targetEmail: string
-    targetPasswordHash: string
+    targetPasswordHash: string | null
+    acceptanceVersion: number
+    sourceSessionVersion: number | null
+    targetAdminUserId: string | null
+    targetAdminSessionVersion: number | null
     otpHash: string
     expiresAt: Date
     consumedAt: Date | null
@@ -1175,6 +1337,10 @@ export interface AdminMasterTransferChallengeFieldRefs {
   readonly targetCodexUserId: Prisma.FieldRef<"AdminMasterTransferChallenge", 'String'>
   readonly targetEmail: Prisma.FieldRef<"AdminMasterTransferChallenge", 'String'>
   readonly targetPasswordHash: Prisma.FieldRef<"AdminMasterTransferChallenge", 'String'>
+  readonly acceptanceVersion: Prisma.FieldRef<"AdminMasterTransferChallenge", 'Int'>
+  readonly sourceSessionVersion: Prisma.FieldRef<"AdminMasterTransferChallenge", 'Int'>
+  readonly targetAdminUserId: Prisma.FieldRef<"AdminMasterTransferChallenge", 'String'>
+  readonly targetAdminSessionVersion: Prisma.FieldRef<"AdminMasterTransferChallenge", 'Int'>
   readonly otpHash: Prisma.FieldRef<"AdminMasterTransferChallenge", 'String'>
   readonly expiresAt: Prisma.FieldRef<"AdminMasterTransferChallenge", 'DateTime'>
   readonly consumedAt: Prisma.FieldRef<"AdminMasterTransferChallenge", 'DateTime'>

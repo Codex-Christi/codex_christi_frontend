@@ -2,11 +2,14 @@
 
 import useAuthStore from '@/stores/authStore';
 import { clearPrivateClientState, publishSessionChange } from '@/lib/auth/client-session';
-import { getAuthRoutes } from '@/lib/auth/domain-routing';
+import { getAuthRoutes, safeAuthReturnPath } from '@/lib/auth/domain-routing';
 import errorToast from '@/lib/error-toast';
 
 let pending: Promise<boolean> | null = null;
-export const logoutUser = (): Promise<boolean> => {
+export const logoutUser = (): Promise<boolean> => performLogout();
+export const logoutUserTo = (next: string): Promise<boolean> => performLogout(next);
+
+function performLogout(next?: string): Promise<boolean> {
   if (pending) return pending;
   pending = (async () => {
     const response = await fetch('/next-api/logout', {
@@ -26,7 +29,10 @@ export const logoutUser = (): Promise<boolean> => {
       window.location.hostname,
       window.location.pathname.startsWith('/shop/'),
     );
-    window.location.replace(`${routes.login}?from-logout=true`);
+    const returnPath = safeAuthReturnPath(next, routes);
+    const query = new URLSearchParams({ 'from-logout': 'true' });
+    if (returnPath) query.set('next', returnPath);
+    window.location.replace(`${routes.login}?${query}`);
     return true;
   })()
     .catch((error) => {
@@ -39,4 +45,4 @@ export const logoutUser = (): Promise<boolean> => {
       pending = null;
     });
   return pending;
-};
+}

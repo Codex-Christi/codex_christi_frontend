@@ -65,18 +65,23 @@ model AdminAuditLog {
 }
 
 model AdminMasterTransferChallenge {
-  id                 String     @id @default(cuid())
-  actorAdminUserId   String?
-  actorAdminUser     AdminUser? @relation("ActorAdminMasterTransferChallenges", fields: [actorAdminUserId], references: [id], onDelete: SetNull)
-  actorCodexUserId   String
-  targetCodexUserId  String
-  targetEmail        String
-  targetPasswordHash String
-  otpHash            String
-  expiresAt          DateTime
-  consumedAt         DateTime?
-  attemptCount       Int        @default(0)
-  createdAt          DateTime   @default(now())
+  id                        String     @id @default(cuid())
+  actorAdminUserId          String?
+  actorAdminUser            AdminUser? @relation("ActorAdminMasterTransferChallenges", fields: [actorAdminUserId], references: [id], onDelete: SetNull)
+  actorCodexUserId          String
+  targetCodexUserId         String
+  targetEmail               String
+  // Legacy only. Version 2 invitations never store a sender-chosen password.
+  targetPasswordHash        String?
+  acceptanceVersion         Int        @default(1)
+  sourceSessionVersion      Int?
+  targetAdminUserId         String?
+  targetAdminSessionVersion Int?
+  otpHash                   String
+  expiresAt                 DateTime
+  consumedAt                DateTime?
+  attemptCount              Int        @default(0)
+  createdAt                 DateTime   @default(now())
 
   @@index([actorAdminUserId, consumedAt, expiresAt])
   @@index([createdAt])

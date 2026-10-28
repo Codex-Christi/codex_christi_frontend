@@ -1,6 +1,11 @@
 export const ADMIN_ROOT_PATH = '/admin';
 export const ADMIN_UNLOCK_PATH = '/admin/unlock';
 export const ADMIN_LOGOUT_PATH = '/admin/logout';
+export const ADMIN_TRANSFER_ACCEPT_PATH = '/admin/transfer/accept';
+
+export function buildAdminTransferAcceptancePath(challengeId: string) {
+  return `${ADMIN_TRANSFER_ACCEPT_PATH}?${new URLSearchParams({ invitation: challengeId })}`;
+}
 
 export function getSafeAdminReturnPath(value: string | null | undefined) {
   if (!value) return null;

@@ -36,10 +36,10 @@ export default function AdminOpsManagementModals() {
         icon={KeyRound}
         eyebrow='Master'
         title='Master Transfer'
-        description='Move master privileges after password verification and OTP confirmation.'
+        description='Invite another account to accept admin ownership.'
         actionLabel='Open Transfer Form'
         dialogTitle='Master Admin Transfer'
-        dialogDescription='Transfer master admin privileges to another Codex Christi account.'
+        dialogDescription='Your admin access stays active until the invited account accepts.'
       >
         <AdminMasterTransferForm />
       </AdminOpsModalCard>

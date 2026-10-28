@@ -60,7 +60,7 @@ This is required for the OTP email used by master-admin transfer.
 ## Deploy Steps
 
 Use the existing deployment workflow. Its migrate service reads `.env.production`,
-generates the Admin Ops client and applies the existing migrations before app
+generates the Admin Ops client and applies reviewed migrations before app
 restart. Confirm direct and pooled URLs address the same production database.
 Do not run an unqualified migration command that could load `.env.local` instead.
 See [database setup](../devScripts/README.md#database-setup).
@@ -69,6 +69,20 @@ The user reports the previous Next release and Nginx are deployed; production
 authentication checks remain pending. The recovery/transfer changes described
 here still require their own release. Do not treat local tests as acceptance of
 either release.
+
+This release adds `20261028010000_recipient_owned_admin_transfer` to the existing
+Admin Ops table. Review a backup and migration history first. The migration
+adds source/recipient version snapshots, makes the old sender-password column
+nullable, consumes old pending invitations and refuses new active legacy
+invitations at database level. An older runtime therefore cannot start its
+unsafe transfer flow between migration and restart. Generate the client and
+deploy the new runtime with this migration; do not run it manually against a
+production URL merely to test it. No Django, Nginx or new service is needed.
+
+Old pending links need a new invitation. If rolling the app back, leave transfers
+unavailable rather than drop the guards or restore consumed codes. The nullable
+legacy password column remains only for history; new invitations never store a
+sender-chosen recipient password.
 
 ## Emergency Creation And Password Reset
 
@@ -137,32 +151,67 @@ The old `--creation-token`, `--password` and `--scopes` arguments are refused.
 
 Only master admins can access `/admin/admin-ops`.
 
-Operational admin creation now:
+Operational admin creation and edits:
 
-- verifies the target Codex Christi user ID before writing the ledger row;
-- shows a small public profile preview in the UI;
-- does not depend on mutable email as identity;
-- stores the stable Codex Christi user ID as the admin identity.
+- verify the target Codex Christi user ID before writing the ledger row;
+- show a small public profile preview in the UI;
+- do not depend on mutable email as identity;
+- store the stable Codex Christi user ID as the admin identity;
+- hash outside a short transaction, then lock account rows in a stable order and
+  recheck the acting master's current role, active status and session version;
+- refuse ordinary provisioning edits to any existing master, not just self;
+- save the account/version change, affected invitation cancellation and required
+  success audit together. An audit failure rolls everything back. A conflicting
+  account creation fails rather than overwriting an account created meanwhile.
 
-Master-admin transfer now:
+## Transfer Ownership
 
-- requires the current master admin unlock password;
-- shares Unlock's database-backed failed-password window: five failures in
+1. While signed in and unlocked as the current master, open the ownership form
+   at `/admin/admin-ops`. Supply the current unlock password, recipient's exact
+   Django user UUID and invitation email. Preview the UUID before sending.
+2. The recipient receives a link and six-digit code, valid for ten minutes.
+   Their delivery email need not equal their Django email; it is not proof of
+   account identity. The sender cannot choose their password or finish for them.
+3. The recipient opens `/admin/transfer/accept?invitation=...` and signs in as that
+   exact Django account. No prior admin record/unlock is needed for this page;
+   every other admin page keeps its gate. Sign Out And Switch Account preserves
+   the invitation while using normal Logout. The link has no OTP or login token.
+4. The recipient enters the code, chooses and confirms their own 12-128-character
+   unlock password, and explicitly accepts. Source revocation, recipient grant,
+   invitation consumption/cancellation and required audit share one transaction.
+   They then unlock admin with the new password. A failed audit or stale account
+   snapshot cannot partly transfer ownership.
+5. The sender remains active until acceptance and can cancel the pending
+   invitation. After acceptance their old admin version is rejected on the next
+   live check, but ordinary website login stays active for both users. Already
+   open tabs are not instantly erased. A changed source/recipient admin version,
+   role or status requires a fresh invitation; disabled/master targets are refused.
+
+Transfer safeguards:
+
+- Current-password proof shares Unlock's failed-password window: five failures in
   15 minutes block further checks until the existing lockout expires;
-- shares a two-slot process-local password-work budget with Unlock, password
+- Password proof/hashing shares a two-slot process-local budget with Unlock, password
   change and provisioning hashes; busy work is refused, not queued;
-- verifies the target Codex Christi user ID before sending OTP;
-- applies an 8-second profile deadline, rejects redirects and caps JSON at 512 KiB;
-- sends OTP to the email entered for the transfer;
-- allows one new challenge per minute and at most three in 15 minutes per source
+- Target profile verification has an 8-second deadline, refuses redirects and caps
+  JSON at 512 KiB. It runs outside the write transaction.
+- At most one new invitation per minute and three in 15 minutes per source
   admin, including consumed/email-failed challenges; checks again under the
-  source-row transaction lock before creating a challenge;
-- logs out the old master after completion.
+  source-row transaction lock before creating a challenge.
+- Five incorrect codes consume the invitation. Code guesses, cancellation and
+  acceptance serialize on locked account rows before changing the challenge.
+- Only same-origin, bounded POST requests accept ownership. The recipient user ID
+  comes from the verified primary session, never submitted form data. Successful
+  acceptance clears only admin cookies; main access/refresh cookies stay intact.
+- A delivery failure invalidates the invitation; uncertain sending/acceptance does
+  not auto-retry. Check the account/audit and new unlock password before retrying.
 
-These limits do not establish that the entered email belongs to the target
-account. Signed-in recipient acceptance remains follow-up work. Password slots
-are local to each Node process, not a cross-container limit. Other sensitive
-admin password checks have not all been moved to this helper.
+Local checks used disposable PostgreSQL records, stubbed mail/profile responses
+and synthetic cookies. They do not verify production delivery or HTTPS behavior.
+Follow the [deployment checklist](./nextjs-auth-shop-integration-hardening-plan.md#deployment-checklist)
+with disposable accounts before accepting this release. Password slots are local
+to each Node process, not a cross-container limit. Other sensitive admin password
+checks have not all been moved to this helper.
 
 ## Stale Variables And Scripts
 
