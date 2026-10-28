@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { getServerDjangoApiBaseUrl } from '@/lib/django/getServerDjangoApiBaseUrl';
+import { djangoRequest, readDjangoJson } from '@/lib/django/request';
 
 export type CodexChristiUserProfilePreview = {
   id: string;
@@ -35,16 +35,13 @@ export async function fetchCodexChristiUserProfilePreview({
     throw new Error('Enter a valid Codex Christi user UUID.');
   }
 
-  const response = await fetch(
-    `${getServerDjangoApiBaseUrl()}/account/${encodeURIComponent(normalizedUserId)}/profile`,
-    {
-      cache: 'no-store',
-      headers: {
-        Accept: 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
+  const response = await djangoRequest(`/account/${encodeURIComponent(normalizedUserId)}/profile`, {
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-  );
+  });
 
   if (response.status === 404) {
     return null;
@@ -54,7 +51,7 @@ export async function fetchCodexChristiUserProfilePreview({
     throw new Error('Unable to verify that Codex Christi user ID right now.');
   }
 
-  const payload = (await response.json()) as PublicUserProfileResponse;
+  const payload = (await readDjangoJson(response)) as PublicUserProfileResponse;
   const data = payload.data;
 
   if (!data?.id || data.id !== normalizedUserId) {

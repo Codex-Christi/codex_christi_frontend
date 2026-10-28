@@ -15,9 +15,38 @@ import { getAdminRequestAuditContext } from './admin-request-audit';
 import { buildAdminMasterTransferOtpEmailHtml } from './admin-master-transfer-email';
 import { requireCodexChristiUserProfilePreview } from './codex-christi-user-profile';
 import { parseNewAdminPassword } from '../formSchemas/admin-password';
+import { AdminCredentialError, withAdminCredentialWork } from './admin-credential-work';
+import { verifyAdminPassword } from './admin-password-check';
+import type { Prisma } from '../prisma/adminOpsLedger/generated/adminOpsLedger/client';
 
 const MASTER_TRANSFER_OTP_EXPIRY_MINUTES = 10;
 const MAX_MASTER_TRANSFER_OTP_ATTEMPTS = 5;
+const TRANSFER_SEND_WINDOW_MS = 15 * 60_000;
+const TRANSFER_SEND_COOLDOWN_MS = 60_000;
+const MAX_TRANSFER_SENDS = 3;
+
+async function checkTransferSendLimit(
+  prisma: Pick<Prisma.TransactionClient, 'adminMasterTransferChallenge'>,
+  actorAdminUserId: string,
+) {
+  const recent = await prisma.adminMasterTransferChallenge.findMany({
+    where: {
+      actorAdminUserId,
+      createdAt: { gt: new Date(Date.now() - TRANSFER_SEND_WINDOW_MS) },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: MAX_TRANSFER_SENDS,
+    select: { createdAt: true },
+  });
+  if (
+    recent.length >= MAX_TRANSFER_SENDS ||
+    (recent[0] && recent[0].createdAt.getTime() > Date.now() - TRANSFER_SEND_COOLDOWN_MS)
+  )
+    throw new AdminCredentialError(
+      'A transfer was started recently. Wait before requesting another code; at most three are allowed in 15 minutes.',
+      429,
+    );
+}
 
 type MasterTransferActor = {
   adminUserId: string;
@@ -72,33 +101,21 @@ export async function startMasterAdminTransfer({
     throw new Error('Master admin authorization required.');
   }
 
-  const passwordMatches = await argon2
-    .verify(actorAdmin.passwordHash, currentAdminPassword)
-    .catch(() => false);
-
-  if (!passwordMatches) {
-    await writeAdminAuditLog({
-      actor,
-      action: 'admin.master_transfer.password_failed',
-      targetType: 'adminUser',
-      targetId: normalizedTargetCodexUserId,
-      outcome: 'failure',
-      metadata: { reason: 'invalid_current_admin_password' },
-    });
-
-    throw new Error('Current admin unlock password is incorrect.');
-  }
+  await withAdminCredentialWork(() =>
+    verifyAdminPassword(actorAdmin, currentAdminPassword, 'master_transfer'),
+  );
+  const prisma = getAdminOpsLedgerPrisma();
+  await checkTransferSendLimit(prisma, actor.adminUserId);
 
   const targetProfile = await requireCodexChristiUserProfilePreview({
     userId: normalizedTargetCodexUserId,
   });
 
-  const prisma = getAdminOpsLedgerPrisma();
   const otp = createAdminTransferOtp();
   const otpHash = hashAdminTransferOtp(otp);
-  const targetPasswordHash = await argon2.hash(password, {
-    type: argon2.argon2id,
-  });
+  const targetPasswordHash = await withAdminCredentialWork(() =>
+    argon2.hash(password, { type: argon2.argon2id }),
+  );
   const expiresAt = new Date(Date.now() + MASTER_TRANSFER_OTP_EXPIRY_MINUTES * 60_000);
 
   const challenge = await prisma.$transaction(async (tx) => {
@@ -109,6 +126,8 @@ export async function startMasterAdminTransfer({
     });
     if (current.count !== 1)
       throw new Error('Admin access changed. Unlock again before starting a transfer.');
+    // The source-row lock serializes this check with concurrent starts.
+    await checkTransferSendLimit(tx, actor.adminUserId);
     await tx.adminMasterTransferChallenge.updateMany({
       where: { actorAdminUserId: actor.adminUserId, consumedAt: null },
       data: { consumedAt: new Date() },

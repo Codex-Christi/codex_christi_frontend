@@ -2,6 +2,7 @@ import 'server-only';
 
 import argon2 from 'argon2';
 import { parseOptionalNewAdminPassword } from '../formSchemas/admin-password';
+import { withAdminCredentialWork } from './admin-credential-work';
 import type { Prisma } from '@/lib/prisma/adminOpsLedger/generated/adminOpsLedger/client';
 import { getAdminOpsLedgerPrisma } from '@/lib/prisma/adminOpsLedger/adminOpsLedgerPrisma';
 import {
@@ -380,7 +381,9 @@ export async function upsertAdminUserFromDashboard({
   }
 
   const passwordHash =
-    password !== null ? await argon2.hash(password, { type: argon2.argon2id }) : undefined;
+    password !== null
+      ? await withAdminCredentialWork(() => argon2.hash(password, { type: argon2.argon2id }))
+      : undefined;
   const disabledAt = input.status === 'disabled' ? new Date() : null;
   const disabledReason =
     input.status === 'disabled' ? 'Disabled from admin access management.' : null;

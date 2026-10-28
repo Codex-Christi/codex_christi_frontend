@@ -24,9 +24,11 @@ import {
 import { requireMasterAdminAction } from '@/lib/admin/require-admin';
 import { getServerAccessToken } from '@/lib/session/server-session';
 import {
+  adminUnlockSchema,
   parseNewAdminPassword,
   parseOptionalNewAdminPassword,
 } from '@/lib/formSchemas/admin-password';
+import { AdminCredentialError } from '@/lib/admin/admin-credential-work';
 
 export type AdminUserProvisionActionState = {
   error: string | null;
@@ -150,7 +152,8 @@ export async function provisionAdminUserAction(
 
     return {
       error:
-        error instanceof Error && error.message.includes('requires an unlock password')
+        error instanceof AdminCredentialError ||
+        (error instanceof Error && error.message.includes('requires an unlock password'))
           ? error.message
           : 'Unable to save admin user. Check that the Codex Christi user ID and email are not already assigned.',
       success: null,
@@ -217,12 +220,16 @@ export async function startMasterAdminTransferAction(
   if (!auth.ok) return { error: auth.error, challenge: null };
 
   const actor = auth.actor;
-  const currentAdminPassword = String(formData.get('currentAdminPassword') ?? '');
   const targetCodexUserId = String(formData.get('targetCodexUserId') ?? '');
   const targetEmail = String(formData.get('targetEmail') ?? '');
 
   try {
     const targetAdminPassword = parseNewAdminPassword(formData.get('targetAdminPassword'));
+    const proof = adminUnlockSchema.safeParse({
+      password: formData.get('currentAdminPassword'),
+    });
+    if (!proof.success) throw new AdminCredentialError('Check your current unlock password.', 400);
+    const currentAdminPassword = proof.data.password;
     const challenge = await startMasterAdminTransfer({
       actor,
       currentAdminPassword,
