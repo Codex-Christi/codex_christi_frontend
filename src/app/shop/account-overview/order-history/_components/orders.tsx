@@ -4,6 +4,7 @@ import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink
 import type { HistoryOrder } from '@/lib/shop/orderHistory/model';
 import styles from '../orderHistory.module.css';
 import RefreshOrders from './refresh-orders';
+import { CopyReference } from './history-actions';
 
 export const historyPath = '/shop/account-overview/order-history';
 
@@ -62,16 +63,18 @@ export function HistoryUnavailable({ invalid = false }: { invalid?: boolean }) {
   );
 }
 
-function placedAt(value: string) {
-  return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone: 'UTC' }).format(
-    new Date(value),
-  );
+export function orderDate(value: string, withTime = false) {
+  return new Intl.DateTimeFormat('en', {
+    dateStyle: 'medium',
+    ...(withTime ? { timeStyle: 'short' as const } : {}),
+    timeZone: 'UTC',
+  }).format(new Date(value));
 }
 
 export function OrderLines({ order, preview = false }: { order: HistoryOrder; preview?: boolean }) {
   const lines = preview ? order.lines.slice(0, 2) : order.lines;
   return order.detailsAvailable ? (
-    <ul className={styles.lines}>
+    <ul className={`${styles.lines} ${preview ? styles.preview : ''}`}>
       {lines.map((line) => (
         <li key={line.id} className={styles.line}>
           <div className={styles.image}>
@@ -89,14 +92,20 @@ export function OrderLines({ order, preview = false }: { order: HistoryOrder; pr
             )}
           </div>
           <div className={styles.lineText}>
-            <h3>{line.title}</h3>
+            <h3 title={line.title}>{line.title}</h3>
+            {(line.lineAmount || line.unitAmount) && (
+              <strong className={styles.linePrice}>
+                {line.lineAmount ?? `${line.unitAmount} each`}
+              </strong>
+            )}
             {line.options && <p>{line.options}</p>}
             <p>
               Quantity: {line.quantity}
-              {!preview && line.unitAmount ? ` · ${line.unitAmount} each` : ''}
+              {!preview && line.quantity > 1 && line.lineAmount && line.unitAmount
+                ? ` · ${line.unitAmount} each`
+                : ''}
             </p>
           </div>
-          {!preview && line.lineAmount && <span>{line.lineAmount}</span>}
         </li>
       ))}
       {preview && order.lines.length > lines.length && (
@@ -112,8 +121,13 @@ export function OrderIdentity({ order }: { order: HistoryOrder }) {
   return (
     <div className={styles.identity}>
       <div>
-        <h2>Order {order.reference}</h2>
-        <time dateTime={order.createdAt}>{placedAt(order.createdAt)}</time>
+        <div className={styles.reference}>
+          <h2 title={order.reference}>Order {order.reference}</h2>
+          <CopyReference value={order.reference} />
+        </div>
+        <span className={styles.muted}>
+          {order.dateLabel} <time dateTime={order.displayDate}>{orderDate(order.displayDate)}</time>
+        </span>
       </div>
       <span className={order.needsReview ? styles.warning : styles.badge}>{order.status}</span>
     </div>
@@ -141,9 +155,7 @@ export default function Orders({ orders }: { orders: HistoryOrder[] }) {
           <OrderIdentity order={order} />
           <OrderLines order={order} preview />
           <div className={styles.actions}>
-            <span>
-              {order.paidAmount ? `Captured: ${order.paidAmount}` : 'Payment requires review'}
-            </span>
+            <span>{order.paidAmount ? `Paid ${order.paidAmount}` : 'Payment requires review'}</span>
             <ReceiptLink order={order} />
             <CustomShopLink
               href={`${historyPath}/${encodeURIComponent(order.orderToken)}`}

@@ -1,7 +1,7 @@
 'use client';
 import { type FC, useContext, useMemo } from 'react';
 
-import type { CheckoutOptions } from '../PaymentSection';
+import { CheckoutPaymentReviewContext, type CheckoutOptions } from '../PaymentSection';
 
 import dynamic from 'next/dynamic';
 import { ServerOrderDetailsContext } from '../ServerOrderDetailsComponent';
@@ -26,15 +26,17 @@ const PaypalMainCheckout: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
   const serverOrderDetails = useContext(ServerOrderDetailsContext);
   const { countrySupport, finalPricesWithShippingFee } = serverOrderDetails || {};
   const { country_iso2 } = countrySupport?.country || {};
-  const currency = finalPricesWithShippingFee?.currency;
+  const { originalCheckout } = useContext(CheckoutPaymentReviewContext);
+  const currency = originalCheckout?.quote.currency ?? finalPricesWithShippingFee?.currency;
+  const buyerCountry = originalCheckout?.countryCode ?? country_iso2;
 
   const liveOptions = useMemo(
     () => ({
       ...initialOptions,
-      'buyer-country': country_iso2 ?? initialOptions['buyer-country'],
+      'buyer-country': buyerCountry ?? initialOptions['buyer-country'],
       currency,
     }),
-    [country_iso2, currency],
+    [buyerCountry, currency],
   );
 
   if (!currency) return null;

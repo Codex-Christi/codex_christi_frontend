@@ -7,11 +7,11 @@ import {
   HISTORY_PAGE_SIZE,
   HISTORY_POST_CAPTURE_STATUSES,
   historyOrderSelect,
-  historyReceiptUrl,
   toHistoryOrder,
   type HistoryLedgerRow,
   type HistoryFulfillment,
 } from './model';
+import { receiptObjectKey } from './receiptReference';
 
 export class AccountHistoryAccessError extends Error {}
 export class InvalidHistoryQueryError extends Error {}
@@ -138,6 +138,10 @@ export function createAccountOrderReader(deps: Dependencies) {
         nextCursor: rows.length > HISTORY_PAGE_SIZE ? cursorFor(page[page.length - 1]) : null,
       };
     },
+    async owned(orderToken: string) {
+      const { row } = await ownedOrder(orderToken);
+      return row;
+    },
     async detail(orderToken: string) {
       const { session, row } = await ownedOrder(orderToken);
       if (!row) return null;
@@ -149,7 +153,9 @@ export function createAccountOrderReader(deps: Dependencies) {
     },
     async receipt(orderToken: string) {
       const { row } = await ownedOrder(orderToken);
-      return row ? historyReceiptUrl(row.receiptLink) : null;
+      return row && receiptObjectKey(row)
+        ? { orderToken: row.orderToken, receiptLink: row.receiptLink, receiptFile: row.receiptFile }
+        : null;
     },
   };
 }

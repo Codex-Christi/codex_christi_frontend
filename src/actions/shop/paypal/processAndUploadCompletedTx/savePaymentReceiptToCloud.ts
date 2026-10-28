@@ -1,14 +1,16 @@
 'use server';
 
-import fs from 'node:fs/promises';
-import path from 'path';
 import { uploadPaymentReceiptToR2 } from '../../checkout/transactions/uploadPaymentReceipt';
 import { createPaypalShopInvoicePDF } from '../createShopInvoicePDF';
 import type { CompletedTxInterface } from '@/types/shop/paypalCompletedTx';
 import { decryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
 import type { CanonicalOrderSnapshot } from '@/lib/paypal/orderSnapshot/types';
+import { randomUUID } from 'node:crypto';
+import { opaqueReceiptFile } from '@/lib/shop/orderHistory/receiptReference';
 
 export interface PaymentReceiptProps {
+  orderToken?: string;
+  receiptFileName?: string | null;
   authData: CompletedTxInterface['authData'];
   cart?: CompletedTxInterface['cart'];
   canonicalOrderSnapshot?: CanonicalOrderSnapshot | null;
@@ -24,9 +26,13 @@ export interface PaymentReceiptProps {
   } | null;
 }
 
-export const savePaymentReceiptToCloud = async (encodedProps: string) => {
+export const savePaymentReceiptToCloud = async (
+  encodedProps: string,
+): Promise<
+  | { success: true; pdfReceiptLink: string; receiptFileName: string }
+  | { success: false; message: string }
+> => {
   try {
-    // Decrypt and parse data
     const {
       authData,
       cart,
@@ -34,10 +40,22 @@ export const savePaymentReceiptToCloud = async (encodedProps: string) => {
       customer,
       ORD_string,
       shippingAddressOverride,
+      orderToken: suppliedToken,
+      receiptFileName: previousFile,
     } = JSON.parse(
       decryptForPostProcessingServerAction(encodedProps, 'receipt'),
     ) as PaymentReceiptProps;
-    const { email: customerEmail, name: customerName } = customer || {};
+    const auth = authData as unknown as {
+      purchaseUnits?: Array<{ customId?: string }>;
+      purchase_units?: Array<{ custom_id?: string }>;
+    };
+    const orderToken =
+      suppliedToken ?? auth.purchaseUnits?.[0]?.customId ?? auth.purchase_units?.[0]?.custom_id;
+    if (!orderToken || !/^[A-Za-z0-9_-]{1,128}$/u.test(orderToken) || !ORD_string)
+      throw new Error('Missing order receipt reference.');
+    const receiptFileName = opaqueReceiptFile(previousFile)
+      ? previousFile
+      : `receipt-${randomUUID()}`;
 
     const pdfBuffer = await createPaypalShopInvoicePDF(
       authData,
@@ -47,63 +65,22 @@ export const savePaymentReceiptToCloud = async (encodedProps: string) => {
       customer,
     );
 
-    // Upload to r2
     const { accessLink } = await uploadPaymentReceiptToR2({
       fileBody: pdfBuffer,
-      filename: `invoice-${authData.id}-${customerName}-${customerEmail}.pdf`,
+      filename: `${receiptFileName}.pdf`,
+      orderToken,
     });
 
-    // Post order data to backend
-    if (!ORD_string || ORD_string === '') {
-      throw new Error('Missing order identifier for backend processing.');
-    }
-
-    const clientSideResp = {
+    return {
       success: true,
       pdfReceiptLink: accessLink,
-      receiptFileName: `invoice-${authData.id}-${customerName}-${customerEmail}`,
+      receiptFileName,
     };
-    return clientSideResp;
-
-    // Catch errors
   } catch (error: unknown) {
-    // Save error details
-    const errorDir = path.join(process.cwd(), 'transaction-errors');
-    await fs.mkdir(errorDir, { recursive: true });
-
-    let errorMessage = 'Unknown error';
-    let errorStack = undefined;
-    if (error instanceof Error) {
-      errorMessage = error.message;
-      errorStack = error.stack; // Preserving stack trace
-    }
-    console.log('TX Upload Err: ', error);
-
-    const errorPath = path.join(errorDir, `error-${Date.now()}.json`);
-    await fs.writeFile(
-      errorPath,
-      JSON.stringify(
-        {
-          error: errorMessage,
-          stack: errorStack, // Preserved stack in error file
-          timestamp: new Date().toISOString(),
-        },
-        null,
-        2,
-      ),
-    );
-
-    // Try to save customer details offline for manual re-upload
-    // To-Do...
-
-    // //FOR DEV USE
-    // throw new Error(errorMessage);
-
-    //Production use, till we figure out a way to capture unprocessed orders
+    // The processing runner records this failure in the ledger for support/retry.
     return {
       success: false,
-      message: errorMessage,
-      errorId: path.basename(errorPath),
+      message: error instanceof Error ? error.message : 'Receipt could not be saved.',
     };
   }
 };

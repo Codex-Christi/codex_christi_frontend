@@ -59,6 +59,46 @@ test('business failure, missing IDs, malformed bodies and identity mismatches ar
     );
 });
 
+test('echoed account, intent, authorization and supported amount references must match', () => {
+  const data = {
+    ...response().data,
+    user: '4fd1c53d-d22c-4b30-9e12-3826c9f7aa80',
+    order_intent_id: 'intent-1',
+    payment_auth_id: 'AUTH-1',
+    amount_received: '035.0 USD',
+  };
+  const expected = {
+    userId: data.user,
+    intentUuid: 'intent-1',
+    paymentAuthId: 'AUTH-1',
+    amountReceived: '35.00 USD',
+  };
+  assert.ok(parsePaymentSaveResponse({ ...response(), data }, expected));
+  for (const mismatch of [
+    { userId: null },
+    { userId: 'd73b4b97-3ec0-4163-8a34-55d649404f81' },
+    { intentUuid: 'other-intent' },
+    { paymentAuthId: 'other-authorization' },
+    { amountReceived: '35.01 USD' },
+    { amountReceived: '35.00 EUR' },
+  ])
+    assert.throws(
+      () => parsePaymentSaveResponse({ ...response(), data }, { ...expected, ...mismatch }),
+      InvalidPaymentSaveResponseError,
+    );
+  assert.ok(
+    parsePaymentSaveResponse(response(), expected),
+    'Documented absent/null echoes remain compatible',
+  );
+  assert.ok(
+    parsePaymentSaveResponse(
+      { ...response(), data: { ...data, amount_received: '35.00' } },
+      expected,
+    ),
+    'An undocumented amount format is not used as payment evidence',
+  );
+});
+
 test('the real payment-save action accepts only validated success and never retries failed POSTs', async (t) => {
   const previous = { ...process.env };
   const originalFetch = globalThis.fetch;
@@ -131,7 +171,12 @@ test('the real payment-save action accepts only validated success and never retr
     return Response.json({
       status: 201,
       success: true,
-      data: { processing_status: 'completed', error_message: null },
+      data: {
+        id: 'd73b4b97-3ec0-4163-8a34-55d649404f81',
+        order_payment_custom_id: 'payment/reference?revision=1',
+        processing_status: 'completed',
+        error_message: null,
+      },
     });
   };
   const processing = encryptForPostProcessingServerAction(

@@ -3,15 +3,10 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { isSameOriginMutation } from '../auth/request-origin';
-import { AdminCredentialError } from './admin-credentials';
+import { AdminCredentialError, withAdminCredentialWork } from './admin-credential-work';
 import { isAdminActionAuthError } from './require-admin';
 
 export const adminAuthHeaders = { 'Cache-Control': 'private, no-store' };
-
-// Bound password work across Next's separate route bundles on the small VPS.
-const budgetKey = Symbol.for('codexchristi.admin-credential-budget.v1');
-const shared = globalThis as typeof globalThis & { [budgetKey]?: { active: number } };
-const budget = (shared[budgetKey] ??= { active: 0 });
 
 export function adminAuthReply(body: { success: boolean; error?: string }, status = 200) {
   return NextResponse.json(body, { status, headers: adminAuthHeaders });
@@ -44,17 +39,7 @@ export async function adminCredentialPost<T>(
     return adminAuthReply({ success: false, error: 'Request not allowed.' }, 403);
   try {
     const input = schema.parse(await readInput(request));
-    if (budget.active >= 2)
-      return adminAuthReply(
-        { success: false, error: 'Admin access is busy. Please try again shortly.' },
-        429,
-      );
-    budget.active++;
-    try {
-      return await run(input);
-    } finally {
-      budget.active--;
-    }
+    return await withAdminCredentialWork(() => run(input));
   } catch (error) {
     if (error instanceof AdminCredentialError)
       return adminAuthReply({ success: false, error: error.message }, error.status);

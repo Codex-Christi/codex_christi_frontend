@@ -12,12 +12,12 @@ import {
 } from './reader';
 import {
   toHistoryOrder,
-  historyReceiptUrl,
   historyImageUrl,
   historyMoney,
   HISTORY_PAGE_SIZE,
   type HistoryLedgerRow,
 } from './model';
+import { receiptObjectKey } from './receiptReference';
 
 function row(index = 1, owner = 'owner-a'): HistoryLedgerRow {
   const snapshot = finalizeCanonicalOrderSnapshot({
@@ -56,6 +56,7 @@ function row(index = 1, owner = 'owner-a'): HistoryLedgerRow {
     status: 'completed',
     createdAt: new Date('2026-10-01T00:00:00.000Z'),
     receiptLink: 'https://payment-receipts.codexchristi.shop/paypal/invoice.pdf',
+    receiptFile: 'invoice',
     canonicalOrderSnapshot: snapshot as unknown as Prisma.JsonValue,
     canonicalOrderSnapshotHash: snapshot.hash,
     canonicalOrderSnapshotVersion: snapshot.version,
@@ -123,7 +124,7 @@ test('saved asset links are allowlisted and historical money preserves zero-digi
     'https://payment-receipts.codexchristi.shop.evil.example/paypal/a',
     'https://user@payment-receipts.codexchristi.shop/paypal/a',
   ])
-    assert.equal(historyReceiptUrl(url), null);
+    assert.equal(receiptObjectKey({ orderToken: 'token-1', receiptLink: url }), null);
   assert.equal(historyImageUrl('https://unknown.example/image.png'), null);
   assert.equal(historyImageUrl('/media/img/product.jpg'), '/media/img/product.jpg');
   assert.equal(historyImageUrl('/media/../api/private'), null);
@@ -233,7 +234,7 @@ test('missing or failed shipment enrichment does not hide a paid purchase', asyn
   fail = true;
   assert.equal((await reader.detail('token-1'))?.order.paidAmount, '$35.00');
   assert.equal((await reader.detail('token-1'))?.unavailable, true);
-  assert.equal(await reader.receipt('token-1'), row().receiptLink);
+  assert.equal((await reader.receipt('token-1'))?.receiptLink, row().receiptLink);
 });
 
 test("an account switch or logout cannot keep another owner's history visible", () => {
@@ -278,4 +279,43 @@ test('history runtime has no checkout mutations, supplier calls, polling, cron o
       /\.\s*(create|update|upsert|delete|updateMany)\s*\(|\bfetch\s*\(|\bafter\s*\(|setInterval|claimCurrentCheckout|consumePurchase|runPaidFulfillmentProcessing/,
     );
   }
+});
+
+test('paid dates and legacy item names come only from historical payment evidence', () => {
+  const value = row();
+  value.capturePayload = {
+    ...(value.capturePayload as object),
+    create_time: '2026-10-02T03:04:05Z',
+  };
+  assert.equal(toHistoryOrder(value).displayDate, '2026-10-02T03:04:05.000Z');
+  assert.equal(toHistoryOrder(value).dateLabel, 'Paid');
+  const legacy = {
+    ...value,
+    canonicalOrderSnapshot: null,
+    canonicalOrderSnapshotVersion: null,
+    canonicalOrderSnapshotHash: null,
+    authorizePayload: {
+      purchaseUnits: [
+        {
+          items: [
+            {
+              name: 'Original paid item',
+              quantity: '2',
+              unitAmount: { value: '15.00', currencyCode: 'USD' },
+            },
+          ],
+        },
+      ],
+    },
+  };
+  assert.equal(toHistoryOrder(legacy).lines[0].title, 'Original paid item');
+  assert.equal(toHistoryOrder(legacy).detailsSource, 'payment_record');
+  assert.equal(
+    toHistoryOrder({ ...legacy, canonicalOrderSnapshotHash: 'damaged' }).lines.length,
+    0,
+    'Corrupt canonical data must not gain a legacy fallback',
+  );
+  const pending = { ...legacy, capturePayload: { status: 'PENDING' } };
+  assert.equal(toHistoryOrder(pending).lines.length, 0);
+  assert.equal(toHistoryOrder(pending).dateLabel, 'Checkout started');
 });

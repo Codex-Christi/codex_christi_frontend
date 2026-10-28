@@ -1,285 +1,128 @@
-import argon2 from 'argon2';
-import crypto from 'node:crypto';
-import dotenv from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { z } from 'zod';
 import { PrismaClient } from '../src/lib/prisma/adminOpsLedger/generated/adminOpsLedger/client';
 import { normalizePostgresSslMode } from '../src/lib/prisma/postgresSslMode';
-import { parseNewAdminPassword } from '../src/lib/formSchemas/admin-password';
+import { readDjangoJson } from '../src/lib/django/read-json';
 import {
-  getDefaultAdminRole,
-  getDefaultAdminScopes,
-  parseAdminScopes,
-} from '../src/lib/admin/admin-config';
+  AdminRecoveryError,
+  adminRecoverySnapshotSelect,
+  assertAdminRecoveryTarget,
+  recoverAdminAccess,
+} from '../src/lib/admin/admin-recovery-core';
+import {
+  assertRecoveryToken,
+  confirmRecoveryWrite,
+  loadRecoveryConfiguration,
+  parseRecoveryOptions,
+  readRecoveryInput,
+} from './admin-recovery/input';
 
-dotenv.config({ path: '.env.local' });
-dotenv.config();
+const usage = `Emergency admin access (run only from a trusted VPS terminal):
+  yarn admin:user:create-master create --environment production --env-file /absolute/path/.env.production --user-id UUID
+  yarn admin:user:create-master reset-password --environment production --env-file /absolute/path/.env.production --user-id UUID
+  Add --dry-run for a read-only preview. Use development for a development database.
+  Secrets are entered through hidden prompts. --stdin accepts protected JSON input.
+  Passwords and recovery tokens are never accepted in command arguments.
+  Reset preserves identity, permissions and disabled status; it does not change Django login.`;
 
-type ParsedArgs = {
-  creationToken?: string;
-  userId?: string;
-  password?: string;
-  scopes?: string;
-};
-
-type CodexUserPreview = {
-  displayName: string;
-  username: string | null;
-};
-
-function parseArgs(): ParsedArgs {
-  const parsed: ParsedArgs = {};
-  const args = process.argv.slice(2);
-
-  for (let index = 0; index < args.length; index += 1) {
-    const current = args[index];
-    const next = args[index + 1];
-    const inlineSeparatorIndex = current.indexOf('=');
-    const inlineKey =
-      inlineSeparatorIndex > -1 ? current.slice(0, inlineSeparatorIndex) : current;
-    const inlineValue =
-      inlineSeparatorIndex > -1 ? current.slice(inlineSeparatorIndex + 1) : undefined;
-
-    if (inlineKey === '--creation-token' && inlineValue) parsed.creationToken = inlineValue;
-    if (inlineKey === '--user-id' && inlineValue) parsed.userId = inlineValue;
-    if (inlineKey === '--password' && inlineValue) parsed.password = inlineValue;
-    if (inlineKey === '--scopes' && inlineValue) parsed.scopes = inlineValue;
-
-    if (inlineValue) {
-      continue;
-    }
-
-    if (current === '--creation-token') parsed.creationToken = next;
-    if (current === '--user-id') parsed.userId = next;
-    if (current === '--password') parsed.password = next;
-    if (current === '--scopes') parsed.scopes = next;
-
-    if (current.startsWith('--')) {
-      index += 1;
-    }
-  }
-
-  return parsed;
-}
-
-function getConnectionString() {
-  const connectionString =
-    process.env.NEON_ADMIN_OPS_LEDGER_URL ?? process.env.NEON_ADMIN_OPS_LEDGER_POOLED_URL;
-
-  if (!connectionString) {
-    throw new Error('Set NEON_ADMIN_OPS_LEDGER_URL before creating the master admin user.');
-  }
-
-  return connectionString;
-}
-
-function getDjangoApiBaseUrl() {
-  const publicBaseUrl = process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL;
-  const internalBaseUrl = process.env.DJANGO_INTERNAL_BASE_URL;
-  const shouldPreferInternalBaseUrl =
-    process.env.NODE_ENV === 'production' ||
-    process.env.DJANGO_PREFER_INTERNAL_BASE_URL === 'true';
-  const baseUrl = shouldPreferInternalBaseUrl
-    ? internalBaseUrl ?? publicBaseUrl
-    : publicBaseUrl ?? internalBaseUrl;
-
-  if (!baseUrl) {
-    throw new Error('Set NEXT_PUBLIC_DJANGO_API_BASE_URL before creating a master admin user.');
-  }
-
-  return baseUrl.replace(/\/+$/, '');
-}
-
-function assertCreationToken(submittedToken: string | undefined) {
-  const expectedToken = process.env.ADMIN_MASTER_USER_CREATION_TOKEN?.trim();
-  const candidateToken = submittedToken?.trim();
-
-  if (!expectedToken) {
-    throw new Error('Set ADMIN_MASTER_USER_CREATION_TOKEN before creating a master admin user.');
-  }
-
-  if (!candidateToken) {
-    throw new Error('Pass --creation-token before creating a master admin user.');
-  }
-
-  const expected = Buffer.from(expectedToken);
-  const candidate = Buffer.from(candidateToken);
-
-  if (expected.length !== candidate.length || !crypto.timingSafeEqual(expected, candidate)) {
-    throw new Error('The submitted master admin creation token is invalid.');
-  }
-}
-
-async function verifyCodexChristiUserId(userId: string): Promise<CodexUserPreview> {
-  if (!isUuid(userId)) {
-    throw new Error('Enter a valid Codex Christi user UUID.');
-  }
-
+async function verifyNewUser(baseUrl: string, userId: string) {
   const response = await fetch(
-    `${getDjangoApiBaseUrl()}/account/${encodeURIComponent(userId)}/profile`,
+    `${baseUrl.replace(/\/+$/, '')}/account/${encodeURIComponent(userId)}/profile`,
     {
-      headers: {
-        Accept: 'application/json',
-      },
+      cache: 'no-store',
+      redirect: 'error',
+      signal: AbortSignal.timeout(8000),
+      headers: { Accept: 'application/json' },
     },
   );
-
-  if (response.status === 404) {
-    throw new Error('No Codex Christi user exists for that user ID.');
-  }
-
-  if (!response.ok) {
-    throw new Error('Unable to verify the Codex Christi user ID right now.');
-  }
-
-  const payload = (await response.json()) as {
-    data?: {
-      id?: string;
-      first_name?: string | null;
-      last_name?: string | null;
-      username?: string | null;
-    };
-  };
-  const profile = payload.data;
-
-  if (!profile?.id || profile.id !== userId) {
-    throw new Error('Codex Christi profile verification returned an unexpected user ID.');
-  }
-
-  const fullName = [normalizeText(profile.first_name), normalizeText(profile.last_name)]
-    .filter(Boolean)
-    .join(' ');
-
-  return {
-    displayName: fullName || normalizeText(profile.username) || userId,
-    username: normalizeText(profile.username),
-  };
+  if (!response.ok)
+    throw new AdminRecoveryError('Django could not confirm the new user. Nothing was changed.');
+  const parsed = z
+    .object({
+      data: z.object({
+        id: z.string(),
+        username: z.string().max(256).nullish(),
+        first_name: z.string().max(256).nullish(),
+        last_name: z.string().max(256).nullish(),
+      }),
+    })
+    .safeParse(await readDjangoJson(response));
+  if (!parsed.success || parsed.data.data.id !== userId)
+    throw new AdminRecoveryError('Django returned an unexpected user. Nothing was changed.');
+  return parsed.data.data;
 }
 
 async function main() {
-  const args = parseArgs();
-  assertCreationToken(args.creationToken);
-
-  const codexUserId = args.userId?.trim();
-  const password = args.password;
-  const role = getDefaultAdminRole();
-  const scopes = args.scopes ? parseAdminScopes(args.scopes) : getDefaultAdminScopes();
-
-  if (!codexUserId) {
-    throw new Error('Missing --user-id.');
+  if (process.argv.slice(2).some((arg) => arg === '--help')) {
+    console.log(usage);
+    return;
   }
-
-  if (!password) {
-    throw new Error('Missing --password.');
+  const options = parseRecoveryOptions(process.argv.slice(2));
+  const config = loadRecoveryConfiguration(options);
+  const input = await readRecoveryInput(options.stdin);
+  assertRecoveryToken(config.expectedToken, input.creationToken);
+  const prisma = new PrismaClient({
+    adapter: new PrismaPg({
+      connectionString: normalizePostgresSslMode(config.connectionString),
+      connectionTimeoutMillis: 8000,
+    }),
+  });
+  try {
+    const existing = await prisma.adminUser.findUnique({
+      where: { codexUserId: options.userId },
+      select: adminRecoverySnapshotSelect,
+    });
+    assertAdminRecoveryTarget(options.mode, existing);
+    const profile =
+      options.mode === 'create' ? await verifyNewUser(config.djangoBaseUrl!, options.userId) : null;
+    console.log(
+      JSON.stringify(
+        {
+          mode: options.mode,
+          environment: options.environment,
+          envFile: options.envFile,
+          database: config.database,
+          account: existing
+            ? {
+                codexUserId: existing.codexUserId,
+                email: existing.email,
+                displayName: existing.displayName,
+                role: existing.role,
+                scopes: existing.scopes,
+                status: existing.status,
+                sessionVersion: existing.sessionVersion,
+              }
+            : { codexUserId: options.userId, profile, role: 'master_admin', status: 'active' },
+          dryRun: options.dryRun,
+        },
+        null,
+        2,
+      ),
+    );
+    if (options.dryRun) {
+      console.log('Preview only. No password, account, audit or transfer was changed.');
+      return;
+    }
+    const password = await confirmRecoveryWrite(options, input);
+    const admin = await recoverAdminAccess({
+      prisma,
+      mode: options.mode,
+      environment: options.environment,
+      codexUserId: options.userId,
+      expected: existing,
+      password,
+    });
+    console.log(JSON.stringify({ ok: true, action: options.mode, admin }, null, 2));
+  } finally {
+    await prisma.$disconnect();
   }
-  const validatedPassword = parseNewAdminPassword(password);
-
-  if (!scopes.length) {
-    throw new Error('At least one valid admin scope is required.');
-  }
-
-  const verifiedUser = await verifyCodexChristiUserId(codexUserId);
-
-  const adapter = new PrismaPg({
-    connectionString: normalizePostgresSslMode(getConnectionString()),
-  });
-  const prisma = new PrismaClient({ adapter });
-  const passwordHash = await argon2.hash(validatedPassword, {
-    type: argon2.argon2id,
-  });
-  const existing = await prisma.adminUser.findUnique({
-    where: { codexUserId },
-    select: { id: true },
-  });
-  const adminUser = await prisma.adminUser.upsert({
-    where: { codexUserId },
-    create: {
-      codexUserId,
-      email: null,
-      displayName: null,
-      passwordHash,
-      role,
-      scopes,
-      status: 'active',
-      sessionVersion: 1,
-      createdByCodexUserId: 'master_admin_creation_script',
-      updatedByCodexUserId: 'master_admin_creation_script',
-    },
-    update: {
-      email: null,
-      displayName: null,
-      passwordHash,
-      role,
-      scopes,
-      status: 'active',
-      disabledAt: null,
-      disabledReason: null,
-      sessionVersion: {
-        increment: 1,
-      },
-      updatedByCodexUserId: 'master_admin_creation_script',
-    },
-    select: {
-      id: true,
-      codexUserId: true,
-      email: true,
-      role: true,
-      scopes: true,
-      status: true,
-      sessionVersion: true,
-    },
-  });
-
-  await prisma.adminAuditLog.create({
-    data: {
-      actorAdminUserId: adminUser.id,
-      actorCodexUserId: adminUser.codexUserId,
-      action: existing
-        ? 'admin.master_user.creation_script_updated'
-        : 'admin.master_user.creation_script_created',
-      targetType: 'adminUser',
-      targetId: adminUser.id,
-      outcome: 'success',
-      metadata: {
-        codexUserId: adminUser.codexUserId,
-        verifiedDisplayName: verifiedUser.displayName,
-        verifiedUsername: verifiedUser.username,
-        role: adminUser.role,
-        scopes: adminUser.scopes,
-        status: adminUser.status,
-        sessionVersion: adminUser.sessionVersion,
-      },
-    },
-  });
-
-  await prisma.$disconnect();
-
-  console.log(
-    JSON.stringify(
-      {
-        ok: true,
-        action: existing ? 'updated' : 'created',
-        verifiedUser,
-        adminUser,
-      },
-      null,
-      2,
-    ),
-  );
 }
 
 void main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
-
-function normalizeText(value: string | null | undefined) {
-  const trimmed = value?.trim();
-
-  return trimmed || null;
-}
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
+  console.error(
+    error instanceof AdminRecoveryError
+      ? error.message
+      : 'Recovery did not finish. Check configuration/database availability and verify the outcome before retrying. No automatic retry was attempted.',
   );
-}
+  process.exitCode = 1;
+});

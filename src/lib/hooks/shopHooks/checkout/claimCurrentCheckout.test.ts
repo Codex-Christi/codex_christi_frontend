@@ -60,3 +60,31 @@ test('a claim finishing after account switch or a new attempt cannot count as cu
   assert.equal(await work, false);
   assert.equal(usePayPalIntentStore.getState().checkoutAttempt?.inputKey, 'another-attempt');
 });
+
+test('a hanging claim preserves payment and releases deduplication for status recovery', async () => {
+  setup('claim-hanging');
+  const gate = deferred<Response>();
+  let signal: AbortSignal | null | undefined;
+  const work = claimCurrentCheckout(
+    async (_url, init) => {
+      signal = init?.signal;
+      return gate.promise;
+    },
+    { timeoutMs: 10 },
+  );
+  assert.equal(await work, false);
+  assert.equal(signal?.aborted, true);
+  assert.equal(usePayPalIntentStore.getState().orderToken, 'token-claim-hanging');
+  let retried = 0;
+  assert.equal(
+    await claimCurrentCheckout(async () => {
+      retried += 1;
+      return Response.json({ ok: true });
+    }),
+    true,
+  );
+  gate.resolve(Response.json({ ok: true }));
+  await new Promise(setImmediate);
+  assert.equal(await work, false, 'A late response must not turn timed-out ownership into success');
+  assert.equal(retried, 1);
+});

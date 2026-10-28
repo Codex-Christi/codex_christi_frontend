@@ -1,5 +1,5 @@
 import { type FC, useCallback, useContext, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import * as Dialog from '@radix-ui/react-dialog';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import MyPaypalButtons from './MyPaypalButtons';
 import MyPayPalCardFields from './MyPaypalCardFields';
@@ -23,6 +23,8 @@ import {
   checkoutInputIdentity,
   hasDifferentBoundCheckout,
 } from '../checkoutReview';
+import { boundedCheckoutRequest } from '@/lib/hooks/shopHooks/checkout/boundedCheckoutRequest';
+import { resumeOriginalPayPalOrder } from '@/lib/hooks/shopHooks/checkout/originalCheckout';
 
 function checkoutInput() {
   const cart = useCartStore.getState();
@@ -31,7 +33,7 @@ function checkoutInput() {
 }
 
 const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
-  const { review, onPaymentError } = useContext(CheckoutPaymentReviewContext);
+  const { review, onPaymentError, originalCheckout } = useContext(CheckoutPaymentReviewContext);
   const { isFinalizingPayment, mainPayPalApproveCallback } =
     usePayPalTXApproveCallback(onPaymentError);
   const providerAttempt = useRef<CheckoutAttempt | null>(null);
@@ -41,6 +43,23 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
     if (creating.current) return creating.current;
     const operation = (async () => {
       if (!review) throw new Error('Review the current order details before paying.');
+      if (originalCheckout) {
+        const attempt = captureCheckoutAttempt(originalCheckout.orderToken);
+        if (!attempt) throw new Error('Reopen your original purchase before continuing.');
+        try {
+          const providerId = await resumeOriginalPayPalOrder(originalCheckout, attempt);
+          await flushCheckoutStorage('paypal-intent-store');
+          if (!isCurrentCheckoutAttempt(attempt)) throw new Error('This checkout changed.');
+          providerAttempt.current = attempt;
+          return providerId;
+        } catch (error) {
+          if (isCurrentCheckoutAttempt(attempt))
+            onPaymentError(
+              error instanceof Error ? error.message : 'Check the original order status.',
+            );
+          throw new Error('Failed to create PayPal order');
+        }
+      }
       const input = checkoutInput();
       const inputKey = checkoutInputIdentity(input, review);
       const previousAttempt = captureCheckoutAttempt();
@@ -56,17 +75,21 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
         await flushCheckoutStorage('paypal-intent-store');
         if (!isCurrentCheckoutAttempt(attempt))
           throw new Error('This checkout has changed. Please review it again.');
-        const response = await fetch('/next-api/paypal/tx-ledger/intent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...input, attemptId: attempt.attemptId, review }),
+        const { response, payload } = await boundedCheckoutRequest(async (signal) => {
+          const response = await fetch('/next-api/paypal/tx-ledger/intent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...input, attemptId: attempt.attemptId, review }),
+            signal,
+          });
+          const payload = (await response.json()) as {
+            data?: { orderToken?: string; paypalOrderId?: string };
+            code?: string;
+            message?: string;
+            error?: { code?: string; message?: string };
+          };
+          return { response, payload };
         });
-        const payload = (await response.json()) as {
-          data?: { orderToken?: string; paypalOrderId?: string };
-          code?: string;
-          message?: string;
-          error?: { code?: string; message?: string };
-        };
         if (!isCurrentCheckoutAttempt(attempt))
           throw new Error('This checkout has changed. Please review it again.');
         if (!response.ok || !payload.data?.orderToken || !payload.data.paypalOrderId) {
@@ -116,7 +139,7 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
       },
     );
     return operation;
-  }, [mode, review, onPaymentError]);
+  }, [mode, review, onPaymentError, originalCheckout]);
 
   const handlePayPalCancel = useCallback(() => {
     const attempt = providerAttempt.current;
@@ -128,7 +151,7 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
 
   return (
     <div className='mx-auto w-full min-w-0'>
-      {isFinalizingPayment && createPortal(<PayPalFinalizingOverlay />, document.body)}
+      {isFinalizingPayment && <PayPalFinalizingOverlay />}
       <MyPaypalButtons
         mode={mode}
         createOrder={createOrder}
@@ -146,21 +169,25 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
 
 function PayPalFinalizingOverlay() {
   return (
-    <div
-      role='status'
-      aria-live='polite'
-      className='fixed inset-0 z-[600] flex items-center justify-center bg-black/65 px-4 backdrop-blur-sm'
-    >
-      <div className='w-full max-w-sm rounded-2xl border border-white/20 bg-[#171717] p-6 text-center text-white'>
-        <Loader2 className='mx-auto h-8 w-8 animate-spin text-sky-200' aria-hidden='true' />
-        <p className='mt-4 flex items-center justify-center gap-2 font-semibold'>
-          <ShieldCheck size={18} aria-hidden='true' /> Confirming payment
-        </p>
-        <p className='mt-2 text-sm leading-6 text-white/70'>
-          Keep this page open while we confirm the payment with PayPal.
-        </p>
-      </div>
-    </div>
+    <Dialog.Root open>
+      <Dialog.Portal>
+        <Dialog.Overlay className='fixed inset-0 z-[600] bg-black/65 backdrop-blur-sm' />
+        <Dialog.Content
+          onEscapeKeyDown={(event) => event.preventDefault()}
+          onPointerDownOutside={(event) => event.preventDefault()}
+          className='fixed left-1/2 top-1/2 z-[601] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/20 bg-[#171717] p-6 text-center text-white'
+        >
+          <Loader2 className='mx-auto h-8 w-8 animate-spin text-sky-200' aria-hidden='true' />
+          <Dialog.Title className='mt-4 flex items-center justify-center gap-2 font-semibold'>
+            <ShieldCheck size={18} aria-hidden='true' /> Confirming payment
+          </Dialog.Title>
+          <Dialog.Description className='mt-2 text-sm leading-6 text-white/70'>
+            Keep this page open while we check with PayPal. If the connection takes too long, you
+            can check this payment’s status.
+          </Dialog.Description>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 

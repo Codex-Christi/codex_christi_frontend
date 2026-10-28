@@ -1350,53 +1350,19 @@ If your shop runs on a dedicated domain with path normalization, use your shop-s
 
 # 18) PayPal TX Payment Status Endpoint
 
-New file:
+Use the implemented [status route](../src/app/api/paypal/tx-ledger/payments/[orderToken]/status/route.ts)
+as the source of truth, not a copied ledger-lookup example. It verifies account ownership or the
+existing checkout-access grant before returning a private/no-store customer projection. Reading
+status never claims a guest order, retries payment, or clears the cart.
 
-- `src/app/api/paypal/tx-ledger/payments/[orderToken]/status/route.ts`
-
-Returns ledger truth for polling.
-
-This endpoint should be intentionally small and browser-safe:
-
-- use `orderToken` as the lookup key
-- do not treat client state as authoritative
-- do not expose `paypalOrderId` unless you have a concrete browser-side need for it
-- return only the fields the confirmation UI actually needs
-
-```ts
-import { NextResponse } from 'next/server';
-import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
-
-type PageProps = {
-  params: Promise<{ orderToken: string }>;
-};
-
-export async function GET(_req: Request, { params }: PageProps) {
-  const { orderToken } = await params;
-
-  const row = await paypalTxLedger.paypalIntent.findUnique({ where: { orderToken } });
-  if (!row) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  return NextResponse.json({
-    orderToken: row.orderToken,
-    status: row.status,
-    lastEventType: row.lastEventType,
-    receiptLink: row.receiptLink,
-    receiptFile: row.receiptFile,
-    djangoOrderIntentUuid: row.djangoOrderIntentUuid,
-    djangoOrderIntentOrderId: row.djangoOrderIntentOrderId,
-    djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
-    processingCompletedAt: row.processingCompletedAt,
-    error: row.lastErrorMessage ? { code: row.lastErrorCode, message: row.lastErrorMessage } : null,
-  });
-}
-```
-
-Optional hardening:
-
-- If you later want to keep support correlation available, add a separate admin endpoint that can expose `paypalOrderId` server-side instead of returning it to the browser here.
+- Expected order values come from the sealed snapshot; paid amounts require completed capture evidence.
+- Raw provider payloads, storage keys, and internal errors stay server-side.
+- `receiptLink` is the protected application download route; `receiptFile` is a generic download name.
+  Each authorized download signs the saved receipt object for 60 seconds. No signed URL is persisted
+  in the ledger or sent by email.
+- Account-owned history, explicit tracking refresh, verified guest linking, staff receipt access,
+  and the existing bucket's public-access prerequisite are documented in the
+  [account history and receipt rollout guide](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#implemented-read-only-account-history).
 
 ---
 
@@ -1623,9 +1589,13 @@ If the user's browser closes after capture but before `completed`:
 1. The ledger row already exists with status `captured` (or later).
 2. The webhook will still fire and trigger `runPaidFulfillmentProcessing`.
 3. If the user returns, the confirmation page URL (bookmarked or in history) still has `orderToken` in the path — polling resumes automatically.
-4. If the user lost the URL entirely, admin can look up by `customerEmail` and share status or receipt link.
+4. Signed-in owners can reopen purchases from account order history. A guest can explicitly link
+   a paid purchase using its full reference and a checkout-email code. Email match alone is not ownership.
+5. Support can look up a purchase, but should share its protected confirmation page, not a storage
+   URL, staff-only receipt route, or short-lived signed URL. The customer must verify access.
 
-No separate "check my order" page is required. The webhook guarantees completion regardless of browser state.
+The ledger preserves recovery inputs when the browser closes; a webhook alone does not guarantee
+that every downstream operation completes. History reads never restart processing.
 
 ---
 
@@ -2899,26 +2869,26 @@ At this point:
 
 # 27) Package Scripts (no extra Prisma config file)
 
-Add scripts that explicitly target the ledger schema file.
+Use the existing Prisma 7 scripts, which explicitly select the schema and PayPal database branch.
+The CLI and client are pinned to version `7.10.1` in `package.json`.
 
 ```json
 {
   "scripts": {
-    "prisma:merchize:generate": "prisma generate --config prisma.config.ts",
-    "prisma:paypal:validate": "prisma validate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
-    "prisma:paypal:format": "prisma format --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
-    "prisma:paypal:generate": "prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
-    "prisma:paypal:migrate:dev": "prisma migrate dev --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
-    "prisma:paypal:migrate:deploy": "prisma migrate deploy --schema prisma/shop/paypal/paypalTXLedger.schema.prisma"
+    "merchize-offline-catalog:generate": "prisma generate --schema prisma/shop/merchize/priceCatalog.prisma",
+    "prisma:paypalTxLedger:generate:dev": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
+    "prisma:paypalTxLedger:generate:prod": "PAYPAL_TX_LEDGER_NEON_BRANCH=prod prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
+    "prisma:paypalTxLedger:migrate:dev": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev prisma migrate dev --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
+    "prisma:paypalTxLedger:migrate:deploy:prod": "PAYPAL_TX_LEDGER_NEON_BRANCH=prod prisma migrate deploy --schema prisma/shop/paypal/paypalTXLedger.schema.prisma"
   }
 }
 ```
 
 Why this is safe:
 
-- Merchize flow remains config-driven.
-- PayPal ledger flow remains schema-path-driven.
-- No cross-target confusion.
+- Both flows use the shared `prisma.config.ts`; its schema selector requires `--schema`.
+- The catalog targets SQLite, and PayPal scripts explicitly select the Neon dev or production branch.
+- Keep production migrations separate from local validation and client generation.
 
 ---
 

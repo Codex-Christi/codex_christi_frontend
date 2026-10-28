@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { upsertAdminUserFromDashboard, writeAdminAuditLog } from '@/lib/admin/admin-auth-ledger';
 import {
-  completeMasterAdminTransfer,
+  cancelMasterAdminTransfer,
   startMasterAdminTransfer,
   type MasterTransferChallengeSummary,
 } from '@/lib/admin/admin-master-transfer';
@@ -23,10 +23,9 @@ import {
 } from '@/lib/admin/admin-notification-recipients';
 import { requireMasterAdminAction } from '@/lib/admin/require-admin';
 import { getServerAccessToken } from '@/lib/session/server-session';
-import {
-  parseNewAdminPassword,
-  parseOptionalNewAdminPassword,
-} from '@/lib/formSchemas/admin-password';
+import { parseOptionalNewAdminPassword } from '@/lib/formSchemas/admin-password';
+import { adminTransferStartSchema, adminTransferIdSchema } from '@/lib/formSchemas/admin-transfer';
+import { AdminCredentialError } from '@/lib/admin/admin-credential-work';
 
 export type AdminUserProvisionActionState = {
   error: string | null;
@@ -43,9 +42,9 @@ export type MasterAdminTransferStartActionState = {
   challenge: MasterTransferChallengeSummary | null;
 };
 
-export type MasterAdminTransferCompleteActionState = {
+export type MasterAdminTransferCancelActionState = {
   error: string | null;
-  completed?: boolean;
+  cancelled?: boolean;
 };
 
 export type AdminNotificationRecipientGroupActionState = {
@@ -150,7 +149,8 @@ export async function provisionAdminUserAction(
 
     return {
       error:
-        error instanceof Error && error.message.includes('requires an unlock password')
+        error instanceof AdminCredentialError ||
+        (error instanceof Error && error.message.includes('requires an unlock password'))
           ? error.message
           : 'Unable to save admin user. Check that the Codex Christi user ID and email are not already assigned.',
       success: null,
@@ -217,18 +217,17 @@ export async function startMasterAdminTransferAction(
   if (!auth.ok) return { error: auth.error, challenge: null };
 
   const actor = auth.actor;
-  const currentAdminPassword = String(formData.get('currentAdminPassword') ?? '');
-  const targetCodexUserId = String(formData.get('targetCodexUserId') ?? '');
-  const targetEmail = String(formData.get('targetEmail') ?? '');
-
   try {
-    const targetAdminPassword = parseNewAdminPassword(formData.get('targetAdminPassword'));
+    const parsed = adminTransferStartSchema.safeParse({
+      currentAdminPassword: formData.get('currentAdminPassword'),
+      targetCodexUserId: formData.get('targetCodexUserId'),
+      targetEmail: formData.get('targetEmail'),
+    });
+    if (!parsed.success)
+      throw new AdminCredentialError('Check your current password, target user ID and email.', 400);
     const challenge = await startMasterAdminTransfer({
       actor,
-      currentAdminPassword,
-      targetCodexUserId,
-      targetEmail,
-      targetAdminPassword,
+      ...parsed.data,
     });
 
     return {
@@ -237,36 +236,37 @@ export async function startMasterAdminTransferAction(
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Unable to start master transfer.',
+      error:
+        error instanceof AdminCredentialError
+          ? error.message
+          : 'Unable to send an ownership invitation right now.',
       challenge: null,
     };
   }
 }
 
-export async function completeMasterAdminTransferAction(
-  _prevState: MasterAdminTransferCompleteActionState,
+export async function cancelMasterAdminTransferAction(
+  _prevState: MasterAdminTransferCancelActionState,
   formData: FormData,
-): Promise<MasterAdminTransferCompleteActionState> {
+): Promise<MasterAdminTransferCancelActionState> {
   const auth = await getMasterAdminActionContext();
   if (!auth.ok) return { error: auth.error };
 
   const actor = auth.actor;
-  const challengeId = String(formData.get('challengeId') ?? '');
-  const otp = String(formData.get('otp') ?? '').trim();
-
   try {
-    await completeMasterAdminTransfer({
-      actor,
-      challengeId,
-      otp,
-    });
+    const parsed = adminTransferIdSchema.safeParse(formData.get('challengeId'));
+    if (!parsed.success) return { error: 'Check the invitation and try again.' };
+    await cancelMasterAdminTransfer(actor, parsed.data);
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : 'Unable to complete master transfer.',
+      error:
+        error instanceof AdminCredentialError
+          ? error.message
+          : 'Unable to cancel the invitation right now.',
     };
   }
 
-  return { error: null, completed: true };
+  return { error: null, cancelled: true };
 }
 
 export async function saveAdminNotificationRecipientGroupAction(

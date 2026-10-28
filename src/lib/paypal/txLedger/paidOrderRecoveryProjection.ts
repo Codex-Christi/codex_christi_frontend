@@ -18,6 +18,7 @@ import { isMerchizeLookupPendingProviderProcessingError } from '@/lib/merchizeFu
 import { safeLogErrorMessage } from '@/lib/merchizeFulfillmentOps/redaction';
 import { resolvePaidOrderRecoveryIssue } from '@/lib/paypal/txLedger/recoveryIssuePrecedence';
 import type { Prisma } from '@/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger/client';
+import { getDjangoHandoffReview } from './djangoHandoff';
 
 const ADMIN_RECOVERY_LEDGER_STATUSES = [
   PAYPAL_LEDGER_STATUS.CAPTURED,
@@ -293,6 +294,7 @@ function getProjectionLedgerRow(orderToken: string) {
       djangoOrderIntentOrderId: true,
       djangoOrderIntentVerifyPayload: true,
       djangoPaymentSaveCustomId: true,
+      djangoPaymentSaveResponsePayload: true,
       userId: true,
       customerEmail: true,
       customerName: true,
@@ -386,16 +388,21 @@ function buildProjectionData({
 }): Prisma.PaidOrderRecoveryProjectionUncheckedCreateInput {
   const paymentState = getCanonicalPaymentProjectionState(ledgerRow);
   const { isPaid, paymentFailure, paymentSafeForPostProcessing } = paymentState;
-  const providerDetailSyncNeeded = needsProviderDetailSync(
-    ledgerRow.merchizeFulfillmentResponsePayload,
-    merchizeOpsRow?.syncStatus,
-  );
+  const djangoReview = getDjangoHandoffReview(ledgerRow);
+  const providerDetailSyncNeeded =
+    !djangoReview &&
+    needsProviderDetailSync(
+      ledgerRow.merchizeFulfillmentResponsePayload,
+      merchizeOpsRow?.syncStatus,
+    );
   const adminRecoveryStatus = paymentFailure
     ? 'failed'
-    : getAdminRecoveryStatus({
-        ledgerStatus: ledgerRow.status,
-        needsProviderDetailSync: providerDetailSyncNeeded,
-      });
+    : djangoReview
+      ? 'attention'
+      : getAdminRecoveryStatus({
+          ledgerStatus: ledgerRow.status,
+          needsProviderDetailSync: providerDetailSyncNeeded,
+        });
   const isResolved =
     !paymentFailure &&
     (ledgerRow.status === PAYPAL_LEDGER_STATUS.COMPLETED ||
@@ -405,7 +412,8 @@ function buildProjectionData({
     Boolean(paymentFailure) ||
     ADMIN_RECOVERY_LEDGER_STATUSES.includes(
       ledgerRow.status as (typeof ADMIN_RECOVERY_LEDGER_STATUSES)[number],
-    ) || providerDetailSyncNeeded;
+    ) ||
+    providerDetailSyncNeeded;
   const isCustomerProtectionVisible =
     isPaid &&
     !isResolved &&
@@ -437,8 +445,8 @@ function buildProjectionData({
     );
   const currentIssue = resolvePaidOrderRecoveryIssue({
     ledgerIssue: {
-      code: paymentFailure?.errorCode ?? ledgerRow.lastErrorCode,
-      message: paymentFailure?.reason ?? ledgerRow.lastErrorMessage,
+      code: paymentFailure?.errorCode ?? djangoReview?.code ?? ledgerRow.lastErrorCode,
+      message: paymentFailure?.reason ?? djangoReview?.message ?? ledgerRow.lastErrorMessage,
     },
     providerIssue: merchizeOpsRow
       ? {
@@ -473,15 +481,16 @@ function buildProjectionData({
     isResolved,
     needsProviderDetailSync: providerDetailSyncNeeded,
     needsAdminAttention:
-      Boolean(paymentFailure) ||
-      ['failed', 'attention', 'sync'].includes(adminRecoveryStatus),
+      Boolean(paymentFailure) || ['failed', 'attention', 'sync'].includes(adminRecoveryStatus),
     canRetryFullPostProcessing:
+      !djangoReview &&
       isPaid &&
       paymentSafeForPostProcessing &&
       !isResolved &&
       !providerDetailSyncNeeded &&
       FULL_POST_PROCESSING_RETRY_STATUSES.has(ledgerRow.status),
     canRetryFulfillment:
+      !djangoReview &&
       isPaid &&
       paymentSafeForPostProcessing &&
       !isResolved &&

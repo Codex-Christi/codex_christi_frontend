@@ -3,10 +3,14 @@ import {
   captureCheckoutAttempt,
   isCurrentCheckoutAttempt,
 } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
+import { boundedCheckoutRequest } from './boundedCheckoutRequest';
 
 const claims = new Map<string, Promise<boolean>>();
 /** Claiming changes ownership only; a failed request never restarts or cancels payment. */
-export function claimCurrentCheckout(request: typeof fetch = fetch): Promise<boolean> {
+export function claimCurrentCheckout(
+  request: typeof fetch = fetch,
+  { timeoutMs }: { timeoutMs?: number } = {},
+): Promise<boolean> {
   const owner = useAuthStore.getState();
   const ownerId = owner.isAuthenticated ? owner.accountOwnerId : null;
   const attempt = captureCheckoutAttempt();
@@ -20,11 +24,16 @@ export function claimCurrentCheckout(request: typeof fetch = fetch): Promise<boo
   if (pending) return pending;
   const operation = (async () => {
     try {
-      const response = await request('/next-api/shop/checkout/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderToken: attempt.orderToken }),
-      });
+      const response = await boundedCheckoutRequest(
+        (signal) =>
+          request('/next-api/shop/checkout/claim', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderToken: attempt.orderToken }),
+            signal,
+          }),
+        timeoutMs,
+      );
       return response.ok && current();
     } catch {
       return false;

@@ -51,9 +51,11 @@ services:
       - webserver-network
     volumes:
       - merchize_price_catalog_data:/app/data
+      - next_image_cache:/app/.next/cache/images
 
 volumes:
   merchize_price_catalog_data: {}
+  next_image_cache: {}
 
 secrets:
   production_env:

@@ -86,7 +86,7 @@ FROM node:lts-bookworm-slim AS runtime
 WORKDIR /app
 ARG APP_REVISION=unknown
 
-# Prisma query engine needs OpenSSL at runtime
+# Retain OpenSSL and trusted CA certificates for runtime TLS connections.
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
@@ -112,7 +112,7 @@ COPY --from=builder /app/src/datasets /app/src/datasets
 
 # Next may write prerender/image/cache files at runtime.
 # The app runs as `node`, so prepare writable cache folders before dropping privileges.
-RUN mkdir -p /app/.next/cache \
+RUN mkdir -p /app/.next/cache/images \
   && chown -R node:node /app/.next
 
 EXPOSE 3000

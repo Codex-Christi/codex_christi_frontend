@@ -6,10 +6,11 @@ import {
   isMerchizeFulfillmentOpsDatabaseConfigured,
 } from '@/lib/prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOpsPrisma';
 import { createAccountOrderReader } from './reader';
-
-function label(value: string | null) {
-  return value ? value.replace(/[_:]+/gu, ' ').slice(0, 120) : null;
-}
+import {
+  shipmentLabel,
+  shipmentSummary,
+  snapshotCheckedAt,
+} from '@/lib/merchizeFulfillmentOps/customerTracking';
 
 export const accountOrders = createAccountOrderReader({
   session: getServerAuthSnapshot,
@@ -26,18 +27,29 @@ export const accountOrders = createAccountOrderReader({
         orderToken: true,
         merchizeExternalOrderNumber: true,
         progressStatus: true,
-        deliveryStatus: true,
-        lastProgressSyncAt: true,
         lastTrackingSyncAt: true,
+        merchizeProgressPayload: true,
+        merchizeTrackingPayload: true,
       },
     });
-    return rows.map((row) => ({
-      orderToken: row.orderToken,
-      reference: row.merchizeExternalOrderNumber,
-      progress: label(row.progressStatus),
-      tracking: label(row.deliveryStatus),
-      progressCheckedAt: row.lastProgressSyncAt?.toISOString() ?? null,
-      trackingCheckedAt: row.lastTrackingSyncAt?.toISOString() ?? null,
-    }));
+    return rows.map((row) => {
+      const shipment = shipmentSummary(
+        row.merchizeTrackingPayload,
+        row.merchizeExternalOrderNumber,
+      );
+      return {
+        orderToken: row.orderToken,
+        reference: row.merchizeExternalOrderNumber,
+        progress: row.progressStatus ? shipmentLabel(row.progressStatus.split(':')[0]) : null,
+        tracking: shipment.label,
+        progressCheckedAt: snapshotCheckedAt(row.merchizeProgressPayload),
+        trackingCheckedAt:
+          snapshotCheckedAt(row.merchizeTrackingPayload) ??
+          row.lastTrackingSyncAt?.toISOString() ??
+          null,
+        packages: shipment.packages,
+        delivered: shipment.delivered,
+      };
+    });
   },
 });

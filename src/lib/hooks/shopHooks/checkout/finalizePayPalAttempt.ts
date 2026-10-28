@@ -1,9 +1,11 @@
 import {
   isCurrentCheckoutAttempt,
   setCheckoutAttemptStage,
+  usePayPalIntentStore,
   type CheckoutAttempt,
 } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 import type { OrderAuthorizeResponse, OrdersCapture } from '@paypal/paypal-server-sdk';
+import { boundedCheckoutRequest, CheckoutRequestTimeoutError } from './boundedCheckoutRequest';
 
 const finalizing = new Map<string, Promise<'completed' | 'superseded'>>();
 export const isPayPalAttemptFinalizing = (attempt: CheckoutAttempt) =>
@@ -17,7 +19,12 @@ export function finalizePayPalAttempt(
   {
     request = fetch,
     onCompleted,
-  }: { request?: typeof fetch; onCompleted: (orderToken: string) => void },
+    timeoutMs,
+  }: {
+    request?: typeof fetch;
+    onCompleted: (orderToken: string) => void;
+    timeoutMs?: number;
+  },
 ): Promise<'completed' | 'superseded'> {
   if (!isCurrentCheckoutAttempt(attempt)) return Promise.resolve('superseded');
   if (!attempt.orderToken || !attempt.paypalOrderId || attempt.paypalOrderId !== orderID)
@@ -26,44 +33,63 @@ export function finalizePayPalAttempt(
     );
   const existing = finalizing.get(attempt.attemptId);
   if (existing) return existing;
+  const stage = usePayPalIntentStore.getState().activeCheckout?.stage;
+  if (stage && ['paypal_approved', 'capture_checking', 'confirmation_opened'].includes(stage))
+    return Promise.reject(
+      new PayPalCheckoutError(
+        'This payment is already being checked. Check its status before trying again.',
+      ),
+    );
   const operation = (async () => {
     setCheckoutAttemptStage(attempt, 'paypal_approved');
-    const authRes = await request('/next-api/paypal/orders/authorize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderToken: attempt.orderToken, orderID }),
-    });
+    const authData = await boundedCheckoutRequest(async (signal) => {
+      const response = await request('/next-api/paypal/orders/authorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderToken: attempt.orderToken, orderID }),
+        signal,
+      });
+      if (!isCurrentCheckoutAttempt(attempt)) return null;
+      if (!response.ok)
+        throw new PayPalCheckoutError(
+          'Payment authorization could not be confirmed. Check its status before trying again.',
+        );
+      return (await response.json()) as OrderAuthorizeResponse;
+    }, timeoutMs);
     if (!isCurrentCheckoutAttempt(attempt)) return 'superseded' as const;
-    if (!authRes.ok)
-      throw new PayPalCheckoutError(
-        'Payment authorization could not be confirmed. Check its status before trying again.',
-      );
-    const authData = (await authRes.json()) as OrderAuthorizeResponse;
-    if (!isCurrentCheckoutAttempt(attempt)) return 'superseded' as const;
-    const authorizationId = authData.purchaseUnits?.[0]?.payments?.authorizations?.[0]?.id;
+    const authorizationId = authData?.purchaseUnits?.[0]?.payments?.authorizations?.[0]?.id;
     if (!authorizationId)
       throw new PayPalCheckoutError('Payment authorization could not be confirmed.');
     setCheckoutAttemptStage(attempt, 'capture_checking');
-    const capRes = await request('/next-api/paypal/orders/capture', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderToken: attempt.orderToken, authorizationId }),
-    });
+    const captured = await boundedCheckoutRequest(async (signal) => {
+      const response = await request('/next-api/paypal/orders/capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderToken: attempt.orderToken, authorizationId }),
+        signal,
+      });
+      if (!isCurrentCheckoutAttempt(attempt)) return null;
+      if (!response.ok)
+        throw new PayPalCheckoutError(
+          'Payment status could not be confirmed. Check your payment before trying again.',
+        );
+      return (await response.json()) as OrdersCapture;
+    }, timeoutMs);
     if (!isCurrentCheckoutAttempt(attempt)) return 'superseded' as const;
-    if (!capRes.ok)
-      throw new PayPalCheckoutError(
-        'Payment status could not be confirmed. Check your payment before trying again.',
-      );
-    const captured = (await capRes.json()) as OrdersCapture;
-    if (!isCurrentCheckoutAttempt(attempt)) return 'superseded' as const;
-    if (captured.status !== 'COMPLETED')
+    if (captured?.status !== 'COMPLETED')
       throw new PayPalCheckoutError(
         'Payment is still being confirmed. Check its status before trying again.',
       );
     setCheckoutAttemptStage(attempt, 'confirmation_opened');
     onCompleted(attempt.orderToken!);
     return 'completed' as const;
-  })();
+  })().catch((error: unknown) => {
+    if (error instanceof CheckoutRequestTimeoutError)
+      throw new PayPalCheckoutError(
+        'Payment confirmation is taking longer than expected. Check its status before trying again.',
+      );
+    throw error;
+  });
   finalizing.set(attempt.attemptId, operation);
   void operation.then(
     () => finalizing.delete(attempt.attemptId),

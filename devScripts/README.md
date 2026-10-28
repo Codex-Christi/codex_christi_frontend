@@ -42,6 +42,72 @@ Prisma migration history (for example, P3005), stop, back it up and reconcile it
 schema/history before retrying. Do not reset production or mark every migration
 applied without checking what the database contains.
 
+## Persistent Optimized Images
+
+The app mounts the `next_image_cache` named volume at `/app/.next/cache/images`.
+Only prepared images are persisted, not the `.next` application build or HTML/ISR
+cache. The runtime image creates this directory with `node` ownership before the
+volume is first mounted. The existing deployment wrapper preserves the Compose
+project name, so subsequent releases reuse the same image volume.
+
+Next's image disk cache is capped at 256 MiB and evicts older entries as needed.
+The existing image quality, responsive sizes, AVIF/WebP formats and TTL are
+unchanged. A new source URL, size, quality or format can still need its first
+optimization. This is expected; persistence avoids repeating that work merely
+because the app container was replaced. No warm-up job or extra supplier fetch
+is added.
+
+Keep the named volume when replacing containers. Do not use `docker compose
+down -v` or remove the volume during ordinary deployments. If a pre-existing
+image volume is not writable by the runtime `node` user, repair that volume's
+ownership before serving traffic; do not run the app as root to work around it.
+
+Image freshness remains separate from product snapshot/HTML refresh. The current
+minimum image TTL is one year. Updated images should use a new/versioned source
+URL; overwriting an image at the same URL can retain the old optimized image.
+If such an overwrite requires a targeted cache purge, coordinate it with any
+Nginx/CDN image cache too. Do not clear the catalog database or whole `.next`
+directory to refresh an image. Clearing image entries deliberately makes their
+next requests cold again.
+
+## Deferred Cloudflare Web Analytics
+
+The root layout loads one analytics beacon after the page-load event, during
+browser idle time. It uses the visible hostname, not the route: `.org/shop`
+uses the `.org` token, while `.shop` uses its separate token. The corresponding
+`www` hostname uses the same token. Localhost, other hosts, development mode and
+missing tokens do not load the manual beacon. Country/FX and application providers
+do not control analytics loading.
+
+Copy the two settings from [`.env.cloudflare.example`](../.env.cloudflare.example)
+into the existing production environment and fill them with each site's Web
+Analytics token. These are public site identifiers, not Cloudflare API keys.
+`NEXT_PUBLIC_*` values are embedded during `yarn build`; changing a token requires
+a rebuild, not only a container restart. The existing Docker build already passes
+these public variables through, so no Docker or dependency change is needed.
+
+After deploying, switch each site under Cloudflare Web Analytics > Manage Site
+to **Enable with JS Snippet installation**. The loader skips its manual copy if
+an automatically injected beacon is still present, preventing duplicate loading
+during rollout. Automatic injection must be turned off for deferral to take effect.
+Keep existing tracking exclusions aligned with the manually covered pages.
+
+SPA tracking stays enabled and the beacon is not reinserted on client-side
+navigation. Manual setup reports to `https://cloudflareinsights.com/cdn-cgi/rum`;
+any CSP must allow that destination and the script at
+`https://static.cloudflareinsights.com/beacon.min.js`. Cloudflare does not support
+safe SRI version-pinning for manual embedding, unlike its automatic injection.
+Late loading can miss short visits and navigation before initialization; it does
+not remove the beacon's legacy polyfills or guarantee a Lighthouse score increase.
+
+Verify exactly one beacon request per document on both domains, no early beacon
+request before page load, and successful analytics after SPA navigation. Do not
+send synthetic test tokens to Cloudflare: intercept telemetry in disposable tests.
+To roll back the loading policy, re-enable automatic injection; its tag takes
+precedence over this loader. See the [Cloudflare setup guide](https://developers.cloudflare.com/web-analytics/get-started/),
+[manual embedding caveats](https://developers.cloudflare.com/web-analytics/faq/),
+and [Next.js script strategies](https://nextjs.org/docs/app/api-reference/components/script#lazyonload).
+
 ## Readiness
 
 `/next-api/health/ready` (also `/api/health/ready` inside Next) returns `200` only

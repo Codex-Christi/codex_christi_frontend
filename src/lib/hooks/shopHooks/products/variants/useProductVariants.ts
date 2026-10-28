@@ -16,11 +16,7 @@ type OptionsState = {
   error?: Error;
 };
 
-export function useProductVariants(
-  productId: string,
-  shouldFetch: boolean,
-  { defer = false }: { defer?: boolean } = {},
-) {
+export function useProductVariants(productId: string, shouldFetch: boolean) {
   const country = useCurrencyCookie((state) => state.iso3) || 'USA';
   const [retrySequence, setRetrySequence] = useState(0);
   const [response, setResponse] = useState<OptionsState | null>(null);
@@ -33,8 +29,7 @@ export function useProductVariants(
   useEffect(() => {
     if (!enabled) return;
     const controller = new AbortController();
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    let idleId: number | undefined;
+    let retryTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
     async function load(attempt = 0) {
       try {
@@ -43,7 +38,7 @@ export function useProductVariants(
       } catch (error) {
         if (controller.signal.aborted) return;
         if (attempt === 0 && (!(error instanceof ProductOptionsError) || error.retryable)) {
-          timeoutId = setTimeout(() => void load(1), 5_000);
+          retryTimeoutId = setTimeout(() => void load(1), 5_000);
           return;
         }
         setResponse({
@@ -53,19 +48,12 @@ export function useProductVariants(
       }
     }
 
-    if (defer && window.requestIdleCallback) {
-      idleId = window.requestIdleCallback(() => void load(), { timeout: 900 });
-    } else if (defer) {
-      timeoutId = setTimeout(() => void load(), 120);
-    } else {
-      void load();
-    }
+    void load();
     return () => {
       controller.abort();
-      if (idleId !== undefined) window.cancelIdleCallback?.(idleId);
-      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      if (retryTimeoutId !== undefined) clearTimeout(retryTimeoutId);
     };
-  }, [enabled, productId, country, requestKey, defer]);
+  }, [enabled, productId, country, requestKey]);
 
   return {
     data: current?.data,

@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
-import { getMainSiteUrl } from '@/lib/siteBaseUrls';
+import { getMainSiteUrl, getShopSiteUrl } from '@/lib/siteBaseUrls';
 
 const DEFAULT_PENDING_SEND_LIMIT = 25;
 
@@ -68,7 +68,7 @@ function buildCustomerFulfillmentPushVerifiedEmailHtml(
 ) {
   const logoUrl = getMainSiteUrl('/media/img/general/logo-glow-tiny.jpg');
   const receiptLink = payload.receiptLink
-    ? `<a href="${escapeHtml(payload.receiptLink)}" style="display:inline-block;margin-top:14px;border-radius:12px;background:#dbeafe;color:#0f172a;text-decoration:none;font-size:13px;font-weight:700;padding:12px 18px;">View Receipt</a>`
+    ? `<a href="${escapeHtml(getShopSiteUrl(`/shop/checkout/confirmation/${encodeURIComponent(payload.orderToken)}?view=details`))}" style="display:inline-block;margin-top:14px;border-radius:12px;background:#dbeafe;color:#0f172a;text-decoration:none;font-size:13px;font-weight:700;padding:12px 18px;">View Order and Receipt</a>`
     : '';
 
   return `<!doctype html>
@@ -173,7 +173,8 @@ async function sendCustomerNotificationRow(
     return {
       id: row.id,
       ok: false as const,
-      error: 'Customer notification outbox is unavailable. Regenerate the PayPal ledger Prisma client and restart the server.',
+      error:
+        'Customer notification outbox is unavailable. Regenerate the PayPal ledger Prisma client and restart the server.',
     };
   }
 
@@ -276,7 +277,8 @@ export async function resendCustomerNotification(id: string) {
     return {
       id,
       ok: false as const,
-      error: 'Customer notification outbox is unavailable. Regenerate the PayPal ledger Prisma client and restart the server.',
+      error:
+        'Customer notification outbox is unavailable. Regenerate the PayPal ledger Prisma client and restart the server.',
     };
   }
 

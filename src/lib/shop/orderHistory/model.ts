@@ -3,6 +3,8 @@ import { getCanonicalPaymentProjectionState } from '@/lib/paypal/txLedger/canoni
 import { PAYPAL_LEDGER_STATUS as STATUS } from '@/lib/paypal/txLedger/status';
 import { formatOrderMoney } from '@/lib/shop/checkout/orderMoney';
 import type { Prisma } from '@/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger/client';
+import { object, type ShipmentPackage } from '@/lib/merchizeFulfillmentOps/customerTracking';
+import { receiptObjectKey } from './receiptReference';
 
 export const historyOrderSelect = {
   id: true,
@@ -12,6 +14,7 @@ export const historyOrderSelect = {
   status: true,
   createdAt: true,
   receiptLink: true,
+  receiptFile: true,
   canonicalOrderSnapshot: true,
   canonicalOrderSnapshotVersion: true,
   canonicalOrderSnapshotHash: true,
@@ -39,6 +42,8 @@ export type HistoryFulfillment = {
   tracking: string | null;
   progressCheckedAt: string | null;
   trackingCheckedAt: string | null;
+  packages?: ShipmentPackage[];
+  delivered?: boolean;
 };
 
 export function historyMoney(value: string, currency: string) {
@@ -72,19 +77,50 @@ export function historyImageUrl(value: string) {
   }
 }
 
-export function historyReceiptUrl(value: string | null) {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    return url.origin === 'https://payment-receipts.codexchristi.shop' &&
-      url.pathname.startsWith('/paypal/') &&
-      !url.username &&
-      !url.password
-      ? url.href
-      : null;
-  } catch {
-    return null;
-  }
+function legacyPaymentLines(row: HistoryLedgerRow, isPaid: boolean) {
+  if (
+    row.canonicalOrderSnapshot != null ||
+    row.canonicalOrderSnapshotVersion != null ||
+    row.canonicalOrderSnapshotHash != null ||
+    !isPaid
+  )
+    return [];
+  const auth = object(row.authorizePayload);
+  const units = auth?.purchaseUnits ?? auth?.purchase_units;
+  if (!Array.isArray(units) || units.length !== 1) return [];
+  const items = object(units[0])?.items;
+  if (!Array.isArray(items) || items.length > 100) return [];
+  return items.flatMap((value, index) => {
+    const item = object(value);
+    const quantity = Number(item?.quantity);
+    const title = item?.name;
+    const amount = object(item?.unitAmount ?? item?.unit_amount);
+    if (
+      typeof title !== 'string' ||
+      !title.trim() ||
+      title.length > 255 ||
+      !Number.isInteger(quantity) ||
+      quantity < 1 ||
+      quantity > 1000
+    )
+      return [];
+    const unitAmount =
+      typeof amount?.value === 'string' &&
+      typeof (amount.currencyCode ?? amount.currency_code) === 'string'
+        ? historyMoney(amount.value, String(amount.currencyCode ?? amount.currency_code))
+        : null;
+    return [
+      {
+        id: `payment-item-${index}`,
+        title: title.trim(),
+        quantity,
+        options: '',
+        image: null as string | null,
+        unitAmount,
+        lineAmount: null as string | null,
+      },
+    ];
+  });
 }
 
 export function toHistoryOrder(row: HistoryLedgerRow) {
@@ -98,6 +134,17 @@ export function toHistoryOrder(row: HistoryLedgerRow) {
   const captured = payment.captureCompletion.ok ? payment.captureCompletion.amount : null;
   const paidAmount = captured ? historyMoney(captured.value, captured.currency) : null;
   const refunded = row.status === STATUS.REFUNDED;
+  const payload = object(row.capturePayload);
+  const units = payload?.purchaseUnits ?? payload?.purchase_units;
+  const nested = Array.isArray(units) ? object(object(units[0])?.payments)?.captures : null;
+  const capture = Array.isArray(nested) ? object(nested[0]) : payload;
+  const paidDate = captured
+    ? (capture?.updateTime ?? capture?.update_time ?? capture?.createTime ?? capture?.create_time)
+    : null;
+  const paidAt =
+    typeof paidDate === 'string' && Number.isFinite(Date.parse(paidDate))
+      ? new Date(paidDate).toISOString()
+      : null;
   const needsReview =
     Boolean(payment.paymentFailure) ||
     !paidAmount ||
@@ -107,10 +154,22 @@ export function toHistoryOrder(row: HistoryLedgerRow) {
       STATUS.FULFILLMENT_FAILED,
       STATUS.FULFILLMENT_ATTENTION_REQUIRED,
     ].some((status) => row.status === status);
+  const lines =
+    snapshot?.lines.map((line) => ({
+      id: line.lineId,
+      title: line.title,
+      quantity: line.quantity,
+      options: line.selectedOptions.map((option) => `${option.name}: ${option.value}`).join(', '),
+      image: historyImageUrl(line.imageUrl),
+      unitAmount: historyMoney(line.unitAmount.value, line.unitAmount.currency),
+      lineAmount: historyMoney(line.lineAmount.value, line.lineAmount.currency),
+    })) ?? legacyPaymentLines(row, payment.isPaid);
   return {
     orderToken: row.orderToken,
     reference: row.djangoOrderIntentOrderId || row.orderToken,
     createdAt: row.createdAt.toISOString(),
+    displayDate: paidAt ?? row.createdAt.toISOString(),
+    dateLabel: paidAt ? 'Paid' : 'Checkout started',
     status: refunded
       ? 'Refund recorded'
       : needsReview
@@ -123,18 +182,10 @@ export function toHistoryOrder(row: HistoryLedgerRow) {
     paidAmount,
     expectedAmount: snapshot ? historyMoney(snapshot.total.value, snapshot.currency) : null,
     shippingAmount: snapshot ? historyMoney(snapshot.shipping.value, snapshot.currency) : null,
-    receiptAvailable: Boolean(historyReceiptUrl(row.receiptLink)),
-    detailsAvailable: Boolean(snapshot),
-    lines:
-      snapshot?.lines.map((line) => ({
-        id: line.lineId,
-        title: line.title,
-        quantity: line.quantity,
-        options: line.selectedOptions.map((option) => `${option.name}: ${option.value}`).join(', '),
-        image: historyImageUrl(line.imageUrl),
-        unitAmount: historyMoney(line.unitAmount.value, line.unitAmount.currency),
-        lineAmount: historyMoney(line.lineAmount.value, line.lineAmount.currency),
-      })) ?? [],
+    receiptAvailable: Boolean(receiptObjectKey(row)),
+    detailsAvailable: lines.length > 0,
+    detailsSource: snapshot ? 'purchase_snapshot' : lines.length ? 'payment_record' : 'unavailable',
+    lines,
   };
 }
 

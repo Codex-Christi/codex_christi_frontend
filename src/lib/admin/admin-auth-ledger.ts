@@ -2,6 +2,13 @@ import 'server-only';
 
 import argon2 from 'argon2';
 import { parseOptionalNewAdminPassword } from '../formSchemas/admin-password';
+import { withAdminCredentialWork } from './admin-credential-work';
+import { AdminCredentialError } from './admin-credential-work';
+import {
+  lockAdminUsersForWrite,
+  requireCurrentMaster,
+  type AdminWriteActor,
+} from './admin-write-guards';
 import type { Prisma } from '@/lib/prisma/adminOpsLedger/generated/adminOpsLedger/client';
 import { getAdminOpsLedgerPrisma } from '@/lib/prisma/adminOpsLedger/adminOpsLedgerPrisma';
 import {
@@ -88,9 +95,7 @@ export type AdminUserProvisionInput = {
 };
 
 export type AdminAuditActor =
-  | Pick<AdminUserAuthRecord, 'id' | 'codexUserId'>
-  | { adminUserId: string; userID: string }
-  | null;
+  Pick<AdminUserAuthRecord, 'id' | 'codexUserId'> | { adminUserId: string; userID: string } | null;
 
 const adminAuditLogSummarySelect = {
   id: true,
@@ -359,97 +364,117 @@ export async function upsertAdminUserFromDashboard({
   actor,
   input,
 }: {
-  actor: Exclude<AdminAuditActor, null>;
+  actor: AdminWriteActor;
   input: AdminUserProvisionInput;
 }) {
   const password = parseOptionalNewAdminPassword(input.password);
   const prisma = getAdminOpsLedgerPrisma();
-  const existing = await prisma.adminUser.findUnique({
-    where: { codexUserId: input.codexUserId },
-    select: {
-      id: true,
-    },
-  });
-
-  if (!existing && password === null) {
-    throw new Error('A new admin user requires an unlock password.');
-  }
-
-  if (isMasterAdminRole(input.role)) {
-    throw new Error('The master admin user must be managed by the master-admin creation script.');
-  }
+  if (input.codexUserId === actor.userID || isMasterAdminRole(input.role))
+    throw new AdminCredentialError('Use ownership transfer to change master access.', 400);
+  if (
+    !normalizeAdminRole(input.role) ||
+    !input.scopes.length ||
+    normalizeAdminScopes(input.scopes).length !== input.scopes.length ||
+    !['active', 'disabled'].includes(input.status)
+  )
+    throw new AdminCredentialError('Check the admin role, permissions and status.', 400);
 
   const passwordHash =
-    password !== null ? await argon2.hash(password, { type: argon2.argon2id }) : undefined;
+    password !== null
+      ? await withAdminCredentialWork(() => argon2.hash(password, { type: argon2.argon2id }))
+      : undefined;
   const disabledAt = input.status === 'disabled' ? new Date() : null;
   const disabledReason =
     input.status === 'disabled' ? 'Disabled from admin access management.' : null;
-  const actorCodexUserId = getActorCodexUserId(actor);
-  const adminUser = await prisma.adminUser.upsert({
-    where: {
-      codexUserId: input.codexUserId,
-    },
-    create: {
-      codexUserId: input.codexUserId,
-      email: input.email,
-      displayName: input.displayName,
-      passwordHash: passwordHash as string,
-      role: input.role,
-      scopes: input.scopes,
-      status: input.status,
-      disabledAt,
-      disabledReason,
-      createdByCodexUserId: actorCodexUserId,
-      updatedByCodexUserId: actorCodexUserId,
-    },
-    update: {
-      email: input.email,
-      displayName: input.displayName,
-      ...(passwordHash ? { passwordHash } : {}),
-      role: input.role,
-      scopes: input.scopes,
-      status: input.status,
-      disabledAt,
-      disabledReason,
-      sessionVersion: {
-        increment: 1,
+  const requestContext = await getAdminRequestAuditContext();
+  const select = {
+    id: true,
+    codexUserId: true,
+    email: true,
+    displayName: true,
+    role: true,
+    scopes: true,
+    status: true,
+    sessionVersion: true,
+  } satisfies Prisma.AdminUserSelect;
+  const data = {
+    email: input.email,
+    displayName: input.displayName,
+    role: input.role,
+    scopes: input.scopes,
+    status: input.status,
+    disabledAt,
+    disabledReason,
+    updatedByCodexUserId: actor.userID,
+  };
+  return prisma.$transaction(async (tx) => {
+    await lockAdminUsersForWrite(tx, [actor.userID, input.codexUserId]);
+    await requireCurrentMaster(tx, actor);
+    const existing = await tx.adminUser.findUnique({ where: { codexUserId: input.codexUserId } });
+    if (existing?.role === 'master_admin')
+      throw new AdminCredentialError(
+        'Use ownership transfer to change an existing master account.',
+        400,
+      );
+    let adminUser;
+    if (existing) {
+      const changed = await tx.adminUser.updateMany({
+        where: {
+          id: existing.id,
+          sessionVersion: existing.sessionVersion,
+          role: { not: 'master_admin' },
+        },
+        data: {
+          ...data,
+          ...(passwordHash ? { passwordHash } : {}),
+          sessionVersion: { increment: 1 },
+        },
+      });
+      if (changed.count !== 1)
+        throw new AdminCredentialError(
+          'The target admin changed. Reload and review it again.',
+          409,
+        );
+      await tx.adminMasterTransferChallenge.updateMany({
+        where: {
+          consumedAt: null,
+          OR: [{ actorAdminUserId: existing.id }, { targetCodexUserId: input.codexUserId }],
+        },
+        data: { consumedAt: new Date() },
+      });
+      adminUser = await tx.adminUser.findUniqueOrThrow({ where: { id: existing.id }, select });
+    } else {
+      if (!passwordHash)
+        throw new AdminCredentialError('A new admin user requires an unlock password.', 400);
+      // A concurrent create must fail its unique constraint, never update the new account.
+      adminUser = await tx.adminUser.create({
+        data: {
+          ...data,
+          codexUserId: input.codexUserId,
+          passwordHash,
+          createdByCodexUserId: actor.userID,
+        },
+        select,
+      });
+      await tx.adminMasterTransferChallenge.updateMany({
+        where: { consumedAt: null, targetCodexUserId: input.codexUserId },
+        data: { consumedAt: new Date() },
+      });
+    }
+    await tx.adminAuditLog.create({
+      data: {
+        actorAdminUserId: actor.adminUserId,
+        actorCodexUserId: actor.userID,
+        action: existing ? 'admin.user.updated' : 'admin.user.created',
+        targetType: 'adminUser',
+        targetId: adminUser.id,
+        outcome: 'success',
+        metadata: { ...adminUser, passwordChanged: Boolean(passwordHash) },
+        ...requestContext,
       },
-      updatedByCodexUserId: actorCodexUserId,
-    },
-    select: {
-      id: true,
-      codexUserId: true,
-      email: true,
-      displayName: true,
-      role: true,
-      scopes: true,
-      status: true,
-      sessionVersion: true,
-    },
+    });
+    return { action: existing ? ('updated' as const) : ('created' as const), adminUser };
   });
-
-  await writeAdminAuditLog({
-    actor,
-    action: existing ? 'admin.user.updated' : 'admin.user.created',
-    targetType: 'adminUser',
-    targetId: adminUser.id,
-    outcome: 'success',
-    metadata: {
-      codexUserId: adminUser.codexUserId,
-      email: adminUser.email,
-      displayName: adminUser.displayName,
-      role: adminUser.role,
-      scopes: adminUser.scopes,
-      status: adminUser.status,
-      sessionVersion: adminUser.sessionVersion,
-      passwordChanged: Boolean(passwordHash),
-    },
-  });
-
-  return {
-    action: existing ? 'updated' : 'created',
-    adminUser,
-  } as const;
 }
 
 function normalizeAdminUserAuthRecord(row: unknown): AdminUserAuthRecord | null {

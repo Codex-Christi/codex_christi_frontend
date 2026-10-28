@@ -21,6 +21,9 @@ import { billingAddressFromDelivery, checkoutBillingAddressSchema } from '../che
 import type { BillingAddressInterface } from '@/lib/paypal/createPayPalOrder';
 import { formatOrderMoney } from '@/lib/shop/checkout/orderMoney';
 import PayPalLoadingSkeleton from './PayPalLoadingSkeleton';
+import { boundedCheckoutRequest } from '@/lib/hooks/shopHooks/checkout/boundedCheckoutRequest';
+import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
+import CustomShopLink from '../../HelperComponents/CustomShopLink';
 
 export interface MyPayPalCardFieldInterface {
   mode: CheckoutOptions;
@@ -124,7 +127,7 @@ function CardPaymentForm({ onReady, ready }: { onReady: () => void; ready: boole
   const formReady = ready && Boolean(cardFieldsForm);
   const details = useContext(ServerOrderDetailsContext);
   const delivery = useShopCheckoutStore((state) => state.delivery_address);
-  const { review } = useContext(CheckoutPaymentReviewContext);
+  const { review, originalCheckout } = useContext(CheckoutPaymentReviewContext);
   const [sameAsDelivery, setSameAsDelivery] = useState(true);
   const [customAddress, setCustomAddress] = useState<BillingAddressInterface>({
     addressLine1: '',
@@ -138,10 +141,19 @@ function CardPaymentForm({ onReady, ready }: { onReady: () => void; ready: boole
   const [errors, setErrors] = useState<Partial<Record<keyof BillingAddressInterface, string>>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const [slowPayment, setSlowPayment] = useState(false);
+  const orderToken = usePayPalIntentStore((state) => state.checkoutAttempt?.orderToken);
+  useEffect(() => {
+    if (!paying) return;
+    // Bank authentication may take time; offer status access without submitting it again.
+    const timer = window.setTimeout(() => setSlowPayment(true), 30_000);
+    return () => window.clearTimeout(timer);
+  }, [paying]);
   const inputId = useId();
-  const countryCode = details?.countrySupport.country?.country_iso2 ?? '';
+  const countryCode =
+    originalCheckout?.countryCode ?? details?.countrySupport.country?.country_iso2 ?? '';
   const billingAddress = sameAsDelivery
-    ? billingAddressFromDelivery(delivery, countryCode)
+    ? billingAddressFromDelivery(originalCheckout?.deliveryAddress ?? delivery, countryCode)
     : customAddress;
   useEffect(() => {
     if (cardFieldsForm) onReady();
@@ -177,8 +189,9 @@ function CardPaymentForm({ onReady, ready }: { onReady: () => void; ready: boole
       return;
     }
     setPaying(true);
+    setSlowPayment(false);
     try {
-      const state = await cardFieldsForm.getState();
+      const state = await boundedCheckoutRequest(() => cardFieldsForm.getState());
       if (!state.isFormValid) {
         setFormError('Check your card number, name, expiry date, and security code.');
         return;
@@ -204,38 +217,44 @@ function CardPaymentForm({ onReady, ready }: { onReady: () => void; ready: boole
       aria-hidden={!formReady}
       inert={!formReady}
     >
+      {slowPayment && paying && (
+        <p role='status' className='text-sm leading-6 text-amber-100'>
+          This payment is taking longer than usual. Complete any bank approval that is still open.
+          {orderToken && (
+            <>
+              {' '}
+              You can also{' '}
+              <CustomShopLink
+                href={`/shop/checkout/confirmation/${encodeURIComponent(orderToken)}`}
+                className='font-semibold underline'
+              >
+                check this payment’s status
+              </CustomShopLink>{' '}
+              before trying again.
+            </>
+          )}
+        </p>
+      )}
       <div className='grid min-w-0 grid-cols-2 gap-4'>
         <div className='col-span-2 min-w-0'>
           <p id={`${inputId}-name-label`} className='mb-2 text-sm'>
             Name on card
           </p>
-          <PayPalNameField
-            placeholder='Name on card'
-            className='min-h-12'
-          />
+          <PayPalNameField placeholder='Name on card' className='min-h-12' />
         </div>
         <div className='col-span-2 min-w-0'>
           <p id={`${inputId}-number-label`} className='mb-2 text-sm'>
             Card number
           </p>
-          <PayPalNumberField
-            placeholder='Card number'
-            className='min-h-12'
-          />
+          <PayPalNumberField placeholder='Card number' className='min-h-12' />
         </div>
         <div className='min-w-0'>
           <p className='mb-2 text-sm'>Expiry date</p>
-          <PayPalExpiryField
-            placeholder='MM / YY'
-            className='min-h-12'
-          />
+          <PayPalExpiryField placeholder='MM / YY' className='min-h-12' />
         </div>
         <div className='min-w-0'>
           <p className='mb-2 text-sm'>Security code</p>
-          <PayPalCVVField
-            placeholder='CVV'
-            className='min-h-12'
-          />
+          <PayPalCVVField placeholder='CVV' className='min-h-12' />
         </div>
       </div>
       <fieldset

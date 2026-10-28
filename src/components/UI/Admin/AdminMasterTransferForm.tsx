@@ -1,238 +1,162 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { useActionState, useState } from 'react';
-import { KeyRound, Loader2, Search, ShieldCheck, UserRoundCog } from 'lucide-react';
+import { Loader2, Mail, Search, X } from 'lucide-react';
 import {
-  completeMasterAdminTransferAction,
+  cancelMasterAdminTransferAction,
   previewCodexChristiUserProfileAction,
   startMasterAdminTransferAction,
   type CodexUserProfilePreviewActionState,
-  type MasterAdminTransferCompleteActionState,
   type MasterAdminTransferStartActionState,
+  type MasterAdminTransferCancelActionState,
 } from '@/app/admin/(dashboard)/admin-ops/actions';
-import AdminCodexUserProfilePreview from '@/components/UI/Admin/AdminCodexUserProfilePreview';
-import {
-  adminFieldClass,
-  adminInsetSurfaceClass,
-} from '@/components/UI/Admin/dashboard/AdminGlassPanel';
-import { cn } from '@/lib/utils';
-import { logoutUser } from '@/actions/logout';
-import {
-  ADMIN_PASSWORD_MIN_LENGTH,
-  ADMIN_PASSWORD_MAX_LENGTH,
-} from '@/lib/formSchemas/admin-password';
-
-const initialStartState: MasterAdminTransferStartActionState = {
-  error: null,
-  challenge: null,
-};
-
-const initialCompleteState: MasterAdminTransferCompleteActionState = {
-  error: null,
-};
-
-const initialPreviewState: CodexUserProfilePreviewActionState = {
-  error: null,
-  profile: null,
-};
+import AdminCodexUserProfilePreview from './AdminCodexUserProfilePreview';
+import { adminFieldClass } from './dashboard/AdminGlassPanel';
 
 export default function AdminMasterTransferForm() {
-  const [targetCodexUserId, setTargetCodexUserId] = useState('');
-  const [signingOut, setSigningOut] = useState(false);
-  const [startState, startAction, startPending] = useActionState(
-    startMasterAdminTransferAction,
-    initialStartState,
-  );
-  const [completeState, completeAction, completePending] = useActionState(
-    async (previous: MasterAdminTransferCompleteActionState, form: FormData) => {
-      const result = await completeMasterAdminTransferAction(previous, form);
-      if (result.completed) await finishSignOut();
-      return result;
+  const [userId, setUserId] = useState('');
+  const [cancelledId, setCancelledId] = useState<string | null>(null);
+  const [state, invite, pending] = useActionState(startMasterAdminTransferAction, {
+    error: null,
+    challenge: null,
+  } as MasterAdminTransferStartActionState);
+  const [cancelState, cancel, cancelling] = useActionState(
+    async (
+      previous: MasterAdminTransferCancelActionState & { challengeId?: string },
+      form: FormData,
+    ) => {
+      const result = await cancelMasterAdminTransferAction(previous, form);
+      const challengeId = String(form.get('challengeId') ?? '');
+      if (result.cancelled) setCancelledId(challengeId);
+      return { ...result, challengeId };
     },
-    initialCompleteState,
+    { error: null } as MasterAdminTransferCancelActionState & { challengeId?: string },
   );
-  const [previewState, previewAction, previewPending] = useActionState(
+  const [preview, previewAction, previewing] = useActionState(
     previewCodexChristiUserProfileAction,
-    initialPreviewState,
+    { error: null, profile: null } as CodexUserProfilePreviewActionState,
   );
-  const verifiedProfile =
-    previewState.profile?.id === targetCodexUserId.trim() ? previewState.profile : null;
-
-  async function finishSignOut() {
-    setSigningOut(true);
-    try {
-      await logoutUser();
-    } finally {
-      setSigningOut(false);
-    }
-  }
-
-  if (completeState.completed)
-    return (
-      <div className='grid gap-4'>
-        <p role='status' className='text-sm text-emerald-200'>
-          Master access transferred.
-        </p>
-        <button
-          type='button'
-          disabled={signingOut}
-          onClick={() => void finishSignOut()}
-          className='inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-cyan-300 px-4 text-sm font-semibold text-slate-950 disabled:opacity-60'
-        >
-          {signingOut ? <Loader2 size={16} className='animate-spin' /> : <KeyRound size={16} />}
-          {signingOut ? 'Signing out...' : 'Sign out'}
-        </button>
-      </div>
-    );
+  const currentInvite =
+    state.challenge && state.challenge.challengeId !== cancelledId ? state.challenge : null;
 
   return (
-    <div className='space-y-3'>
-      <form action={startAction} className='space-y-3'>
-        <TextField
-          label='Current unlock password'
-          name='currentAdminPassword'
-          type='password'
-          autoComplete='current-password'
-          required
-        />
-        <TextField
-          label='Target Codex Christi user ID'
-          name='targetCodexUserId'
-          value={targetCodexUserId}
-          onChange={setTargetCodexUserId}
-          required
-        />
+    <div className='space-y-4'>
+      <form action={invite} className='space-y-3'>
+        <label className='grid gap-1 text-xs font-medium text-slate-300'>
+          Current unlock password
+          <input
+            name='currentAdminPassword'
+            type='password'
+            autoComplete='current-password'
+            required
+            minLength={1}
+            maxLength={1024}
+            className={adminFieldClass}
+          />
+        </label>
+        <label className='grid gap-1 text-xs font-medium text-slate-300'>
+          Recipient user ID
+          <input
+            name='targetCodexUserId'
+            value={userId}
+            onChange={(event) => setUserId(event.target.value)}
+            required
+            maxLength={36}
+            className={adminFieldClass}
+          />
+        </label>
         <button
           type='submit'
           formAction={previewAction}
           formNoValidate
-          disabled={previewPending || !targetCodexUserId.trim()}
-          className='inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-3 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-60'
+          disabled={previewing || pending || !userId.trim()}
+          className='inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-cyan-300/25 px-3 text-xs text-cyan-100 disabled:opacity-60'
         >
-          {previewPending ? <Loader2 size={15} className='animate-spin' /> : <Search size={15} />}
-          {previewPending ? 'Checking...' : 'Preview Target User'}
+          {previewing ? <Loader2 size={15} className='animate-spin' /> : <Search size={15} />}
+          {previewing ? 'Checking...' : 'Preview Recipient'}
         </button>
-        {previewState.error ? <Message tone='rose'>{previewState.error}</Message> : null}
-        {verifiedProfile ? <AdminCodexUserProfilePreview profile={verifiedProfile} /> : null}
-        <TextField
-          label='Target email'
-          name='targetEmail'
-          type='email'
-          autoComplete='email'
-          required
-        />
-        <TextField
-          label='New target unlock password'
-          name='targetAdminPassword'
-          type='password'
-          autoComplete='new-password'
-          minLength={ADMIN_PASSWORD_MIN_LENGTH}
-          maxLength={ADMIN_PASSWORD_MAX_LENGTH}
-          required
-        />
-
-        {startState.error ? <Message tone='rose'>{startState.error}</Message> : null}
-
+        {preview.error ? (
+          <p role='alert' className='text-sm text-rose-200'>
+            {preview.error}
+          </p>
+        ) : null}
+        {preview.profile?.id === userId.trim() ? (
+          <AdminCodexUserProfilePreview profile={preview.profile} />
+        ) : null}
+        <label className='grid gap-1 text-xs font-medium text-slate-300'>
+          Invitation email
+          <input
+            name='targetEmail'
+            type='email'
+            autoComplete='email'
+            required
+            maxLength={254}
+            className={adminFieldClass}
+          />
+        </label>
+        {state.error ? (
+          <p role='alert' className='text-sm text-rose-200'>
+            {state.error}
+          </p>
+        ) : null}
         <button
           type='submit'
-          disabled={startPending}
-          className='inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-60'
+          disabled={pending || cancelling}
+          className='inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-sm text-cyan-100 disabled:opacity-60'
         >
-          {startPending ? (
-            <Loader2 size={16} className='animate-spin' />
-          ) : (
-            <UserRoundCog size={16} />
-          )}
-          {startPending ? 'Sending...' : 'Send Transfer Code'}
+          {pending ? <Loader2 size={16} className='animate-spin' /> : <Mail size={16} />}
+          {pending ? 'Sending...' : 'Send Ownership Invitation'}
         </button>
       </form>
-
-      {startState.challenge ? (
-        <form action={completeAction} className={cn(adminInsetSurfaceClass, 'space-y-3 p-3')}>
-          <input type='hidden' name='challengeId' value={startState.challenge.challengeId} />
-          <div className='flex items-start gap-2 text-xs leading-5 text-slate-300'>
-            <ShieldCheck size={16} className='mt-0.5 shrink-0 text-cyan-200' />
-            <span>
-              {startState.challenge.targetCodexUserId} · {startState.challenge.targetEmailHint}
-            </span>
-          </div>
-          <TextField
-            label='Transfer code'
-            name='otp'
-            inputMode='numeric'
-            autoComplete='one-time-code'
-            minLength={6}
-            maxLength={6}
-            required
-          />
-
-          {completeState.error ? <Message tone='rose'>{completeState.error}</Message> : null}
-
-          <button
-            type='submit'
-            disabled={completePending}
-            className='inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-rose-300 px-3 text-sm font-semibold text-slate-950 transition hover:bg-rose-200 disabled:cursor-not-allowed disabled:opacity-60'
-          >
-            {completePending ? (
-              <Loader2 size={16} className='animate-spin' />
-            ) : (
-              <KeyRound size={16} />
-            )}
-            {completePending ? 'Transferring...' : 'Transfer And Sign Out'}
-          </button>
-        </form>
+      {currentInvite ? (
+        <section
+          aria-label='Pending ownership invitation'
+          className='space-y-3 border-t border-white/10 pt-4 text-sm text-slate-300'
+        >
+          <p role='status'>
+            Invitation sent. Your admin access stays active until the recipient accepts.
+          </p>
+          <dl className='grid gap-2 text-xs'>
+            <div>
+              <dt className='text-slate-400'>Recipient</dt>
+              <dd className='break-all'>{currentInvite.targetCodexUserId}</dd>
+            </div>
+            <div>
+              <dt className='text-slate-400'>Email</dt>
+              <dd className='break-all'>{currentInvite.targetEmailHint}</dd>
+            </div>
+            <div>
+              <dt className='text-slate-400'>Expires</dt>
+              <dd>
+                <time dateTime={new Date(currentInvite.expiresAt).toISOString()}>
+                  {new Date(currentInvite.expiresAt).toLocaleString()}
+                </time>
+              </dd>
+            </div>
+          </dl>
+          <form action={cancel}>
+            <input type='hidden' name='challengeId' value={currentInvite.challengeId} />
+            <button
+              type='submit'
+              disabled={cancelling || pending}
+              className='inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-rose-300/30 px-3 text-sm text-rose-200 disabled:opacity-60'
+            >
+              {cancelling ? <Loader2 size={16} className='animate-spin' /> : <X size={16} />}
+              {cancelling ? 'Cancelling...' : 'Cancel Invitation'}
+            </button>
+          </form>
+          {cancelState.challengeId === currentInvite.challengeId && cancelState.error ? (
+            <p role='alert' className='text-sm text-rose-200'>
+              {cancelState.error}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+      {!currentInvite && cancelledId ? (
+        <p role='status' className='text-sm text-emerald-200'>
+          Invitation cancelled.
+        </p>
       ) : null}
     </div>
   );
-}
-
-function TextField({
-  label,
-  name,
-  type = 'text',
-  autoComplete,
-  inputMode,
-  value,
-  onChange,
-  minLength,
-  maxLength,
-  required,
-}: {
-  label: string;
-  name: string;
-  type?: string;
-  autoComplete?: string;
-  inputMode?: 'numeric';
-  value?: string;
-  onChange?: (value: string) => void;
-  minLength?: number;
-  maxLength?: number;
-  required?: boolean;
-}) {
-  return (
-    <label className='grid gap-1 text-xs font-medium text-slate-300'>
-      {label}
-      <input
-        name={name}
-        type={type}
-        autoComplete={autoComplete}
-        inputMode={inputMode}
-        value={value}
-        onChange={onChange ? (event) => onChange(event.target.value) : undefined}
-        minLength={minLength}
-        maxLength={maxLength}
-        required={required}
-        className={adminFieldClass}
-      />
-    </label>
-  );
-}
-
-function Message({ tone, children }: { tone: 'rose'; children: ReactNode }) {
-  const toneClass = {
-    rose: 'border-rose-300/20 bg-rose-400/10 text-rose-100',
-  }[tone];
-
-  return <p className={`rounded-lg border px-3 py-2 text-xs leading-5 ${toneClass}`}>{children}</p>;
 }

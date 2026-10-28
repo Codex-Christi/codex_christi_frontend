@@ -3,11 +3,8 @@ import 'server-only';
 import argon2 from 'argon2';
 import {
   getActiveAdminUserByCodexUserId,
-  getAdminUnlockRateLimit,
-  recordAdminUnlockAttempt,
   touchAdminUserUnlockedAt,
   writeAdminAuditLog,
-  type AdminUserAuthRecord,
 } from './admin-auth-ledger';
 import { buildAdminSessionCookie } from './admin-session-server';
 import { getServerSessionState } from '../session/server-session';
@@ -16,44 +13,8 @@ import { getAdminOpsLedgerPrisma } from '../prisma/adminOpsLedger/adminOpsLedger
 import { getAdminRequestAuditContext } from './admin-request-audit';
 import { getEncodedAdminSessionSecret } from '../session/session-config';
 import { parseNewAdminPassword } from '../formSchemas/admin-password';
-
-export class AdminCredentialError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-  ) {
-    super(message);
-  }
-}
-
-async function verifyPassword(
-  admin: AdminUserAuthRecord,
-  password: string,
-  purpose: 'unlock' | 'password_change',
-) {
-  const limit = await getAdminUnlockRateLimit(admin.codexUserId);
-  if (limit.locked)
-    throw new AdminCredentialError(
-      `Too many attempts. Try again in ${limit.retryAfterSeconds ?? 900} seconds.`,
-      429,
-    );
-  const matches = await argon2.verify(admin.passwordHash, password).catch(() => false);
-  if (!matches) {
-    await recordAdminUnlockAttempt({
-      adminUser: admin,
-      success: false,
-      failureReason: `${purpose}_invalid_password`,
-    });
-    await writeAdminAuditLog({
-      actor: admin,
-      action: `admin.${purpose}.failed`,
-      targetType: 'adminUser',
-      targetId: admin.id,
-      outcome: 'failure',
-    });
-    throw new AdminCredentialError('Current admin unlock password is incorrect.', 400);
-  }
-}
+import { AdminCredentialError } from './admin-credential-work';
+import { verifyAdminPassword } from './admin-password-check';
 
 export async function unlockAdmin(password: string) {
   getEncodedAdminSessionSecret();
@@ -62,7 +23,7 @@ export async function unlockAdmin(password: string) {
     throw new AdminCredentialError('Sign in to the website again before unlocking admin.', 401);
   const admin = await getActiveAdminUserByCodexUserId(primary.userID);
   if (!admin) throw new AdminCredentialError('This account does not have admin access.', 403);
-  await verifyPassword(admin, password, 'unlock');
+  await verifyAdminPassword(admin, password, 'unlock');
   const cookie = await buildAdminSessionCookie({
     userID: admin.codexUserId,
     role: admin.role,
@@ -96,7 +57,7 @@ export async function changeAdminUnlockPassword(input: {
   const admin = await getActiveAdminUserByCodexUserId(context.userID);
   if (!admin || admin.id !== context.adminUserId || admin.sessionVersion !== context.sessionVersion)
     throw new AdminCredentialError('Admin access changed. Unlock again.', 409);
-  await verifyPassword(admin, input.currentPassword, 'password_change');
+  await verifyAdminPassword(admin, input.currentPassword, 'password_change');
   const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
   const auditContext = await getAdminRequestAuditContext();
   const now = new Date();

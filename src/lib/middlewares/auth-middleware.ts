@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   ADMIN_LOGOUT_PATH,
   ADMIN_UNLOCK_PATH,
+  ADMIN_TRANSFER_ACCEPT_PATH,
   buildAdminUnlockPath,
   sanitizeAdminReturnPath,
 } from '@/lib/admin/admin-paths';
@@ -122,7 +123,11 @@ async function protect(req: NextRequest, admin: boolean) {
     return redirect(`${authFlowUrl(login, { next: returnPath })}&sessionExp=true`);
   }
   if (req.nextUrl.searchParams.has(SESSION_REFRESH_GUARD_PARAM)) return redirect(path);
-  if (admin && req.nextUrl.pathname !== ADMIN_UNLOCK_PATH) {
+  if (
+    admin &&
+    req.nextUrl.pathname !== ADMIN_UNLOCK_PATH &&
+    req.nextUrl.pathname !== ADMIN_TRANSFER_ACCEPT_PATH
+  ) {
     const unlocked = await getRequestAdminSessionState(req);
     if (!unlocked.isAuthenticated || unlocked.userID !== state.userID) {
       const response = redirect(buildAdminUnlockPath(returnPath));

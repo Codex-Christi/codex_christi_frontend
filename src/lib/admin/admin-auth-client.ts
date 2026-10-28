@@ -3,7 +3,7 @@
 type AdminAuthResult = { success: true } | { success: false; error: string };
 
 export async function postAdminAuth(
-  action: 'lock' | 'unlock' | 'password',
+  action: 'lock' | 'unlock' | 'password' | 'transfer/accept',
   input?: unknown,
 ): Promise<AdminAuthResult> {
   try {
@@ -23,13 +23,15 @@ export async function postAdminAuth(
         return { success: false, error: result.error };
     }
   } catch {
-    // An uncertain password-change response must never trigger an automatic resubmission.
+    // An uncertain credential change must never trigger an automatic resubmission.
   }
   return {
     success: false,
     error:
-      action === 'password'
-        ? 'The change could not be confirmed. Try unlocking with your new password before submitting again.'
-        : 'The request could not be confirmed. Please try again.',
+      action === 'transfer/accept'
+        ? 'Acceptance could not be confirmed. Check admin access before submitting again; this request will not retry automatically.'
+        : action === 'password'
+          ? 'The change could not be confirmed. Try unlocking with your new password before submitting again.'
+          : 'The request could not be confirmed. Please try again.',
   };
 }
