@@ -12,7 +12,6 @@ import {
 } from '@/actions/shop/paypal/processAndUploadCompletedTx/savePaymentReceiptToCloud';
 import {
   FulfillmentPayloadValidationError,
-  FulfillmentProviderRejectedError,
   sendMerchizeFulfillmentOrder,
 } from '@/lib/paypal/txLedger/sendMerchizeFulfillmentOrder';
 import { registerAcceptedMerchizeFulfillmentProcess } from '@/lib/merchizeFulfillmentOps/registerAcceptedMerchizeFulfillmentProcess';
@@ -58,6 +57,8 @@ import {
   startProcessingLease,
 } from './processingLease';
 import type { CartVariant } from '@/stores/shop_stores/cartStore';
+import { DjangoOrderError, djangoOrderFailure } from './djangoOrderContract';
+import { getDjangoHandoffReview, runDjangoHandoff } from './djangoHandoff';
 
 const POST_PROCESSING_LEASE_MS = 5 * 60_000;
 
@@ -160,7 +161,7 @@ function toPaidFulfillmentProcessingError(error: unknown, stage: PaidFulfillment
   const detail = PROCESSING_STAGE_DETAILS[stage];
   const providerMessage = error instanceof Error ? error.message : String(error);
   return new PaidFulfillmentProcessingError({
-    code: detail.code,
+    code: error instanceof DjangoOrderError ? error.failure.code : detail.code,
     message: `${detail.label}: ${providerMessage}`,
     stage,
   });
@@ -171,7 +172,11 @@ function buildPaymentReceiptPayload(args: PaymentReceiptProps) {
 }
 
 function buildPaymentSavePayload(args: PaymentSavingActionProps) {
-  return encryptForPostProcessingServerAction(JSON.stringify(args), 'payment-save');
+  try {
+    return encryptForPostProcessingServerAction(JSON.stringify(args), 'payment-save');
+  } catch (error) {
+    throw new DjangoOrderError(djangoOrderFailure(error, 'not_sent'));
+  }
 }
 
 function toLedgerJson(value: unknown) {
@@ -575,6 +580,14 @@ export async function runPaidFulfillmentProcessing(
       });
     }
     const canonicalOrderSnapshot = canonicalPayment.snapshot;
+    const djangoReview = getDjangoHandoffReview(row);
+    if (djangoReview) {
+      activeStage =
+        djangoReview.operation === 'payment_save'
+          ? 'django_payment_save'
+          : 'django_fulfillment_handoff';
+      throw new DjangoOrderError({ ...djangoReview, outcome: 'uncertain' });
+    }
 
     if (options.executionScope === 'merchize_fulfillment_only') {
       const acceptedDjangoHandoff = isAcceptedDjangoFulfillmentProcessResponse(
@@ -657,47 +670,58 @@ export async function runPaidFulfillmentProcessing(
     if (!row.djangoPaymentSaveCustomId) {
       activeStage = 'django_payment_save';
       await processingLease.assertOwned();
-      const paymentSave = await savePaymentDataToBackend(
-        buildPaymentSavePayload({
-          authData,
-          capturedOrder: finalCapturedOrder,
-          finalCapturedOrder,
-          capturedOrderPaypalID: finalCapturedOrder.id ?? row.paypalOrderId ?? row.orderToken,
-          customer,
-          delivery_address: row.shippingSnapshot as PaymentSavingActionProps['delivery_address'],
-          userId: row.userId,
-          ORD_string,
-          country_iso2: row.countryIso2 ?? 'US',
-          pdfReceiptLink: row.receiptLink ?? '',
-          receiptFileName: row.receiptFile ?? '',
-          canonicalOrderSnapshot,
-        }),
-      );
-      await processingLease.assertOwned();
-
-      if (!paymentSave.ok) {
-        throw new Error(paymentSave.error?.message ?? 'Payment save failed');
-      }
-
-      const djangoPaymentSaveCustomId = paymentSave.data?.custom_id ?? null;
-      if (!djangoPaymentSaveCustomId)
-        throw new Error('Missing verified Django payment save custom_id.');
-
-      await updateLockedRow(orderToken, lockId, {
-        status: PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
-        djangoPaymentSaveCustomId,
-        djangoPaymentSaveResponsePayload: JSON.parse(JSON.stringify(paymentSave)),
-        lastErrorCode: null,
-        lastErrorMessage: null,
-      } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
-
-      row.djangoPaymentSaveCustomId = djangoPaymentSaveCustomId;
+      await runDjangoHandoff({
+        operation: 'payment_save',
+        previousEvidence: row.djangoPaymentSaveResponsePayload,
+        lastErrorCode: row.lastErrorCode,
+        persistEvidence: async (evidence) => {
+          await updateLockedRow(orderToken, lockId, {
+            djangoPaymentSaveResponsePayload: toLedgerJson(evidence),
+          });
+          row.djangoPaymentSaveResponsePayload = toLedgerJson(evidence);
+        },
+        send: async () => {
+          const paymentSave = await savePaymentDataToBackend(
+            buildPaymentSavePayload({
+              authData,
+              capturedOrder: finalCapturedOrder,
+              finalCapturedOrder,
+              capturedOrderPaypalID: finalCapturedOrder.id ?? row.paypalOrderId ?? row.orderToken,
+              customer,
+              delivery_address:
+                row.shippingSnapshot as PaymentSavingActionProps['delivery_address'],
+              userId: row.userId,
+              djangoOrderIntentUuid: row.djangoOrderIntentUuid,
+              ORD_string,
+              country_iso2: row.countryIso2 ?? 'US',
+              pdfReceiptLink: row.receiptLink ?? '',
+              receiptFileName: row.receiptFile ?? '',
+              canonicalOrderSnapshot,
+            }),
+          );
+          if (!paymentSave.ok) throw new DjangoOrderError(paymentSave.error);
+          return paymentSave;
+        },
+        response: (paymentSave) => paymentSave,
+        commit: async (paymentSave, evidence) => {
+          const djangoPaymentSaveCustomId = paymentSave.data.custom_id;
+          await updateLockedRow(orderToken, lockId, {
+            status: PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
+            djangoPaymentSaveCustomId,
+            djangoPaymentSaveResponsePayload: toLedgerJson(evidence),
+            lastErrorCode: null,
+            lastErrorMessage: null,
+          });
+          row.djangoPaymentSaveCustomId = djangoPaymentSaveCustomId;
+          row.djangoPaymentSaveResponsePayload = toLedgerJson(evidence);
+        },
+      });
     }
-
     if (!row.djangoPaymentSaveCustomId) {
       activeStage = 'django_payment_save';
       throw new Error('Missing Django payment save custom_id before fulfillment push');
     }
+    const djangoPaymentSaveCustomId = row.djangoPaymentSaveCustomId;
 
     const fulfillmentAddress =
       (row.fulfillmentAddressOverride as PaymentSavingActionProps['delivery_address'] | null) ??
@@ -720,26 +744,51 @@ export async function runPaidFulfillmentProcessing(
     if (!merchizeExternalOrderNumber) {
       activeStage = 'django_fulfillment_handoff';
       await processingLease.assertOwned();
-      const fulfillmentSend = await sendMerchizeFulfillmentOrder({
-        cartSnapshot: row.cartSnapshot as CartVariant[],
-        canonicalOrderSnapshot,
-        djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
-        identifier: CODEX_CHRISTI_FULFILLMENT_IDENTIFIER,
-        currency: canonicalOrderSnapshot?.currency ?? row.initialCurrency ?? 'USD',
-        customerName: row.customerName,
-        countryIso2: row.countryIso2,
-        fulfillmentAddress,
+      const fulfillmentSend = await runDjangoHandoff({
+        operation: 'fulfillment_handoff',
+        previousEvidence: row.merchizeFulfillmentResponsePayload,
+        lastErrorCode: row.lastErrorCode,
+        persistEvidence: async (evidence) => {
+          await updateLockedRow(orderToken, lockId, {
+            merchizeFulfillmentResponsePayload: toLedgerJson(evidence),
+          });
+          row.merchizeFulfillmentResponsePayload = toLedgerJson(evidence);
+        },
+        send: () =>
+          sendMerchizeFulfillmentOrder({
+            cartSnapshot: row.cartSnapshot as CartVariant[],
+            canonicalOrderSnapshot,
+            djangoPaymentSaveCustomId,
+            djangoOrderIntentUuid: row.djangoOrderIntentUuid,
+            djangoOrderIntentOrderId: row.djangoOrderIntentOrderId,
+            identifier: CODEX_CHRISTI_FULFILLMENT_IDENTIFIER,
+            currency: canonicalOrderSnapshot?.currency ?? row.initialCurrency ?? 'USD',
+            customerName: row.customerName,
+            countryIso2: row.countryIso2,
+            fulfillmentAddress,
+          }),
+        response: ({ ok, status, success, message, data }) => ({
+          ok,
+          status,
+          success,
+          message,
+          data,
+        }),
+        commit: async (result, evidence) => {
+          await updateLockedRow(orderToken, lockId, {
+            merchizeFulfillmentRequestPayload: toLedgerJson(result.requestPayload),
+            merchizeFulfillmentResponsePayload: toLedgerJson(evidence),
+            merchizeFulfillmentProcessingId: result.data.id,
+            merchizeProviderOrderId: result.merchizeOrderIdentifiers.merchizeProviderOrderId,
+            merchizeProviderOrderCode: result.merchizeOrderIdentifiers.merchizeProviderOrderCode,
+            lastErrorCode: null,
+            lastErrorMessage: null,
+          });
+          row.merchizeFulfillmentResponsePayload = toLedgerJson(evidence);
+        },
       });
-      await processingLease.assertOwned();
-
       fulfillmentRequestPayload = fulfillmentSend.requestPayload;
-      fulfillmentResponsePayload = {
-        ok: fulfillmentSend.ok,
-        status: fulfillmentSend.status,
-        success: fulfillmentSend.success,
-        message: fulfillmentSend.message,
-        data: fulfillmentSend.data,
-      };
+      fulfillmentResponsePayload = row.merchizeFulfillmentResponsePayload;
       merchizeFulfillmentProcessingId = fulfillmentSend.data?.id ?? null;
       merchizeProviderOrderId = fulfillmentSend.merchizeOrderIdentifiers.merchizeProviderOrderId;
       merchizeProviderOrderCode =
@@ -747,16 +796,6 @@ export async function runPaidFulfillmentProcessing(
       merchizeProviderStatus = fulfillmentSend.merchizeOrderIdentifiers.merchizeProviderStatus;
       merchizeExternalOrderNumber =
         fulfillmentSend.merchizeOrderIdentifiers.merchizeExternalOrderNumber;
-
-      await updateLockedRow(orderToken, lockId, {
-        merchizeFulfillmentRequestPayload: toLedgerJson(fulfillmentRequestPayload),
-        merchizeFulfillmentResponsePayload: toLedgerJson(fulfillmentResponsePayload),
-        merchizeFulfillmentProcessingId,
-        merchizeProviderOrderId,
-        merchizeProviderOrderCode,
-        lastErrorCode: null,
-        lastErrorMessage: null,
-      } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
     }
 
     if (merchizeExternalOrderNumber) {
@@ -1109,55 +1148,18 @@ export async function runPaidFulfillmentProcessing(
       return;
     }
 
-    if (error instanceof FulfillmentProviderRejectedError) {
-      await paypalTxLedger.$transaction(async (tx) => {
-        const updated = await tx.paypalIntent.updateMany({
-          where: {
-            orderToken,
-            postProcessingLockId: lockId,
-            postProcessingLockExpiresAt: { gt: new Date() },
-          },
-          data: {
-            status: PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
-            lastErrorCode: 'FULFILLMENT_PROVIDER_REJECTED',
-            lastErrorMessage: message,
-            merchizeFulfillmentRequestPayload: toLedgerJson(error.requestPayload),
-            merchizeFulfillmentResponsePayload: toLedgerJson(error.responsePayload),
-            merchizeFulfillmentProcessingId: error.responsePayload.data?.id ?? null,
-            merchizeProviderOrderId: error.responsePayload.data?.provider_order_id ?? null,
-            merchizeProviderOrderCode: error.responsePayload.data?.provider_order_code ?? null,
-            postProcessingLockId: null,
-            postProcessingLockedAt: null,
-            postProcessingLockExpiresAt: null,
-          } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
-        });
-
-        requireProcessingLease(updated);
-        await enqueueAdminRecoveryNotification({
-          db: tx,
-          orderToken,
-          paypalOrderId: row.paypalOrderId,
-          customerName: row.customerName,
-          customerEmail: row.customerEmail,
-          ledgerStatus: PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED,
-          errorCode: 'FULFILLMENT_PROVIDER_REJECTED',
-          errorMessage: message,
-          issueSummary: [message],
-          receiptLink: row.receiptLink,
-        });
+    if (error instanceof DjangoOrderError && error.failure.outcome === 'uncertain') {
+      await markFulfillmentAttentionRequiredAndNotify({
+        orderToken,
+        lockId,
+        row,
+        errorCode: error.failure.code,
+        errorMessage: message,
+        issueSummary: [
+          message,
+          'Do not replay Django POSTs or recapture payment. Reconcile the existing Django record first.',
+        ],
       });
-      await refreshPaidOrderRecoveryProjectionSafely(orderToken);
-
-      await sendPendingAdminRecoveryNotificationsForOrder(orderToken).catch((notificationError) => {
-        console.error('[AdminNotificationOutbox] failed to send fulfillment failed alert', {
-          orderToken,
-          error:
-            notificationError instanceof Error
-              ? notificationError.message
-              : String(notificationError),
-        });
-      });
-
       return;
     }
 

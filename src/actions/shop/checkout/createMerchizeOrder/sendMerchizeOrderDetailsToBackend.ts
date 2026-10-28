@@ -1,12 +1,9 @@
 'use server';
 
-import { FetcherError, FetcherOptions, universalFetcher } from '@/lib/utils/SWRfetcherAdvanced';
-import { generateSignatureHeaders } from '@/lib/hooks/shopHooks/checkout/helpers/generateSignatureHeaders';
-import { returnReducedBackendError } from '@/lib/hooks/shopHooks/checkout/helpers/returnReducedBackendError';
 import { decryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/serverPostProcessingCrypto';
-import { getServerDjangoApiBaseUrl } from '@/lib/django/getServerDjangoApiBaseUrl';
-
-const baseURL = getServerDjangoApiBaseUrl();
+import { parseDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
+import { postDjangoOrder } from '@/lib/paypal/txLedger/djangoOrderRequest';
+import { djangoOrderFailure } from '@/lib/paypal/txLedger/djangoOrderContract';
 
 interface OrderProcessingItem {
   product_id: string;
@@ -34,36 +31,12 @@ interface MerchizeFulfillmentProcessPayload {
 
 interface MerchizeFulfillmentProcessProps {
   djangoPaymentSaveCustomId: string;
+  djangoOrderIntentUuid?: string | null;
+  djangoOrderIntentOrderId?: string | null;
   payload: MerchizeFulfillmentProcessPayload;
 }
 
-export interface OrderProcessingAPIResponse {
-  status: number;
-  success: boolean;
-  message: string;
-  data: {
-    id: string;
-    order_payment_custom_id: string;
-    order_intent_id: string;
-    order_intent_order_id: string;
-    provider_order_id: string | null;
-    provider_order_code: string | null;
-    processing_status:
-      | 'pending'
-      | 'processing'
-      | 'shipped'
-      | 'delivered'
-      | 'cancelled'
-      | 'completed'
-      | 'failed';
-    request_data: Record<string, unknown>;
-    response_data: Record<string, unknown> | null;
-    error_message: string | null;
-    retry_count: number;
-    date_created: string;
-    date_updated: string;
-  };
-}
+export type OrderProcessingAPIResponse = ReturnType<typeof parseDjangoFulfillmentProcessResponse>;
 
 const ACCEPTED_INFORMATIONAL_MESSAGES = new Set(['order created but details not available']);
 const IDEMPOTENT_PROVIDER_MESSAGES = new Set(['order is duplicated']);
@@ -102,7 +75,7 @@ function isDjangoFulfillmentBusinessSuccess(response: OrderProcessingAPIResponse
   }
 
   if (response.success !== true) return false;
-  if (response.data?.processing_status === 'failed') return false;
+  if (['failed', 'cancelled'].includes(response.data.processing_status)) return false;
 
   return (
     !response.data?.error_message || isAcceptedInformationalMessage(response.data.error_message)
@@ -119,25 +92,29 @@ function getDjangoFulfillmentFailureMessage(response: OrderProcessingAPIResponse
 }
 
 export const sendMerchizeOrderDetailsToBackend = async (encProps: string) => {
-  const { djangoPaymentSaveCustomId, payload } = JSON.parse(
-    decryptForPostProcessingServerAction(encProps, 'fulfillment'),
-  ) as MerchizeFulfillmentProcessProps;
-
-  if (!djangoPaymentSaveCustomId) {
-    throw new Error('Missing Django payment save custom_id before fulfillment processing');
-  }
-
+  let dispatched = false;
   try {
+    const { djangoPaymentSaveCustomId, djangoOrderIntentUuid, djangoOrderIntentOrderId, payload } =
+      JSON.parse(
+        decryptForPostProcessingServerAction(encProps, 'fulfillment'),
+      ) as MerchizeFulfillmentProcessProps;
+
+    if (!djangoPaymentSaveCustomId) {
+      throw new Error('Missing Django payment save custom_id before fulfillment processing');
+    }
+
     // Django names this route segment `{custom_id}`. Locally it is always the
     // payment-save custom ID returned by /orders/order-payment.
-    const response = await universalFetcher<OrderProcessingAPIResponse, typeof payload>(
-      `${baseURL}/orders/process/${encodeURIComponent(djangoPaymentSaveCustomId)}`,
+    dispatched = true;
+    const response = parseDjangoFulfillmentProcessResponse(
+      await postDjangoOrder(
+        `/orders/process/${encodeURIComponent(djangoPaymentSaveCustomId)}`,
+        payload,
+      ),
       {
-        arg: payload,
-        fetcherOptions: {
-          method: 'POST',
-          headers: { ...(await generateSignatureHeaders()) },
-        } satisfies FetcherOptions,
+        customId: djangoPaymentSaveCustomId,
+        intentUuid: djangoOrderIntentUuid,
+        orderId: djangoOrderIntentOrderId,
       },
     );
 
@@ -145,23 +122,19 @@ export const sendMerchizeOrderDetailsToBackend = async (encProps: string) => {
       return {
         ok: false as const,
         error: {
+          code: 'DJANGO_FULFILLMENT_REJECTED',
+          outcome: 'uncertain' as const,
           message: getDjangoFulfillmentFailureMessage(response),
-          status: response.status,
-          businessFailure: true as const,
           responsePayload: response,
         },
       };
     }
 
-    return { ok: true as const, ...response };
-  } catch (err: FetcherError | unknown) {
-    if (err instanceof FetcherError) {
-      return {
-        ok: false as const,
-        error: returnReducedBackendError(err),
-      };
-    }
-
-    return { ok: false as const, error: { message: 'Unknown error' } };
+    return { ...response, ok: true as const };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: djangoOrderFailure(error, dispatched ? 'uncertain' : 'not_sent'),
+    };
   }
 };

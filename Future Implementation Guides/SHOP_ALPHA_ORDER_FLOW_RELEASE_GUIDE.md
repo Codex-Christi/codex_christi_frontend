@@ -1625,15 +1625,55 @@ or temporary receipt/database fixtures are shipped with this feature.
 ### Implemented Payment-Save Validation
 
 `paymentSaveResponse.ts` checks business success, documented success status, payment UUID, nonempty
-custom ID, and `recipient_email` before returning a successful result. Recipient, PayPal, and intent
-references are checked against the request when available. Unknown response fields are retained
+custom ID, and `recipient_email` before returning a successful result. Recipient, account UUID,
+intent UUID/reference, authorization, and PayPal references are checked when echoed. Supported
+currency-bearing amount echoes are compared as decimal strings; other documented string formats
+are not treated as capture evidence. Nullable/omitted echoes remain compatible. Unknown response fields are retained
 server-side; legacy nested request keys such as `orderReceipient` are unchanged. The runner cannot
 write `payment_saved` with a missing verified custom ID. Django's custom ID is not assumed to equal
 the local token and is encoded as one path segment when passed to fulfillment processing.
 
 Malformed JSON, a business-failure payload inside an HTTP success, missing identifiers, and
 mismatched references fail closed. Tests exercise the real action with stubbed API responses;
-no live payment POST or supplier order is created. A 409 is not replayed or treated as success.
+no live payment POST or supplier order is created. A 409 is not treated as success.
+
+### Django Handoff Review Holds
+
+Both payment save and initial fulfillment processing now reserve a durable `_nextDjangoAttempt`
+marker in their existing ledger response JSON before dispatch. This is Next.js-only metadata,
+not an upstream field, new table, or migration. The latest attempt records its ID, operation,
+start/finish time, outcome, failure code, and available HTTP status. Successful response evidence
+and its checkpoint identifier are committed together under the existing processing lease.
+
+- A crash, lost reply, failed checkpoint, 409, server failure, malformed response, or conflicting
+  identity requires review. A fresh worker cannot replay that POST through capture, webhook,
+  scanner, reconciliation, admin resume, or fulfillment-only retry. Capture is never repeated.
+- Preparation failures are `not_sent`. Explicit JSON validation/auth/rate-limit rejections are
+  distinguished from unknown outcomes; correcting them may permit another attempt. A business
+  failure inside HTTP success is not proof that the upstream operation had no side effects.
+- Fulfillment replies require a valid processing UUID, payment custom ID, supported status, and
+  matching echoed intent references before becoming checkpoints. Existing accepted informational
+  `201` replies remain supported. An uncertain success-shaped reply cannot become provider-sync
+  evidence just because it contains `success: true`.
+- Recovery projections disable POST retry controls while an outcome needs review. The runner
+  independently enforces the same hold; stale UI or a direct admin action cannot bypass it.
+  Known legacy Django-stage errors without a durable checkpoint are also held conservatively.
+- Transport sends one POST with no-store caching, no redirect following, a 30-second timeout,
+  and a 256 KiB response limit. It adds no retries, cron, `after()`, or storefront cache changes.
+
+Review means independently matching the existing Django record and its identifiers before any
+audited ledger repair. There is no "ignore hold" button and no automatic 409-to-success shortcut.
+Without a Django lookup/idempotency contract, Next.js cannot automatically prove whether an
+uncertain write committed. Historical attempts that never left evidence cannot be reconstructed.
+Do not clear markers, invent custom IDs, replay processing, or recapture to make the UI green.
+No automatic reconciliation or new repair endpoint is provided. Deploy the guarded runner to all
+processing workers together; older runners do not enforce these markers and must not run alongside
+the new version or be restored while unresolved attempts remain.
+
+`djangoHandoff*.test.ts`, `djangoOrderRequest.test.ts`, and `paymentSaveResponse.test.ts` cover
+lost replies/checkpoints, restart fencing, mismatched identities, transport limits, and corrected
+definite rejections using in-memory storage and stubbed network responses. The real runner and
+recovery projection are exercised without live payment, supplier, email, or database writes.
 
 ### Contract Gaps To Resolve Before Extending Checkout
 

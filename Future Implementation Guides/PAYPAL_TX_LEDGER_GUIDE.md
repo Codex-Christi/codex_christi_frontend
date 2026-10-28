@@ -2869,26 +2869,26 @@ At this point:
 
 # 27) Package Scripts (no extra Prisma config file)
 
-Add scripts that explicitly target the ledger schema file.
+Use the existing Prisma 7 scripts, which explicitly select the schema and PayPal database branch.
+The CLI and client are pinned to version `7.10.1` in `package.json`.
 
 ```json
 {
   "scripts": {
-    "prisma:merchize:generate": "prisma generate --config prisma.config.ts",
-    "prisma:paypal:validate": "prisma validate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
-    "prisma:paypal:format": "prisma format --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
-    "prisma:paypal:generate": "prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
-    "prisma:paypal:migrate:dev": "prisma migrate dev --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
-    "prisma:paypal:migrate:deploy": "prisma migrate deploy --schema prisma/shop/paypal/paypalTXLedger.schema.prisma"
+    "merchize-offline-catalog:generate": "prisma generate --schema prisma/shop/merchize/priceCatalog.prisma",
+    "prisma:paypalTxLedger:generate:dev": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
+    "prisma:paypalTxLedger:generate:prod": "PAYPAL_TX_LEDGER_NEON_BRANCH=prod prisma generate --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
+    "prisma:paypalTxLedger:migrate:dev": "PAYPAL_TX_LEDGER_NEON_BRANCH=dev prisma migrate dev --schema prisma/shop/paypal/paypalTXLedger.schema.prisma",
+    "prisma:paypalTxLedger:migrate:deploy:prod": "PAYPAL_TX_LEDGER_NEON_BRANCH=prod prisma migrate deploy --schema prisma/shop/paypal/paypalTXLedger.schema.prisma"
   }
 }
 ```
 
 Why this is safe:
 
-- Merchize flow remains config-driven.
-- PayPal ledger flow remains schema-path-driven.
-- No cross-target confusion.
+- Both flows use the shared `prisma.config.ts`; its schema selector requires `--schema`.
+- The catalog targets SQLite, and PayPal scripts explicitly select the Neon dev or production branch.
+- Keep production migrations separate from local validation and client generation.
 
 ---
 

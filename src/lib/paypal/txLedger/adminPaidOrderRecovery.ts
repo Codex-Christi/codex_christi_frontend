@@ -27,6 +27,7 @@ import { safeLogErrorMessage } from '@/lib/merchizeFulfillmentOps/redaction';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import { getMerchizeFulfillmentRetryEligibility } from '@/lib/paypal/txLedger/fulfillmentRetryPolicy';
 import { resolvePaidOrderRecoveryIssue } from '@/lib/paypal/txLedger/recoveryIssuePrecedence';
+import { getDjangoHandoffReview } from './djangoHandoff';
 import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/lib/merchizeFulfillmentOps/merchizeMapper';
 import {
   parseCanonicalOrderSnapshotFromLedger,
@@ -152,12 +153,7 @@ function getCaptureAmount(capturePayload: unknown, fallbackCurrency?: string | n
   return '—';
 }
 
-function getRecoveryAmount(
-  row: {
-    capturePayload: unknown;
-    initialCurrency: string | null;
-  },
-) {
+function getRecoveryAmount(row: { capturePayload: unknown; initialCurrency: string | null }) {
   return getCaptureAmount(row.capturePayload, row.initialCurrency);
 }
 
@@ -987,18 +983,22 @@ function mapWebhookEvent(event: {
 }
 
 function getScannerState(
-  row: CanonicalOrderSnapshotLedgerEnvelope & {
-    status: string;
-    authorizePayload: unknown;
-    capturePayload: unknown;
-    processingCompletedAt: Date | null;
-    postProcessingLockExpiresAt: Date | null;
-    updatedAt: Date;
-  },
+  row: CanonicalOrderSnapshotLedgerEnvelope &
+    Parameters<typeof getDjangoHandoffReview>[0] & {
+      status: string;
+      authorizePayload: unknown;
+      capturePayload: unknown;
+      processingCompletedAt: Date | null;
+      postProcessingLockExpiresAt: Date | null;
+      updatedAt: Date;
+    },
 ) {
   if (row.processingCompletedAt) {
     return { eligible: false, reason: 'Processing is already completed.' };
   }
+
+  const djangoReview = getDjangoHandoffReview(row);
+  if (djangoReview) return { eligible: false, reason: djangoReview.message };
 
   if (!SCANNER_RECOVERABLE_STATUSES.has(row.status)) {
     return { eligible: false, reason: `Status ${row.status} is not automatic-scanner eligible.` };
@@ -1058,6 +1058,7 @@ function buildDetail(
     djangoOrderIntentUuid: string | null;
     djangoOrderIntentOrderId: string | null;
     djangoPaymentSaveCustomId: string | null;
+    djangoPaymentSaveResponsePayload: unknown;
     merchizeFulfillmentResponsePayload: unknown;
     merchizeFulfillmentProcessingId: string | null;
     merchizeProviderOrderId: string | null;
@@ -1103,6 +1104,7 @@ function buildDetail(
     row.authorizePayload,
     row.capturePayload,
   );
+  const djangoReview = getDjangoHandoffReview(row);
   const requiresManualRelease =
     canonicalPaymentChain.ok &&
     row.status === PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED &&
@@ -1239,7 +1241,7 @@ function buildDetail(
     webhookEvents: row.webhookEvents,
     scannerState: getScannerState(row),
     retryMode:
-      row.processingCompletedAt || !canonicalPaymentChain.ok
+      row.processingCompletedAt || !canonicalPaymentChain.ok || djangoReview
         ? 'none'
         : fulfillmentRetryEligibility.mode,
     merchizeFulfillmentOps: row.merchizeFulfillmentOps,
@@ -1263,7 +1265,7 @@ function buildDetail(
       needsProviderDetailSync: providerDetailSyncNeeded,
       requiresManualRelease,
       retryMode:
-        row.processingCompletedAt || !canonicalPaymentChain.ok
+        row.processingCompletedAt || !canonicalPaymentChain.ok || djangoReview
           ? 'none'
           : fulfillmentRetryEligibility.mode,
       fulfillmentRetryEligibility,

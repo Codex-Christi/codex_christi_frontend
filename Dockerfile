@@ -86,7 +86,7 @@ FROM node:lts-bookworm-slim AS runtime
 WORKDIR /app
 ARG APP_REVISION=unknown
 
-# Prisma query engine needs OpenSSL at runtime
+# Retain OpenSSL and trusted CA certificates for runtime TLS connections.
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*

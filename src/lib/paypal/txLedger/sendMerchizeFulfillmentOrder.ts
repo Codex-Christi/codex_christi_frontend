@@ -11,11 +11,14 @@ import { normalizeCountryToIso2 } from '@/lib/utils/shop/checkout/normalizeCount
 import type { CanonicalOrderSnapshot } from '@/lib/paypal/orderSnapshot/types';
 import { parseCanonicalOrderSnapshot } from '@/lib/paypal/orderSnapshot/canonicalize';
 import { getCanonicalFulfillmentItems } from '@/lib/paypal/orderSnapshot/consumerData';
+import { DjangoOrderError, djangoOrderFailure } from './djangoOrderContract';
 
 export type MerchizeFulfillmentOrderArgs = {
   cartSnapshot: CartVariant[];
   canonicalOrderSnapshot?: CanonicalOrderSnapshot | null;
   djangoPaymentSaveCustomId: string;
+  djangoOrderIntentUuid?: string | null;
+  djangoOrderIntentOrderId?: string | null;
   identifier: string;
   currency: string;
   customerName: string;
@@ -50,6 +53,8 @@ type MerchizeFulfillmentProcessPayload = {
 
 type MerchizeFulfillmentProcessProps = {
   djangoPaymentSaveCustomId: string;
+  djangoOrderIntentUuid?: string | null;
+  djangoOrderIntentOrderId?: string | null;
   payload: MerchizeFulfillmentProcessPayload;
 };
 
@@ -58,7 +63,7 @@ export type FulfillmentValidationIssue = {
   message: string;
 };
 
-export class FulfillmentPayloadValidationError extends Error {
+export class FulfillmentPayloadValidationError extends DjangoOrderError {
   issues: FulfillmentValidationIssue[];
   requestPayload: MerchizeFulfillmentProcessPayload;
 
@@ -66,43 +71,15 @@ export class FulfillmentPayloadValidationError extends Error {
     issues: FulfillmentValidationIssue[],
     requestPayload: MerchizeFulfillmentProcessPayload,
   ) {
-    super(issues.map((issue) => `${issue.field}: ${issue.message}`).join('; '));
+    super({
+      code: 'FULFILLMENT_PAYLOAD_INVALID',
+      message: issues.map((issue) => `${issue.field}: ${issue.message}`).join('; '),
+      outcome: 'not_sent',
+    });
     this.name = 'FulfillmentPayloadValidationError';
     this.issues = issues;
     this.requestPayload = requestPayload;
   }
-}
-
-export class FulfillmentProviderRejectedError extends Error {
-  requestPayload: MerchizeFulfillmentProcessPayload;
-  responsePayload: OrderProcessingAPIResponse;
-
-  constructor(
-    message: string,
-    args: {
-      requestPayload: MerchizeFulfillmentProcessPayload;
-      responsePayload: OrderProcessingAPIResponse;
-    },
-  ) {
-    super(message);
-    this.name = 'FulfillmentProviderRejectedError';
-    this.requestPayload = args.requestPayload;
-    this.responsePayload = args.responsePayload;
-  }
-}
-
-function isFulfillmentBusinessFailure(error: unknown): error is {
-  businessFailure: true;
-  message: string;
-  responsePayload: OrderProcessingAPIResponse;
-} {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'businessFailure' in error &&
-    (error as { businessFailure?: unknown }).businessFailure === true &&
-    'responsePayload' in error
-  );
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -240,35 +217,35 @@ function buildFulfillmentPayload(
 }
 
 export async function sendMerchizeFulfillmentOrder(args: MerchizeFulfillmentOrderArgs) {
-  // Canonical orders never consult the browser cart. Legacy rows retain their original mapping.
-  const items = args.canonicalOrderSnapshot
-    ? getCanonicalFulfillmentItems(parseCanonicalOrderSnapshot(args.canonicalOrderSnapshot))
-    : mapCartToProcessingItems(args.cartSnapshot, args.currency);
-  const requestPayload = buildFulfillmentPayload(args, items);
-  const validationIssues = getFulfillmentPayloadIssues(requestPayload);
+  let requestPayload: MerchizeFulfillmentProcessPayload;
+  let encodedProps: string;
+  try {
+    // Canonical orders never consult the browser cart. Legacy rows retain their original mapping.
+    const items = args.canonicalOrderSnapshot
+      ? getCanonicalFulfillmentItems(parseCanonicalOrderSnapshot(args.canonicalOrderSnapshot))
+      : mapCartToProcessingItems(args.cartSnapshot, args.currency);
+    requestPayload = buildFulfillmentPayload(args, items);
+    const validationIssues = getFulfillmentPayloadIssues(requestPayload);
 
-  if (validationIssues.length > 0) {
-    throw new FulfillmentPayloadValidationError(validationIssues, requestPayload);
-  }
-
-  const payload = {
-    djangoPaymentSaveCustomId: args.djangoPaymentSaveCustomId,
-    payload: requestPayload,
-  } satisfies MerchizeFulfillmentProcessProps;
-
-  const response = await sendMerchizeOrderDetailsToBackend(
-    encryptForPostProcessingServerAction(JSON.stringify(payload), 'fulfillment'),
-  );
-
-  if (!response.ok) {
-    if (isFulfillmentBusinessFailure(response.error)) {
-      throw new FulfillmentProviderRejectedError(response.error.message, {
-        requestPayload,
-        responsePayload: response.error.responsePayload,
-      });
+    if (validationIssues.length > 0) {
+      throw new FulfillmentPayloadValidationError(validationIssues, requestPayload);
     }
 
-    throw new Error(response.error?.message ?? 'Fulfillment push failed');
+    const payload = {
+      djangoPaymentSaveCustomId: args.djangoPaymentSaveCustomId,
+      djangoOrderIntentUuid: args.djangoOrderIntentUuid,
+      djangoOrderIntentOrderId: args.djangoOrderIntentOrderId,
+      payload: requestPayload,
+    } satisfies MerchizeFulfillmentProcessProps;
+    encodedProps = encryptForPostProcessingServerAction(JSON.stringify(payload), 'fulfillment');
+  } catch (error) {
+    if (error instanceof DjangoOrderError) throw error;
+    throw new DjangoOrderError(djangoOrderFailure(error, 'not_sent'));
+  }
+  const response = await sendMerchizeOrderDetailsToBackend(encodedProps);
+
+  if (!response.ok) {
+    throw new DjangoOrderError(response.error);
   }
 
   return {
