@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { merchizeCatalogPrisma as db } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
 import { fetchMerchizeJson } from '@/lib/merchizeStorefront/providerErrors';
+import { createBoundedProviderReader } from './providerReads';
 import type {
   CatalogItem,
   StrictCatalogVariantRecord,
@@ -255,50 +256,7 @@ export function createSupplierEvidenceResolver(deps: SupplierEvidenceDependencie
   };
 }
 
-const flights = new Map<string, Promise<unknown>>();
-const failures = new Map<string, number>();
-let activeRequests = 0;
-const requestQueue: Array<() => void> = [];
-async function boundedProviderRead<T>(key: string, read: () => Promise<T>): Promise<T> {
-  const running = flights.get(key);
-  if (running) return running as Promise<T>;
-  if ((failures.get(key) ?? 0) > Date.now())
-    throw new Error('Supplier verification is cooling down.');
-  if (requestQueue.length >= 64) throw new Error('Supplier verification is busy.');
-  const task = (async () => {
-    if (activeRequests >= 4)
-      await new Promise<void>((resolve, reject) => {
-        const start = () => {
-          clearTimeout(timer);
-          resolve();
-        };
-        const timer = setTimeout(() => {
-          const index = requestQueue.indexOf(start);
-          if (index >= 0) requestQueue.splice(index, 1);
-          reject(new Error('Supplier verification queue timed out.'));
-        }, 15_000);
-        requestQueue.push(start);
-      });
-    else activeRequests += 1;
-    try {
-      return await read();
-    } catch (error) {
-      if (failures.size >= 256) failures.delete(failures.keys().next().value!);
-      failures.set(key, Date.now() + 5_000);
-      throw error;
-    } finally {
-      const next = requestQueue.shift();
-      if (next) next();
-      else activeRequests -= 1;
-    }
-  })();
-  flights.set(key, task);
-  try {
-    return await task;
-  } finally {
-    flights.delete(key);
-  }
-}
+const boundedProviderRead = createBoundedProviderReader();
 
 export function supplierEvidenceStoreScope() {
   return `${process.env.MERCHIZE_CATALOG_URL ?? ''}|${process.env.MERCHIZE_STORE_SLUG ?? '27mkjsl'}`;
@@ -419,15 +377,19 @@ export function createDemandCatalogResolver(
       url.searchParams.set('search', queries.join(','));
       url.searchParams.set('page', String(page));
       url.searchParams.set('limit', '50');
-      return boundedProviderRead(`${scope}|${url.search}`, () =>
-        fetchMerchizeJson(
-          url.toString(),
-          {
-            headers: { 'X-API-KEY': process.env.MERCHIZE_API_KEY! },
-            cache: 'no-store',
-          },
-          { timeoutMs: 15_000 },
-        ),
+      return boundedProviderRead(
+        `${scope}|${url.search}`,
+        (signal) =>
+          fetchMerchizeJson(
+            url.toString(),
+            {
+              headers: { 'X-API-KEY': process.env.MERCHIZE_API_KEY! },
+              cache: 'no-store',
+              signal,
+            },
+            { timeoutMs: 15_000 },
+          ),
+        options.signal,
       );
     },
   });

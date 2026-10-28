@@ -17,7 +17,9 @@ export async function GET(req: Request, ctx: { params: Params }) {
     );
 
   try {
-    const result = await verifyProductForDestination(id, country);
+    req.signal.throwIfAborted();
+    const result = await verifyProductForDestination(id, country, { signal: req.signal });
+    req.signal.throwIfAborted();
     const verificationIncomplete = result.check.unverifiedCount > 0;
 
     if (verificationIncomplete && result.variants.length === 0) {
@@ -44,6 +46,11 @@ export async function GET(req: Request, ctx: { params: Params }) {
       },
     );
   } catch (err) {
+    if (req.signal.aborted)
+      return new NextResponse(null, {
+        status: 499,
+        headers: { 'Cache-Control': 'private, no-store' },
+      });
     console.warn('[shop.productOptions] supplier verification failed', {
       productId: id,
       status: merchizeErrorStatus(err),

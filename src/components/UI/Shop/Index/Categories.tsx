@@ -3,8 +3,17 @@ import { categoriesObj } from '@/lib/utils/shopHomePageProductsData';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import GlobalProductPrice from '../GlobalShopComponents/GlobalProductPrice';
 import DeferredFloatingCountryDropdown from './DeferredFloatingCountryDropdown';
+import { getUnpublishedHomeProductIds } from '@/lib/merchizeStorefront/publicationSnapshot';
 
-const Categories = () => {
+const Categories = async () => {
+  const unpublishedIds = await getUnpublishedHomeProductIds();
+  const categories = Object.entries(categoriesObj)
+    .map(([slug, category]) => ({
+      slug,
+      ...category,
+      content: category.content.filter((product) => !unpublishedIds.has(product.productId)),
+    }))
+    .filter((category) => category.content.length);
   const imageQuality = 50;
   const imageSizes =
     '(max-width: 640px) 80px, (max-width: 1024px) 125px, (min-width: 1280px) 120px, 160px';
@@ -13,7 +22,7 @@ const Categories = () => {
   return (
     <div className='space-y-8'>
       <div className='grid gap-8 md:grid-cols-2 lg:grid-cols-4'>
-        {Object.entries(categoriesObj).map(([categoryName, products]) => (
+        {categories.map(({ slug: categoryName, ...products }) => (
           <div
             className='bg-[linear-gradient(161.11deg,_rgba(0,_133,_255,_0.7)_6.84%,_rgba(0,_24,_140,_0.5)_49.48%,_rgba(8,_8,_8,_0.7)_92.13%)] 
             backdrop-blur-[4px] py-8 px-4 rounded-[20px] md:px-8'

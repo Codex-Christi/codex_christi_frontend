@@ -29,9 +29,18 @@ import {
   type ShopSeoManifestWarning,
 } from './types';
 import { readProductSeoManifestEntry, readCategorySeoManifestEntry } from './read';
+import { isStorefrontProductUnpublished } from '@/lib/merchizeStorefront/publication';
 
 export async function hasChangedShopSearchPreviews() {
-  const products = buildProductEntries(await getProductSnapshotRows(), 'comparison');
+  const productRows = await getProductSnapshotRows();
+  const products = buildProductEntries(productRows, 'comparison');
+  for (const row of productRows) {
+    if (
+      isStorefrontProductUnpublished(row.rawProductJson) &&
+      (await readProductSeoManifestEntry(row.merchizeProductId))
+    )
+      return true;
+  }
   const categories = buildCategoryEntries(await getCategorySnapshotRows(), 'comparison');
   for (const [id, expected] of products) {
     const actual = await readProductSeoManifestEntry(id);
@@ -184,6 +193,9 @@ async function generateShopSeoManifestUnlocked(
   await writeJsonAtomic(getShopSeoManifestIndexPath(), index);
 
   const affectedRoutes = [
+    ...productRows
+      .filter((row) => isStorefrontProductUnpublished(row.rawProductJson))
+      .map((row) => `/shop/product/${encodeURIComponent(row.merchizeProductId)}`),
     ...productList.map((entry) => entry.route),
     ...categoryList.flatMap((entry) => getCategoryRevalidationPaths(entry)),
   ];
@@ -408,6 +420,7 @@ async function getProductSnapshotRows() {
       description: true,
       image: true,
       retailPrice: true,
+      rawProductJson: true,
       updatedAt: true,
     },
     orderBy: { lastSeenAt: 'desc' },
@@ -432,6 +445,7 @@ function buildProductEntries(rows: ProductSnapshotRow[], generatedAt: string) {
   const entries = new Map<string, ProductSeoManifestEntry>();
 
   for (const row of rows) {
+    if (isStorefrontProductUnpublished(row.rawProductJson)) continue;
     const title = row.title?.trim() || 'Product';
     entries.set(row.merchizeProductId, {
       schemaVersion: SHOP_SEO_MANIFEST_SCHEMA_VERSION,

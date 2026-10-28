@@ -2,6 +2,8 @@ import { cache } from 'react';
 import {
   fetchMerchizeJson,
   shouldUseStorefrontSnapshot,
+  coerceMerchizeProviderError,
+  MerchizeProviderError,
 } from '@/lib/merchizeStorefront/providerErrors';
 import {
   assertBasicStorefrontProductData,
@@ -14,6 +16,10 @@ import type { BasicProductInterface, ProductResult } from '@/lib/merchizeStorefr
 import { resolveProviderStorefrontProductCompatibility } from '@/lib/merchizeStorefront/currentProductLineCompatibility';
 import { STRICT_STOREFRONT_PROVIDER_TIMEOUT_MS } from '@/lib/merchizeStorefront/strictLiveProduct';
 import { resolveProductGalleryImages } from '@/lib/merchizeStorefront/imageUrls';
+import {
+  getStorefrontPublication,
+  isStorefrontProductUnpublished,
+} from '@/lib/merchizeStorefront/publication';
 
 export const merchizeBaseURL = process.env.MERCHIZE_BASE_URL!;
 export const merchizeAPIKey = process.env.MERCHIZE_API_KEY!;
@@ -25,6 +31,16 @@ export const storefrontSnapshotCacheSeconds = () => {
   return Math.max(0, Math.floor(cacheForDays(days)));
 };
 
+function assertPublicDisplayProduct(product: BasicProductInterface['data']) {
+  if (isStorefrontProductUnpublished(product))
+    throw new MerchizeProviderError({
+      url: `${merchizeBaseURL}/product/products/${encodeURIComponent(product._id)}`,
+      status: 404,
+      message: 'This storefront product is not published.',
+    });
+  return product;
+}
+
 // --- Fetch Base Product Info ---
 export const fetchBaseProduct = cache(async (externalProductID: string, forceRefresh = false) => {
   const snapshot = await getBasicProductSnapshotState(externalProductID).catch((err) => {
@@ -32,9 +48,10 @@ export const fetchBaseProduct = cache(async (externalProductID: string, forceRef
     return null;
   });
   if (!forceRefresh && snapshot?.isFresh) {
-    return snapshot.product;
+    return assertPublicDisplayProduct(snapshot.product);
   }
 
+  let liveProduct: BasicProductInterface['data'] | null = null;
   try {
     const json = await fetchMerchizeJson<BasicProductInterface>(
       `${merchizeBaseURL}/product/products/${externalProductID}`,
@@ -53,11 +70,20 @@ export const fetchBaseProduct = cache(async (externalProductID: string, forceRef
       json.data,
       `Merchize product ${externalProductID}`,
     );
+    liveProduct = product;
 
     await upsertStorefrontProductSnapshot(product, { force: forceRefresh }).catch((err) => {
       if (forceRefresh) throw err;
       console.warn('[storefrontSnapshot] product snapshot upsert failed:', err);
     });
+    assertPublicDisplayProduct(product);
+    if (
+      getStorefrontPublication(product) === 'unknown' &&
+      snapshot &&
+      isStorefrontProductUnpublished(snapshot.product)
+    ) {
+      assertPublicDisplayProduct(snapshot.product);
+    }
 
     return {
       ...product,
@@ -68,13 +94,24 @@ export const fetchBaseProduct = cache(async (externalProductID: string, forceRef
         })[0] ?? '',
     };
   } catch (err) {
+    if (
+      !liveProduct &&
+      coerceMerchizeProviderError(err)?.kind === 'not_found' &&
+      snapshot &&
+      !isStorefrontProductUnpublished(snapshot.product)
+    ) {
+      await upsertStorefrontProductSnapshot(
+        { ...snapshot.product, _storefront_not_found: true },
+        { force: true },
+      ).catch(() => console.warn('[storefrontSnapshot] product removal could not be saved'));
+    }
     if (forceRefresh) throw err;
     if (!shouldUseStorefrontSnapshot(err) && !isInvalidStorefrontProductPayloadError(err)) {
       throw err;
     }
 
     if (!snapshot) throw err;
-    return snapshot.product;
+    return assertPublicDisplayProduct(snapshot.product);
   }
 });
 

@@ -7,6 +7,7 @@ import type {
 } from '@/lib/merchizeStorefront/productTypes';
 import { resolveProductGalleryImages } from '@/lib/merchizeStorefront/imageUrls';
 import { getCategoryPagePath } from '@/lib/utils/shop/categoryPagePath';
+import { getStorefrontPublication } from './publication';
 
 type BasicProductData = BasicProductInterface['data'];
 type ProductVariantsData = ProductVariantsInterface['data'];
@@ -203,26 +204,49 @@ function productSnapshotWhere(productIDorSlug: string) {
 
 export async function upsertStorefrontProductSnapshot(
   product: unknown,
-  opts: { force?: boolean } = {},
+  opts: {
+    force?: boolean;
+    refreshPublication?: boolean;
+    observedAt?: Date;
+    signal?: AbortSignal;
+  } = {},
 ) {
+  opts.signal?.throwIfAborted();
   const validProduct = assertBasicStorefrontProductData(
     product,
     'Storefront product snapshot upsert',
   );
-  const now = new Date();
+  const now = opts.observedAt ?? new Date();
   const retailPrice = parseRetailPrice(validProduct.retail_price);
-  const existing = await merchizeCatalogPrisma.storefrontProductSnapshot.findUnique({
-    where: { merchizeProductId: validProduct._id },
-    select: { lastProductFetchAt: true },
-  });
+  // Keep the publication check and write atomic against concurrent listing/verification reads.
+  await merchizeCatalogPrisma.$transaction(async (db) => {
+    const existing = await db.storefrontProductSnapshot.findUnique({
+      where: { merchizeProductId: validProduct._id },
+      select: { lastProductFetchAt: true, rawProductJson: true },
+    });
+    opts.signal?.throwIfAborted();
+    const publication = getStorefrontPublication(validProduct);
+    const previousPublication = getStorefrontPublication(existing?.rawProductJson);
+    // A slow older positive check cannot resurrect a newer confirmed removal.
+    if (
+      publication === 'published' &&
+      previousPublication === 'unpublished' &&
+      opts.observedAt &&
+      existing?.lastProductFetchAt &&
+      existing.lastProductFetchAt > opts.observedAt
+    )
+      return;
+    const publicationChanged = publication !== 'unknown' && publication !== previousPublication;
+    if (
+      !opts.force &&
+      isFresh(existing?.lastProductFetchAt, now) &&
+      !(publicationChanged && opts.refreshPublication)
+    )
+      return;
+    if (previousPublication === 'unpublished' && publication === 'unknown') return;
+    const image = resolveProductGalleryImages({ metadata: validProduct })[0] ?? null;
 
-  if (!opts.force && isFresh(existing?.lastProductFetchAt, now)) return;
-  const image = resolveProductGalleryImages({ metadata: validProduct })[0] ?? null;
-
-  await merchizeCatalogPrisma.storefrontProductSnapshot.upsert({
-    where: { merchizeProductId: validProduct._id },
-    create: {
-      merchizeProductId: validProduct._id,
+    const data = {
       slug: validProduct.slug ?? null,
       title: validProduct.title ?? null,
       description: validProduct.description ?? null,
@@ -231,17 +255,12 @@ export async function upsertStorefrontProductSnapshot(
       rawProductJson: toJsonValue(validProduct),
       lastSeenAt: now,
       lastProductFetchAt: now,
-    },
-    update: {
-      slug: validProduct.slug ?? null,
-      title: validProduct.title ?? null,
-      description: validProduct.description ?? null,
-      image,
-      retailPrice,
-      rawProductJson: toJsonValue(validProduct),
-      lastSeenAt: now,
-      lastProductFetchAt: now,
-    },
+    };
+    await db.storefrontProductSnapshot.upsert({
+      where: { merchizeProductId: validProduct._id },
+      create: { merchizeProductId: validProduct._id, ...data },
+      update: data,
+    });
   });
 }
 

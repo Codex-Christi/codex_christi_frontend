@@ -1,7 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
 import { merchizeCatalogPrisma as db } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
-import { isMerchizeStorefrontProductAvailable } from '@/lib/paypal/orderSnapshot/merchizeAvailability';
+import { getStorefrontPublication } from './publication';
 import { resolveProductGalleryImages } from './imageUrls';
 import { fetchMerchizeJson, MerchizeProviderError } from './providerErrors';
 import {
@@ -16,16 +16,12 @@ import {
   type SearchProduct,
 } from './productSearch';
 import { upsertStorefrontProductSnapshot } from './snapshot';
+import { getUnpublishedStorefrontProductIds } from './publicationSnapshot';
 
 const MAX_INDEX_PRODUCTS = 1000;
 
 function publishedProduct(raw: unknown): raw is Record<string, unknown> {
-  return (
-    !!raw &&
-    typeof raw === 'object' &&
-    !Array.isArray(raw) &&
-    isMerchizeStorefrontProductAvailable(raw)
-  );
+  return getStorefrontPublication(raw) === 'published';
 }
 
 export const getProductSearchIndex = cache(async () => {
@@ -115,20 +111,25 @@ export const searchStorefrontProducts = cache(
       const published = data.products.filter(publishedProduct);
       // Reuse the existing display snapshot, never the checkout availability evidence.
       try {
-        for (const product of published) await upsertStorefrontProductSnapshot(product);
+        for (const product of data.products) await upsertStorefrontProductSnapshot(product);
       } catch {
         console.warn(
           '[shop.search] display snapshots could not be updated; returning supplier results',
         );
       }
+      const unpublishedIds = await getUnpublishedStorefrontProductIds(
+        published.map((product) => product._id),
+      ).catch(() => new Set<string>());
       if (data.total > 0 || page > 1)
         return {
-          products: published.map((product) => ({
-            id: product._id,
-            title: product.title,
-            image: resolveProductGalleryImages({ metadata: product })[0] ?? null,
-            price: Number(product.retail_price),
-          })),
+          products: published
+            .filter((product) => !unpublishedIds.has(product._id))
+            .map((product) => ({
+              id: product._id,
+              title: product.title,
+              image: resolveProductGalleryImages({ metadata: product })[0] ?? null,
+              price: Number(product.retail_price),
+            })),
           page,
           totalPages: data.pages,
           source,

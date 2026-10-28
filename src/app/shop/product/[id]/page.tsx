@@ -24,6 +24,7 @@ import { resolveProductGalleryImages } from '@/lib/merchizeStorefront/imageUrls'
 import { getProductOptionLayout } from '@/lib/merchizeStorefront/productOptionLayout';
 import { STRICT_STOREFRONT_PROVIDER_TIMEOUT_MS } from '@/lib/merchizeStorefront/strictLiveProduct';
 import { getProductStructuredData } from '@/lib/merchizeStorefront/productStructuredData';
+import { getUnpublishedProductMetadata } from '@/lib/shop/seoManifest/productVisibility';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -167,6 +168,23 @@ async function getDevLiveProductMetadata(productId: string) {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const startedAt = Date.now();
   const { id } = await params;
+  const unpublishedMetadata = await getUnpublishedProductMetadata(id).catch((err) => {
+    console.warn(
+      '[product.generateMetadata] snapshot metadata lookup failed:',
+      err instanceof Error ? err.message : String(err),
+    );
+    return null;
+  });
+  if (unpublishedMetadata) {
+    recordShopMetadataSource({
+      targetKind: 'product',
+      targetId: id,
+      source: 'snapshot',
+      startedAt,
+      shouldIndex: false,
+    });
+    return unpublishedMetadata;
+  }
 
   const manifestEntry = await readProductSeoManifestEntry(id).catch((err) => {
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -185,11 +203,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const productMetaData = await getBasicProductFromSnapshot(id).catch((err) => {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    console.warn('[product.generateMetadata] snapshot metadata lookup failed:', errorMessage);
+    console.warn(
+      '[product.generateMetadata] snapshot metadata lookup failed:',
+      err instanceof Error ? err.message : String(err),
+    );
     return null;
   });
-
   if (productMetaData) {
     recordShopMetadataSource({
       targetKind: 'product',

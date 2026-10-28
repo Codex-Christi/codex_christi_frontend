@@ -17,9 +17,11 @@ export async function verifyProductForDestination(
   countryIso3: string,
   options: {
     forceRefresh?: boolean;
+    signal?: AbortSignal;
     context?: ReturnType<typeof createStorefrontVerificationContext>;
   } = {},
 ) {
+  options.signal?.throwIfAborted();
   const country = countries.all.find(
     (country) => country.alpha3 === countryIso3 && country.alpha3.length === 3,
   );
@@ -107,6 +109,7 @@ export async function verifyProductForDestination(
           .findUnique({ where: { merchizeProductId: productId }, select: { id: true } })
           .catch(() => null),
       );
+    context.signal?.throwIfAborted();
     if (knownProduct)
       await db.storefrontProductDestinationCheck
         .upsert({

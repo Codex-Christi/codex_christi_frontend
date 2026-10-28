@@ -50,6 +50,8 @@ loaded after client navigation, so this mainly saves the first browsing download
 | Search suggestions and keyboard controls | [StorefrontSearchForm.tsx](../src/components/UI/Shop/Nav/StorefrontSearchForm.tsx) |
 | Local search projection and submitted supplier search | [searchCatalog.ts](../src/lib/merchizeStorefront/searchCatalog.ts) |
 | Category deadlines and payload checks | [categoryDetailsSSR.ts](../src/app/shop/category/[id]/categoryDetailsSSR.ts), [listingPayload.ts](../src/lib/merchizeStorefront/listingPayload.ts) |
+| Public product visibility and saved-state filtering | [publication.ts](../src/lib/merchizeStorefront/publication.ts), [publicationSnapshot.ts](../src/lib/merchizeStorefront/publicationSnapshot.ts) |
+| Shared supplier-read cancellation and queue limits | [providerReads.ts](../src/lib/merchizeCatalog/providerReads.ts) |
 
 `getProductOptionGroups()` groups variant options in one pass for both product
 details and the category quick-selection popover. It preserves the original
@@ -124,6 +126,44 @@ Saving a page replaces obsolete members in that position range and prunes rows
 beyond the supplier total. A confirmed empty listing remains intentionally empty.
 No cron, `after()`, schema migration, or checkout-verification change is involved.
 
+## Publication and Cancellation
+
+`publication.ts` separates published, explicitly unpublished, and unknown display
+data. Private, inactive, deleted, taken-down, unapproved, and non-active products
+are not public listings. Missing legacy flags are unknown, not proof of removal;
+checkout still requires its existing complete, fresh publication evidence.
+
+A negative publication observation from strict live verification bypasses the
+saved product's normal TTL. A strict live product check can also restore a
+republished product. Cached listings cannot immediately override a fresh verified
+observation in either direction, and incomplete data cannot clear it.
+A confirmed 404/410 on a known saved product leaves a local
+removal marker; network failures never create one. These are awaited writes to
+the existing SQLite snapshot, not background tasks or a new table.
+The publication check and snapshot write share a short SQLite transaction; an older
+in-flight positive verification cannot resurrect a newer confirmed removal.
+
+Product display rejects known unpublished records, including during outage
+fallback. Homepage previews, category cards, and search omit them too. Metadata
+does a small local publication lookup before using the manifest; a known
+unpublished product gets noindex metadata without its title, image, or price.
+Manifest generation excludes it without recreating a curated fallback, and
+includes its route in admin revalidation. Admin metadata diagnostics use the same
+rule. Normal published metadata keeps the manifest-first content flow.
+
+Existing ISR lifetimes remain: already-generated HTML is not an instant supplier
+webhook. Confirmed state takes effect when the page regenerates or an existing
+admin action revalidates it. Display fallback is not purchase authorization.
+
+The product-options route now passes its request abort signal through product,
+variant, preset, and catalog verification. Canceled requests return a private,
+uncacheable cancellation response and do not record provider-outage failures.
+Shared catalog reads track their callers: canceling one caller leaves other
+callers running; canceling the last aborts upstream. Four active reads, a queue
+cap of 64, the 15-second queue deadline, and genuine-error cooldown are preserved.
+Cancellation itself does not trigger cooldown. An already-committed database
+write is not rolled back, but cancellation stops subsequent verification stages.
+
 ## Product Images and Details
 
 One image resolver serves live data, snapshots, and the gallery. Saved variant
@@ -190,6 +230,9 @@ Use Yarn. These checks do not rebuild the app or restart the running dev server:
 yarn lint
 yarn tsc --noEmit --pretty false --incremental false
 yarn test:storefront
+SESSION_SECRET=storefront-integration-fixture-secret-32 \
+ADMIN_SESSION_SECRET=storefront-integration-admin-secret-32 \
+NEXT_PUBLIC_DJANGO_API_BASE_URL=https://django.example/api/v1 \
 node --require next/dist/server/node-environment --conditions=react-server --import tsx --test src/lib/merchizeStorefront/*.integration.test.ts src/lib/merchizeCatalog/*.integration.test.ts
 ```
 
@@ -211,6 +254,12 @@ and API product photos. Search results must retain `noindex,follow`. Check a nor
 category and a missing category too. Use the isolated integration tests for timeouts,
 provider outages, malformed payloads, incomplete saved pages, and forced-refresh
 failures; do not simulate these by purging the working storefront database.
+The fixture-only auth values above satisfy the readiness check; they are not
+deployment credentials and the tests stub supplier/backend network calls. Check
+private-to-public transitions, negative-state precedence, and cancellation with
+both one and multiple shared-read callers using the isolated regression tests.
+The publication integration test also removes its temporary manifest directory.
+Keep these regression tests; they are not demo routes or production data fixtures.
 
 With the browser cache disabled, check About at 412px and 1440px. Confirm one hero
 download per page, readable navigation, and unchanged card positions. On a product

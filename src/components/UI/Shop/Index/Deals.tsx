@@ -3,8 +3,12 @@ import { launchMerchProducts } from '@/lib/utils/shopHomePageProductsData';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import DealsScrollControls from './DealsScrollControls';
 import styles from './Deals.module.css';
+import { getUnpublishedHomeProductIds } from '@/lib/merchizeStorefront/publicationSnapshot';
 
-const Deals = () => {
+const Deals = async () => {
+  const unpublishedIds = await getUnpublishedHomeProductIds();
+  const products = launchMerchProducts.filter((product) => !unpublishedIds.has(product.productId));
+  if (!products.length) return null;
   const eagerImageCount = 1;
   const imageQuality = 50;
   const imageSizes = '(max-width: 767px) 135px, 160px';
@@ -22,10 +26,14 @@ const Deals = () => {
       '
       >
         <div className='flex w-32 shrink-0 flex-col items-center justify-center md:w-auto md:-space-y-2'>
-          <p className={`${styles.outlinedText} whitespace-nowrap text-[2rem] leading-none text-center md:text-7xl`}>
+          <p
+            className={`${styles.outlinedText} whitespace-nowrap text-[2rem] leading-none text-center md:text-7xl`}
+          >
             Launch
           </p>
-          <p className={`${styles.outlinedText} whitespace-nowrap text-[2rem] leading-none text-center md:text-7xl`}>
+          <p
+            className={`${styles.outlinedText} whitespace-nowrap text-[2rem] leading-none text-center md:text-7xl`}
+          >
             Merch
           </p>
         </div>
@@ -42,7 +50,7 @@ const Deals = () => {
         className='overflow-x-auto overflow-y-hidden min-w-full flex gap-2 lg:gap-10 xl:gap-7
         scroll-smooth snap-x snap-mandatory md:grid-cols-5 md:w-full md:col-span-8 custom-scrollbar'
       >
-        {launchMerchProducts.map((merch, i) => (
+        {products.map((merch, i) => (
           <CustomShopLink
             className='w-[12rem] h-[12rem] md:h-[150px] relative shrink-0 overflow-hidden'
             href={`/shop/product/${merch.productId}`}

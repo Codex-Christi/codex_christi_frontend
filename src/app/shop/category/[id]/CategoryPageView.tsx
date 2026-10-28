@@ -15,6 +15,8 @@ import CustomShopLink from '@/components/UI/Shop/HelperComponents/CustomShopLink
 import type { CategoryProductCardData } from '@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/ProductCard';
 import ProductList from '@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/ProductList';
 import PaginationControls from '@/components/UI/Shop/Categories/[eachCategory]/CategoryListProductCard/PaginationControls';
+import { isStorefrontProductUnpublished } from '@/lib/merchizeStorefront/publication';
+import { getUnpublishedStorefrontProductIds } from '@/lib/merchizeStorefront/publicationSnapshot';
 
 export const CATEGORY_PAGE_SIZE = 15;
 const SHOP_SITE_NAME = 'Codex Christi Shop';
@@ -233,11 +235,22 @@ export default async function CategoryPageView({
   const { name, description } = pageData.categoryMetaData;
   const { products, totalPages } = pageData.initialProductFetchResp;
   if (page > 1 && page > totalPages) notFound();
+  const unpublishedIds = await getUnpublishedStorefrontProductIds(
+    products.map((product) => product._id),
+  ).catch(() => new Set<string>());
 
   // Keep listing cards limited to the display fields they need.
-  const cardProducts: CategoryProductCardData[] = products.map(
-    ({ _id, title, slug, image, retail_price }) => ({ _id, title, slug, image, retail_price }),
-  );
+  const cardProducts: CategoryProductCardData[] = products
+    .filter(
+      (product) => !isStorefrontProductUnpublished(product) && !unpublishedIds.has(product._id),
+    )
+    .map(({ _id, title, slug, image, retail_price }) => ({
+      _id,
+      title,
+      slug,
+      image,
+      retail_price,
+    }));
 
   return (
     <div className='min-h-[60vh]'>
@@ -247,18 +260,18 @@ export default async function CategoryPageView({
       </header>
 
       <main className='px-8 pt-7 flex flex-col gap-16 mb-10'>
-        {products.length > 0 ? (
-          <>
-            <ProductList initialData={cardProducts} />
-            <PaginationControls currentPage={page} category={categoryName} totalPages={totalPages} />
-          </>
+        {cardProducts.length > 0 ? (
+          <ProductList initialData={cardProducts} />
         ) : (
           <div className='space-y-4 py-12 text-center'>
-            <p>No products in this category yet.</p>
+            <p>No products available on this page.</p>
             <CustomShopLink href='/shop/categories' className='underline underline-offset-4'>
               Browse other categories
             </CustomShopLink>
           </div>
+        )}
+        {(cardProducts.length > 0 || totalPages > 1) && (
+          <PaginationControls currentPage={page} category={categoryName} totalPages={totalPages} />
         )}
       </main>
     </div>

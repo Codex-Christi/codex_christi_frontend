@@ -14,6 +14,7 @@ import {
   type StrictLiveStorefrontProductDetails,
 } from './strictLiveProduct';
 import { isMerchizeStorefrontProductAvailable } from '@/lib/paypal/orderSnapshot/merchizeAvailability';
+import { upsertStorefrontProductSnapshot } from './snapshot';
 import {
   assertStorefrontVariantCompatibilityInputBounds,
   crossCheckCurrentPresetMatchAgainstCatalog,
@@ -509,6 +510,7 @@ export async function resolveProviderStorefrontProductCompatibility(
   productLookup: string,
   options: ResolveCurrentProductLineCompatibilityOptions = {},
 ): Promise<ProviderStorefrontProductCompatibilityResolution> {
+  const observedAt = new Date();
   options.signal?.throwIfAborted();
   const fetched = await (options.loadProduct ?? fetchStrictLiveStorefrontProductDetails)(
     productLookup,
@@ -523,22 +525,31 @@ export async function resolveProviderStorefrontProductCompatibility(
   const result = await resolveStrictLiveProductCompatibility(details, options);
   options.signal?.throwIfAborted();
   if (!selected && options.persist !== false) {
-    await recordProductCheck(result.productMetaData, result.compatibility.results).catch(() => {
+    await recordProductCheck(
+      result.productMetaData,
+      result.compatibility.results,
+      options.signal,
+      observedAt,
+    ).catch((error) => {
+      if (options.signal?.aborted) throw error;
       console.warn('[storefrontProductCheck] summary write failed');
     });
   }
+  options.signal?.throwIfAborted();
   return result;
 }
 
 async function recordProductCheck(
   product: BasicProductInterface['data'],
   results: StorefrontVariantCompatibilityResult[],
+  signal?: AbortSignal,
+  observedAt = new Date(),
 ) {
   const data = {
     completed: true,
     errorMessage: null,
     title: product.title,
-    checkedAt: new Date(),
+    checkedAt: observedAt,
     productAvailable: isMerchizeStorefrontProductAvailable(product),
     availableCount: results.filter((r) => r.status === 'available').length,
     unavailableCount: results.filter((r) => r.status === 'unavailable').length,
@@ -566,6 +577,15 @@ async function recordProductCheck(
     where: { merchizeProductId: product._id },
     create: { merchizeProductId: product._id, ...data },
     update: data,
+  });
+  signal?.throwIfAborted();
+  await upsertStorefrontProductSnapshot(product, {
+    refreshPublication: true,
+    observedAt,
+    signal,
+  }).catch((error) => {
+    if (signal?.aborted) throw error;
+    console.warn('[storefrontProductCheck] display snapshot could not be updated');
   });
 }
 

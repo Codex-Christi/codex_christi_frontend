@@ -2,6 +2,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { getUnpublishedProductMetadata } from '@/lib/shop/seoManifest/productVisibility';
 import { writeAdminAuditLog } from '@/lib/admin/admin-auth-ledger';
 import { getAdminActionErrorMessage, requireAdminAction } from '@/lib/admin/require-admin';
 import { merchizeCatalogPrisma } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
@@ -334,9 +335,11 @@ export async function runStorefrontMetadataDiagnosticsAction() {
   ]);
   const checks = [
     {
-      label: 'Published products resolve to indexable metadata',
-      ok: productDiagnostics.every((item) => item.ok && item.shouldIndex),
-      detail: `${productDiagnostics.filter((item) => item.ok && item.shouldIndex).length}/${productDiagnostics.length} published products covered.`,
+      label: 'Product metadata respects publication state',
+      ok: productDiagnostics.every(
+        (item) => item.ok && (item.shouldIndex || item.source === 'snapshot'),
+      ),
+      detail: `${productDiagnostics.filter((item) => item.shouldIndex).length} products indexable; ${productDiagnostics.filter((item) => !item.shouldIndex && item.source === 'snapshot').length} confirmed unpublished products excluded; ${productDiagnostics.filter((item) => item.source === 'unknown_noindex').length} unresolved.`,
     },
     {
       label: 'Configured categories resolve to indexable metadata',
@@ -385,6 +388,15 @@ export async function runStorefrontMetadataDiagnosticsAction() {
 async function resolveProductMetadataDiagnostic(
   productId: string,
 ): Promise<MetadataSourceDiagnostic> {
+  if (await getUnpublishedProductMetadata(productId).catch(() => null))
+    return {
+      targetKind: 'product',
+      targetId: productId,
+      source: 'snapshot',
+      shouldIndex: false,
+      ok: true,
+      message: 'Confirmed unpublished product is excluded from search indexing.',
+    };
   const manifestEntry = await readProductSeoManifestEntry(productId).catch(() => null);
   if (manifestEntry) {
     return {
