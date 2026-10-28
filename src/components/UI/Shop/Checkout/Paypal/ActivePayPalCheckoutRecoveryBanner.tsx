@@ -12,7 +12,6 @@ import {
   setCheckoutAttemptStage,
   type CheckoutAttempt,
   type ActivePayPalCheckout,
-  type ActivePayPalCheckoutPaymentSurface,
   type ActivePayPalCheckoutStage,
 } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 import type { PayPalTxPaymentStatusResponse } from '@/lib/paypal/txLedger/mapLedgerToProcessingState';
@@ -22,6 +21,12 @@ import {
 } from '@/lib/hooks/shopHooks/checkout/checkoutAttemptRecovery';
 import { claimCurrentCheckout } from '@/lib/hooks/shopHooks/checkout/claimCurrentCheckout';
 import { flushCheckoutStorage } from '@/stores/shop_stores/checkoutStore/storage';
+import { readCheckoutStatus } from '@/lib/hooks/shopHooks/checkout/readCheckoutStatus';
+import {
+  canReopenCheckoutPayment,
+  originalCheckoutScope,
+} from '@/lib/hooks/shopHooks/checkout/originalCheckout';
+import CustomShopLink from '../../HelperComponents/CustomShopLink';
 
 const CONFIRMATION_STATUSES = new Set([
   'captured',
@@ -33,30 +38,6 @@ const CONFIRMATION_STATUSES = new Set([
   'completed',
   'error',
 ]);
-
-function getPaymentSurfaceCopy(paymentSurface?: ActivePayPalCheckoutPaymentSurface | null) {
-  if (paymentSurface === 'card') {
-    return {
-      cta: 'Continue with card',
-      label: 'card form',
-      nextSurface: 'card' as const,
-    };
-  }
-
-  if (paymentSurface === 'paypal_buttons') {
-    return {
-      cta: 'Continue with PayPal',
-      label: 'PayPal checkout',
-      nextSurface: 'paypal_buttons' as const,
-    };
-  }
-
-  return {
-    cta: 'Show payment options',
-    label: 'payment flow',
-    nextSurface: null,
-  };
-}
 
 function getStageCopy(stage: ActivePayPalCheckoutStage, paymentLabel: string) {
   if (stage === 'paypal_cancelled') {
@@ -80,12 +61,14 @@ function getStageCopy(stage: ActivePayPalCheckoutStage, paymentLabel: string) {
 }
 
 type ActivePayPalCheckoutRecoveryBannerProps = {
-  onSelectPaymentSurface: (paymentSurface: ActivePayPalCheckoutPaymentSurface | null) => void;
+  onContinueOriginal: () => void;
+  reviewing?: boolean;
   onStartSeparateOrder?: () => void;
 };
 
 export default function ActivePayPalCheckoutRecoveryBanner({
-  onSelectPaymentSurface,
+  onContinueOriginal,
+  reviewing = false,
   onStartSeparateOrder,
 }: ActivePayPalCheckoutRecoveryBannerProps) {
   const { push } = useShopRouter();
@@ -109,27 +92,17 @@ export default function ActivePayPalCheckoutRecoveryBanner({
   const [unpaid, setUnpaid] = useState<PayPalTxPaymentStatusResponse | null>(null);
   const [confirmSeparate, setConfirmSeparate] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const paymentSurfaceCopy = useMemo(
-    () => getPaymentSurfaceCopy(activeCheckout?.paymentSurface),
-    [activeCheckout?.paymentSurface],
-  );
-  const copy = useMemo(
-    () => getStageCopy(activeCheckout?.stage ?? 'paypal_order_created', paymentSurfaceCopy.label),
-    [activeCheckout?.stage, paymentSurfaceCopy.label],
-  );
+  const paymentLabel = activeCheckout?.paymentSurface === 'card' ? 'card form' : 'PayPal checkout';
+  const copy = getStageCopy(activeCheckout?.stage ?? 'paypal_order_created', paymentLabel);
 
   const loadStatus = useCallback(async (captured: CheckoutAttempt) => {
+    const scope = originalCheckoutScope();
+    const current = () => isCurrentCheckoutAttempt(captured) && originalCheckoutScope() === scope;
     await claimCurrentCheckout();
-    if (!isCurrentCheckoutAttempt(captured)) return null;
-    const response = await fetch(
-      `/next-api/paypal/tx-ledger/payments/${encodeURIComponent(captured.orderToken!)}/status`,
-      { cache: 'no-store', signal: AbortSignal.timeout(15_000) },
-    );
-    if (!isCurrentCheckoutAttempt(captured)) return null;
-    if (!response.ok) throw new Error('Payment status is temporarily unavailable.');
-    const status = (await response.json()) as PayPalTxPaymentStatusResponse;
-    if (!isCurrentCheckoutAttempt(captured)) return null;
-    if (status.orderToken !== captured.orderToken) throw new Error('Payment status mismatch.');
+    if (!current()) return null;
+    const { data: status } = await readCheckoutStatus(captured.orderToken!);
+    if (!current()) return null;
+    if (!status) throw new Error('Payment status is temporarily unavailable.');
     return status;
   }, []);
 
@@ -186,7 +159,6 @@ export default function ActivePayPalCheckoutRecoveryBanner({
         );
         return;
       }
-      onSelectPaymentSurface(null);
       onStartSeparateOrder?.();
       await flushCheckoutStorage('paypal-intent-store');
     } catch {
@@ -202,7 +174,7 @@ export default function ActivePayPalCheckoutRecoveryBanner({
   if (!activeCheckout) return null;
 
   return (
-    <div className='overflow-hidden rounded-2xl border border-cyan-100/16 bg-cyan-50/[0.045] p-4 text-white shadow-[0_18px_38px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.07)] backdrop-blur-xl'>
+    <div className='min-w-0 text-white'>
       <div className='flex items-start gap-3'>
         <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cyan-100/20 bg-cyan-100/[0.08] text-cyan-50'>
           <CreditCard size={17} />
@@ -270,13 +242,22 @@ export default function ActivePayPalCheckoutRecoveryBanner({
               )}
               Check status
             </Button>
-            <Button
-              name={paymentSurfaceCopy.cta}
-              onClick={() => onSelectPaymentSurface(paymentSurfaceCopy.nextSurface)}
-              className='h-auto rounded-full border border-white/12 bg-white/[0.045] px-4 py-2 text-xs font-semibold text-white/78 hover:bg-white/[0.08] hover:text-white'
+            {canReopenCheckoutPayment(activeCheckout.stage) && (
+              <Button
+                name='Review original purchase'
+                onClick={onContinueOriginal}
+                disabled={reviewing || isChecking}
+                className='h-auto rounded-full border border-white/25 bg-white/[0.045] px-4 py-2 text-xs font-semibold text-white hover:bg-white/[0.08]'
+              >
+                {reviewing ? 'Opening original purchase…' : 'Review original purchase'}
+              </Button>
+            )}
+            <CustomShopLink
+              href={`/shop/checkout/confirmation/${encodeURIComponent(activeCheckout.orderToken)}`}
+              className='inline-flex min-h-11 items-center text-xs font-semibold underline'
             >
-              {paymentSurfaceCopy.cta}
-            </Button>
+              Open order status
+            </CustomShopLink>
           </div>
         </div>
       </div>

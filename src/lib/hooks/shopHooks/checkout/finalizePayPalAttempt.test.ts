@@ -187,3 +187,96 @@ test('a server rejection exposes recovery guidance without internal payment diag
       !error.message.includes('secret'),
   );
 });
+
+test('hanging authorization releases the waiting UI but preserves the attempt and rejects replay', async () => {
+  const attempt = setup('hanging-authorize');
+  const gate = deferred<Response>();
+  let requests = 0;
+  let signal: AbortSignal | null | undefined;
+  const options = {
+    timeoutMs: 10,
+    request: async (_url: string | URL | Request, init?: RequestInit) => {
+      requests += 1;
+      signal = init?.signal;
+      return gate.promise;
+    },
+    onCompleted: () => assert.fail('late authorization navigated'),
+  };
+  await assert.rejects(
+    finalizePayPalAttempt(attempt, attempt.paypalOrderId!, options),
+    /taking longer.*Check its status/,
+  );
+  assert.equal(signal?.aborted, true);
+  assert.equal(isCurrentCheckoutAttempt(attempt), true);
+  assert.equal(usePayPalIntentStore.getState().activeCheckout?.stage, 'paypal_approved');
+  await assert.rejects(
+    finalizePayPalAttempt(attempt, attempt.paypalOrderId!, options),
+    /already being checked/,
+  );
+  gate.resolve(authorized());
+  await new Promise(setImmediate);
+  assert.equal(requests, 1, 'A late authorization must not dispatch capture');
+  assert.equal(usePayPalIntentStore.getState().activeCheckout?.stage, 'paypal_approved');
+});
+
+test('hanging capture remains uncertain and its late result cannot navigate or replay after reload', async () => {
+  const attempt = setup('hanging-capture');
+  const gate = deferred<Response>();
+  let requests = 0;
+  const options = {
+    timeoutMs: 10,
+    request: async () => (++requests === 1 ? authorized() : gate.promise),
+    onCompleted: () => assert.fail('late capture navigated'),
+  };
+  await assert.rejects(
+    finalizePayPalAttempt(attempt, attempt.paypalOrderId!, options),
+    /taking longer.*Check its status/,
+  );
+  assert.equal(usePayPalIntentStore.getState().activeCheckout?.stage, 'capture_checking');
+  const saved = {
+    state: {
+      checkoutAttempt: attempt,
+      orderToken: attempt.orderToken,
+      activeCheckout: usePayPalIntentStore.getState().activeCheckout,
+    },
+    version: 0,
+  };
+  usePayPalIntentStore.persist.setOptions({
+    storage: {
+      getItem: async () => structuredClone(saved),
+      setItem: async () => {},
+      removeItem: async () => {},
+    },
+  });
+  usePayPalIntentStore.setState({ checkoutAttempt: null, activeCheckout: null });
+  await usePayPalIntentStore.persist.rehydrate();
+  await assert.rejects(
+    finalizePayPalAttempt(captureCheckoutAttempt()!, attempt.paypalOrderId!, options),
+    /already being checked/,
+  );
+  gate.resolve(captured());
+  await new Promise(setImmediate);
+  assert.equal(requests, 2);
+  assert.equal(usePayPalIntentStore.getState().activeCheckout?.stage, 'capture_checking');
+});
+
+test('an authorization response with a hanging body cannot hold checkout or start capture later', async () => {
+  const attempt = setup('hanging-body');
+  const body = deferred<unknown>();
+  let requests = 0;
+  await assert.rejects(
+    finalizePayPalAttempt(attempt, attempt.paypalOrderId!, {
+      timeoutMs: 10,
+      request: async () => {
+        requests += 1;
+        return { ok: true, json: () => body.promise } as Response;
+      },
+      onCompleted: () => assert.fail('late response body navigated'),
+    }),
+    /taking longer.*Check its status/,
+  );
+  body.resolve(await authorized().json());
+  await new Promise(setImmediate);
+  assert.equal(requests, 1);
+  assert.equal(usePayPalIntentStore.getState().activeCheckout?.stage, 'paypal_approved');
+});

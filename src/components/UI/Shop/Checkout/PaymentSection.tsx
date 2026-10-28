@@ -24,14 +24,13 @@ import {
   hasDifferentBoundCheckout,
 } from './checkoutReview';
 import { applyCheckoutSetupFailure } from './checkoutSetupFailure';
+import type { OriginalCheckout } from '@/lib/shop/checkout/originalCheckout';
 
 const PayPalCheckout = dynamic(() => import('./Paypal/PayPalMainCheckoutComponent'));
-const ActivePayPalCheckoutRecoveryBanner = dynamic(
-  () => import('./Paypal/ActivePayPalCheckoutRecoveryBanner'),
-);
 export type CheckoutOptions = 'card' | 'paypal_buttons' | '';
 export const CheckoutPaymentReviewContext = createContext<{
   review: CheckoutReview | null;
+  originalCheckout?: OriginalCheckout;
   onPaymentError: (message: string, code?: string) => void;
 }>({ review: null, onPaymentError: () => {} });
 
@@ -43,10 +42,6 @@ type CheckoutPaymentViewProps = {
   onEdit: () => void;
   onRefreshQuote: () => void;
   onVerificationRequired: (message: string) => void;
-  renderRecovery?: (
-    choose: (surface: 'card' | 'paypal_buttons' | null) => void,
-    startSeparate: () => void,
-  ) => ReactNode;
   renderPayment: (mode: CheckoutOptions) => ReactNode;
   previousOrderToken?: string;
   paymentBlocked?: boolean;
@@ -85,12 +80,6 @@ export default function PaymentSection() {
       onEdit={() => handleOpenItem('basic-checkout-info')}
       onRefreshQuote={refreshQuote}
       onVerificationRequired={requestVerification}
-      renderRecovery={(choose, startSeparate) => (
-        <ActivePayPalCheckoutRecoveryBanner
-          onSelectPaymentSurface={choose}
-          onStartSeparateOrder={startSeparate}
-        />
-      )}
       renderPayment={(mode) => <PayPalCheckout mode={mode} />}
     />
   );
@@ -104,7 +93,6 @@ export function CheckoutPaymentView({
   onEdit,
   onRefreshQuote,
   onVerificationRequired,
-  renderRecovery,
   renderPayment,
   paymentBlocked,
   previousOrderToken,
@@ -144,14 +132,6 @@ export function CheckoutPaymentView({
             <ArrowLeft size={16} aria-hidden='true' /> Edit delivery
           </button>
         </header>
-        {renderRecovery?.(
-          (surface) => setPayOption(surface ?? ''),
-          () => {
-            setAcceptedReview(null);
-            setPayOption('');
-            setPaymentError(null);
-          },
-        )}
         <section
           aria-labelledby='checkout-final-review'
           className='min-w-0 border-b border-white/20 pb-4'
@@ -212,31 +192,7 @@ export function CheckoutPaymentView({
             Privacy (draft)
           </CustomShopLink>
         </p>
-        <fieldset className='min-w-0'>
-          <legend className='mb-3 font-semibold'>Payment method</legend>
-          <div className='flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2'>
-            {(['card', 'paypal_buttons'] as const).map((method) => (
-              <label
-                key={method}
-                className='inline-flex min-h-11 cursor-pointer items-center gap-2 py-2'
-              >
-                <input
-                  type='radio'
-                  name='checkout-payment-method'
-                  value={method}
-                  checked={payOption === method}
-                  onChange={() => setPayOption(method)}
-                  className='h-5 w-5 shrink-0 accent-[#0085ff]'
-                />
-                {method === 'card' ? (
-                  <span className='text-sm font-medium'>Credit / debit card</span>
-                ) : (
-                  <Image src={PayPal} alt='PayPal' className='h-auto w-10' />
-                )}
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <CheckoutPaymentMethods value={payOption} onChange={setPayOption} />
         {paymentError && (
           <p
             role='alert'
@@ -272,5 +228,41 @@ export function CheckoutPaymentView({
         </p>
       </div>
     </CheckoutPaymentReviewContext.Provider>
+  );
+}
+
+export function CheckoutPaymentMethods({
+  value,
+  onChange,
+}: {
+  value: CheckoutOptions;
+  onChange: (value: CheckoutOptions) => void;
+}) {
+  return (
+    <fieldset className='min-w-0'>
+      <legend className='mb-3 font-semibold'>Payment method</legend>
+      <div className='flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2'>
+        {(['card', 'paypal_buttons'] as const).map((method) => (
+          <label
+            key={method}
+            className='inline-flex min-h-11 cursor-pointer items-center gap-2 py-2'
+          >
+            <input
+              type='radio'
+              name='checkout-payment-method'
+              value={method}
+              checked={value === method}
+              onChange={() => onChange(method)}
+              className='h-5 w-5 shrink-0 accent-[#0085ff]'
+            />
+            {method === 'card' ? (
+              <span className='text-sm font-medium'>Credit / debit card</span>
+            ) : (
+              <Image src={PayPal} alt='PayPal' className='h-auto w-10' />
+            )}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }

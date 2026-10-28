@@ -6,6 +6,7 @@ import CheckoutAccessRecovery from '@/components/UI/Shop/Checkout/CheckoutAccess
 import CheckoutStorageNotice from '@/components/UI/Shop/Checkout/CheckoutStorageNotice';
 import { useAuthStore } from '@/stores/authStore';
 import { claimCurrentCheckout } from '@/lib/hooks/shopHooks/checkout/claimCurrentCheckout';
+import { readCheckoutStatus } from '@/lib/hooks/shopHooks/checkout/readCheckoutStatus';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { clearLegacyCheckoutCaches } from '@/stores/shop_stores/checkoutStore/storage';
@@ -74,10 +75,7 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
       try {
         if (authenticatedOwner && !viewingEarlierOrder) await claimCurrentCheckout();
         if (cancelled) return;
-        const response = await fetch(
-          `/next-api/paypal/tx-ledger/payments/${encodeURIComponent(orderToken)}/status`,
-          { cache: 'no-store', signal: controller.signal },
-        );
+        const response = await readCheckoutStatus(orderToken, { signal: controller.signal });
         if (cancelled) return;
         if (response.status === 403) {
           setPayload(null);
@@ -93,10 +91,9 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
           setAccessRequired(true);
           return;
         }
-        if (!response.ok) throw new Error('Status unavailable');
-        const next = (await response.json()) as PayPalTxPaymentStatusResponse;
+        const next = response.data;
+        if (!next) throw new Error('Status unavailable');
         if (cancelled) return;
-        if (next.orderToken !== orderToken) throw new Error('Order mismatch');
         setPayloadOwner(authenticatedOwner);
         setPayload(next);
         setAccessRequired(false);

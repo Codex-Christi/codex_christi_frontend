@@ -232,6 +232,37 @@ src/lib/shop/checkout/checkoutProof.ts
 src/lib/shop/checkout/serverEmailProofCookies.ts
 ```
 
+### Bounded Payment Recovery And Original-Purchase Continuation
+
+- Checkout setup, authorization, capture, claim, and status reads have bounded client waits. The
+  deadline includes response-body reads and settles even when a transport ignores cancellation.
+  A timeout preserves the original attempt and its uncertain stage; later replies cannot advance
+  capture or navigation. Repeated approval callbacks cannot replay an approved/uncertain attempt.
+- The confirmation dialog traps keyboard focus while authorization/capture is pending. Hosted-card
+  validation is bounded; a slow bank-authentication submission offers access to the existing order
+  status without resubmitting the payment or interrupting the bank challenge.
+- `GET /next-api/shop/checkout/{orderToken}/resume` returns a private original-purchase preview only
+  to its account owner or original payment grant. Status-only recovery grants cannot authorize
+  payment. The GET never claims ownership, calls a supplier, reprices, or creates a provider order.
+- Resume requires an untouched `intent_created` row, valid canonical purchase data, and matching
+  stored verification/address evidence. Authorization, capture, errors, processing, or fulfillment
+  evidence require status recovery instead. Legacy/damaged rows have no payment-resume fallback.
+- The original-purchase view is independent of the merged cart's quote and conflicts. It displays
+  saved items, delivery, and total, and requires a fresh acknowledgement. PayPal uses that purchase's
+  currency/country and original delivery address for same-as-delivery billing.
+- Immediately before PayPal opens, the client rechecks authorized original-order state and its
+  review fingerprint, then returns the existing provider ID. It never posts the merged cart to the
+  intent endpoint or records a replacement cart checkout snapshot. Existing guest-adoption bindings
+  preserve account items and later additions when the original purchased quantities are consumed.
+- Account/attempt changes invalidate pending preview reads. Stalled claims release their local
+  request lock so a later ownership/status check can proceed safely.
+
+Regression coverage includes never-settling requests/body reads, ignored aborts, late replies,
+duplicate approvals, account changes, protected resume access, and guest-cart adoption followed by
+original-order consumption. Sandbox browser checks use an inert temporary UI fixture, removed
+after verification; they do not substitute for a new live sign-in/payment test. Fulfillment,
+post-payment runners, and webhook processing stay disabled during this verification.
+
 ### Known Django Backend Contract Gap
 
 Observed behavior:
