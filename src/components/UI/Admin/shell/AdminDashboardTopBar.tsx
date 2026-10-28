@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { ArrowUpLeft, Lock, Menu } from 'lucide-react';
+import { ArrowUpLeft, Menu } from 'lucide-react';
+import AdminLockButton from '../AdminLockButton';
 import styles from './AdminDashboardShell.module.css';
 
 type AdminDashboardTopBarProps = {
@@ -41,14 +42,7 @@ export default function AdminDashboardTopBar({
           <span className='hidden sm:inline'>Site root</span>
         </Link>
 
-        <Link
-          href='/admin/logout'
-          aria-label='Lock admin session'
-          title='Lock admin session'
-          className='grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/[0.035] text-slate-200 transition hover:border-cyan-300/25 hover:bg-white/[0.06] hover:text-cyan-100'
-        >
-          <Lock size={17} />
-        </Link>
+        <AdminLockButton />
       </div>
     </header>
   );

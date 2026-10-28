@@ -18,7 +18,7 @@ export function getSafeAdminReturnPath(value: string | null | undefined) {
       return null;
     }
 
-    if (!parsed.pathname.startsWith(ADMIN_ROOT_PATH)) {
+    if (parsed.pathname !== ADMIN_ROOT_PATH && !parsed.pathname.startsWith(`${ADMIN_ROOT_PATH}/`)) {
       return null;
     }
 
@@ -35,12 +35,14 @@ export function sanitizeAdminReturnPath(
   return getSafeAdminReturnPath(value) ?? fallback;
 }
 
-export function buildAdminUnlockPath(returnPath: string | null | undefined) {
+export function getAdminUnlockDestination(returnPath: string | null | undefined) {
   const safeReturnPath = sanitizeAdminReturnPath(returnPath);
-  return `${ADMIN_UNLOCK_PATH}?next=${encodeURIComponent(safeReturnPath)}`;
+  const path = safeReturnPath.split('?')[0];
+  return path === ADMIN_UNLOCK_PATH || path === ADMIN_LOGOUT_PATH
+    ? ADMIN_ROOT_PATH
+    : safeReturnPath;
 }
 
-export function buildAdminLogoutPath(returnPath: string | null | undefined) {
-  const safeReturnPath = sanitizeAdminReturnPath(returnPath);
-  return `${ADMIN_LOGOUT_PATH}?next=${encodeURIComponent(safeReturnPath)}`;
+export function buildAdminUnlockPath(returnPath: string | null | undefined) {
+  return `${ADMIN_UNLOCK_PATH}?next=${encodeURIComponent(getAdminUnlockDestination(returnPath))}`;
 }

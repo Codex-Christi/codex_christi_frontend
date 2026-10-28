@@ -3,7 +3,7 @@ import 'server-only';
 import { notFound, redirect } from 'next/navigation';
 import { getServerSessionState } from '@/lib/session/server-session';
 import { getActiveAdminUserByCodexUserId } from './admin-auth-ledger';
-import { buildAdminLogoutPath, buildAdminUnlockPath, sanitizeAdminReturnPath } from './admin-paths';
+import { buildAdminUnlockPath, sanitizeAdminReturnPath } from './admin-paths';
 import {
   isAdminScopeAllowed,
   isMasterAdminRole,
@@ -23,9 +23,7 @@ export type AdminAuthContext = {
 };
 
 export type AdminActionAuthErrorCode =
-  | 'admin_session_expired'
-  | 'admin_permission_denied'
-  | 'primary_session_expired';
+  'admin_session_expired' | 'admin_permission_denied' | 'primary_session_expired';
 
 export class AdminActionAuthError extends Error {
   code: AdminActionAuthErrorCode;
@@ -126,17 +124,7 @@ export async function requireAdminPage({
     adminSession.userID !== primarySession.userID ||
     adminSession.sessionVersion !== adminUser.sessionVersion
   ) {
-    const shouldClearAdminCookie =
-      adminSession.shouldClearCookie ||
-      (adminSession.isAuthenticated &&
-        (adminSession.userID !== primarySession.userID ||
-          adminSession.sessionVersion !== adminUser.sessionVersion));
-
-    redirect(
-      shouldClearAdminCookie
-        ? buildAdminLogoutPath(safeReturnPath)
-        : buildAdminUnlockPath(safeReturnPath),
-    );
+    redirect(buildAdminUnlockPath(safeReturnPath));
   }
 
   if (!isAdminScopeAllowed(adminUser.scopes, scope, adminUser.role)) {

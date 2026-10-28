@@ -6,7 +6,7 @@ import AdminAmbientSlideshow from '@/components/UI/Admin/dashboard/AdminAmbientS
 import AdminGlassPanel from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import DefaultPageWrapper from '@/components/UI/general/DefaultPageWrapper';
 import { isAdminOpsLedgerUnavailableError } from '@/lib/admin/admin-ops-ledger-errors';
-import { buildAdminLogoutPath, sanitizeAdminReturnPath } from '@/lib/admin/admin-paths';
+import { getAdminUnlockDestination } from '@/lib/admin/admin-paths';
 import { getServerAdminSessionState } from '@/lib/admin/admin-session-server';
 import { requirePrimaryAdminCandidate } from '@/lib/admin/require-admin';
 
@@ -17,12 +17,13 @@ export const metadata: Metadata = {
 type AdminUnlockPageProps = {
   searchParams: Promise<{
     next?: string;
+    passwordChanged?: string;
   }>;
 };
 
 export default async function AdminUnlockPage({ searchParams }: AdminUnlockPageProps) {
   const params = await searchParams;
-  const nextPath = sanitizeAdminReturnPath(params.next, '/admin');
+  const nextPath = getAdminUnlockDestination(params.next);
   const adminUser = await requirePrimaryAdminCandidate({
     returnPath: `/admin/unlock?next=${encodeURIComponent(nextPath)}`,
   }).catch((error) => {
@@ -38,10 +39,6 @@ export default async function AdminUnlockPage({ searchParams }: AdminUnlockPageP
   }
 
   const adminSession = await getServerAdminSessionState();
-
-  if (adminSession.shouldClearCookie) {
-    redirect(buildAdminLogoutPath(nextPath));
-  }
 
   if (
     adminSession.isAuthenticated &&
@@ -68,6 +65,11 @@ export default async function AdminUnlockPage({ searchParams }: AdminUnlockPageP
             </p>
           </div>
 
+          {params.passwordChanged === 'true' ? (
+            <p role='status' className='mb-5 text-sm text-emerald-200'>
+              Admin password changed. Unlock again.
+            </p>
+          ) : null}
           <AdminUnlockForm nextPath={nextPath} />
         </AdminGlassPanel>
       </main>

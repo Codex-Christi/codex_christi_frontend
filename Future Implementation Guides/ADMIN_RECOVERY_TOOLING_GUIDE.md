@@ -1,6 +1,6 @@
 # Admin And Recovery Tooling Guide
 
-Last updated: 2026-08-06
+Last updated: 2026-10-27 (authentication pointer; operational checkpoints retain their own dates)
 
 This guide isolates the admin and checkout recovery work from the broader PayPal TX ledger guide. Use it as the source of truth for the next implementation phase: admin visibility, support recovery, retry operations, and maintenance tooling.
 
@@ -15,8 +15,9 @@ Related source docs:
 Release sequencing:
 
 - `SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md` is canonical for public-alpha priority and release gates.
-- This guide remains authoritative for admin authentication, audit, recovery actions, notification
-  recipient management, and operational UI behavior.
+- The [authentication guide](./nextjs-auth-shop-integration-hardening-plan.md#admin-lock-and-password-changes)
+  owns current admin Lock/unlock, signing-key readiness, own-password changes and email/recovery boundaries.
+  This guide owns audit, operational recovery actions, notification recipients and the remaining admin UI.
 - Older phase lists and "Next Step" sections are domain backlog, not the cross-domain release order.
 
 ## Current Position

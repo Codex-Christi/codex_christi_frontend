@@ -9,8 +9,7 @@ import {
   type AdminScope,
 } from './admin-config';
 import { signAdminSessionToken, verifyAdminSessionToken } from './admin-session-token';
-
-const LEGACY_ADMIN_SESSION_COOKIE_PATHS = ['/'];
+import type { ResponseCookieDefinition } from '../session/response-cookies';
 
 export async function getServerAdminSessionState() {
   const cookieStore = await cookies();
@@ -19,7 +18,7 @@ export async function getServerAdminSessionState() {
   return verifyAdminSessionToken(token);
 }
 
-export async function createAdminSession({
+export async function buildAdminSessionCookie({
   userID,
   role,
   scopes,
@@ -29,7 +28,7 @@ export async function createAdminSession({
   role: AdminRole;
   scopes: AdminScope[];
   sessionVersion: number;
-}) {
+}): Promise<ResponseCookieDefinition> {
   const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL_SECONDS * 1000);
   const token = await signAdminSessionToken({
     userID,
@@ -38,48 +37,16 @@ export async function createAdminSession({
     sessionVersion,
     expiresAt,
   });
-  const cookieStore = await cookies();
-
-  for (const path of LEGACY_ADMIN_SESSION_COOKIE_PATHS) {
-    cookieStore.set(ADMIN_SESSION_COOKIE_NAME, '', {
+  return {
+    name: ADMIN_SESSION_COOKIE_NAME,
+    value: token,
+    options: {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path,
-      expires: new Date(0),
-    });
-  }
-
-  cookieStore.set(ADMIN_SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: ADMIN_SESSION_COOKIE_PATH,
-    expires: expiresAt,
-    maxAge: ADMIN_SESSION_TTL_SECONDS,
-  });
-
-  return { expiresAt };
-}
-
-export async function deleteAdminSession() {
-  const cookieStore = await cookies();
-
-  cookieStore.set(ADMIN_SESSION_COOKIE_NAME, '', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: ADMIN_SESSION_COOKIE_PATH,
-    expires: new Date(0),
-  });
-
-  for (const path of LEGACY_ADMIN_SESSION_COOKIE_PATHS) {
-    cookieStore.set(ADMIN_SESSION_COOKIE_NAME, '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path,
-      expires: new Date(0),
-    });
-  }
+      sameSite: 'lax' as const,
+      path: ADMIN_SESSION_COOKIE_PATH,
+      expires: expiresAt,
+      maxAge: ADMIN_SESSION_TTL_SECONDS,
+    },
+  };
 }

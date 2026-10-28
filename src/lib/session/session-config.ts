@@ -3,10 +3,17 @@ import 'server-only';
 import { resolveServerDjangoApiBaseUrl } from '../django/resolveServerDjangoApiBaseUrl';
 
 export function getEncodedSessionSecret() {
-  const secret = process.env.SESSION_SECRET;
+  return encodeSecret(process.env.SESSION_SECRET, 'SESSION_SECRET');
+}
+
+export function getEncodedAdminSessionSecret() {
+  return encodeSecret(process.env.ADMIN_SESSION_SECRET?.trim(), 'ADMIN_SESSION_SECRET');
+}
+
+function encodeSecret(secret: string | undefined, name: string) {
   const encoded = new TextEncoder().encode(secret);
   if (!secret || encoded.length < 32) {
-    throw new Error('SESSION_SECRET must contain at least 32 bytes.');
+    throw new Error(`${name} must contain at least 32 bytes.`);
   }
   return encoded;
 }
@@ -22,6 +29,7 @@ export function getDjangoAuthRefreshPath() {
 // Called at runtime, never at module import or during a secret-free image build.
 export function assertAuthConfiguration() {
   getEncodedSessionSecret();
+  getEncodedAdminSessionSecret();
   const base = resolveServerDjangoApiBaseUrl();
   const url = new URL(base);
   if (

@@ -2,6 +2,7 @@ import {
   ClipboardList,
   DatabaseZap,
   Home,
+  KeyRound,
   RotateCcw,
   ScrollText,
   Settings,
@@ -28,6 +29,12 @@ export const adminDashboardNavigationGroups: AdminDashboardNavigationGroup[] = [
         href: '/admin',
         icon: Home,
         section: 'admin',
+      },
+      {
+        title: 'My Admin Password',
+        href: '/admin/security',
+        icon: KeyRound,
+        section: 'admin-password',
       },
     ],
   },
@@ -125,6 +132,15 @@ const defaultPageConfig: AdminDashboardPageConfig = {
 };
 
 const pageConfigs: Array<[prefix: string, config: AdminDashboardPageConfig]> = [
+  [
+    '/admin/security',
+    {
+      section: 'admin-password',
+      title: 'My Admin Password',
+      subtitle: 'Admin account security',
+      searchPlaceholder: 'Search admin tools',
+    },
+  ],
   [
     '/admin/shop/paid-order-recovery/',
     {

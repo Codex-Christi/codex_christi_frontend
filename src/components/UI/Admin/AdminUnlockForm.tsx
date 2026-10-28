@@ -2,24 +2,31 @@
 
 import { useActionState } from 'react';
 import { KeyRound, ShieldCheck } from 'lucide-react';
-import {
-  unlockAdminAction,
-  type AdminUnlockActionState,
-} from '@/app/admin/unlock/actions';
+import { postAdminAuth } from '@/lib/admin/admin-auth-client';
+import { adminUnlockSchema } from '@/lib/formSchemas/admin-password';
+import { getAdminUnlockDestination } from '@/lib/admin/admin-paths';
 import { adminInsetSurfaceClass } from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import { cn } from '@/lib/utils';
 
-const initialState: AdminUnlockActionState = {
+const initialState: { error: string | null } = {
   error: null,
 };
 
 export default function AdminUnlockForm({ nextPath }: { nextPath: string }) {
-  const [state, formAction, pending] = useActionState(unlockAdminAction, initialState);
+  const [state, formAction, pending] = useActionState(
+    async (_previous: typeof initialState, form: FormData) => {
+      const parsed = adminUnlockSchema.safeParse({ password: form.get('password') });
+      if (!parsed.success) return { error: 'Enter your admin unlock password.' };
+      const result = await postAdminAuth('unlock', parsed.data);
+      if (!result.success) return { error: result.error };
+      window.location.replace(getAdminUnlockDestination(nextPath));
+      return { error: null };
+    },
+    initialState,
+  );
 
   return (
     <form action={formAction} className='mx-auto w-full max-w-[420px] space-y-5'>
-      <input type='hidden' name='next' value={nextPath} />
-
       <div className='space-y-2'>
         <div className='flex items-center gap-2 text-sm font-medium text-cyan-100'>
           <ShieldCheck size={17} />
@@ -28,7 +35,12 @@ export default function AdminUnlockForm({ nextPath }: { nextPath: string }) {
         <label className='sr-only' htmlFor='admin-password'>
           Admin password
         </label>
-        <div className={cn(adminInsetSurfaceClass, 'flex h-12 items-center gap-3 px-3 focus-within:border-cyan-300/40')}>
+        <div
+          className={cn(
+            adminInsetSurfaceClass,
+            'flex h-12 items-center gap-3 px-3 focus-within:border-cyan-300/40',
+          )}
+        >
           <KeyRound size={18} className='shrink-0 text-slate-400' />
           <input
             id='admin-password'
@@ -38,6 +50,7 @@ export default function AdminUnlockForm({ nextPath }: { nextPath: string }) {
             className='h-full min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-500'
             placeholder='Admin password'
             required
+            maxLength={1024}
           />
         </div>
       </div>

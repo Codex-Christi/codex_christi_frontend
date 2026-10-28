@@ -37,6 +37,8 @@ export const redirectLoggedInUserToProfileMiddleware = (req: NextRequest) =>
   redirectLoggedInUserToProfile(req);
 
 async function protect(req: NextRequest, admin: boolean) {
+  // The legacy lock alias handles its own method/origin checks, without refreshing login.
+  if (admin && req.nextUrl.pathname === ADMIN_LOGOUT_PATH) return NextResponse.next();
   // Unsafe methods are checked by their own actions/handlers; never replay a POST via redirects.
   if (req.method !== 'GET' && req.method !== 'HEAD') return NextResponse.next();
   const host = req.headers.get('host') ?? '';
@@ -120,11 +122,7 @@ async function protect(req: NextRequest, admin: boolean) {
     return redirect(`${authFlowUrl(login, { next: returnPath })}&sessionExp=true`);
   }
   if (req.nextUrl.searchParams.has(SESSION_REFRESH_GUARD_PARAM)) return redirect(path);
-  if (
-    admin &&
-    req.nextUrl.pathname !== ADMIN_UNLOCK_PATH &&
-    req.nextUrl.pathname !== ADMIN_LOGOUT_PATH
-  ) {
+  if (admin && req.nextUrl.pathname !== ADMIN_UNLOCK_PATH) {
     const unlocked = await getRequestAdminSessionState(req);
     if (!unlocked.isAuthenticated || unlocked.userID !== state.userID) {
       const response = redirect(buildAdminUnlockPath(returnPath));

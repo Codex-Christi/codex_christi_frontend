@@ -23,8 +23,9 @@ inspect its logs and restore the previous release manually when needed.
 
 `/next-api/health/ready` (also `/api/health/ready` inside Next) returns `200` only
 when the app can query its required local catalog tables and its authentication
-configuration is valid. The Next container must have a `SESSION_SECRET` of at
-least 32 UTF-8 bytes, an HTTP(S) Django API base URL without credentials, query
+configuration is valid. The Next container must have separate random
+`SESSION_SECRET` and `ADMIN_SESSION_SECRET` values of at least 32 UTF-8 bytes
+each, an HTTP(S) Django API base URL without credentials, query
 or fragment, and a valid `DJANGO_AUTH_REFRESH_PATH` if overriding the default
 `/auth/token/refresh`. Internal Docker HTTP URLs are allowed. The selected URL
 uses the same internal/public preference as real Django requests.
@@ -32,6 +33,13 @@ uses the same internal/public preference as real Django requests.
 Otherwise it returns `503` with a generic body. The handler logs only the failed
 check, not secrets, URLs or database details. Responses are not cached. These
 checks run at request time, so the image build does not need a session secret.
+
+`ADMIN_SESSION_SECRET` is a server signing key, not an admin's unlock password.
+Changing that key requires fresh admin unlocks but does not invalidate ordinary
+site login. An admin can change their own unlock password at `/admin/security`;
+that invalidates previous unlocks for that admin while preserving ordinary login.
+Ensure the existing Admin Ops schema is migrated before using that form; the
+current production setup script does not apply admin-database migrations.
 
 The container probes this endpoint every 30 seconds. This is a local readiness
 probe, not a catalog refresh: it makes no Django, Merchize, PayPal or remote

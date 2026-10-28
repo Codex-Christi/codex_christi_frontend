@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { upsertAdminUserFromDashboard, writeAdminAuditLog } from '@/lib/admin/admin-auth-ledger';
 import {
   completeMasterAdminTransfer,
@@ -22,9 +21,7 @@ import {
   saveAdminNotificationRecipientEmailPermissions,
   saveAdminNotificationRecipientGroup,
 } from '@/lib/admin/admin-notification-recipients';
-import { deleteAdminSession } from '@/lib/admin/admin-session-server';
 import { requireMasterAdminAction } from '@/lib/admin/require-admin';
-import { deleteSession } from '@/lib/session/main-session';
 import { getServerAccessToken } from '@/lib/session/server-session';
 
 export type AdminUserProvisionActionState = {
@@ -44,6 +41,7 @@ export type MasterAdminTransferStartActionState = {
 
 export type MasterAdminTransferCompleteActionState = {
   error: string | null;
+  completed?: boolean;
 };
 
 export type AdminNotificationRecipientGroupActionState = {
@@ -256,9 +254,7 @@ export async function completeMasterAdminTransferAction(
     };
   }
 
-  await deleteAdminSession();
-  await deleteSession();
-  redirect('/auth/sign-in?from-master-transfer=true');
+  return { error: null, completed: true };
 }
 
 export async function saveAdminNotificationRecipientGroupAction(

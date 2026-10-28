@@ -17,6 +17,7 @@ import {
   adminInsetSurfaceClass,
 } from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import { cn } from '@/lib/utils';
+import { logoutUser } from '@/actions/logout';
 
 const initialStartState: MasterAdminTransferStartActionState = {
   error: null,
@@ -34,12 +35,17 @@ const initialPreviewState: CodexUserProfilePreviewActionState = {
 
 export default function AdminMasterTransferForm() {
   const [targetCodexUserId, setTargetCodexUserId] = useState('');
+  const [signingOut, setSigningOut] = useState(false);
   const [startState, startAction, startPending] = useActionState(
     startMasterAdminTransferAction,
     initialStartState,
   );
   const [completeState, completeAction, completePending] = useActionState(
-    completeMasterAdminTransferAction,
+    async (previous: MasterAdminTransferCompleteActionState, form: FormData) => {
+      const result = await completeMasterAdminTransferAction(previous, form);
+      if (result.completed) await finishSignOut();
+      return result;
+    },
     initialCompleteState,
   );
   const [previewState, previewAction, previewPending] = useActionState(
@@ -48,6 +54,33 @@ export default function AdminMasterTransferForm() {
   );
   const verifiedProfile =
     previewState.profile?.id === targetCodexUserId.trim() ? previewState.profile : null;
+
+  async function finishSignOut() {
+    setSigningOut(true);
+    try {
+      await logoutUser();
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
+  if (completeState.completed)
+    return (
+      <div className='grid gap-4'>
+        <p role='status' className='text-sm text-emerald-200'>
+          Master access transferred.
+        </p>
+        <button
+          type='button'
+          disabled={signingOut}
+          onClick={() => void finishSignOut()}
+          className='inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-cyan-300 px-4 text-sm font-semibold text-slate-950 disabled:opacity-60'
+        >
+          {signingOut ? <Loader2 size={16} className='animate-spin' /> : <KeyRound size={16} />}
+          {signingOut ? 'Signing out...' : 'Sign out'}
+        </button>
+      </div>
+    );
 
   return (
     <div className='space-y-3'>

@@ -1,11 +1,11 @@
 import { jwtVerify, SignJWT, type JWTPayload } from 'jose';
 import {
-  getAdminSessionSecret,
   normalizeAdminRole,
   normalizeAdminScopes,
   type AdminRole,
   type AdminScope,
 } from './admin-config';
+import { getEncodedAdminSessionSecret } from '../session/session-config';
 
 export type AdminSessionState = {
   isAuthenticated: boolean;
@@ -33,16 +33,6 @@ const emptyAdminSessionState: AdminSessionState = {
   expiresAt: null,
   shouldClearCookie: false,
 };
-
-function getEncodedAdminSessionSecret() {
-  const secret = getAdminSessionSecret();
-
-  if (!secret) {
-    throw new Error('ADMIN_SESSION_SECRET is not configured.');
-  }
-
-  return new TextEncoder().encode(secret);
-}
 
 export async function signAdminSessionToken({
   userID,
@@ -81,9 +71,8 @@ export async function verifyAdminSessionToken(
     const scopes = normalizeAdminScopes(adminPayload.scopes);
     const sessionVersion =
       typeof adminPayload.sessionVersion === 'number' ? adminPayload.sessionVersion : null;
-    const expiresAt = typeof adminPayload.exp === 'number'
-      ? new Date(adminPayload.exp * 1000)
-      : null;
+    const expiresAt =
+      typeof adminPayload.exp === 'number' ? new Date(adminPayload.exp * 1000) : null;
 
     if (
       !userID ||

@@ -3,6 +3,7 @@ import type { AdminRole, AdminScope } from '@/lib/admin/admin-config';
 
 export type AdminDashboardSection =
   | 'admin'
+  | 'admin-password'
   | 'admin-notification-recipients'
   | 'admin-ops'
   | 'admin-security-records'

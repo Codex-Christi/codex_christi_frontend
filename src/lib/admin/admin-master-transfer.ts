@@ -10,11 +10,8 @@ import {
   isMasterAdminRole,
   MASTER_ADMIN_ROLE,
 } from './admin-config';
-import {
-  getActiveAdminUserByCodexUserId,
-  writeAdminAuditLog,
-  type AdminAuditActor,
-} from './admin-auth-ledger';
+import { getActiveAdminUserByCodexUserId, writeAdminAuditLog } from './admin-auth-ledger';
+import { getAdminRequestAuditContext } from './admin-request-audit';
 import { buildAdminMasterTransferOtpEmailHtml } from './admin-master-transfer-email';
 import { requireCodexChristiUserProfilePreview } from './codex-christi-user-profile';
 
@@ -22,9 +19,10 @@ const MASTER_TRANSFER_OTP_EXPIRY_MINUTES = 10;
 const MAX_MASTER_TRANSFER_OTP_ATTEMPTS = 5;
 const MIN_MASTER_TRANSFER_PASSWORD_LENGTH = 12;
 
-type MasterTransferActor = Exclude<AdminAuditActor, null> & {
+type MasterTransferActor = {
   adminUserId: string;
   userID: string;
+  sessionVersion: number;
 };
 
 export type MasterTransferChallengeSummary = {
@@ -70,7 +68,12 @@ export async function startMasterAdminTransfer({
 
   const actorAdmin = await getActiveAdminUserByCodexUserId(actor.userID);
 
-  if (!actorAdmin || !isMasterAdminRole(actorAdmin.role)) {
+  if (
+    !actorAdmin ||
+    actorAdmin.id !== actor.adminUserId ||
+    actorAdmin.sessionVersion !== actor.sessionVersion ||
+    !isMasterAdminRole(actorAdmin.role)
+  ) {
     throw new Error('Master admin authorization required.');
   }
 
@@ -103,32 +106,35 @@ export async function startMasterAdminTransfer({
   });
   const expiresAt = new Date(Date.now() + MASTER_TRANSFER_OTP_EXPIRY_MINUTES * 60_000);
 
-  await prisma.adminMasterTransferChallenge.updateMany({
-    where: {
-      actorAdminUserId: actor.adminUserId,
-      consumedAt: null,
-    },
-    data: {
-      consumedAt: new Date(),
-    },
-  });
-
-  const challenge = await prisma.adminMasterTransferChallenge.create({
-    data: {
-      actorAdminUserId: actor.adminUserId,
-      actorCodexUserId: actor.userID,
-      targetCodexUserId: normalizedTargetCodexUserId,
-      targetEmail: normalizedTargetEmail,
-      targetPasswordHash,
-      otpHash,
-      expiresAt,
-    },
-    select: {
-      id: true,
-      targetCodexUserId: true,
-      targetEmail: true,
-      expiresAt: true,
-    },
+  const challenge = await prisma.$transaction(async (tx) => {
+    // Lock the source row before its challenges, matching password-change lock order.
+    const current = await tx.adminUser.updateMany({
+      where: activeMasterWhere(actor),
+      data: { updatedAt: new Date() },
+    });
+    if (current.count !== 1)
+      throw new Error('Admin access changed. Unlock again before starting a transfer.');
+    await tx.adminMasterTransferChallenge.updateMany({
+      where: { actorAdminUserId: actor.adminUserId, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+    return tx.adminMasterTransferChallenge.create({
+      data: {
+        actorAdminUserId: actor.adminUserId,
+        actorCodexUserId: actor.userID,
+        targetCodexUserId: normalizedTargetCodexUserId,
+        targetEmail: normalizedTargetEmail,
+        targetPasswordHash,
+        otpHash,
+        expiresAt,
+      },
+      select: {
+        id: true,
+        targetCodexUserId: true,
+        targetEmail: true,
+        expiresAt: true,
+      },
+    });
   });
 
   try {
@@ -235,8 +241,7 @@ export async function completeMasterAdminTransfer({
         attemptCount: {
           increment: 1,
         },
-        consumedAt:
-          nextAttemptCount >= MAX_MASTER_TRANSFER_OTP_ATTEMPTS ? new Date() : undefined,
+        consumedAt: nextAttemptCount >= MAX_MASTER_TRANSFER_OTP_ATTEMPTS ? new Date() : undefined,
       },
     });
 
@@ -249,12 +254,34 @@ export async function completeMasterAdminTransfer({
 
   const now = new Date();
 
-  const [, targetAdmin] = await prisma.$transaction([
-    prisma.adminMasterTransferChallenge.update({
-      where: { id: challenge.id },
+  const auditContext = await getAdminRequestAuditContext();
+  return prisma.$transaction(async (tx) => {
+    const source = await tx.adminUser.updateMany({
+      where: activeMasterWhere(actor),
+      data: {
+        status: 'disabled',
+        disabledAt: now,
+        disabledReason: `Master admin transferred to ${challenge.targetCodexUserId}.`,
+        sessionVersion: { increment: 1 },
+        updatedByCodexUserId: actor.userID,
+      },
+    });
+    if (source.count !== 1)
+      throw new Error('Admin access changed. Unlock again before completing a transfer.');
+    const claimed = await tx.adminMasterTransferChallenge.updateMany({
+      where: {
+        id: challenge.id,
+        actorAdminUserId: actor.adminUserId,
+        actorCodexUserId: actor.userID,
+        consumedAt: null,
+        expiresAt: { gt: now },
+        attemptCount: { lt: MAX_MASTER_TRANSFER_OTP_ATTEMPTS },
+        otpHash: challenge.otpHash,
+      },
       data: { consumedAt: now },
-    }),
-    prisma.adminUser.upsert({
+    });
+    if (claimed.count !== 1) throw new Error('This transfer code is expired or already used.');
+    const targetAdmin = await tx.adminUser.upsert({
       where: {
         codexUserId: challenge.targetCodexUserId,
       },
@@ -288,37 +315,35 @@ export async function completeMasterAdminTransfer({
         codexUserId: true,
         sessionVersion: true,
       },
-    }),
-    prisma.adminUser.update({
-      where: {
-        id: actor.adminUserId,
-      },
+    });
+    await tx.adminAuditLog.create({
       data: {
-        status: 'disabled',
-        disabledAt: now,
-        disabledReason: `Master admin transferred to ${challenge.targetCodexUserId}.`,
-        sessionVersion: {
-          increment: 1,
+        actorAdminUserId: actor.adminUserId,
+        actorCodexUserId: actor.userID,
+        action: 'admin.master_transfer.completed',
+        targetType: 'adminUser',
+        targetId: targetAdmin.id,
+        outcome: 'success',
+        metadata: {
+          targetCodexUserId: targetAdmin.codexUserId,
+          targetSessionVersion: targetAdmin.sessionVersion,
+          previousMasterCodexUserId: actor.userID,
         },
-        updatedByCodexUserId: actor.userID,
+        ...auditContext,
       },
-    }),
-  ]);
-
-  await writeAdminAuditLog({
-    actor,
-    action: 'admin.master_transfer.completed',
-    targetType: 'adminUser',
-    targetId: targetAdmin.id,
-    outcome: 'success',
-    metadata: {
-      targetCodexUserId: targetAdmin.codexUserId,
-      targetSessionVersion: targetAdmin.sessionVersion,
-      previousMasterCodexUserId: actor.userID,
-    },
+    });
+    return targetAdmin;
   });
+}
 
-  return targetAdmin;
+function activeMasterWhere(actor: MasterTransferActor) {
+  return {
+    id: actor.adminUserId,
+    codexUserId: actor.userID,
+    role: MASTER_ADMIN_ROLE,
+    status: 'active',
+    sessionVersion: actor.sessionVersion,
+  };
 }
 
 function createAdminTransferOtp(length = 6) {
