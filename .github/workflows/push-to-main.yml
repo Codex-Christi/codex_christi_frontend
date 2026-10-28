@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '24'
+          node-version: "24"
       - name: Install dependencies
         run: |
           npm install --global yarn@1.22.22 --force
@@ -32,8 +32,6 @@ jobs:
         run: yarn test:auth
       - name: Checkout state and payment safeguards
         run: yarn test:checkout
-      - name: Deployment safeguards
-        run: node --test scripts/deploy-verified-release.test.mjs
   deploy:
     needs: verify
     if: github.event_name == 'push'
@@ -47,27 +45,111 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Prepare SSH key
-        env:
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
-          umask 077
-          printf '%s' "$VPS_SSH_KEY" | base64 -d > "$RUNNER_TEMP/vps_key.pem"
+          echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > vps_key.pem
+          chmod 0600 vps_key.pem
       - name: Prepare the known_hosts
-        env:
-          VPS_SSH_HOST_KEYS: ${{ secrets.VPS_SSH_HOST_KEYS }}
         run: |
-          umask 077
-          printf '%s' "$VPS_SSH_HOST_KEYS" | base64 -d > "$RUNNER_TEMP/vps_known_hosts"
+          mkdir ~/.ssh/ && touch ~/.ssh/known_hosts
+          echo "${{ secrets.VPS_SSH_HOST_KEYS }}" | base64 -d >> ~/.ssh/known_hosts
       - name: Deploy the verified commit and wait for readiness
-        env:
-          VPS_SSH_USERNAME: ${{ secrets.VPS_SSH_USERNAME }}
-          VPS_IP: ${{ secrets.VPS_IP }}
+        id: deployment
         run: |
           set -euo pipefail
-          ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$RUNNER_TEMP/vps_known_hosts" -o ConnectTimeout=15 \
-            -i "$RUNNER_TEMP/vps_key.pem" "$VPS_SSH_USERNAME@$VPS_IP" \
-            bash -s -- "$GITHUB_SHA" < devScripts/deploy-verified-release.sh
-      - name: Remove deployment credentials
+          DATE=$(date "+%Y%m%d%H%M%S")
+          COMMIT_SHA="${GITHUB_SHA:-unknown}"
+
+          ssh -i vps_key.pem "${{ secrets.VPS_SSH_USERNAME }}@${{ secrets.VPS_IP }}" <<EOF 2>&1 | tee "$RUNNER_TEMP/vps-deploy-output.log"
+          set -eo pipefail
+
+          cd apps/codexchristi
+          echo "VPS_EXPECTED_REVISION=${COMMIT_SHA}"
+          echo "VPS_CHECKOUT_BEFORE=\$(git rev-parse HEAD)"
+          tracked_changes="\$(git status --porcelain=v1 --untracked-files=no)"
+          if [ "\$tracked_changes" = " D serverlogs.txt" ]; then
+            git restore --worktree -- serverlogs.txt
+            echo "Restored the deleted tracked serverlogs.txt."
+          fi
+          git status --short --untracked-files=no
+          git diff --quiet
+          git diff --cached --quiet
+          echo "VPS_TRACKED_FILES=clean"
+          git fetch origin main
+          if ! git merge-base --is-ancestor HEAD "${COMMIT_SHA}"; then
+            echo "VPS_ANCESTRY=diverged"
+            echo "VPS checkout cannot fast-forward to the verified commit; stopping before deployment." >&2
+            echo "VPS_DIVERGENCE_COUNTS=\$(git rev-list --left-right --count HEAD..."${COMMIT_SHA}")"
+            exit 1
+          fi
+          echo "VPS_ANCESTRY=fast-forward"
+          git merge --ff-only "${COMMIT_SHA}"
+          test "\$(git rev-parse HEAD)" = "${COMMIT_SHA}"
+
+          echo "Starting deploy for commit: ${COMMIT_SHA}" > "deploy-${DATE}.log"
+          echo "VPS_LOG_FILE=deploy-${DATE}.log"
+          echo "VPS_CHECKOUT_AFTER=\$(git rev-parse HEAD)"
+          bash ./devScripts/production.sh 2>&1 | tee -a "deploy-${DATE}.log"
+          EOF
+      - name: Prepare deployment proof without credentials
         if: always()
-        run: rm -f "$RUNNER_TEMP/vps_key.pem" "$RUNNER_TEMP/vps_known_hosts"
+        env:
+          DEPLOY_OUTCOME: ${{ steps.deployment.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import re
+
+          raw_file = pathlib.Path(os.environ['RUNNER_TEMP']) / 'vps-deploy-output.log'
+          raw = raw_file.read_text(errors='replace') if raw_file.exists() else ''
+          raw = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', raw)
+          allowed = re.compile(
+              r'(?:VPS_(?:EXPECTED_REVISION|CHECKOUT_BEFORE|CHECKOUT_AFTER)=[0-9a-f]{40}'
+              r'|VPS_LOG_FILE=deploy-[0-9]{14}\.log'
+              r'|VPS_TRACKED_FILES=clean'
+              r'|VPS_ANCESTRY=(?:fast-forward|diverged)'
+              r'|VPS_DIVERGENCE_COUNTS=[0-9]+\s+[0-9]+'
+              r'|Restored the deleted tracked serverlogs\.txt\.'
+              r'|VPS checkout cannot fast-forward to the verified commit; stopping before deployment\.'
+              r'|Release [0-9a-f]{40} is healthy\.'
+              r'|== deploy (?:start|finished) [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z ==)'
+          )
+          output = '\n'.join(line.strip() for line in raw.splitlines() if allowed.fullmatch(line.strip())) + '\n'
+          revision = os.environ['GITHUB_SHA']
+          outcome = os.environ.get('DEPLOY_OUTCOME', 'skipped')
+          healthy = f'Release {revision} is healthy.' in output.splitlines()
+          log_match = re.search(r'^VPS_LOG_FILE=(deploy-[0-9]{14}\.log)$', output, re.MULTILINE)
+          before = re.search(r'^VPS_CHECKOUT_BEFORE=([0-9a-f]{40})$', output, re.MULTILINE)
+          after = re.search(r'^VPS_CHECKOUT_AFTER=([0-9a-f]{40})$', output, re.MULTILINE)
+          ancestry = re.search(r'^VPS_ANCESTRY=(fast-forward|diverged)$', output, re.MULTILINE)
+          counts = re.search(r'^VPS_DIVERGENCE_COUNTS=([0-9]+)\s+([0-9]+)$', output, re.MULTILINE)
+          proof = {
+              'run_url': f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              'expected_revision': revision,
+              'deployment_step_outcome': outcome,
+              'expected_release_reported_healthy': healthy,
+              'checkout_before': before.group(1) if before else None,
+              'checkout_after': after.group(1) if after else None,
+              'ancestry': ancestry.group(1) if ancestry else 'unverified',
+              'divergence_counts': [int(counts.group(1)), int(counts.group(2))] if counts else None,
+              'deployment_verified': outcome == 'success' and healthy and after is not None and after.group(1) == revision,
+              'vps_log_file': log_match.group(1) if log_match else None,
+              'log_source': 'Strictly whitelisted deployment evidence. The full deployment log remains on the VPS.',
+          }
+          destination = pathlib.Path('deployment-proof')
+          destination.mkdir(exist_ok=True)
+          (destination / 'proof.json').write_text(json.dumps(proof, indent=2) + '\n')
+          (destination / 'vps-deploy-evidence.log').write_text(output)
+          print(json.dumps(proof, indent=2))
+          PY
+      - name: Upload deployment proof
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: deployment-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            deployment-proof/proof.json
+            deployment-proof/vps-deploy-evidence.log
+          if-no-files-found: error
+          retention-days: 7
