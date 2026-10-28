@@ -63,8 +63,8 @@ echo "Building services (parallel)…"
 docker compose --progress=plain -f "$COMPOSE_FILE" build --parallel
 
 # The migrate service is a one-shot container.
-# Remove/recreate it so the SQLite schema setup and volume permission repair always run.
-echo "Running one-off catalog migration/volume permission repair…"
+# Recreate it so Admin Ops/PayPal migrations and catalog setup always run.
+echo "Running database migrations and catalog volume setup…"
 docker compose -f "$COMPOSE_FILE" rm -fsv migrate
 docker compose -f "$COMPOSE_FILE" up --force-recreate --no-deps --exit-code-from migrate migrate
 

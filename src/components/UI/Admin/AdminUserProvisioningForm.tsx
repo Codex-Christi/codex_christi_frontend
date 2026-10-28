@@ -14,6 +14,10 @@ import {
   adminInsetSurfaceClass,
 } from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import { cn } from '@/lib/utils';
+import {
+  ADMIN_PASSWORD_MIN_LENGTH,
+  ADMIN_PASSWORD_MAX_LENGTH,
+} from '@/lib/formSchemas/admin-password';
 
 const initialState: AdminUserProvisionActionState = {
   error: null,
@@ -80,6 +84,8 @@ export default function AdminUserProvisioningForm() {
           name='password'
           type='password'
           autoComplete='new-password'
+          minLength={ADMIN_PASSWORD_MIN_LENGTH}
+          maxLength={ADMIN_PASSWORD_MAX_LENGTH}
         />
 
         <label className='grid gap-1 text-xs font-medium text-slate-300'>
@@ -150,6 +156,8 @@ function TextField({
   autoComplete,
   value,
   onChange,
+  minLength,
+  maxLength,
   required,
 }: {
   label: string;
@@ -158,6 +166,8 @@ function TextField({
   autoComplete?: string;
   value?: string;
   onChange?: (value: string) => void;
+  minLength?: number;
+  maxLength?: number;
   required?: boolean;
 }) {
   return (
@@ -170,6 +180,8 @@ function TextField({
         value={value}
         onChange={onChange ? (event) => onChange(event.target.value) : undefined}
         required={required}
+        minLength={minLength}
+        maxLength={maxLength}
         className={adminFieldClass}
       />
     </label>

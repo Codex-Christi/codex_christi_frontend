@@ -18,6 +18,10 @@ import {
 } from '@/components/UI/Admin/dashboard/AdminGlassPanel';
 import { cn } from '@/lib/utils';
 import { logoutUser } from '@/actions/logout';
+import {
+  ADMIN_PASSWORD_MIN_LENGTH,
+  ADMIN_PASSWORD_MAX_LENGTH,
+} from '@/lib/formSchemas/admin-password';
 
 const initialStartState: MasterAdminTransferStartActionState = {
   error: null,
@@ -123,7 +127,8 @@ export default function AdminMasterTransferForm() {
           name='targetAdminPassword'
           type='password'
           autoComplete='new-password'
-          minLength={12}
+          minLength={ADMIN_PASSWORD_MIN_LENGTH}
+          maxLength={ADMIN_PASSWORD_MAX_LENGTH}
           required
         />
 

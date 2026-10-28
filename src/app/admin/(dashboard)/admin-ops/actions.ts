@@ -23,6 +23,10 @@ import {
 } from '@/lib/admin/admin-notification-recipients';
 import { requireMasterAdminAction } from '@/lib/admin/require-admin';
 import { getServerAccessToken } from '@/lib/session/server-session';
+import {
+  parseNewAdminPassword,
+  parseOptionalNewAdminPassword,
+} from '@/lib/formSchemas/admin-password';
 
 export type AdminUserProvisionActionState = {
   error: string | null;
@@ -69,7 +73,15 @@ export async function provisionAdminUserAction(
   const codexUserId = String(formData.get('codexUserId') ?? '').trim();
   const email = normalizeOptionalString(formData.get('email'))?.toLowerCase() ?? null;
   const displayName = normalizeOptionalString(formData.get('displayName')) ?? null;
-  const password = normalizeOptionalString(formData.get('password')) ?? null;
+  let password: string | null;
+  try {
+    password = parseOptionalNewAdminPassword(formData.get('password'));
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Check the unlock password.',
+      success: null,
+    };
+  }
   const role = normalizeAdminRole(String(formData.get('role') ?? ''));
   const scopes = normalizeAdminScopes(formData.getAll('scopes').map(String));
   const status = normalizeAdminStatus(String(formData.get('status') ?? 'active'));
@@ -208,9 +220,9 @@ export async function startMasterAdminTransferAction(
   const currentAdminPassword = String(formData.get('currentAdminPassword') ?? '');
   const targetCodexUserId = String(formData.get('targetCodexUserId') ?? '');
   const targetEmail = String(formData.get('targetEmail') ?? '');
-  const targetAdminPassword = String(formData.get('targetAdminPassword') ?? '');
 
   try {
+    const targetAdminPassword = parseNewAdminPassword(formData.get('targetAdminPassword'));
     const challenge = await startMasterAdminTransfer({
       actor,
       currentAdminPassword,

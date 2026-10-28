@@ -15,6 +15,7 @@ import { requireAdminAction } from './require-admin';
 import { getAdminOpsLedgerPrisma } from '../prisma/adminOpsLedger/adminOpsLedgerPrisma';
 import { getAdminRequestAuditContext } from './admin-request-audit';
 import { getEncodedAdminSessionSecret } from '../session/session-config';
+import { parseNewAdminPassword } from '../formSchemas/admin-password';
 
 export class AdminCredentialError extends Error {
   constructor(
@@ -91,11 +92,12 @@ export async function changeAdminUnlockPassword(input: {
   password: string;
 }) {
   const context = await requireAdminAction();
+  const password = parseNewAdminPassword(input.password);
   const admin = await getActiveAdminUserByCodexUserId(context.userID);
   if (!admin || admin.id !== context.adminUserId || admin.sessionVersion !== context.sessionVersion)
     throw new AdminCredentialError('Admin access changed. Unlock again.', 409);
   await verifyPassword(admin, input.currentPassword, 'password_change');
-  const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
+  const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
   const auditContext = await getAdminRequestAuditContext();
   const now = new Date();
   // Hash before the short transaction; only the still-current account version may change.

@@ -14,10 +14,10 @@ import { getActiveAdminUserByCodexUserId, writeAdminAuditLog } from './admin-aut
 import { getAdminRequestAuditContext } from './admin-request-audit';
 import { buildAdminMasterTransferOtpEmailHtml } from './admin-master-transfer-email';
 import { requireCodexChristiUserProfilePreview } from './codex-christi-user-profile';
+import { parseNewAdminPassword } from '../formSchemas/admin-password';
 
 const MASTER_TRANSFER_OTP_EXPIRY_MINUTES = 10;
 const MAX_MASTER_TRANSFER_OTP_ATTEMPTS = 5;
-const MIN_MASTER_TRANSFER_PASSWORD_LENGTH = 12;
 
 type MasterTransferActor = {
   adminUserId: string;
@@ -45,6 +45,7 @@ export async function startMasterAdminTransfer({
   targetEmail: string;
   targetAdminPassword: string;
 }): Promise<MasterTransferChallengeSummary> {
+  const password = parseNewAdminPassword(targetAdminPassword);
   const normalizedTargetCodexUserId = targetCodexUserId.trim();
   const normalizedTargetEmail = normalizeAdminTransferEmail(targetEmail);
 
@@ -58,12 +59,6 @@ export async function startMasterAdminTransfer({
 
   if (!isValidEmail(normalizedTargetEmail)) {
     throw new Error('Enter a valid target email.');
-  }
-
-  if (targetAdminPassword.length < MIN_MASTER_TRANSFER_PASSWORD_LENGTH) {
-    throw new Error(
-      `The new admin unlock password must be at least ${MIN_MASTER_TRANSFER_PASSWORD_LENGTH} characters.`,
-    );
   }
 
   const actorAdmin = await getActiveAdminUserByCodexUserId(actor.userID);
@@ -101,7 +96,7 @@ export async function startMasterAdminTransfer({
   const prisma = getAdminOpsLedgerPrisma();
   const otp = createAdminTransferOtp();
   const otpHash = hashAdminTransferOtp(otp);
-  const targetPasswordHash = await argon2.hash(targetAdminPassword, {
+  const targetPasswordHash = await argon2.hash(password, {
     type: argon2.argon2id,
   });
   const expiresAt = new Date(Date.now() + MASTER_TRANSFER_OTP_EXPIRY_MINUTES * 60_000);

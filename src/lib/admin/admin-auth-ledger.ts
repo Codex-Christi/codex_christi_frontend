@@ -1,6 +1,7 @@
 import 'server-only';
 
 import argon2 from 'argon2';
+import { parseOptionalNewAdminPassword } from '../formSchemas/admin-password';
 import type { Prisma } from '@/lib/prisma/adminOpsLedger/generated/adminOpsLedger/client';
 import { getAdminOpsLedgerPrisma } from '@/lib/prisma/adminOpsLedger/adminOpsLedgerPrisma';
 import {
@@ -361,6 +362,7 @@ export async function upsertAdminUserFromDashboard({
   actor: Exclude<AdminAuditActor, null>;
   input: AdminUserProvisionInput;
 }) {
+  const password = parseOptionalNewAdminPassword(input.password);
   const prisma = getAdminOpsLedgerPrisma();
   const existing = await prisma.adminUser.findUnique({
     where: { codexUserId: input.codexUserId },
@@ -369,7 +371,7 @@ export async function upsertAdminUserFromDashboard({
     },
   });
 
-  if (!existing && !input.password) {
+  if (!existing && password === null) {
     throw new Error('A new admin user requires an unlock password.');
   }
 
@@ -377,9 +379,8 @@ export async function upsertAdminUserFromDashboard({
     throw new Error('The master admin user must be managed by the master-admin creation script.');
   }
 
-  const passwordHash = input.password
-    ? await argon2.hash(input.password, { type: argon2.argon2id })
-    : undefined;
+  const passwordHash =
+    password !== null ? await argon2.hash(password, { type: argon2.argon2id }) : undefined;
   const disabledAt = input.status === 'disabled' ? new Date() : null;
   const disabledReason =
     input.status === 'disabled' ? 'Disabled from admin access management.' : null;

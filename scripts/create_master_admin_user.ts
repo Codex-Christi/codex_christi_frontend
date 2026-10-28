@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/lib/prisma/adminOpsLedger/generated/adminOpsLedger/client';
 import { normalizePostgresSslMode } from '../src/lib/prisma/postgresSslMode';
+import { parseNewAdminPassword } from '../src/lib/formSchemas/admin-password';
 import {
   getDefaultAdminRole,
   getDefaultAdminScopes,
@@ -170,6 +171,7 @@ async function main() {
   if (!password) {
     throw new Error('Missing --password.');
   }
+  const validatedPassword = parseNewAdminPassword(password);
 
   if (!scopes.length) {
     throw new Error('At least one valid admin scope is required.');
@@ -181,7 +183,7 @@ async function main() {
     connectionString: normalizePostgresSslMode(getConnectionString()),
   });
   const prisma = new PrismaClient({ adapter });
-  const passwordHash = await argon2.hash(password, {
+  const passwordHash = await argon2.hash(validatedPassword, {
     type: argon2.argon2id,
   });
   const existing = await prisma.adminUser.findUnique({

@@ -2,7 +2,11 @@
 
 import { useActionState } from 'react';
 import { KeyRound, Loader2 } from 'lucide-react';
-import { adminPasswordChangeSchema } from '@/lib/formSchemas/admin-password';
+import {
+  adminPasswordChangeSchema,
+  ADMIN_PASSWORD_MIN_LENGTH,
+  ADMIN_PASSWORD_MAX_LENGTH,
+} from '@/lib/formSchemas/admin-password';
 import { postAdminAuth } from '@/lib/admin/admin-auth-client';
 import { buildAdminUnlockPath } from '@/lib/admin/admin-paths';
 import { adminFieldClass } from './dashboard/AdminGlassPanel';
@@ -48,15 +52,15 @@ export default function AdminPasswordChangeForm() {
           name: 'password',
           label: 'New unlock password',
           autoComplete: 'new-password',
-          minLength: 12,
-          maxLength: 128,
+          minLength: ADMIN_PASSWORD_MIN_LENGTH,
+          maxLength: ADMIN_PASSWORD_MAX_LENGTH,
         },
         {
           name: 'confirmation',
           label: 'Confirm new unlock password',
           autoComplete: 'new-password',
-          minLength: 12,
-          maxLength: 128,
+          minLength: ADMIN_PASSWORD_MIN_LENGTH,
+          maxLength: ADMIN_PASSWORD_MAX_LENGTH,
         },
       ].map((field) => (
         <div key={field.name} className='grid gap-2'>
