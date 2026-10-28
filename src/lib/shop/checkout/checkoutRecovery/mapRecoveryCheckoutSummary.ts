@@ -146,14 +146,13 @@ function getShippingSummary(
 
 function getStepLabel(row: RecoveryLedgerRow) {
   if (row.lastErrorMessage || row.status === 'error') {
-    if (row.djangoPaymentSaveCustomId) return 'Payment saved; fulfillment review pending';
-    if (row.receiptLink) return 'Receipt prepared; payment save or fulfillment needs review';
-    return 'Payment captured; order review pending';
+    if (row.receiptLink) return 'Receipt ready; order needs review';
+    return 'Payment received; order needs review';
   }
 
-  if (row.status === 'payment_saved') return 'Payment saved; fulfillment is still being finalized';
-  if (row.status === 'receipt_uploaded') return 'Receipt prepared; payment save is still pending';
-  if (row.status === 'captured') return 'Payment captured; receipt is still pending';
+  if (row.status === 'payment_saved') return 'Payment received; order confirmation is pending';
+  if (row.status === 'receipt_uploaded') return 'Receipt ready; order confirmation is pending';
+  if (row.status === 'captured') return 'Payment received; receipt is being prepared';
   return 'Payment received; checkout is still being reviewed';
 }
 

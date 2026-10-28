@@ -19,6 +19,7 @@ export interface DjangoOrderIntentAPIResponse {
   status: number;
   success: boolean;
   message?: string;
+  emailVerificationMethod?: 'next-otp';
   data: {
     id: string;
     email: string | null;
@@ -49,11 +50,13 @@ interface VerifyDjangoOrderIntentOTPArg {
   email: string;
   otp: string;
   order_id: string;
+  intentUuid: string;
   headers?: HeadersInit;
 }
 
 interface ResendDjangoOrderIntentOTPArg {
   email: string;
+  intentUuid: string;
   headers?: HeadersInit;
 }
 
@@ -82,7 +85,12 @@ export const useVerifyDjangoOrderIntentOTPMutation = () => {
   return useMutationHook<DjangoOrderIntentAPIResponse, VerifyDjangoOrderIntentOTPArg>(
     '/next-api/shop/checkout/django-order-intent/verify',
     (arg) => ({
-      body: { email: arg.email, otp: arg.otp, order_id: arg.order_id },
+      body: {
+        email: arg.email,
+        otp: arg.otp,
+        order_id: arg.order_id,
+        intentUuid: arg.intentUuid,
+      },
       key: arg.email,
       fetcherOptions: {
         headers: {
@@ -98,7 +106,7 @@ export const useResendDjangoOrderIntentOTPMutation = () => {
   return useMutationHook<DjangoOrderIntentAPIResponse, ResendDjangoOrderIntentOTPArg>(
     '/next-api/shop/checkout/django-order-intent/resend-otp',
     (arg) => ({
-      body: { email: arg.email },
+      body: { email: arg.email, intentUuid: arg.intentUuid },
       key: arg.email,
       fetcherOptions: {
         headers: {

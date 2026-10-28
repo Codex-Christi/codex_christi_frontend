@@ -7,8 +7,7 @@ import { useWishlist } from '@/stores/shop_stores/use-wishlist';
 import { useEditUserMainProfileStore } from '@/stores/editUserProfileStore';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
-import { useVerifiedEmailsStore } from '@/stores/shop_stores/checkoutStore/useVerifiedEmailsStore';
-import { usePaidCheckoutRecoveryStore } from '@/stores/shop_stores/checkoutStore/paidCheckoutRecoveryStore';
+import { clearLegacyCheckoutCaches } from '@/stores/shop_stores/checkoutStore/storage';
 import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 
 export function isGuestSession(state: { accountOwnerId: string | null; status: string }) {
@@ -21,15 +20,11 @@ export async function clearPrivateClientState({ preserveGuestCheckout = false } 
   const checkoutStores = [
     useShopCheckoutStore,
     useDjangoOrderIntentStore,
-    useVerifiedEmailsStore,
-    usePaidCheckoutRecoveryStore,
     usePayPalIntentStore,
   ];
   if (!preserveGuestCheckout) {
     useShopCheckoutStore.getState().resetCheckoutToInitial();
     useDjangoOrderIntentStore.getState().clearDjangoOrderIntent();
-    useVerifiedEmailsStore.getState().clearStore();
-    usePaidCheckoutRecoveryStore.getState().clearRecoverySession();
     usePayPalIntentStore.getState().clearActiveCheckout();
     usePayPalIntentStore.getState().clearIntent();
   }
@@ -41,6 +36,7 @@ export async function clearPrivateClientState({ preserveGuestCheckout = false } 
     clearUserMainProfileStore(),
     clearUserShopProfile(),
     clearPrivateWishlist(),
+    clearLegacyCheckoutCaches(),
     ...removals,
   ]);
 }

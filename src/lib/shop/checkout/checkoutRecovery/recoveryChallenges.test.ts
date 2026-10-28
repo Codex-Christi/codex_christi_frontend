@@ -13,6 +13,11 @@ type Challenge = {
   attemptCount: number;
   createdAt: Date;
 };
+type ChallengeWhere = {
+  email?: string;
+  consumedAt?: null;
+  otpHash?: { startsWith?: string; not?: { startsWith: string } };
+};
 
 function database(t: TestContext, initial: Challenge[] = []) {
   const previous = global.__paypalTxLedger__;
@@ -21,6 +26,16 @@ function database(t: TestContext, initial: Challenge[] = []) {
   const rows = initial;
   let pending = Promise.resolve();
   let locks = 0;
+  const matching = (where: ChallengeWhere = {}) =>
+    rows
+      .filter(
+        (row) =>
+          (!where.email || row.email === where.email) &&
+          (where.consumedAt !== null || (!row.consumedAt && row.expiresAt > new Date())) &&
+          (!where.otpHash?.startsWith || row.otpHash.startsWith(where.otpHash.startsWith)) &&
+          (!where.otpHash?.not || !row.otpHash.startsWith(where.otpHash.not.startsWith)),
+      )
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   const tx = {
     $executeRaw: async (strings: TemplateStringsArray, key: string) => {
       assert.match(strings.join('?'), /pg_advisory_xact_lock\(hashtextextended/u);
@@ -29,15 +44,8 @@ function database(t: TestContext, initial: Challenge[] = []) {
       return 1;
     },
     checkoutRecoveryOtpChallenge: {
-      findMany: async () =>
-        rows
-          .filter((row) => !row.consumedAt && row.expiresAt > new Date())
-          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-          .slice(0, 3),
-      findFirst: async ({ where }: { where: { consumedAt?: null } }) =>
-        (where.consumedAt === null
-          ? await tx.checkoutRecoveryOtpChallenge.findMany()
-          : [...rows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()))[0] ?? null,
+      findMany: async ({ where }: { where: ChallengeWhere }) => matching(where).slice(0, 3),
+      findFirst: async ({ where }: { where: ChallengeWhere }) => matching(where)[0] ?? null,
       create: async ({ data }: { data: Pick<Challenge, 'email' | 'otpHash' | 'expiresAt'> }) => {
         const row = {
           ...data,
@@ -127,4 +135,61 @@ test('a correct recovery code is consumed once across parallel verification requ
   );
   assert.equal(results.filter((result) => result === 'verified').length, 1);
   assert.equal(db.rows[0].attemptCount, 1);
+});
+
+test('checkout email codes cannot verify recovery or another checkout context', async (t) => {
+  const db = database(t);
+  const challenge = await reserveRecoveryChallenge(
+    'customer@example.com',
+    'browser/intent/address',
+  );
+  assert.ok(challenge.otp);
+  assert.match(db.rows[0].otpHash, /^checkout-email:[a-f0-9]{64}:[a-f0-9]{64}$/u);
+  assert.equal(await consumeRecoveryChallenge('customer@example.com', challenge.otp!), 'invalid');
+  assert.equal(
+    await consumeRecoveryChallenge(
+      'customer@example.com',
+      challenge.otp!,
+      'different-browser/intent/address',
+    ),
+    'invalid',
+  );
+  assert.equal(db.rows[0].attemptCount, 0);
+  assert.equal(
+    await consumeRecoveryChallenge(
+      'customer@example.com',
+      challenge.otp!,
+      'browser/intent/address',
+    ),
+    'verified',
+  );
+  assert.equal(
+    await consumeRecoveryChallenge(
+      'customer@example.com',
+      challenge.otp!,
+      'browser/intent/address',
+    ),
+    'invalid',
+  );
+});
+
+test('checkout codes keep the email-wide resend cooldown and per-code guess budget', async (t) => {
+  const db = database(t);
+  const challenge = await reserveRecoveryChallenge('customer@example.com', 'checkout-one');
+  const blocked = await reserveRecoveryChallenge('customer@example.com', 'checkout-two');
+  assert.equal(blocked.otp, null);
+  assert.equal(blocked.hasActiveChallenge, false);
+  assert.equal(db.rows.length, 1);
+  const results = await Promise.all(
+    Array.from({ length: 12 }, () =>
+      consumeRecoveryChallenge('customer@example.com', 'invalid', 'checkout-one'),
+    ),
+  );
+  assert.equal(results.includes('verified'), false);
+  assert.equal(db.rows[0].attemptCount, 5);
+  assert.ok(challenge.otp);
+  assert.equal(
+    await consumeRecoveryChallenge('customer@example.com', challenge.otp!, 'checkout-one'),
+    'invalid',
+  );
 });

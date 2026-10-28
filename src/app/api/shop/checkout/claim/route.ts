@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       );
     const row = await paypalTxLedger.paypalIntent.findUnique({
       where: { orderToken },
-      select: { orderToken: true, userId: true },
+      select: { orderToken: true, userId: true, djangoOrderIntentUuid: true },
     });
     if (!row)
       throw new CheckoutRequestError(

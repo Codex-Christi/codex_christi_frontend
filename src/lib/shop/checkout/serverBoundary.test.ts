@@ -21,6 +21,8 @@ import {
   readUpstreamEmailProof,
   sealCheckoutValue,
   createCheckoutGrant,
+  openCheckoutValue,
+  type CheckoutEmailProof,
 } from './checkoutProof';
 import { checkoutInputFingerprint } from './checkoutReview';
 import { buildAuthSessionCookies } from '@/lib/session/session-cookies';
@@ -79,6 +81,7 @@ function setup(t: TestContext) {
   const proof = {
     ...readUpstreamEmailProof(upstream, body.customer.email),
     browserId: 'browser-a',
+    ownerId: null,
   };
   const proofCookies = `${CHECKOUT_BROWSER_COOKIE}=${sealCheckoutValue('browser-a', 'browser', 60)}; ${emailProofCookieName(proof.intentUuid)}=${sealCheckoutValue(proof, 'email-proof', 60)}`;
   return { proof, proofCookies };
@@ -180,11 +183,18 @@ test('a lost intent response reuses its immutable provider order and rejects cha
 });
 
 test('the Django proxy issues HttpOnly evidence only from a verified successful upstream response', async (t) => {
-  setup(t);
+  const { proof } = setup(t);
   t.mock.method(globalThis, 'fetch', async () => Response.json(upstream));
+  const pending = { ...proof, verified: false, verificationMethod: 'django-otp' as const };
+  const pendingCookies = `${CHECKOUT_BROWSER_COOKIE}=${sealCheckoutValue(proof.browserId, 'browser', 60)}; ${emailProofCookieName(proof.intentUuid)}=${sealCheckoutValue(pending, 'email-proof', 60)}`;
   const req = request(
-    { email: 'customer@example.com', otp: '123456', order_id: 'ORD-123' },
-    '',
+    {
+      email: 'customer@example.com',
+      otp: '123456',
+      order_id: 'ORD-123',
+      intentUuid: proof.intentUuid,
+    },
+    pendingCookies,
     '/next-api/shop/checkout/django-order-intent/verify',
   );
   const response = await inRequest(req, () =>
@@ -194,6 +204,52 @@ test('the Django proxy issues HttpOnly evidence only from a verified successful 
   assert.match(response.headers.get('set-cookie') ?? '', /checkout-browser=/u);
   assert.match(response.headers.get('set-cookie') ?? '', /checkout-proof-/u);
   assert.match(response.headers.get('set-cookie') ?? '', /HttpOnly/u);
+});
+
+test('an account email proof cannot authorize a payment after logout or another account signs in', async (t) => {
+  const { proof } = setup(t);
+  const owned = { ...proof, ownerId: 'alice' };
+  const proofCookies = `${CHECKOUT_BROWSER_COOKIE}=${sealCheckoutValue(proof.browserId, 'browser', 60)}; ${emailProofCookieName(proof.intentUuid)}=${sealCheckoutValue(owned, 'email-proof', 60)}`;
+  const fetch = t.mock.method(globalThis, 'fetch', async () => {
+    throw new Error('No provider request allowed');
+  });
+  for (const account of ['', await accountCookie('bob')]) {
+    const req = request(body, `${account}; ${proofCookies}`);
+    const response = await inRequest(req, () => intent(req));
+    assert.equal(response.status, 403);
+    assert.equal((await response.json()).code, 'CHECKOUT_EMAIL_VERIFICATION_REQUIRED');
+  }
+  assert.equal(fetch.mock.callCount(), 0);
+});
+
+test('a guest email proof is bound to the signed-in owner when an existing payment attempt is resumed', async (t) => {
+  const { proof, proofCookies } = setup(t);
+  const row = {
+    orderToken: checkoutAttemptToken(body.attemptId, proof),
+    userId: 'alice',
+    customerEmail: body.customer.email,
+    paypalOrderId: 'PAYPAL-EXISTING',
+    djangoOrderIntentPayload: {
+      requestFingerprint: checkoutInputFingerprint({
+        selections: body.selections,
+        email: body.customer.email,
+        name: body.customer.name,
+        address,
+        quote,
+      }),
+    },
+  };
+  global.__paypalTxLedger__ = {
+    paypalIntent: { findUnique: async () => row },
+  } as unknown as PrismaClient;
+  const req = request(body, `${await accountCookie('alice')}; ${proofCookies}`);
+  const response = await inRequest(req, () => intent(req));
+  assert.equal(response.status, 200);
+  const bound = openCheckoutValue<CheckoutEmailProof>(
+    response.cookies.get(emailProofCookieName(proof.intentUuid))?.value,
+    'email-proof',
+  );
+  assert.equal(bound?.ownerId, 'alice');
 });
 
 test('only the original payment grant can claim a guest checkout, and another account cannot claim it again', async (t) => {

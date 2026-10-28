@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { MemoryLegacyStorage } from '@/lib/cart/test-support';
 import {
+  clearLegacyCheckoutCaches,
   createCheckoutObfuscatedStorage,
   flushCheckoutStorage,
   getCheckoutStorageIssues,
@@ -10,6 +11,17 @@ import {
 import { obfuscateBrowserText } from '@/lib/crypto/browserObfuscatedStorage';
 
 const value = { state: { orderToken: 'order-one' }, version: 0 };
+
+test('obsolete verification caches are removed without deleting the active checkout', async () => {
+  const storage = new MemoryLegacyStorage();
+  for (const name of ['paid-checkout-recovery-store', 'verifiedEmailsList-emails']) {
+    for (const suffix of ['', ':v2', ':recovery']) storage.setItem(`${name}${suffix}`, 'old');
+  }
+  storage.setItem('django-order-intent-store:v2', JSON.stringify(value));
+  await clearLegacyCheckoutCaches({ getStorage: () => storage });
+  assert.equal(storage.size, 1);
+  assert.equal(storage.getItem('django-order-intent-store:v2'), JSON.stringify(value));
+});
 
 test('HTTP LAN checkout state survives reload without Web Crypto while old encrypted records remain safe', async () => {
   const storage = new MemoryLegacyStorage();

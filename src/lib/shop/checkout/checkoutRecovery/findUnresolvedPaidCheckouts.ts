@@ -17,7 +17,10 @@ const UNRESOLVED_PAID_STATUSES = [
 ] as const;
 
 const RECOVERY_LEDGER_ROW_SELECT = {
+  id: true,
   orderToken: true,
+  userId: true,
+  customerEmail: true,
   status: true,
   cartSnapshot: true,
   shippingSnapshot: true,
@@ -34,82 +37,46 @@ const RECOVERY_LEDGER_ROW_SELECT = {
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.PaypalIntentSelect;
+type RecoveryLedgerRow = Prisma.PaypalIntentGetPayload<{
+  select: typeof RECOVERY_LEDGER_ROW_SELECT;
+}>;
+const RECOVERY_SCAN_PAGE_SIZE = 10;
 
-async function findUnresolvedPaidCheckoutsByEmailFromLegacyLedger(normalizedEmail: string) {
-  const rows = await paypalTxLedger.paypalIntent.findMany({
-    where: {
-      customerEmail: normalizedEmail,
-      processingCompletedAt: null,
-      capturePayload: {
-        not: Prisma.AnyNull,
-      },
-      djangoOrderIntentOrderId: {
-        not: null,
-      },
-      djangoOrderIntentVerifyPayload: {
-        not: Prisma.AnyNull,
-      },
-      status: {
-        in: [...UNRESOLVED_PAID_STATUSES],
-      },
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-    take: 10,
-    select: RECOVERY_LEDGER_ROW_SELECT,
-  });
-
-  return rows.filter((row) => isCompletedPayPalCapture(row.capturePayload)).slice(0, 3);
-}
-
+/** Read payment truth directly: a stale/missing queue projection must not decide customer access. */
 export async function findUnresolvedPaidCheckoutsByEmail(email: string) {
   const normalizedEmail = normalizeRecoveryEmail(email);
+  const paid: RecoveryLedgerRow[] = [];
+  let cursor: { id: string } | undefined;
 
-  try {
-    const projections = await paypalTxLedger.paidOrderRecoveryProjection.findMany({
+  for (;;) {
+    const rows = await paypalTxLedger.paypalIntent.findMany({
       where: {
         customerEmail: normalizedEmail,
-        isCustomerProtectionVisible: true,
-      },
-      orderBy: [{ paypalIntentUpdatedAt: 'desc' }, { updatedAt: 'desc' }],
-      take: 3,
-      select: {
-        orderToken: true,
-      },
-    });
-
-    if (projections.length) {
-      const orderTokens = projections.map((projection) => projection.orderToken);
-      const rows = await paypalTxLedger.paypalIntent.findMany({
-        where: {
-          orderToken: {
-            in: orderTokens,
-          },
+        processingCompletedAt: null,
+        capturePayload: {
+          not: Prisma.AnyNull,
         },
-        select: RECOVERY_LEDGER_ROW_SELECT,
-      });
-      const rowByOrderToken = new Map(rows.map((row) => [row.orderToken, row]));
-
-      return orderTokens
-        .map((orderToken) => rowByOrderToken.get(orderToken))
-        .filter((row): row is (typeof rows)[number] => Boolean(row));
-    }
-
-    const projectionCountForEmail = await paypalTxLedger.paidOrderRecoveryProjection.count({
-      where: {
-        customerEmail: normalizedEmail,
+        djangoOrderIntentOrderId: {
+          not: null,
+        },
+        djangoOrderIntentVerifyPayload: {
+          not: Prisma.AnyNull,
+        },
+        status: {
+          in: [...UNRESOLVED_PAID_STATUSES],
+        },
       },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: RECOVERY_SCAN_PAGE_SIZE,
+      ...(cursor ? { cursor, skip: 1 } : {}),
+      select: RECOVERY_LEDGER_ROW_SELECT,
     });
 
-    return projectionCountForEmail > 0
-      ? []
-      : findUnresolvedPaidCheckoutsByEmailFromLegacyLedger(normalizedEmail);
-  } catch (error) {
-    console.error('[checkout-recovery.projection_lookup_failed]', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-
-    return findUnresolvedPaidCheckoutsByEmailFromLegacyLedger(normalizedEmail);
+    for (const row of rows) {
+      if (isCompletedPayPalCapture(row.capturePayload)) paid.push(row);
+      if (paid.length === 3) return paid;
+    }
+    if (rows.length < RECOVERY_SCAN_PAGE_SIZE) return paid;
+    cursor = { id: rows[rows.length - 1].id };
   }
 }

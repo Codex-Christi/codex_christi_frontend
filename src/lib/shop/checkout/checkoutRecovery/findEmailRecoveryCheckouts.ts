@@ -2,13 +2,15 @@ import 'server-only';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { isCompletedPayPalCapture } from '@/lib/paypal/txLedger/captureCompletion';
 import { findUnresolvedPaidCheckoutsByEmail } from './findUnresolvedPaidCheckouts';
+import { normalizeRecoveryEmail } from './recoveryOtpUtils';
 
-/** Call exact-order lookup only after email OTP verification; never expose existence beforehand. */
+/** Exact rows must be filtered by server access policy or email OTP before exposing any details. */
 export async function findEmailRecoveryCheckouts(email: string, orderToken?: string) {
-  if (!orderToken) return findUnresolvedPaidCheckoutsByEmail(email);
+  const normalizedEmail = normalizeRecoveryEmail(email);
+  if (!orderToken) return findUnresolvedPaidCheckoutsByEmail(normalizedEmail);
   const row = await paypalTxLedger.paypalIntent.findUnique({ where: { orderToken } });
   return row &&
-    row.customerEmail.trim().toLowerCase() === email &&
+    normalizeRecoveryEmail(row.customerEmail) === normalizedEmail &&
     isCompletedPayPalCapture(row.capturePayload)
     ? [row]
     : [];

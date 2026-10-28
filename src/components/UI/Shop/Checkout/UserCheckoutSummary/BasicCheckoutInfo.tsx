@@ -28,19 +28,28 @@ import { useUserShopProfile } from '@/stores/shop_stores/use-user-shop-profile';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import dynamic from 'next/dynamic';
 import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore';
-import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 import {
-  getFreshPaidCheckoutRecoverySessionForEmail,
-  getPaidCheckoutRecoverySessionRemainingMinutes,
-} from '@/stores/shop_stores/checkoutStore/paidCheckoutRecoveryStore';
+  captureCheckoutAttempt,
+  clearCheckoutAttempt,
+} from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
+import { useAuthStore } from '@/stores/authStore';
+import { getAuthGeneration } from '@/lib/auth/session-generation';
+import { useCartStore } from '@/stores/shop_stores/cartStore';
+import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
+import { getCartVerificationIdentity } from '../../Cart/cartAvailability';
+import { isPayPalAttemptFinalizing } from '@/lib/hooks/shopHooks/checkout/finalizePayPalAttempt';
 import {
-  DEFAULT_PAID_CHECKOUT_RECOVERY_PROMPT_STATE,
+  createPaidOrderReviewFence,
+  getPaidOrderReviewKey,
+  getRecoveryDraftIdentity,
+  isReviewedPaidAttempt,
+} from './paidCheckoutRecoveryReview';
+import {
   getCheckoutValuesFromStore,
-  getPaidCheckoutRecoveryExpiryMinutes,
-  getRecipientName,
   saveBasicCheckoutInfoToStore,
   startPaidCheckoutRecovery,
   toDjangoOrderIntentPayload,
+  type PaidCheckoutRecoveryPromptState,
 } from './basicCheckoutInfoHelpers';
 
 const DjangoOrderIntentOtpController = dynamic(
@@ -71,9 +80,11 @@ export const BasicCheckoutInfo = () => {
   const hasAppliedHydratedCheckoutValuesRef = useRef(false);
   const [isDjangoOrderIntentOtpOpen, setIsDjangoOrderIntentOtpOpen] = useState(false);
   const [isPaidCheckoutRecoveryOpen, setIsPaidCheckoutRecoveryOpen] = useState(false);
-  const [paidCheckoutRecoveryPrompt, setPaidCheckoutRecoveryPrompt] = useState(
-    DEFAULT_PAID_CHECKOUT_RECOVERY_PROMPT_STATE,
-  );
+  const [paidCheckoutRecoveryPrompt, setPaidCheckoutRecoveryPrompt] =
+    useState<PaidCheckoutRecoveryPromptState | null>(null);
+  const reviewRequestRef = useRef<AbortController | null>(null);
+  const acknowledgedReviewRef = useRef<string | null>(null);
+  const submissionRef = useRef(0);
   const [paidCheckoutRecoveryPromptVersion, setPaidCheckoutRecoveryPromptVersion] = useState(0);
   const [isCheckingPaidCheckoutRecovery, setIsCheckingPaidCheckoutRecovery] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -98,8 +109,6 @@ export const BasicCheckoutInfo = () => {
     openDjangoOrderIntentOtpModal,
   );
   const { createDjangoOrderIntent } = djangoOrderIntentEmailVerification;
-  const clearActivePayPalCheckout = usePayPalIntentStore((s) => s.clearActiveCheckout);
-  const clearPayPalIntent = usePayPalIntentStore((s) => s.clearIntent);
 
   const basicCheckoutInfoForm = useForm<BasicCheckoutInfoFormSchema>({
     resolver: zodResolver(BasicCheckoutInfoFormSchema),
@@ -178,93 +187,182 @@ export const BasicCheckoutInfo = () => {
     setValue,
   ]);
 
+  const cancelReviewRequest = useCallback(() => {
+    reviewRequestRef.current?.abort();
+    reviewRequestRef.current = null;
+  }, []);
+
+  const handleDjangoOrderIntentOtpOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) cancelReviewRequest();
+      setIsDjangoOrderIntentOtpOpen(open);
+    },
+    [cancelReviewRequest],
+  );
+
+  useEffect(() => cancelReviewRequest, [cancelReviewRequest]);
+
+  const currentReviewScope = useCallback(() => {
+    const auth = useAuthStore.getState();
+    return JSON.stringify([
+      getAuthGeneration(),
+      auth.status,
+      auth.accountOwnerId,
+      getRecoveryDraftIdentity(basicCheckoutInfoForm.getValues()),
+      getCartVerificationIdentity(useCartStore.getState().variants),
+    ]);
+  }, [basicCheckoutInfoForm]);
+
+  const reviewEarlierPayments = useCallback(
+    async (data: BasicCheckoutInfoFormSchema, phase: PaidCheckoutRecoveryPromptState['phase']) => {
+      cancelReviewRequest();
+      const controller = new AbortController();
+      reviewRequestRef.current = controller;
+      const current = createPaidOrderReviewFence(currentReviewScope, controller.signal);
+      const scope = currentReviewScope();
+      const verification = useDjangoOrderIntentStore.getState();
+      const intentUuid =
+        phase === 'after-verification' ? verification.djangoOrderIntentUuid : undefined;
+      const generation = verification.generation;
+      const result = await startPaidCheckoutRecovery(data, {
+        intentUuid,
+        signal: controller.signal,
+      });
+      if (
+        !current() ||
+        getRecoveryDraftIdentity(data) !==
+          getRecoveryDraftIdentity(basicCheckoutInfoForm.getValues()) ||
+        (intentUuid &&
+          (useDjangoOrderIntentStore.getState().djangoOrderIntentUuid !== intentUuid ||
+            useDjangoOrderIntentStore.getState().generation !== generation))
+      )
+        throw new DOMException('Checkout details changed.', 'AbortError');
+
+      if (phase === 'after-verification' && result.recoveryRequired && !result.recoveryVerified)
+        throw new Error('We couldn’t check your earlier order. Please continue checkout again.');
+      const checkouts = result.recoveryVerified ? (result.checkouts ?? []) : [];
+      const reviewKey = getPaidOrderReviewKey(scope, checkouts);
+      const needsReview = checkouts.length > 0 && acknowledgedReviewRef.current !== reviewKey;
+      if (needsReview) {
+        setPaidCheckoutRecoveryPrompt({
+          pendingCheckoutData: data,
+          checkouts,
+          scope,
+          reviewKey,
+          phase,
+        });
+        setPaidCheckoutRecoveryPromptVersion((version) => version + 1);
+        setIsPaidCheckoutRecoveryOpen(true);
+      }
+      return { needsReview, checkouts };
+    },
+    [basicCheckoutInfoForm, cancelReviewRequest, currentReviewScope],
+  );
+
+  const handleVerifiedCheckout = useCallback(async () => {
+    setSubmitError(null);
+    try {
+      if (!canContinue) throw new Error('Wait for prices and delivery to finish updating.');
+      const { needsReview } = await reviewEarlierPayments(
+        basicCheckoutInfoForm.getValues(),
+        'after-verification',
+      );
+      if (!needsReview) handleOpenItem('payment-section');
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError'))
+        setSubmitError('Your email is verified. Please try continuing checkout again.');
+      throw error;
+    }
+  }, [basicCheckoutInfoForm, canContinue, handleOpenItem, reviewEarlierPayments]);
+
   const createDjangoOrderIntentFromCheckoutInfo = useCallback(
     async (data: BasicCheckoutInfoFormSchema) => {
-      // This creates/reuses the Django backend order intent, not the PayPal ledger intent.
-      const djangoOrderIntent = await createDjangoOrderIntent(toDjangoOrderIntentPayload(data));
-
-      if (djangoOrderIntent?.data.otp_status === 'verified') {
-        handleOpenItem('payment-section');
-      }
-      if (!djangoOrderIntent)
-        setSubmitError('We couldn’t verify these details. Please check them and try again.');
+      const controller = reviewRequestRef.current ?? new AbortController();
+      reviewRequestRef.current = controller;
+      const current = createPaidOrderReviewFence(currentReviewScope, controller.signal);
+      const intent = await createDjangoOrderIntent(
+        toDjangoOrderIntentPayload(data),
+        undefined,
+        current,
+      );
+      if (!current()) throw new DOMException('Checkout details changed.', 'AbortError');
+      if (!intent)
+        throw new Error('We couldn’t verify these details. Please check them and try again.');
+      if (intent.data.otp_status === 'verified') await handleVerifiedCheckout();
     },
-    [createDjangoOrderIntent, handleOpenItem],
+    [createDjangoOrderIntent, currentReviewScope, handleVerifiedCheckout],
+  );
+
+  const handleRecoveryOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        cancelReviewRequest();
+        submissionRef.current += 1;
+        setIsCheckingPaidCheckoutRecovery(false);
+        setPaidCheckoutRecoveryPrompt(null);
+      }
+      setIsPaidCheckoutRecoveryOpen(open);
+    },
+    [cancelReviewRequest],
   );
 
   const startNewOrderAfterPaidCheckoutRecoveryReview = useCallback(async () => {
-    if (!paidCheckoutRecoveryPrompt.pendingCheckoutData) {
-      errorToast({
-        header: 'Checkout details missing',
-        message: 'Please submit your checkout details again.',
-      });
-      return;
+    const prompt = paidCheckoutRecoveryPrompt;
+    if (!prompt || prompt.scope !== currentReviewScope())
+      throw new Error('Your cart or details changed. Close this message and continue again.');
+
+    acknowledgedReviewRef.current = prompt.reviewKey;
+    try {
+      const { needsReview, checkouts } = await reviewEarlierPayments(
+        prompt.pendingCheckoutData,
+        prompt.phase,
+      );
+      if (needsReview) throw new Error('Earlier order details changed. Review them again.');
+      const attempt = captureCheckoutAttempt();
+      if (isReviewedPaidAttempt(attempt, checkouts) && attempt) {
+        if (isPayPalAttemptFinalizing(attempt))
+          throw new Error('Wait for your earlier payment confirmation to finish.');
+        if (!clearCheckoutAttempt(attempt))
+          throw new Error('Checkout changed. Please review it again.');
+      }
+      // An unrelated or uncertain attempt is retained for the existing payment safeguards.
+      if (prompt.phase === 'after-verification') handleOpenItem('payment-section');
+      else await createDjangoOrderIntentFromCheckoutInfo(prompt.pendingCheckoutData);
+    } catch (error) {
+      acknowledgedReviewRef.current = null;
+      throw error;
     }
-
-    clearActivePayPalCheckout();
-    clearPayPalIntent();
-
-    await createDjangoOrderIntentFromCheckoutInfo(paidCheckoutRecoveryPrompt.pendingCheckoutData);
   }, [
-    clearActivePayPalCheckout,
-    clearPayPalIntent,
     createDjangoOrderIntentFromCheckoutInfo,
-    paidCheckoutRecoveryPrompt.pendingCheckoutData,
+    currentReviewScope,
+    handleOpenItem,
+    paidCheckoutRecoveryPrompt,
+    reviewEarlierPayments,
   ]);
 
   async function onSubmit(data: BasicCheckoutInfoFormSchema) {
     if (!canContinue) return;
+    const request = ++submissionRef.current;
     setSubmitError(null);
     saveBasicCheckoutInfoToStore(data);
-    setPaidCheckoutRecoveryPrompt((current) => ({ ...current, pendingCheckoutData: data }));
     setIsCheckingPaidCheckoutRecovery(true);
-
     try {
-      const freshRecoverySession = getFreshPaidCheckoutRecoverySessionForEmail(data.email);
-
-      if (freshRecoverySession) {
-        setPaidCheckoutRecoveryPrompt({
-          pendingCheckoutData: data,
-          email: data.email,
-          recipientName: getRecipientName(data),
-          expiresInMinutes: getPaidCheckoutRecoverySessionRemainingMinutes(freshRecoverySession),
-          resendAvailableInSeconds: 0,
-          verifiedCheckouts: freshRecoverySession.checkouts,
-        });
-        setPaidCheckoutRecoveryPromptVersion((version) => version + 1);
-        setIsPaidCheckoutRecoveryOpen(true);
-        return;
-      }
-
-      const paidCheckoutRecoveryStart = await startPaidCheckoutRecovery(data);
-
-      if (paidCheckoutRecoveryStart.recoveryRequired) {
-        setPaidCheckoutRecoveryPrompt({
-          pendingCheckoutData: data,
-          email: data.email,
-          recipientName: getRecipientName(data),
-          expiresInMinutes: getPaidCheckoutRecoveryExpiryMinutes(paidCheckoutRecoveryStart),
-          resendAvailableInSeconds: paidCheckoutRecoveryStart.resendAvailableInSeconds ?? 0,
-          verifiedCheckouts: [],
-        });
-        setPaidCheckoutRecoveryPromptVersion((version) => version + 1);
-        setIsPaidCheckoutRecoveryOpen(true);
-        return;
-      }
-
+      if ((await reviewEarlierPayments(data, 'before-verification')).needsReview) return;
       await createDjangoOrderIntentFromCheckoutInfo(data);
     } catch (error) {
-      console.warn('[checkout] Contact verification unavailable', error);
-      setSubmitError(
-        'We couldn’t continue right now. Your details are still here. Please try again.',
-      );
+      if (!(error instanceof DOMException && error.name === 'AbortError'))
+        setSubmitError(
+          error instanceof Error
+            ? error.message
+            : 'We couldn’t continue right now. Your details are still here. Please try again.',
+        );
     } finally {
-      setIsCheckingPaidCheckoutRecovery(false);
+      if (submissionRef.current === request) setIsCheckingPaidCheckoutRecovery(false);
     }
   }
 
   const continueLabel = isCheckingPaidCheckoutRecovery
-    ? 'Checking your email…'
+    ? 'Preparing checkout…'
     : 'Continue to review & payment';
 
   return (
@@ -275,12 +373,14 @@ export const BasicCheckoutInfo = () => {
       />
       <Form {...basicCheckoutInfoForm}>
         <form
-          onSubmit={basicCheckoutInfoForm.handleSubmit(onSubmit, () => {
-            errorToast({
-              message: 'Check form and correct errors',
-              header: 'Incorrect details!',
-            });
-          })}
+          onSubmit={(event) => {
+            void basicCheckoutInfoForm.handleSubmit(onSubmit, () => {
+              errorToast({
+                message: 'Check form and correct errors',
+                header: 'Incorrect details!',
+              });
+            })(event);
+          }}
           className='grid w-full min-w-0 grid-cols-1 items-start gap-x-4 gap-y-5 sm:grid-cols-2'
           noValidate
         >
@@ -356,23 +456,21 @@ export const BasicCheckoutInfo = () => {
         </form>
       </Form>
 
-      <PaidCheckoutRecoveryModal
-        key={`${paidCheckoutRecoveryPromptVersion}-${paidCheckoutRecoveryPrompt.email}-${paidCheckoutRecoveryPrompt.expiresInMinutes}-${paidCheckoutRecoveryPrompt.resendAvailableInSeconds}-${paidCheckoutRecoveryPrompt.verifiedCheckouts.map((checkout) => checkout.orderToken).join('|')}`}
-        isOpen={isPaidCheckoutRecoveryOpen}
-        onOpenChange={setIsPaidCheckoutRecoveryOpen}
-        email={paidCheckoutRecoveryPrompt.email}
-        recipientName={paidCheckoutRecoveryPrompt.recipientName}
-        expiresInMinutes={paidCheckoutRecoveryPrompt.expiresInMinutes}
-        resendAvailableInSeconds={paidCheckoutRecoveryPrompt.resendAvailableInSeconds}
-        initialVerifiedCheckouts={paidCheckoutRecoveryPrompt.verifiedCheckouts}
-        onStartSeparateOrder={startNewOrderAfterPaidCheckoutRecoveryReview}
-      />
+      {paidCheckoutRecoveryPrompt && (
+        <PaidCheckoutRecoveryModal
+          key={paidCheckoutRecoveryPromptVersion}
+          isOpen={isPaidCheckoutRecoveryOpen}
+          onOpenChange={handleRecoveryOpenChange}
+          checkouts={paidCheckoutRecoveryPrompt.checkouts}
+          onStartSeparateOrder={startNewOrderAfterPaidCheckoutRecoveryReview}
+        />
+      )}
       <DjangoOrderIntentOtpController
         isOpen={isDjangoOrderIntentOtpOpen}
-        onOpenChange={setIsDjangoOrderIntentOtpOpen}
+        onOpenChange={handleDjangoOrderIntentOtpOpenChange}
         title='Verify your email before proceeding'
         length={6}
-        proceedToPaymentTrigger={handleOpenItem}
+        proceedToPaymentTrigger={handleVerifiedCheckout}
         djangoOrderIntentEmailVerification={djangoOrderIntentEmailVerification}
         email={email}
       />

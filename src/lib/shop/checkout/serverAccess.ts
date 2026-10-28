@@ -13,10 +13,16 @@ import {
   createCheckoutGrant,
   openCheckoutValue,
   type CheckoutGrant,
+  type CheckoutEmailProof,
+  emailProofCookieName,
+  CHECKOUT_BROWSER_COOKIE,
+  bindCheckoutEmailProofOwner,
+  isCheckoutEmailProofOwner,
 } from './checkoutProof';
+import { writeCheckoutEmailProof } from './serverEmailProofCookies';
 
 export async function requireCheckoutAccess(
-  row: { orderToken: string; userId: string | null },
+  row: { orderToken: string; userId: string | null; djangoOrderIntentUuid?: string | null },
   payment = false,
   request?: Request,
 ) {
@@ -67,6 +73,25 @@ export async function requireCheckoutAccess(
         maxAge: CHECKOUT_GRANT_SECONDS,
       },
     );
+    if (row.djangoOrderIntentUuid) {
+      const proof = openCheckoutValue<CheckoutEmailProof>(
+        cookieStore.get(emailProofCookieName(row.djangoOrderIntentUuid))?.value,
+        'email-proof',
+      );
+      const browserId = openCheckoutValue<string>(
+        cookieStore.get(CHECKOUT_BROWSER_COOKIE)?.value,
+        'browser',
+      );
+      if (
+        proof?.verified &&
+        proof.intentUuid === row.djangoOrderIntentUuid &&
+        proof.browserId === browserId &&
+        isCheckoutEmailProofOwner(proof, userId)
+      ) {
+        const bound = bindCheckoutEmailProofOwner(proof, userId);
+        if (bound !== proof) writeCheckoutEmailProof(cookieStore, request, bound);
+      }
+    }
   }
 }
 

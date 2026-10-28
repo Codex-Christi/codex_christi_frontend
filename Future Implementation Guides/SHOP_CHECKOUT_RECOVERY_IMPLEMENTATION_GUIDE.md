@@ -1,6 +1,6 @@
 # Shop Checkout Recovery Implementation Guide
 
-Last updated: 2026-08-06
+Last updated: 2026-10-27
 
 This guide summarizes the customer-side checkout recovery architecture around Django order-intent OTP, Next.js-owned paid checkout recovery OTP, and the PayPal transaction ledger.
 
@@ -132,6 +132,8 @@ npx prisma format --schema prisma/shop/paypal/paypalTXLedger.schema.prisma
 
 ## Checkout Recovery OTP Plan
 
+This initial plan describes explicit recovery of a protected order. It is not a prerequisite for every new purchase; the current flow below takes precedence.
+
 Reason:
 
 Django OTP is tied to Django order intent creation/resumption, so it should not be used to prove ownership of a potentially unresolved paid Prisma ledger row before creating a new Django intent.
@@ -189,58 +191,45 @@ Client route paths should follow the current app convention:
 /next-api/shop/checkout/recovery/verify
 ```
 
-## Recovery Flow
+## Explicit Protected-Order Recovery
 
-1. User enters checkout email.
-2. Next server checks Prisma ledger for unresolved paid rows.
-3. If none, continue normal Django intent creation.
-4. If found, pause Django intent creation.
-5. Send Next-owned recovery OTP.
-6. Verify OTP.
-7. After verification, show safe unresolved checkout summary.
-8. Tell customer not to place another order for the same purchase.
+When a customer cannot open a protected confirmation, they can request a recovery code for the
+checkout email. The start route sends the same response whether an order exists or not. After
+successful verification, the server returns safe order summaries and grants read-only status
+access. This flow does not require or authorize another payment.
 
-Unresolved paid rows are roughly:
+For earlier-order review during a new checkout, the ledger lookup scans unresolved payment and
+fulfillment states, verifies completed capture evidence, and returns at most three paid orders.
+Pagination prevents newer unsuccessful attempts from hiding an older paid purchase. Access policy
+is applied before any summary is returned.
 
-```ts
-status in ['captured', 'receipt_uploaded', 'payment_saved', 'error']
-processingCompletedAt: null
-capturePayload exists
-```
+## Current Checkout Verification And Earlier-Order Review
 
-## Current Django OTP Frontend Guard
+Django endpoints remain unchanged. Next.js owns the trusted browser proof and customer recovery decisions.
 
-The Django order-intent OTP flow is still owned by the Django backend. The frontend cannot force Django to accept a code once Django has marked the matching order intent or OTP state invalid, expired, consumed, or otherwise inconsistent.
+- Contact submission calls recovery `start` with `mode: "review"`. This does not send email or disclose whether an unverified email has orders. The server returns summaries only for the signed-in owner, a valid read-only checkout grant, or a verified browser/account-bound email proof.
+- An authorized customer sees the earlier paid order's amount, date, items, and reference immediately. **View earlier order** opens `/shop/checkout/confirmation/{orderToken}?view=details`; this view never claims a checkout, consumes cart items, or clears the current draft.
+- **Start a separate purchase** is an explicit acknowledgement of another purchase/payment, scoped to the current account, cart, contact details, and reviewed paid-order set. Only a matching reviewed paid attempt can be cleared; uncertain or unrelated attempts remain protected.
+- Guests continue normal checkout email verification. After verification, the same trusted proof authorizes earlier-order review without a second recovery OTP. Local cached recovery summaries are not an authorization source.
+- Obsolete recovery-summary and email-only verification stores have been removed. Session and purchase cleanup delete their legacy browser records while preserving current checkout state as appropriate.
+- Django supplies the current intent UUID, order ID, and address. A create response reporting `verified` is reusable only with matching current HttpOnly proof. Otherwise Next.js sends its own checkout verification code; it does not treat knowledge of an email address as verification.
+- Next-owned checkout codes use scoped HMAC hashes in the existing `CheckoutRecoveryOtpChallenge` table. The scope includes browser, account context, intent UUID, order ID, email, and address. Recovery codes and checkout codes cannot verify each other. Email send limits, five-attempt budgets, single-use consumption, and transaction locks remain enforced; no migration is required.
+- Verify/resend requests to the Next.js proxy include `intentUuid`. Only the existing supported fields are forwarded to Django. Both Django and Next-owned verification must match the sealed pending proof before a trusted verified proof is issued.
+- Guest proof can follow sign-in and then binds to that account. Account-issued proof cannot be reused after logout or by a different account. Reusing an already bound verified proof does not slide its expiry.
+- Review and OTP callbacks are fenced against closing, unmounting, account changes, changed drafts, and replaced requests. A failed continuation stays recoverable rather than silently advancing to payment.
+- Email entry uses an accessible single code field and an explicit Verify button. The glass matches the cart, and the verification drawer tracks visual viewport height for mobile keyboards.
+- PayPal attempt identity, immutable order snapshots, authorization/capture reconciliation, and idempotent purchase consumption remain independent of this UX review.
 
-Current frontend safeguards:
-
-- `BasicCheckoutInfo` runs the paid checkout recovery scan before creating a Django order intent.
-- If unresolved paid ledger rows exist, Django intent creation is paused and the Next.js-owned checkout recovery OTP flow is shown.
-- After the Next.js-owned recovery OTP is verified, the browser stores a short-lived encrypted recovery review session for the email. Returning to checkout inside that window reopens the reviewed recovery state instead of forcing another recovery OTP.
-- The recovery review UI should keep the customer in the checkout context. It shows a compact paid-order summary first and uses an expandable details section for shipping, status, extra recovered checkouts, and receipt links.
-- Avoid routing the customer to the historical confirmation page from the recovery modal as the primary UX. Historical confirmation pages are status views and can have checkout cleanup side effects if opened as the current checkout.
-- If a historical confirmation page must be opened, use read-only recovery mode: `/shop/checkout/confirmation/{orderToken}?view=recovery`.
-- Confirmation read-only recovery mode must not clear the current cart, checkout form, verified email store, Django intent store, PayPal intent store, or active PayPal marker.
-- When the customer explicitly starts a separate new order from the recovery review UI, clear the stale active PayPal marker before continuing.
-- If no paid recovery case exists, the frontend checks for a recent locally persisted verified Django order intent for the same email before calling `/orders/intent` again.
-- The local verified Django intent reuse window is intentionally short: 15 minutes.
-- The local reuse guard is browser-scoped and encrypted in the existing checkout intent store. It is a UX guard, not a replacement for backend idempotency.
-- Stale SWR mutation errors from a previous failed OTP verification no longer block the next verification attempt.
-- The Django OTP modal clears the entered digits after submit, close, and failed verification paths so a previous OTP is not preserved visually.
-- If Django create returns `otp_status: "expired"`, the UI opens the OTP modal with explicit guidance to use Resend instead of showing a generic success message.
-- Checkout recovery and Django OTP drawers use the visual viewport height to remain centered and scrollable when mobile browsers open the keyboard.
-
-Relevant files:
+Primary files:
 
 ```txt
 src/components/UI/Shop/Checkout/UserCheckoutSummary/BasicCheckoutInfo.tsx
-src/components/UI/Shop/Checkout/UserCheckoutSummary/basicCheckoutInfoHelpers.ts
-src/components/UI/Shop/Checkout/UserCheckoutSummary/DjangoOrderIntentOtpController.tsx
-src/components/UI/Shop/Checkout/UserCheckoutSummary/DjangoOrderIntentOtpModal.tsx
-src/lib/hooks/shopHooks/checkout/useDjangoOrderIntentEmailVerification.ts
-src/lib/hooks/useVisualViewportHeightCssVar.ts
-src/stores/shop_stores/checkoutStore/paidCheckoutRecoveryStore.ts
-src/stores/shop_stores/checkoutStore/djangoOrderIntentStore.ts
+src/components/UI/Shop/Checkout/UserCheckoutSummary/PaidCheckoutRecoveryModal.tsx
+src/lib/shop/checkout/checkoutRecovery/reviewPolicy.ts
+src/lib/shop/checkout/djangoOrderIntent/djangoOrderIntentServer.ts
+src/lib/shop/checkout/djangoOrderIntent/checkoutEmailVerification.ts
+src/lib/shop/checkout/checkoutProof.ts
+src/lib/shop/checkout/serverEmailProofCookies.ts
 ```
 
 ### Known Django Backend Contract Gap
@@ -251,11 +240,11 @@ Observed behavior:
 - Later attempts for the same email/order-intent family can return invalid or expired OTP even when the newly delivered OTP appears to still be within its validity window.
 - Waiting for the apparent OTP window may not reliably create a clean customer-facing retry path.
 
-Frontend workaround:
+Next.js adaptation:
 
-- Reuse a recent locally verified Django order intent for the same email when available.
-- Keep the user in the OTP modal on failed verification and clear the digits.
-- Guide the user toward Resend when Django reports an expired state.
+- Reuse only a matching trusted server proof, never a local verification flag alone.
+- For a reused Django intent already marked verified, establish fresh email ownership through a scoped Next-owned code when no current proof exists.
+- Pending/expired Django intents still use their existing verification and resend endpoints. Upstream errors remain visible and do not authorize payment.
 
 Backend behavior that should eventually be implemented by Django:
 
@@ -266,7 +255,7 @@ Backend behavior that should eventually be implemented by Django:
 - If a completed intent cannot be reused, provide a backend-supported reset/supersede endpoint instead of leaving the frontend to wait for an implicit timeout.
 - Include the OTP validity and resend cooldown in every create/resend/verify response so the UI can show accurate state.
 
-Until that backend contract exists, the frontend must treat Django OTP as a fragile pre-payment dependency and keep the paid checkout recovery OTP separate.
+Django still owns its pending-intent OTP lifecycle. Next.js now separates explicit protected-order recovery from normal checkout verification, and can safely verify ownership of an already-verified reused intent without changing Django.
 
 ## Zepto Mail Helper
 

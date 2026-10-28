@@ -13,7 +13,10 @@ import {
   type CheckoutEmailProof,
   CHECKOUT_BROWSER_COOKIE,
   checkoutGrantCookieName,
+  isCheckoutEmailProofOwner,
+  bindCheckoutEmailProofOwner,
 } from '@/lib/shop/checkout/checkoutProof';
+import { writeCheckoutEmailProof } from '@/lib/shop/checkout/serverEmailProofCookies';
 import { grantCheckoutAccess, requireCheckoutAccess } from '@/lib/shop/checkout/serverAccess';
 import {
   checkoutEmail,
@@ -149,7 +152,7 @@ export async function POST(req: Request) {
       body;
     const customerRecord = asRecord(customer);
     const sessionState = await getServerSessionState();
-    const authenticatedUserId = sessionState.isAuthenticated ? sessionState.userID : null;
+    const authenticatedUserId = sessionState.isAuthenticated ? (sessionState.userID ?? null) : null;
 
     if (!Array.isArray(selections) || selections.length === 0) {
       return validationError('INVALID_CART', 'Cart required');
@@ -164,7 +167,7 @@ export async function POST(req: Request) {
     const email = checkoutEmail(customerRecord.email);
     const name = checkoutString(customerRecord.name, 200);
     const selector = checkoutString(djangoOrderIntentUuid, 128);
-    const proof = openCheckoutValue<CheckoutEmailProof>(
+    let proof = openCheckoutValue<CheckoutEmailProof>(
       (await cookies()).get(emailProofCookieName(selector))?.value,
       'email-proof',
     );
@@ -176,6 +179,7 @@ export async function POST(req: Request) {
       !proof ||
       !browserId ||
       proof.browserId !== browserId ||
+      !isCheckoutEmailProofOwner(proof, authenticatedUserId) ||
       !matchesCheckoutProof(proof, email, delivery_address)
     )
       throw new CheckoutRequestError(
@@ -183,6 +187,8 @@ export async function POST(req: Request) {
         403,
         'CHECKOUT_EMAIL_VERIFICATION_REQUIRED',
       );
+    const originalProof = proof;
+    proof = bindCheckoutEmailProofOwner(proof, authenticatedUserId);
     const quote = readReviewedCheckoutQuote(review);
     const requestFingerprint = checkoutInputFingerprint({
       selections,
@@ -193,8 +199,8 @@ export async function POST(req: Request) {
     });
     orderToken = checkoutAttemptToken(attemptId, proof);
     let existing = await paypalTxLedger.paypalIntent.findUnique({ where: { orderToken } });
-    const respond = (paypalOrderId: string) =>
-      grantCheckoutAccess(
+    const respond = (paypalOrderId: string) => {
+      const response = grantCheckoutAccess(
         paypalRouteSuccess({ requestId, data: { orderToken: orderToken!, paypalOrderId } }),
         req,
         {
@@ -202,6 +208,9 @@ export async function POST(req: Request) {
           userId: existing ? existing.userId : (authenticatedUserId ?? null),
         },
       );
+      if (proof !== originalProof) writeCheckoutEmailProof(response.cookies, req, proof);
+      return response;
+    };
     if (existing) {
       const savedInput = asRecord(existing.djangoOrderIntentPayload);
       if (

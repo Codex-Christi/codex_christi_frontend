@@ -1,41 +1,26 @@
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
-import type { PaidCheckoutRecoverySummary } from '@/stores/shop_stores/checkoutStore/paidCheckoutRecoveryStore';
+import type { PaidCheckoutRecoverySummary } from '@/lib/shop/checkout/checkoutRecovery/types';
 import type { DjangoOrderIntentPayload } from '@/lib/hooks/shopHooks/checkout/djangoOrderIntentMutationHooks';
 import type { BasicCheckoutInfoFormSchema } from './BasicCheckoutInfo';
 
 export type PaidCheckoutRecoveryStartResponse = {
   ok: boolean;
   recoveryRequired?: boolean;
-  expiresInMinutes?: number;
-  expiresInSeconds?: number;
-  resendAvailableInSeconds?: number;
+  recoveryVerified?: boolean;
+  checkouts?: PaidCheckoutRecoverySummary[];
   message?: string;
 };
 
 export type PaidCheckoutRecoveryPromptState = {
-  email: string;
-  expiresInMinutes: number;
-  pendingCheckoutData: BasicCheckoutInfoFormSchema | null;
-  recipientName: string;
-  resendAvailableInSeconds: number;
-  verifiedCheckouts: PaidCheckoutRecoverySummary[];
-};
-
-export const DEFAULT_PAID_CHECKOUT_RECOVERY_PROMPT_STATE: PaidCheckoutRecoveryPromptState = {
-  email: '',
-  expiresInMinutes: 10,
-  pendingCheckoutData: null,
-  recipientName: '',
-  resendAvailableInSeconds: 0,
-  verifiedCheckouts: [],
+  pendingCheckoutData: BasicCheckoutInfoFormSchema;
+  checkouts: PaidCheckoutRecoverySummary[];
+  scope: string;
+  reviewKey: string;
+  phase: 'before-verification' | 'after-verification';
 };
 
 export function getRecipientName(data: BasicCheckoutInfoFormSchema) {
   return `${data.firstname} ${data.lastname}`.trim();
-}
-
-export function getPaidCheckoutRecoveryExpiryMinutes(payload: PaidCheckoutRecoveryStartResponse) {
-  return payload.expiresInMinutes ?? Math.max(1, Math.ceil((payload.expiresInSeconds ?? 600) / 60));
 }
 
 export function getCheckoutValuesFromStore(
@@ -90,11 +75,20 @@ export function toDjangoOrderIntentPayload(
   };
 }
 
-export async function startPaidCheckoutRecovery(data: BasicCheckoutInfoFormSchema) {
+export async function startPaidCheckoutRecovery(
+  data: BasicCheckoutInfoFormSchema,
+  { intentUuid, signal }: { intentUuid?: string; signal?: AbortSignal } = {},
+) {
   const response = await fetch('/next-api/shop/checkout/recovery/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: data.email, recipientName: getRecipientName(data) }),
+    body: JSON.stringify({
+      mode: 'review',
+      email: data.email,
+      recipientName: getRecipientName(data),
+      ...(intentUuid ? { intentUuid } : {}),
+    }),
+    signal,
   });
   const payload = (await response.json()) as PaidCheckoutRecoveryStartResponse;
 

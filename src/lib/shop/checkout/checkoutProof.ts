@@ -11,6 +11,8 @@ export type CheckoutEmailProof = {
   orderId: string;
   addressHash: string;
   verified: boolean;
+  verificationMethod?: 'django-otp' | 'next-otp';
+  ownerId?: string | null;
 };
 type CheckoutGrant = {
   orderToken: string;
@@ -86,7 +88,7 @@ export function readUpstreamEmailProof(
   if (
     response?.success !== true ||
     !data ||
-    !['pending', 'verified'].includes(String(data.otp_status)) ||
+    !['pending', 'verified', 'expired'].includes(String(data.otp_status)) ||
     checkoutEmail(data.email) !== expectedEmail
   )
     throw new Error('Django checkout verification response is incomplete.');
@@ -109,6 +111,24 @@ export function matchesCheckoutProof(
     proof.email === checkoutEmail(email) &&
     proof.addressHash === checkoutAddressHash(address),
   );
+}
+
+/** Guest verification may follow sign-in; account-issued proof never follows logout or a switch. */
+export function isCheckoutEmailProofOwner(proof: CheckoutEmailProof | null, userId: string | null) {
+  return Boolean(
+    proof &&
+    (proof.ownerId === null || (typeof proof.ownerId === 'string' && proof.ownerId === userId)),
+  );
+}
+
+export function bindCheckoutEmailProofOwner(proof: CheckoutEmailProof, userId: string | null) {
+  if (!isCheckoutEmailProofOwner(proof, userId))
+    throw new CheckoutRequestError(
+      'Verify your checkout email again for this account.',
+      403,
+      'CHECKOUT_EMAIL_VERIFICATION_REQUIRED',
+    );
+  return proof.ownerId === null && userId ? { ...proof, ownerId: userId } : proof;
 }
 
 export function checkoutAttemptToken(attemptId: unknown, proof: CheckoutEmailProof) {

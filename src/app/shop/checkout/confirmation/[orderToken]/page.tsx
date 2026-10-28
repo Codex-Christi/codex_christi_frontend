@@ -8,7 +8,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { claimCurrentCheckout } from '@/lib/hooks/shopHooks/checkout/claimCurrentCheckout';
 import { useCartStore } from '@/stores/shop_stores/cartStore';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
-import { useVerifiedEmailsStore } from '@/stores/shop_stores/checkoutStore/useVerifiedEmailsStore';
+import { clearLegacyCheckoutCaches } from '@/stores/shop_stores/checkoutStore/storage';
 import { useDjangoOrderIntentStore } from '@/stores/shop_stores/checkoutStore/djangoOrderIntentStore';
 import {
   captureCheckoutAttempt,
@@ -20,10 +20,14 @@ import {
   type PayPalTxPaymentStatusResponse,
 } from '@/lib/paypal/txLedger/mapLedgerToProcessingState';
 
-type PageProps = { params: Promise<{ orderToken: string }> };
+type PageProps = {
+  params: Promise<{ orderToken: string }>;
+  searchParams: Promise<{ view?: string }>;
+};
 
-export default function CheckoutConfirmationPage({ params }: PageProps) {
+export default function CheckoutConfirmationPage({ params, searchParams }: PageProps) {
   const { orderToken } = use(params);
+  const viewingEarlierOrder = use(searchParams).view === 'details';
   const authenticatedOwner = useAuthStore((state) =>
     state.isAuthenticated ? state.accountOwnerId : null,
   );
@@ -54,7 +58,7 @@ export default function CheckoutConfirmationPage({ params }: PageProps) {
       consumed.current.add(purchase.orderId);
       // Returning to an older order must not erase the details of a newer checkout.
       if (attempt && isCurrentCheckoutAttempt(attempt)) {
-        useVerifiedEmailsStore.getState().clearStore();
+        void clearLegacyCheckoutCaches();
         useDjangoOrderIntentStore.getState().clearDjangoOrderIntent();
         useShopCheckoutStore.getState().resetCheckoutToStoreDefaults();
         clearCheckoutAttempt(attempt);
@@ -70,7 +74,7 @@ export default function CheckoutConfirmationPage({ params }: PageProps) {
     const poll = async () => {
       setRefreshing(true);
       try {
-        if (authenticatedOwner) await claimCurrentCheckout();
+        if (authenticatedOwner && !viewingEarlierOrder) await claimCurrentCheckout();
         if (cancelled) return;
         const response = await fetch(
           `/next-api/paypal/tx-ledger/payments/${encodeURIComponent(orderToken)}/status`,
@@ -99,7 +103,7 @@ export default function CheckoutConfirmationPage({ params }: PageProps) {
         setPayload(next);
         setAccessRequired(false);
         setLookupError(null);
-        if (next.cartPurchase) {
+        if (next.cartPurchase && !viewingEarlierOrder) {
           try {
             await consumeConfirmedPurchase(next.cartPurchase);
             if (!cancelled) setCartError(null);
@@ -135,7 +139,7 @@ export default function CheckoutConfirmationPage({ params }: PageProps) {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [orderToken, retry, consumeConfirmedPurchase, authenticatedOwner]);
+  }, [orderToken, retry, consumeConfirmedPurchase, authenticatedOwner, viewingEarlierOrder]);
 
   const downloadReceipt = async () => {
     if (!state?.receiptLink || !state.receiptFileName) return;
@@ -168,7 +172,7 @@ export default function CheckoutConfirmationPage({ params }: PageProps) {
       accessRequired={accessRequired}
       refunded={refunded}
       lookupError={lookupError}
-      cartError={cartError}
+      cartError={viewingEarlierOrder ? null : cartError}
       refreshing={refreshing}
       downloading={downloading}
       downloadError={downloadError}

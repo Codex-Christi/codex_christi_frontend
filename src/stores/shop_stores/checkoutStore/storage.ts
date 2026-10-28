@@ -69,6 +69,15 @@ type StorageOptions = {
   cryptoAvailable?: () => boolean;
 };
 
+/** Old email-wide flags and recovery summaries no longer authorize checkout. */
+export function clearLegacyCheckoutCaches(options?: StorageOptions) {
+  return Promise.all(
+    ['paid-checkout-recovery-store', 'verifiedEmailsList-emails'].map((name) =>
+      createCheckoutObfuscatedStorage(name, undefined, options).removeItem(name),
+    ),
+  );
+}
+
 /** A separate current record preserves old encrypted data when a browser cannot decrypt it. */
 export function createCheckoutObfuscatedStorage<S>(
   purpose: string,
