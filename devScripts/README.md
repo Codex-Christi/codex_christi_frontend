@@ -57,6 +57,44 @@ Prisma migration history (for example, P3005), stop, back it up and reconcile it
 schema/history before retrying. Do not reset production or mark every migration
 applied without checking what the database contains.
 
+## Deferred Cloudflare Web Analytics
+
+The root layout loads one analytics beacon after the page-load event, during
+browser idle time. It uses the visible hostname, not the route: `.org/shop`
+uses the `.org` token, while `.shop` uses its separate token. The corresponding
+`www` hostname uses the same token. Localhost, other hosts, development mode and
+missing tokens do not load the manual beacon. Country/FX and application providers
+do not control analytics loading.
+
+Copy the two settings from [`.env.cloudflare.example`](../.env.cloudflare.example)
+into the existing production environment and fill them with each site's Web
+Analytics token. These are public site identifiers, not Cloudflare API keys.
+`NEXT_PUBLIC_*` values are embedded during `yarn build`; changing a token requires
+a rebuild, not only a container restart. The existing Docker build already passes
+these public variables through, so no Docker or dependency change is needed.
+
+After deploying, switch each site under Cloudflare Web Analytics > Manage Site
+to **Enable with JS Snippet installation**. The loader skips its manual copy if
+an automatically injected beacon is still present, preventing duplicate loading
+during rollout. Automatic injection must be turned off for deferral to take effect.
+Keep existing tracking exclusions aligned with the manually covered pages.
+
+SPA tracking stays enabled and the beacon is not reinserted on client-side
+navigation. Manual setup reports to `https://cloudflareinsights.com/cdn-cgi/rum`;
+any CSP must allow that destination and the script at
+`https://static.cloudflareinsights.com/beacon.min.js`. Cloudflare does not support
+safe SRI version-pinning for manual embedding, unlike its automatic injection.
+Late loading can miss short visits and navigation before initialization; it does
+not remove the beacon's legacy polyfills or guarantee a Lighthouse score increase.
+
+Verify exactly one beacon request per document on both domains, no early beacon
+request before page load, and successful analytics after SPA navigation. Do not
+send synthetic test tokens to Cloudflare: intercept telemetry in disposable tests.
+To roll back the loading policy, re-enable automatic injection; its tag takes
+precedence over this loader. See the [Cloudflare setup guide](https://developers.cloudflare.com/web-analytics/get-started/),
+[manual embedding caveats](https://developers.cloudflare.com/web-analytics/faq/),
+and [Next.js script strategies](https://nextjs.org/docs/app/api-reference/components/script#lazyonload).
+
 ## Readiness
 
 `/next-api/health/ready` (also `/api/health/ready` inside Next) returns `200` only

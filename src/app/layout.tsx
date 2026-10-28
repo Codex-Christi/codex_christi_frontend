@@ -3,6 +3,7 @@ import localFont from 'next/font/local';
 import './globals.css';
 import dynamic from 'next/dynamic';
 import { getMainSiteBaseUrl } from '@/lib/siteBaseUrls';
+import CloudflareWebAnalytics from '@/components/UI/general/CloudflareWebAnalytics';
 
 // Dynamic Components
 
@@ -67,6 +68,7 @@ export default function RootLayout({
       >
         {children}
         <AllRootProviders />
+        <CloudflareWebAnalytics />
       </body>
     </html>
   );
