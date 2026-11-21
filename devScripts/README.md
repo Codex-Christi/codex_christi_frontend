@@ -2,12 +2,19 @@
 
 ## Before Deployment
 
-Pull requests and pushes to `main` and `release/leaseweb` run lint, TypeScript,
+Pushes to any branch and pull requests targeting `main` run lint, TypeScript,
 the existing storefront/authentication/checkout suites, release-settings and
-recovery tests, and a synthetic-settings Linux container build. Deployment runs
-only for pushes to `release/leaseweb` after both verification jobs pass and the
-explicit deployment gate is enabled. Current `main` contains later features;
-it is not the first Leaseweb release source.
+recovery tests, and a synthetic-settings Linux container build. Use one temporary
+`review/leaseweb` branch for these deployment changes. A review-branch push runs
+checks and cannot deploy.
+
+Deployment runs only for pushes to `main`, after both verification jobs pass and
+the explicit deployment gate is enabled. This candidate starts from deployed
+revision `e7a7599e93338d1d6b270d1aeee5f68d21e34848`; current local `main` contains
+later application changes. Verify the complete application that will result
+before merging into `main` or enabling deployment. Merging this review does not
+remove those later changes. The review branch can be deleted after merging;
+ordinary releases continue from `main`.
 The production Docker build uses Turbopack.
 
 The deployment job waits for the VPS script instead of starting it in the

@@ -6,12 +6,14 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
 import unittest
 
 SOURCE = Path(__file__).resolve().parents[2] / 'devScripts' / 'production.sh'
+WORKFLOW = Path(__file__).resolve().parents[2] / '.github/workflows/push-to-main.yml'
 OLD = 'sha256:' + '1' * 64
 NEW = 'sha256:' + '2' * 64
 CHECK = 'sha256:' + '3' * 64
@@ -82,6 +84,42 @@ p=pathlib.Path(os.environ['RELEASE_FIXTURE']); s=json.loads(p.read_text())
 with p.with_suffix('.proxy').open('a') as f: f.write(sys.argv[-1]+'\n')
 raise SystemExit(1 if s['mode']=='proxy_failure' and sys.argv[-1]==s['new_revision'] else 0)
 '''
+
+
+class WorkflowContractTests(unittest.TestCase):
+    def test_review_branch_pushes_run_checks_and_pull_requests_target_main(self):
+        workflow = WORKFLOW.read_text()
+        events = workflow.split('\npermissions:', 1)[0]
+        push = events.split('  push:\n', 1)[1].split('  pull_request:\n', 1)[0]
+        pull_request = events.split('  pull_request:\n', 1)[1]
+        for event, expected in ((push, ['**']), (pull_request, ['main'])):
+            match = re.search(r'^    branches: \[(.*?)\]$', event, re.MULTILINE)
+            self.assertIsNotNone(match)
+            branches = [value.strip().strip('\"\'') for value in match[1].split(',')]
+            self.assertEqual(branches, expected)
+            self.assertNotRegex(event, r'(?m)^    (?:paths|paths-ignore|branches-ignore):')
+
+    def test_only_enabled_main_pushes_can_deploy_and_remote_fetch_agrees(self):
+        workflow = WORKFLOW.read_text()
+        condition = re.search(r'^    if: (.+)$', workflow, re.MULTILINE)[1]
+        comparisons = []
+        for clause in condition.split('&&'):
+            match = re.fullmatch(r"\s*(github\.event_name|github\.ref|vars\.LEASEWEB_FRONTEND_DEPLOY_ENABLED)\s*==\s*'([^']*)'\s*", clause)
+            self.assertIsNotNone(match, 'The deployment condition needs explicit policy review.')
+            comparisons.append(match.groups())
+        self.assertEqual(len(comparisons), 3)
+        for event, ref, gate, expected in (
+                ('push', 'refs/heads/main', 'true', True),
+                ('push', 'refs/heads/main', '', False),
+                ('push', 'refs/heads/main', 'false', False),
+                ('push', 'refs/heads/review/leaseweb', 'true', False),
+                ('push', 'refs/tags/main', 'true', False),
+                ('pull_request', 'refs/heads/main', 'true', False)):
+            values = {'github.event_name': event, 'github.ref': ref,
+                      'vars.LEASEWEB_FRONTEND_DEPLOY_ENABLED': gate}
+            self.assertEqual(all(values[key] == value for key, value in comparisons), expected)
+        self.assertIn('git fetch origin main >', workflow)
+        self.assertNotIn('release/leaseweb', workflow)
 
 
 class ReleaseTests(unittest.TestCase):

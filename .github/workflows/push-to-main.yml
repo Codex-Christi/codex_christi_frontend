@@ -1,9 +1,9 @@
 name: Frontend checks and Leaseweb release
 on:
   push:
-    branches: [main, release/leaseweb]
+    branches: ['**']
   pull_request:
-    branches: [main, release/leaseweb]
+    branches: [main]
 permissions:
   contents: read
 jobs:
@@ -88,7 +88,7 @@ jobs:
   release:
     needs: [verify, container-build]
     # This variable remains unset until the private rehearsal and cutover pass.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/release/leaseweb' && vars.LEASEWEB_FRONTEND_DEPLOY_ENABLED == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.LEASEWEB_FRONTEND_DEPLOY_ENABLED == 'true'
     concurrency:
       group: codex-christi-frontend-production
       cancel-in-progress: false
@@ -203,7 +203,7 @@ jobs:
           echo "VPS_EXPECTED_REVISION=$revision"
           echo "VPS_CHECKOUT_BEFORE=$(git rev-parse HEAD)"
           test -z "$(git status --porcelain=v1 --untracked-files=normal)"
-          git fetch origin release/leaseweb > "$incoming/git-fetch.log" 2>&1
+          git fetch origin main > "$incoming/git-fetch.log" 2>&1
           git merge-base --is-ancestor HEAD "$revision"
           git merge --ff-only "$revision" > "$incoming/git-merge.log" 2>&1
           test "$(git rev-parse HEAD)" = "$revision"

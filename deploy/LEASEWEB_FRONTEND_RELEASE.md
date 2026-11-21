@@ -17,18 +17,23 @@ the backend owner's control. This frontend release does not change them.
 
 ## Application source
 
-The first frontend release branch is `release/leaseweb`, based on deployed
-revision `e7a7599e93338d1d6b270d1aeee5f68d21e34848`. Only reviewed deployment
-changes belong in this candidate. `package.json`, `yarn.lock`, `prisma.config.ts`,
-application source and the four existing Prisma schemas retain that baseline.
-Current `main` contains later features, and the original working tree contains
-unfinished account-security work. Neither is silently included in this release.
+Use one temporary `review/leaseweb` branch for the frontend deployment review.
+It starts from deployed revision `e7a7599e93338d1d6b270d1aeee5f68d21e34848`.
+Only reviewed deployment changes belong in this candidate. `package.json`,
+`yarn.lock`, `prisma.config.ts`, application source and the four existing Prisma
+schemas retain that baseline. Current local `main` contains later features,
+and the original working tree contains unfinished account-security work.
+Neither is silently included in this candidate.
 
-Publish and protect the reviewed release branch deliberately. The first
-frontend deployment must use that branch directly; merging it into newer
-`main` would retain those newer application changes. Later feature adoption
-requires its own release checks. Original working trees and indexes are not
-reset or cleaned to prepare this candidate.
+Push the temporary branch for review and CI checks. It cannot deploy. After
+the complete intended application is verified, merge the reviewed changes into
+`main`; production deployment runs only from `main`, behind the existing gate.
+Merging into newer `main` retains its later application changes. Review and test
+that complete result, including its required database compatibility and customer
+flows, before enabling deployment. The four-schema build guard still requires
+explicit review of any additional database-backed feature. Delete the temporary
+branch after merging. No permanent release branch is needed, and the original
+working trees and indexes are not reset or cleaned to prepare this candidate.
 
 Build from Git on Linux or from a Git archive. The verified source contains
 case-sensitive asset names that a normal macOS checkout can collapse. Sparse
@@ -92,8 +97,11 @@ existing named image/proxy caches. Deployment never uses global pruning,
 
 ## Adopt and rehearse before enabling automation
 
-1. Review the three candidate Git histories and publish to their intended
-   repositories. The shared edge keeps manual maintenance initially.
+1. Review the frontend and Nginx temporary `review/leaseweb` branches and publish
+   them to their intended repositories for checks. Merge into `main` only after
+   verifying the complete intended result. Review the shared edge's initial
+   `main` separately; it keeps manual maintenance and needs no temporary branch.
+   The frontend review branch does not deploy.
 2. Adopt exact Git checkouts at the established VPS paths, preserving private
    environments, certificates, release records and recovery files. Frontend,
    Nginx and edge deployment directories currently contain selected installation
