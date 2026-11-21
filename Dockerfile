@@ -1,18 +1,25 @@
 # syntax=docker/dockerfile:1.4
 
+# Supplied by release configuration after verifying the official amd64 image.
+# A digest is required by the build scripts; no moving LTS tag is deployed.
+ARG NODE_IMAGE
+
 ########################
 # 1) Base image
 ########################
-FROM node:lts-bookworm-slim AS base
+FROM ${NODE_IMAGE} AS base
+ARG NODE_IMAGE
 WORKDIR /app
+
+RUN case "$NODE_IMAGE" in *@sha256:*) ;; *) echo 'NODE_IMAGE must include its verified digest' >&2; exit 1 ;; esac
 
 # Prisma wants OpenSSL present
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
-# Use corepack so Yarn is available
-RUN corepack enable
+# Match the package manager used by CI instead of following a moving Corepack default.
+RUN npm install --global yarn@1.22.22 --force
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -27,37 +34,20 @@ COPY package.json yarn.lock .yarnrc.yml ./
 
 # Cache Yarn downloads
 RUN --mount=type=cache,target=/root/.cache/yarn \
-  yarn_major="$(yarn --version | cut -d. -f1)" \
-  && if [ "$yarn_major" -ge 2 ]; then \
-    yarn install --immutable --inline-builds; \
-  else \
-    yarn install --frozen-lockfile --check-files; \
-  fi
+  yarn install --frozen-lockfile --non-interactive
 
 ########################
-# 3) Builder layer
+# 3) Generate the four production clients, without connecting to any database
 ########################
-FROM deps AS builder
+FROM deps AS generated
 WORKDIR /app
 
-# Copy the full project for build
 COPY . .
 
-# More heap for Next build (3 GB) to prevent OOM on small VPS
-ENV NODE_OPTIONS="--max-old-space-size=1792"
-ENV NEXT_TELEMETRY_DISABLED=1
-
-RUN --mount=type=secret,id=production_env,target=/run/secrets/production_env \
-  public_env=/tmp/next-public-build.env \
-  && grep -E '^NEXT_PUBLIC_[A-Za-z0-9_]+=' /run/secrets/production_env > "$public_env" \
-  && set -a \
-  && source "$public_env" \
-  && set +a \
-  && case "${NEXT_PUBLIC_PAYPAL_PAYMENT_MODE:-}" in \
-    sandbox) test -n "${NEXT_PUBLIC_PAYPAL_SANDBOX_CLIENT_ID:-}" ;; \
-    live) test -n "${NEXT_PUBLIC_PAYPAL_LIVE_CLIENT_ID:-}" ;; \
-    *) echo "NEXT_PUBLIC_PAYPAL_PAYMENT_MODE must be sandbox or live" >&2; exit 1 ;; \
-  esac
+# New database-backed features must be explicitly reconciled with the release build.
+# This guard leaves the working checkout alone and prevents partial client releases.
+RUN test "$(find prisma -name '*.prisma' -type f | wc -l | tr -d ' ')" = 4 \
+  || { echo 'Unexpected Prisma schema: review client generation and read-only checks before release' >&2; exit 1; }
 
 # Generate every Prisma client needed by the standalone app. Prisma 7 config
 # asks for datasource URLs even for generate, so non-secret placeholder URLs are
@@ -73,18 +63,38 @@ RUN yarn prisma generate --schema prisma/shop/merchize/priceCatalog.prisma \
     MERCHIZE_FULFILLMENT_OPS_NEON_DB_STRING=postgresql://user:password@localhost:5432/merchize_fulfillment_ops \
     yarn prisma generate --schema prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOps.schema.prisma
 
-RUN --mount=type=cache,target=/root/.cache/yarn \
-  set -a \
-  && source /tmp/next-public-build.env \
-  && set +a \
-  && yarn build
+########################
+# 4) Next.js compilation, after all clients exist
+########################
+FROM generated AS builder
+ARG APP_REVISION=unknown
+ENV APP_REVISION=${APP_REVISION}
+ENV DEPLOYMENT_VERSION=${APP_REVISION}
+ENV NODE_OPTIONS="--max-old-space-size=1792"
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Parse configuration as data, not shell commands. Only public settings enter the build.
+RUN --mount=type=secret,id=production_env,target=/run/secrets/production_env,required=true node --input-type=module <<'JS'
+import { readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { parse } from 'dotenv';
+import { validatePublicSettings } from './scripts/check-release-settings.mjs';
+const publicEnv = validatePublicSettings(parse(readFileSync('/run/secrets/production_env')));
+// This exact approved map is compiled and retained for the offline runtime check.
+writeFileSync('/app/release-public-settings.json', JSON.stringify(publicEnv) + '\n');
+const result = spawnSync('yarn', ['build'], { stdio: 'inherit', env: { ...process.env, ...publicEnv } });
+if (result.error) throw new Error('Next.js compilation could not start.');
+process.exit(result.status ?? 1);
+JS
 
 ########################
-# 4) Runtime (small)
+# 5) Runtime (small)
 ########################
-FROM node:lts-bookworm-slim AS runtime
+FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app
 ARG APP_REVISION=unknown
+LABEL org.opencontainers.image.revision=${APP_REVISION}
+LABEL org.codex-christi.release-settings=1
 
 # Retain OpenSSL and trusted CA certificates for runtime TLS connections.
 RUN apt-get update -y \
@@ -103,6 +113,8 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY scripts/check-deployment-health.mjs ./scripts/check-deployment-health.mjs
+COPY scripts/check-release-settings.mjs ./scripts/check-release-settings.mjs
+COPY --from=builder /app/release-public-settings.json ./release-public-settings.json
 
 # Next config may still be read at runtime (images/rewrites)
 COPY --from=builder /app/next.config.* ./
@@ -123,19 +135,23 @@ USER node
 CMD ["node", "server.js"]
 
 ########################
-# 5) Migrations runner (keeps Prisma CLI out of runtime image)
+# 6) Explicit read-only preflight runner (keeps tooling out of runtime image)
 ########################
-FROM deps AS migrate
+FROM deps AS datastore-check
 WORKDIR /app
-
+ARG APP_REVISION=unknown
+LABEL org.opencontainers.image.revision=${APP_REVISION}
+ENV APP_REVISION=${APP_REVISION}
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-
-# Only what production database setup needs.
-COPY prisma /app/prisma
-COPY prisma.config.* /app/
-COPY scripts/prisma_production_setup.sh /app/scripts/prisma_production_setup.sh
-
-RUN chmod +x /app/scripts/prisma_production_setup.sh
-
-CMD ["bash", "/app/scripts/prisma_production_setup.sh"]
+# Keep public assets, application routes and migration/operator tooling out of
+# the checker artifact. Only generated clients and pure connection selectors run.
+COPY --from=generated /app/scripts/check-production-datastores.mjs ./scripts/check-production-datastores.mjs
+COPY --from=generated /app/src/lib/prisma/postgresSslMode.ts ./src/lib/prisma/postgresSslMode.ts
+COPY --from=generated /app/src/lib/prisma/shop/shopOpsDataTarget.ts ./src/lib/prisma/shop/shopOpsDataTarget.ts
+COPY --from=generated /app/src/lib/prisma/shop/merchize/generated ./src/lib/prisma/shop/merchize/generated
+COPY --from=generated /app/src/lib/prisma/adminOpsLedger/generated ./src/lib/prisma/adminOpsLedger/generated
+COPY --from=generated /app/src/lib/prisma/shop/paypal/txLedger/generated ./src/lib/prisma/shop/paypal/txLedger/generated
+COPY --from=generated /app/src/lib/prisma/shop/merchizeFulfillmentOps/generated ./src/lib/prisma/shop/merchizeFulfillmentOps/generated
+USER node
+CMD ["node", "--import", "tsx", "scripts/check-production-datastores.mjs"]

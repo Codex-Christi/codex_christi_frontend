@@ -52,6 +52,9 @@ next-env.d.ts
 # Dev tools and GitHub
 .git
 .github
+.codex/
+.agents/
+AGENTS.md
 .editorconfig
 .gitattributes
 .node-version
@@ -78,4 +81,23 @@ deploy-*.log
 data/
 *.db
 
-src/lib/prisma/shop/merchize/generated/
+# Clients are generated in the build, never copied from a developer machine.
+src/lib/prisma/**/generated/
+
+# Migration archives, local operator artifacts and proxy secrets are not app source.
+backups/
+.deploy/
+deploy/
+scripts/migration/
+scripts/deployment/
+scripts/tests/
+scripts/agent-writing-hook.mjs
+__pycache__/
+*.pyc
+*.dump
+*.dump.*
+*.sqlite
+*.sqlite3
+*.tar
+*.tar.gz
+*.key

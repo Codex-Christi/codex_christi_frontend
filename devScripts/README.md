@@ -2,9 +2,12 @@
 
 ## Before Deployment
 
-Pull requests and pushes to `main` run lint, TypeScript, and the existing
-storefront, authentication and checkout regression suites. Deployment starts
-only after those pass.
+Pull requests and pushes to `main` and `release/leaseweb` run lint, TypeScript,
+the existing storefront/authentication/checkout suites, release-settings and
+recovery tests, and a synthetic-settings Linux container build. Deployment runs
+only for pushes to `release/leaseweb` after both verification jobs pass and the
+explicit deployment gate is enabled. Current `main` contains later features;
+it is not the first Leaseweb release source.
 The production Docker build uses Turbopack.
 
 The deployment job waits for the VPS script instead of starting it in the
@@ -12,35 +15,34 @@ background. It fast-forwards to the exact verified commit and refuses to deploy
 from a different revision or over tracked local edits. Production deployments
 are serialized. The VPS needs Docker Compose v2 with `up --wait` support.
 
-The VPS script builds the images, waits for database setup to succeed,
-and waits up to 120 seconds for the new app container to become healthy. The
-running image must identify itself with the expected Git revision. A failed
-migration, readiness check, or revision check fails the job before Docker pruning.
-An unhealthy deployment does **not** automatically roll back the container;
-inspect its logs and restore the previous release manually when needed.
+The prepared Leaseweb workflow builds a runtime image and matching read-only
+datastore checker on CI, transfers a checksummed archive, and deploys exact
+destination image IDs. The VPS script first compares the candidate image's
+compiled public settings with its Compose-parsed runtime settings in a one-off
+container with no network or data mounts. It then checks existing data read-only
+before replacing only the frontend, waits for revision readiness, refreshes Nginx, and
+checks both HTTPS routes. A failed replacement or proxy check attempts recovery
+to the retained image, Compose configuration and runtime environment. No global
+Docker pruning occurs.
 
-### Database Setup
+Deployment remains disabled until `LEASEWEB_FRONTEND_DEPLOY_ENABLED=true` is
+explicitly configured after the private rehearsal. See the
+[Leaseweb frontend release procedure](../deploy/LEASEWEB_FRONTEND_RELEASE.md)
+for initial setup, build inputs, deployment access and recovery checkpoints.
 
-The existing `migrate` container reads `.env.production`. Before touching any
-database, `scripts/prisma_production_setup.sh` requires `NODE_ENV=production`
-and a valid Admin Ops PostgreSQL URL. It uses `NEON_ADMIN_OPS_LEDGER_URL` first,
-falling back to `NEON_ADMIN_OPS_LEDGER_POOLED_URL` only if the first variable is
-unset. An empty or invalid direct URL fails instead of silently using another
-database. The selected URL is pinned before Prisma loads dotenv files and is
-not printed by the preflight check.
+### Existing Databases
 
-The user confirmed both URL variables exist on the VPS. Before deployment,
-confirm both point to the **same intended production database**: migrations use
-the direct URL, while the running app prefers the pooled URL. The preflight
-checks syntax, not database ownership, branch or connectivity.
+All four production Prisma clients are generated before Next.js compilation:
+Merchize SQLite catalog, Neon Admin Ops, Neon PayPal ledger, and Neon Merchize
+Fulfillment Ops. Generation creates client code without applying migrations.
 
-Setup generates the Admin Ops client and runs its existing `prisma migrate deploy`
-first, then runs the unchanged catalog setup/permissions and PayPal steps.
-Any failure stops the script and prevents the app restart. No new migration,
-automatic baseline or Admin Ops `db push` is added. If an existing database lacks
-Prisma migration history (for example, P3005), stop, back it up and reconcile its
-schema/history before retrying. Do not reset production or mark every migration
-applied without checking what the database contains.
+The profile-only `datastore-check` service reads `.env.production` and checks the
+same selected Neon endpoints used by the application in read-only transactions.
+It also checks the existing SQLite catalog through a read-only volume mount.
+Failure stops app replacement without changing schemas or repairing data.
+Neither the ordinary release nor the legacy `prisma_production_setup.sh` entry
+point runs migrations, `db push`, catalog synchronization or permission repairs.
+Schema changes require their own separately reviewed operation.
 
 ## Persistent Optimized Images
 
@@ -63,8 +65,10 @@ image volume is not writable by the runtime `node` user, repair that volume's
 ownership before serving traffic; do not run the app as root to work around it.
 
 Image freshness remains separate from product snapshot/HTML refresh. The current
-minimum image TTL is one year. Updated images should use a new/versioned source
-URL; overwriting an image at the same URL can retain the old optimized image.
+minimum image TTL is one year. The POD provider controls product source URLs;
+if it replaces an image at the same URL, the old optimized image can remain.
+Review the refresh policy against actual supplier behavior during private
+integration instead of requiring manual preparation of supplier files.
 If such an overwrite requires a targeted cache purge, coordinate it with any
 Nginx/CDN image cache too. Do not clear the catalog database or whole `.next`
 directory to refresh an image. Clearing image entries deliberately makes their
@@ -127,8 +131,9 @@ checks run at request time, so the image build does not need a session secret.
 Changing that key requires fresh admin unlocks but does not invalidate ordinary
 site login. An admin can change their own unlock password at `/admin/security`;
 that invalidates previous unlocks for that admin while preserving ordinary login.
-The deployment migration step must finish before using that form; runtime
-readiness deliberately does not query the remote Admin Ops database.
+The existing Admin Ops schema must be compatible before using that form; runtime
+readiness deliberately does not query the remote Admin Ops database. The separate
+read-only release preflight checks that compatibility without applying migrations.
 
 The container probes this endpoint every 30 seconds. This is a local readiness
 probe, not a catalog refresh: it makes no Django, Merchize, PayPal or remote

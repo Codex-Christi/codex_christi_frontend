@@ -25,11 +25,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
-.env*.*
-.env*.local
-.env*.production
-!.env
+# Local application settings and credentials keep their existing filenames.
+.env
+.env.*
+!.env.example
+!.env.cloudflare.example
 
 # vercel
 .vercel
@@ -64,3 +64,11 @@ transaction-errors
 /src/lib/prisma/shop/merchize/generated/
 
 .merchize_price_catalog_schema.sha
+
+# Private release identifiers, environment snapshots and recovery checkpoints.
+/.deploy/
+/scripts/deployment/**/__pycache__/
+/scripts/tests/__pycache__/
+
+# Temporary VPS preview overrides are retired during normal release adoption.
+/compose.preview.json

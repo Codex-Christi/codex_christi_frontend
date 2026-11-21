@@ -1,67 +1,110 @@
-services:
-  # One build, one runtime container. The app image contains the shop routes too.
-  migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: migrate
-    image: codexchristi-next:migrate
-    container_name: codex-con-app-migrate
-    env_file:
-      - .env.production
-    environment:
-      MERCHIZE_OFFLINE_CATALOG_DATABASE_URL: file:/app/data/db/shop/merchizeCatalog.db
-    restart: 'no'
-    networks:
-      - webserver-network
-    volumes:
-      - merchize_price_catalog_data:/app/data
+name: codex-christi-frontend
 
+services:
+  # Deploy prebuilt release artifacts. Building and database checks are separate steps.
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime
-      args:
-        APP_REVISION: ${DEPLOY_REVISION:-unknown}
-      secrets:
-        - production_env
-    image: codexchristi-next:runtime
-    container_name: codex-con-app-start
+    image: ${DEPLOY_IMAGE:?Set the verified frontend release image ID or digest}
+    pull_policy: never
+    container_name: codex-christi-next
     env_file:
-      - .env.production
-    mem_limit: 768m #change_later
-    memswap_limit: 1g #change_later
+      - ${RUNTIME_ENV_FILE:-.env.production}
+    mem_limit: ${APP_MEMORY_LIMIT:-768m}
+    memswap_limit: ${APP_MEMORY_SWAP_LIMIT:-1g}
     environment:
       MERCHIZE_OFFLINE_CATALOG_DATABASE_URL: file:/app/data/db/shop/merchizeCatalog.db
       NODE_OPTIONS: --max-old-space-size=512
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
+    init: true
+    stop_grace_period: 30s
     expose:
       - '3000'
-    restart: always
+    restart: unless-stopped
     healthcheck:
       test: ['CMD', 'node', 'scripts/check-deployment-health.mjs']
       interval: 30s
       timeout: 5s
-      start_period: 15s
+      start_period: 20s
       retries: 3
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     networks:
-      - webserver-network
+      webserver-network:
+        aliases:
+          - app
+          - codex-con-app-start
+      frontend-egress: {}
     volumes:
       - merchize_price_catalog_data:/app/data
       - next_image_cache:/app/.next/cache/images
+    logging:
+      driver: json-file
+      options:
+        max-size: '20m'
+        max-file: '3'
+
+  # Check compiled settings against Compose-parsed runtime values without any network or data mount.
+  release-settings-check:
+    profiles: ['verify']
+    image: ${DEPLOY_IMAGE:?Set the verified frontend release image ID or digest}
+    pull_policy: never
+    entrypoint: ['node']
+    command: ['scripts/check-release-settings.mjs', '--runtime']
+    env_file:
+      - ${RUNTIME_ENV_FILE:-.env.production}
+    network_mode: none
+    restart: 'no'
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: '1m'
+        max-file: '1'
+
+  # Explicitly invoked before app replacement. Never migrates or changes data.
+  datastore-check:
+    profiles: ['verify']
+    image: ${DATASTORE_CHECK_IMAGE:?Set the matching read-only datastore-check release image}
+    pull_policy: never
+    env_file:
+      - ${RUNTIME_ENV_FILE:-.env.production}
+    environment:
+      MERCHIZE_OFFLINE_CATALOG_DATABASE_URL: file:/app/data/db/shop/merchizeCatalog.db
+    restart: 'no'
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - frontend-egress
+    volumes:
+      - merchize_price_catalog_data:/app/data:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: '1m'
+        max-file: '1'
 
 volumes:
-  merchize_price_catalog_data: {}
-  next_image_cache: {}
-
-secrets:
-  production_env:
-    file: ${DOCKER_BUILD_ENV_FILE:-.env.production}
+  # Refuse to create an empty replacement for the verified restored catalog.
+  merchize_price_catalog_data:
+    external: true
+    name: codex-christi-next-data
+  next_image_cache:
+    name: codex-christi-next-image-cache
 
 networks:
   webserver-network:
     external: true
-    name: webserver-network
+    name: codex-christi-network
+  # Only frontend-owned services receive Internet egress; backend networking is untouched.
+  frontend-egress:
+    driver: bridge
+    name: codex-christi-frontend-egress
