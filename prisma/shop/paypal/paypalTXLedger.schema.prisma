@@ -52,6 +52,7 @@ model PaypalIntent {
   processingTriggerSource            String?
   processingTriggerDetail            String?
   processingTriggeredAt              DateTime?
+  customerRecoveryRequestedAt        DateTime?
   checkoutSurfaceHost                String?
   checkoutSurfaceOrigin              String?
   checkoutSurfaceLabel               String?

@@ -1023,6 +1023,7 @@ export const PaypalIntentScalarFieldEnum = {
   processingTriggerSource: 'processingTriggerSource',
   processingTriggerDetail: 'processingTriggerDetail',
   processingTriggeredAt: 'processingTriggeredAt',
+  customerRecoveryRequestedAt: 'customerRecoveryRequestedAt',
   checkoutSurfaceHost: 'checkoutSurfaceHost',
   checkoutSurfaceOrigin: 'checkoutSurfaceOrigin',
   checkoutSurfaceLabel: 'checkoutSurfaceLabel',
