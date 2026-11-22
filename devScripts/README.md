@@ -8,8 +8,9 @@ recovery tests, and a synthetic-settings Linux container build. Use one temporar
 `review/leaseweb` branch for these deployment changes. A review-branch push runs
 checks and cannot deploy.
 
-Deployment runs only for pushes to `main`, after both verification jobs pass and
-the explicit deployment gate is enabled. This candidate starts from deployed
+Artifact staging runs only for pushes to `main` or manual runs on `main`, after
+both verification jobs pass and the explicit staging gate is enabled. This
+candidate starts from deployed
 revision `e7a7599e93338d1d6b270d1aeee5f68d21e34848`; current local `main` contains
 later application changes. Verify the complete application that will result
 before merging into `main` or enabling deployment. Merging this review does not
@@ -17,14 +18,14 @@ remove those later changes. The review branch can be deleted after merging;
 ordinary releases continue from `main`.
 The production Docker build uses Turbopack.
 
-The deployment job waits for the VPS script instead of starting it in the
-background. It fast-forwards to the exact verified commit and refuses to deploy
-from a different revision or over tracked local edits. Production deployments
-are serialized. The VPS needs Docker Compose v2 with `up --wait` support.
+The CI job builds the runtime image and matching read-only datastore checker,
+compresses the two images into one artifact, and sends it to a restricted VPS
+inbox with its exact revision, length and SHA-256 checksum. The inbox accepts
+one candidate at a time; the administrator must review it before activation.
+The deployment key cannot run a shell, Docker, Git, or a release command.
 
-The prepared Leaseweb workflow builds a runtime image and matching read-only
-datastore checker on CI, transfers a checksummed archive, and deploys exact
-destination image IDs. The VPS script first compares the candidate image's
+The separate owner-run release procedure deploys exact destination image IDs.
+The VPS script first compares the candidate image's
 compiled public settings with its Compose-parsed runtime settings in a one-off
 container with no network or data mounts. It then checks existing data read-only
 before replacing only the frontend, waits for revision readiness, refreshes Nginx, and
@@ -32,8 +33,11 @@ checks both HTTPS routes. A failed replacement or proxy check attempts recovery
 to the retained image, Compose configuration and runtime environment. No global
 Docker pruning occurs.
 
-Deployment remains disabled until `LEASEWEB_FRONTEND_DEPLOY_ENABLED=true` is
-explicitly configured after the private rehearsal. See the
+Staging remains disabled until `LEASEWEB_FRONTEND_STAGE_ENABLED=true` is
+explicitly configured after the restricted inbox is installed. The new secrets
+`LEASEWEB_STAGE_SSH_KEY` and `LEASEWEB_STAGE_SSH_HOST_KEYS` are separate from
+any existing production credentials. The job reports staging, never deployment.
+See the
 [Leaseweb frontend release procedure](../deploy/LEASEWEB_FRONTEND_RELEASE.md)
 for initial setup, build inputs, deployment access and recovery checkpoints.
 

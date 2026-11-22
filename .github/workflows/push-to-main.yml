@@ -1,9 +1,10 @@
-name: Frontend checks and Leaseweb release
+name: Frontend checks and Leaseweb staging
 on:
   push:
     branches: ['**']
   pull_request:
     branches: [main]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -86,19 +87,20 @@ jobs:
             --env PAYPAL_PAYMENT_MODE=sandbox --env PAYPAL_SANDBOX_CLIENT_ID=synthetic-public-client \
             --entrypoint node codex-christi-next:ci scripts/check-release-settings.mjs --runtime
   release:
+    name: Stage frontend release (no deployment)
     needs: [verify, container-build]
-    # This variable remains unset until the private rehearsal and cutover pass.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.LEASEWEB_FRONTEND_DEPLOY_ENABLED == 'true'
+    # Staging is separate from deployment; the existing deploy gate cannot enable it.
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && vars.LEASEWEB_FRONTEND_STAGE_ENABLED == 'true'
     concurrency:
-      group: codex-christi-frontend-production
+      group: codex-christi-frontend-stage
       cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
       NODE_IMAGE: ${{ vars.CODEX_NODE_IMAGE }}
       PUBLIC_BUILD_ENV: ${{ vars.CODEX_NEXT_PUBLIC_BUILD_ENV }}
-      VPS_USER: ${{ secrets.VPS_SSH_USERNAME }}
-      VPS_HOST: ${{ secrets.VPS_IP }}
+      VPS_USER: codex-christi-frontend-deploy
+      VPS_HOST: '216.22.53.127'
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -143,14 +145,13 @@ jobs:
           docker buildx build --load --platform linux/amd64 --target datastore-check \
             --build-arg "NODE_IMAGE=$NODE_IMAGE" --build-arg "APP_REVISION=$GITHUB_SHA" \
             --tag "codex-christi-datastore-check:$GITHUB_SHA" .
-          docker save --output "$RUNNER_TEMP/frontend-release.tar" \
-            "codex-christi-next:$GITHUB_SHA" "codex-christi-datastore-check:$GITHUB_SHA"
-          cd "$RUNNER_TEMP"
-          sha256sum frontend-release.tar > frontend-release.tar.sha256
+          umask 077
+          docker save "codex-christi-next:$GITHUB_SHA" "codex-christi-datastore-check:$GITHUB_SHA" \
+            | gzip -n -1 > "$RUNNER_TEMP/frontend-release.tar.gz"
       - name: Prepare pinned SSH host authentication
         env:
-          VPS_KEY_B64: ${{ secrets.VPS_SSH_KEY }}
-          VPS_HOST_KEYS_B64: ${{ secrets.VPS_SSH_HOST_KEYS }}
+          VPS_KEY_B64: ${{ secrets.LEASEWEB_STAGE_SSH_KEY }}
+          VPS_HOST_KEYS_B64: ${{ secrets.LEASEWEB_STAGE_SSH_HOST_KEYS }}
         run: |
           set -euo pipefail
           python3 - <<'PYTHON'
@@ -169,79 +170,65 @@ jobs:
               path.write_bytes(value)
               path.chmod(0o600)
           PYTHON
+          ssh-keygen -y -P '' -f "$RUNNER_TEMP/codex-ssh/key" >/dev/null
+          host_line="$(< "$RUNNER_TEMP/codex-ssh/known_hosts")"
+          [[ "$host_line" =~ ^216\.22\.53\.127\ ssh-ed25519\ [A-Za-z0-9+/]+={0,2}$ ]] || exit 1
           ssh-keygen -F "$VPS_HOST" -f "$RUNNER_TEMP/codex-ssh/known_hosts" >/dev/null
-      - name: Transfer the checked artifact and deploy in the foreground
-        id: deployment
+          test "$(ssh-keygen -lf "$RUNNER_TEMP/codex-ssh/known_hosts" -E sha256 | awk '{print $2}')" = 'SHA256:TLtsmbTG+t17MTtgk/WlPPZzmEBoGr5uA09QhDqNj+A'
+      - name: Submit the checked image pair to the private inbox
+        id: stage
         run: |
           set -euo pipefail
-          ssh_options=(-i "$RUNNER_TEMP/codex-ssh/key" -o BatchMode=yes -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/codex-ssh/known_hosts")
-          remote="$VPS_USER@$VPS_HOST"
-          incoming="$(ssh "${ssh_options[@]}" "$remote" 'umask 077; install -d -m 700 /home/codex-christi/codexchristi/.deploy/incoming; mktemp -d /home/codex-christi/codexchristi/.deploy/incoming/release-XXXXXXXX')"
-          [[ "$incoming" =~ ^/home/codex-christi/codexchristi/\.deploy/incoming/release-[A-Za-z0-9]{8}$ ]]
-          scp "${ssh_options[@]}" "$RUNNER_TEMP/frontend-release.tar" \
-            "$RUNNER_TEMP/frontend-release.tar.sha256" "$remote:$incoming/"
-          ssh "${ssh_options[@]}" "$remote" bash -s -- "$incoming" "$GITHUB_SHA" <<'REMOTE' 2>&1 | tee "$RUNNER_TEMP/frontend-release-output.log"
-          set -euo pipefail
-          umask 077
-          incoming="$1"
-          revision="$2"
-          [[ "$incoming" =~ ^/home/codex-christi/codexchristi/\.deploy/incoming/release-[A-Za-z0-9]{8}$ ]]
-          [[ "$revision" =~ ^[0-9a-f]{40}$ ]]
-          cd "$incoming"
-          sha256sum --check frontend-release.tar.sha256 > transfer-check.log 2>&1
-          docker info > docker-check.log 2>&1 || { echo 'Unattended Docker access is not configured for the deployment account.' >&2; exit 1; }
-          docker load --input frontend-release.tar > image-load.log 2>&1
-          # Local image IDs can differ between Docker storage implementations.
-          # Resolve the loaded, commit-tagged artifacts on the destination host.
-          runtime_image="$(docker image inspect --format '{{.Id}}' "codex-christi-next:$revision")"
-          check_image="$(docker image inspect --format '{{.Id}}' "codex-christi-datastore-check:$revision")"
-          [[ "$runtime_image" =~ ^sha256:[0-9a-f]{64}$ && "$check_image" =~ ^sha256:[0-9a-f]{64}$ ]]
-          cd /home/codex-christi/codexchristi
-          exec 9>.deploy/deployment.lock
-          flock -n 9 || { echo 'Another frontend deployment is running.' >&2; exit 1; }
-          echo "VPS_EXPECTED_REVISION=$revision"
-          echo "VPS_CHECKOUT_BEFORE=$(git rev-parse HEAD)"
-          test -z "$(git status --porcelain=v1 --untracked-files=normal)"
-          git fetch origin main > "$incoming/git-fetch.log" 2>&1
-          git merge-base --is-ancestor HEAD "$revision"
-          git merge --ff-only "$revision" > "$incoming/git-merge.log" 2>&1
-          test "$(git rev-parse HEAD)" = "$revision"
-          echo "VPS_CHECKOUT_AFTER=$(git rev-parse HEAD)"
-          DEPLOYMENT_LOCK_FD=9 DEPLOY_REVISION="$revision" DEPLOY_IMAGE="$runtime_image" DATASTORE_CHECK_IMAGE="$check_image" \
-            bash ./devScripts/production.sh
-          REMOTE
-      - name: Prepare deployment evidence
+          archive="$RUNNER_TEMP/frontend-release.tar.gz"
+          bytes="$(wc -c < "$archive" | tr -d '[:space:]')"
+          sha="$(sha256sum "$archive" | cut -d ' ' -f 1)"
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ && "$sha" =~ ^[0-9a-f]{64}$ && "$bytes" =~ ^[1-9][0-9]{0,9}$ ]] || exit 1
+          (( bytes <= 4294967296 )) || exit 1
+          ssh_options=(-F /dev/null -T -i "$RUNNER_TEMP/codex-ssh/key" -o BatchMode=yes \
+            -o IdentitiesOnly=yes -o IdentityAgent=none -o StrictHostKeyChecking=yes \
+            -o "UserKnownHostsFile=$RUNNER_TEMP/codex-ssh/known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null -o ClearAllForwardings=yes \
+            -o HostKeyAlgorithms=ssh-ed25519 -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no \
+            -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
+          ssh "${ssh_options[@]}" "$VPS_USER@$VPS_HOST" "stage $GITHUB_SHA $bytes $sha" < "$archive" > "$RUNNER_TEMP/frontend-stage-response"
+          receipt="CODEX_RELEASE_STAGED=frontend:$GITHUB_SHA:$sha:$bytes"
+          if ! printf '%s\n' "$receipt" | cmp -s - "$RUNNER_TEMP/frontend-stage-response"; then
+            echo 'The server did not return the expected staging receipt.' >&2; exit 1;
+          fi
+          printf '%s\n' "$receipt" > "$RUNNER_TEMP/frontend-stage-receipt"
+          printf '%s\n' 'Frontend artifact staged. No deployment was requested or performed.'
+      - name: Prepare staging evidence
         if: always()
         env:
-          DEPLOY_OUTCOME: ${{ steps.deployment.outcome }}
+          STAGE_OUTCOME: ${{ steps.stage.outcome }}
         run: |
           python3 - <<'PYTHON'
           import json, os, pathlib, re
-          source = pathlib.Path(os.environ['RUNNER_TEMP']) / 'frontend-release-output.log'
+          source = pathlib.Path(os.environ['RUNNER_TEMP']) / 'frontend-stage-receipt'
           raw = source.read_text(errors='replace') if source.exists() else ''
           revision = os.environ['GITHUB_SHA']
-          healthy = f'Release {revision} is healthy.' in raw.splitlines()
-          allowed = re.compile(r'(?:VPS_(?:EXPECTED_REVISION|CHECKOUT_BEFORE|CHECKOUT_AFTER)=[0-9a-f]{40}|Release [0-9a-f]{40} is healthy\.)')
-          evidence = [line for line in raw.splitlines() if allowed.fullmatch(line)]
-          proof = {'revision': revision, 'deployment_step_outcome': os.environ.get('DEPLOY_OUTCOME', 'skipped'),
-                   'expected_release_reported_healthy': healthy,
-                   'deployment_verified': os.environ.get('DEPLOY_OUTCOME') == 'success' and healthy,
+          match = re.fullmatch(r'CODEX_RELEASE_STAGED=frontend:' + re.escape(revision) + r':([0-9a-f]{64}):([1-9][0-9]*)\n', raw)
+          staged = os.environ.get('STAGE_OUTCOME') == 'success' and match is not None
+          proof = {'role': 'frontend', 'revision': revision, 'stage_step_outcome': os.environ.get('STAGE_OUTCOME', 'skipped'),
+                   'staged': staged, 'deployment_verified': False,
+                   'repository': os.environ['GITHUB_REPOSITORY'], 'run_id': os.environ['GITHUB_RUN_ID'],
+                   'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
                    'run_url': f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"}
-          destination = pathlib.Path('deployment-proof')
+          if staged:
+              proof.update(sha256=match[1], bytes=int(match[2]))
+          destination = pathlib.Path('staging-proof')
           destination.mkdir(exist_ok=True)
           (destination / 'proof.json').write_text(json.dumps(proof, indent=2) + '\n')
-          (destination / 'evidence.log').write_text('\n'.join(evidence) + '\n')
           print(json.dumps(proof, indent=2))
           PYTHON
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
-          name: frontend-deployment-proof-${{ github.run_id }}-${{ github.run_attempt }}
-          path: deployment-proof/
+          name: frontend-staging-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: staging-proof/
           if-no-files-found: error
           retention-days: 7
-      - name: Remove runner authentication and build input files
+      - name: Remove runner authentication and release files
         if: always()
         run: |
-          rm -f "$RUNNER_TEMP/codex-ssh/key" "$RUNNER_TEMP/codex-ssh/known_hosts" "$RUNNER_TEMP/next-public-build.env"
+          rm -f "$RUNNER_TEMP/codex-ssh/key" "$RUNNER_TEMP/codex-ssh/known_hosts" "$RUNNER_TEMP/next-public-build.env" "$RUNNER_TEMP/frontend-release.tar.gz" "$RUNNER_TEMP/frontend-stage-receipt" "$RUNNER_TEMP/frontend-stage-response"

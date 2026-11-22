@@ -3,6 +3,7 @@
 No network, Docker daemon, real database, SSH account or production file is used.
 """
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -147,27 +148,78 @@ class WorkflowContractTests(unittest.TestCase):
             self.assertEqual(branches, expected)
             self.assertNotRegex(event, r'(?m)^    (?:paths|paths-ignore|branches-ignore):')
 
-    def test_only_enabled_main_pushes_can_deploy_and_remote_fetch_agrees(self):
+    def test_only_enabled_main_pushes_or_manual_runs_can_stage(self):
         workflow = WORKFLOW.read_text()
         condition = re.search(r'^    if: (.+)$', workflow, re.MULTILINE)[1]
-        comparisons = []
-        for clause in condition.split('&&'):
-            match = re.fullmatch(r"\s*(github\.event_name|github\.ref|vars\.LEASEWEB_FRONTEND_DEPLOY_ENABLED)\s*==\s*'([^']*)'\s*", clause)
-            self.assertIsNotNone(match, 'The deployment condition needs explicit policy review.')
-            comparisons.append(match.groups())
-        self.assertEqual(len(comparisons), 3)
-        for event, ref, gate, expected in (
-                ('push', 'refs/heads/main', 'true', True),
-                ('push', 'refs/heads/main', '', False),
-                ('push', 'refs/heads/main', 'false', False),
-                ('push', 'refs/heads/review/leaseweb', 'true', False),
-                ('push', 'refs/tags/main', 'true', False),
-                ('pull_request', 'refs/heads/main', 'true', False)):
-            values = {'github.event_name': event, 'github.ref': ref,
-                      'vars.LEASEWEB_FRONTEND_DEPLOY_ENABLED': gate}
-            self.assertEqual(all(values[key] == value for key, value in comparisons), expected)
-        self.assertIn('git fetch origin main >', workflow)
+        self.assertEqual(condition, "(github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && vars.LEASEWEB_FRONTEND_STAGE_ENABLED == 'true'")
+        self.assertIn('  workflow_dispatch:', workflow)
+        self.assertIn('needs: [verify, container-build]', workflow)
+        self.assertNotIn('LEASEWEB_FRONTEND_DEPLOY_ENABLED', workflow)
+        self.assertIn('secrets.LEASEWEB_STAGE_SSH_KEY', workflow)
+        self.assertIn('secrets.LEASEWEB_STAGE_SSH_HOST_KEYS', workflow)
+        self.assertNotIn('git fetch origin main', workflow)
+        self.assertNotIn('docker load', workflow)
+        self.assertNotIn('scp ', workflow)
         self.assertNotIn('release/leaseweb', workflow)
+
+    def test_stage_transmits_only_fixed_request_and_checks_receipt(self):
+        workflow = WORKFLOW.read_text()
+        body = workflow.split('      - name: Submit the checked image pair to the private inbox\n', 1)[1]
+        body = body.split('        run: |\n', 1)[1].split('\n      - name:', 1)[0]
+        script = '\n'.join(line[10:] for line in body.splitlines()) + '\n'
+        with tempfile.TemporaryDirectory(prefix='codex-workflow-stage-fixture-') as folder:
+            root = Path(folder)
+            artifact = b'synthetic archive bytes\n'
+            (root / 'frontend-release.tar.gz').write_bytes(artifact)
+            revision = 'a' * 40
+            digest = hashlib.sha256(artifact).hexdigest()
+            stub = root / 'ssh'
+            stub.write_text('''#!/usr/bin/env python3
+import hashlib, os, sys
+data = sys.stdin.buffer.read()
+args = sys.argv[1:]
+revision = os.environ['GITHUB_SHA']
+digest = hashlib.sha256(data).hexdigest()
+assert args[-2] == 'codex-christi-frontend-deploy@216.22.53.127'
+assert args[-1] == f'stage {revision} {len(data)} {digest}'
+assert 'StrictHostKeyChecking=yes' in args and 'IdentityAgent=none' in args
+print('wrong-receipt' if os.environ['BAD_RECEIPT'] == '1' else f'CODEX_RELEASE_STAGED=frontend:{revision}:{digest}:{len(data)}')
+''')
+            stub.chmod(0o700)
+            env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH'],
+                       RUNNER_TEMP=str(root), GITHUB_SHA=revision, VPS_USER='codex-christi-frontend-deploy',
+                       VPS_HOST='216.22.53.127', BAD_RECEIPT='0')
+            result = subprocess.run(['bash', '-c', script], env=env, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((root / 'frontend-stage-receipt').read_text(),
+                             f'CODEX_RELEASE_STAGED=frontend:{revision}:{digest}:{len(artifact)}\n')
+            (root / 'frontend-stage-receipt').unlink()
+            env['BAD_RECEIPT'] = '1'
+            result = subprocess.run(['bash', '-c', script], env=env, capture_output=True, text=True, timeout=15)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse((root / 'frontend-stage-receipt').exists())
+
+    def test_staging_proof_never_claims_deployment(self):
+        body = WORKFLOW.read_text().split('      - name: Prepare staging evidence\n', 1)[1]
+        body = body.split('        run: |\n', 1)[1].split('\n      - uses:', 1)[0]
+        script = '\n'.join(line[10:] for line in body.splitlines()) + '\n'
+        with tempfile.TemporaryDirectory(prefix='codex-stage-proof-fixture-') as folder:
+            root = Path(folder)
+            receipt = root / 'frontend-stage-receipt'
+            revision, digest = 'a' * 40, 'b' * 64
+            valid = f'CODEX_RELEASE_STAGED=frontend:{revision}:{digest}:10\n'
+            env = dict(os.environ, RUNNER_TEMP=folder, GITHUB_SHA=revision, GITHUB_SERVER_URL='https://github.com',
+                       GITHUB_REPOSITORY='fixture/frontend', GITHUB_RUN_ID='1', GITHUB_RUN_ATTEMPT='2')
+            for raw, outcome, staged in ((valid, 'success', True), (valid, 'failure', False), (valid + '\n', 'success', False)):
+                receipt.write_text(raw)
+                result = subprocess.run(['bash', '-c', script], cwd=root, env={**env, 'STAGE_OUTCOME': outcome},
+                                        capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                proof = json.loads((root / 'staging-proof' / 'proof.json').read_text())
+                self.assertEqual(proof['staged'], staged)
+                self.assertFalse(proof['deployment_verified'])
+                self.assertEqual(proof['run_attempt'], '2')
+                self.assertEqual('sha256' in proof, staged)
 
 
 class ReleaseTests(unittest.TestCase):
