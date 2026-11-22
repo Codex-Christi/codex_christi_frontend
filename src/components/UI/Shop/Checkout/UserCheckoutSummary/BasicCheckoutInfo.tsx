@@ -16,7 +16,15 @@ import { SignUpFormSchema } from '@/lib/formSchemas/signUpFormSchema';
 import { FaAngleDoubleDown } from 'react-icons/fa';
 import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import { useShallow } from 'zustand/react/shallow';
-import { useCallback, useContext, useEffect, useRef, useState, startTransition } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  startTransition,
+} from 'react';
 import { CheckoutAccordionContext } from '../ProductCheckout';
 import { checkoutDeliveryAddressSchema } from '../checkoutAddress';
 import CheckoutAccountPrompt from '../CheckoutAccountPrompt';
@@ -31,6 +39,7 @@ import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currenc
 import {
   captureCheckoutAttempt,
   clearCheckoutAttempt,
+  usePayPalIntentStore,
 } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 import { useAuthStore } from '@/stores/authStore';
 import { getAuthGeneration } from '@/lib/auth/session-generation';
@@ -45,6 +54,7 @@ import {
   isReviewedPaidAttempt,
 } from './paidCheckoutRecoveryReview';
 import {
+  getCheckoutAccountEmail,
   getCheckoutValuesFromStore,
   saveBasicCheckoutInfoToStore,
   startPaidCheckoutRecovery,
@@ -91,16 +101,33 @@ export const BasicCheckoutInfo = () => {
 
   const { handleOpenItem, canContinue } = useContext(CheckoutAccordionContext);
   const [checkoutHydrated, setCheckoutHydrated] = useState(false);
-  const { delivery_address, email } = useShopCheckoutStore(
+  const { delivery_address, email, emailIsCustom } = useShopCheckoutStore(
     useShallow((s) => ({
       delivery_address: s.delivery_address,
       email: s.email,
+      emailIsCustom: s.emailIsCustom || s.draftEmail !== null,
     })),
   );
   const setShippingCountryISO3 = useShopCheckoutStore((s) => s.setShippingCountryISO3);
+  const setDraftEmail = useShopCheckoutStore((s) => s.setDraftEmail);
   const hydrateFromShopProfile = useShopCheckoutStore((s) => s.hydrateFromShopProfile);
   const userShopProfile = useUserShopProfile((s) => s.userShopProfile);
-  const fallbackEmail = useUserMainProfileStore((s) => s.userMainProfile?.email);
+  const signedInUserId = useAuthStore((s) => s.userSessionInfo?.user_id);
+  const accountEmail = useUserMainProfileStore((s) =>
+    signedInUserId && s.userMainProfile?.id === signedInUserId ? s.userMainProfile.email : null,
+  );
+  const djangoIntentUuid = useDjangoOrderIntentStore((s) => s.djangoOrderIntentUuid);
+  const payPalOrderToken = usePayPalIntentStore((s) => s.checkoutAttempt?.orderToken);
+  const verificationHydrated = useSyncExternalStore(
+    useDjangoOrderIntentStore.persist.onFinishHydration,
+    useDjangoOrderIntentStore.persist.hasHydrated,
+    () => false,
+  );
+  const paymentHydrated = useSyncExternalStore(
+    usePayPalIntentStore.persist.onFinishHydration,
+    usePayPalIntentStore.persist.hasHydrated,
+    () => false,
+  );
   const selectedCountryISO3 = useCurrencyCookie((s) => s.iso3);
   const changeCookieStoreCountry = useCurrencyCookie((s) => s.changeCountry);
   const openDjangoOrderIntentOtpModal = useCallback(() => setIsDjangoOrderIntentOtpOpen(true), []);
@@ -115,8 +142,9 @@ export const BasicCheckoutInfo = () => {
     defaultValues: getCheckoutValuesFromStore(selectedCountryISO3),
   });
   const {
-    formState: { isDirty: isCheckoutFormDirty },
+    formState: { isDirty: isCheckoutFormDirty, dirtyFields },
     reset,
+    resetField,
     setValue,
   } = basicCheckoutInfoForm;
 
@@ -156,16 +184,50 @@ export const BasicCheckoutInfo = () => {
     const vals = deriveValuesFromStore();
     if (vals.addressLine1 || vals.adminArea1 || vals.adminArea2) return;
 
-    hydrateFromShopProfile(userShopProfile, fallbackEmail);
+    hydrateFromShopProfile(userShopProfile);
     reset(deriveValuesFromStore());
   }, [
     checkoutHydrated,
     deriveValuesFromStore,
-    fallbackEmail,
     hydrateFromShopProfile,
     isCheckoutFormDirty,
     reset,
     userShopProfile,
+  ]);
+
+  const emailIsDirty = dirtyFields.email === true;
+  useEffect(() => {
+    if (!checkoutHydrated || !verificationHydrated || !paymentHydrated) return;
+    const nextEmail = getCheckoutAccountEmail({
+      accountEmail,
+      emailIsCustom,
+      emailIsDirty,
+      hasExistingOrder: Boolean(
+        djangoIntentUuid ||
+        payPalOrderToken ||
+        isCheckingPaidCheckoutRecovery ||
+        paidCheckoutRecoveryPrompt,
+      ),
+    });
+    if (!nextEmail) return;
+
+    if (nextEmail !== email) useShopCheckoutStore.setState({ email: nextEmail });
+    if (nextEmail !== basicCheckoutInfoForm.getValues('email'))
+      resetField('email', { defaultValue: nextEmail });
+  }, [
+    accountEmail,
+    basicCheckoutInfoForm,
+    checkoutHydrated,
+    djangoIntentUuid,
+    email,
+    emailIsCustom,
+    emailIsDirty,
+    isCheckingPaidCheckoutRecovery,
+    paidCheckoutRecoveryPrompt,
+    payPalOrderToken,
+    paymentHydrated,
+    resetField,
+    verificationHydrated,
   ]);
 
   useEffect(() => {
@@ -344,7 +406,7 @@ export const BasicCheckoutInfo = () => {
     if (!canContinue) return;
     const request = ++submissionRef.current;
     setSubmitError(null);
-    saveBasicCheckoutInfoToStore(data);
+    saveBasicCheckoutInfoToStore(data, emailIsDirty);
     setIsCheckingPaidCheckoutRecovery(true);
     try {
       if ((await reviewEarlierPayments(data, 'before-verification')).needsReview) return;
@@ -369,7 +431,9 @@ export const BasicCheckoutInfo = () => {
     <>
       <h2 className='mb-3 text-xl font-semibold'>Contact & delivery</h2>
       <CheckoutAccountPrompt
-        onSignIn={() => saveBasicCheckoutInfoToStore(basicCheckoutInfoForm.getValues())}
+        onSignIn={() =>
+          saveBasicCheckoutInfoToStore(basicCheckoutInfoForm.getValues(), emailIsDirty)
+        }
       />
       <Form {...basicCheckoutInfoForm}>
         <form
@@ -402,6 +466,7 @@ export const BasicCheckoutInfo = () => {
             labelString='Email address'
             type='email'
             autoComplete='email'
+            onValueChange={setDraftEmail}
             className='sm:col-span-2'
           />
           <p className='-mt-3 text-xs leading-5 text-white/60 sm:col-span-2'>

@@ -26,13 +26,14 @@ export function getRecipientName(data: BasicCheckoutInfoFormSchema) {
 export function getCheckoutValuesFromStore(
   selectedCountryISO3?: string,
 ): BasicCheckoutInfoFormSchema {
-  const { delivery_address, email, first_name, last_name } = useShopCheckoutStore.getState();
+  const { delivery_address, draftEmail, email, first_name, last_name } =
+    useShopCheckoutStore.getState();
 
   return {
     country: selectedCountryISO3 ?? delivery_address?.shipping_country ?? '',
     firstname: first_name ?? '',
     lastname: last_name ?? '',
-    email: email ?? '',
+    email: draftEmail ?? email ?? '',
     addressLine1: delivery_address?.shipping_address_line_1 ?? '',
     addressLine2: delivery_address?.shipping_address_line_2 ?? '',
     adminArea1: delivery_address?.shipping_state ?? '',
@@ -41,10 +42,31 @@ export function getCheckoutValuesFromStore(
   };
 }
 
-export function saveBasicCheckoutInfoToStore(data: BasicCheckoutInfoFormSchema) {
+export function getCheckoutAccountEmail({
+  accountEmail,
+  emailIsCustom,
+  emailIsDirty,
+  hasExistingOrder,
+}: {
+  accountEmail?: string | null;
+  emailIsCustom: boolean;
+  emailIsDirty: boolean;
+  hasExistingOrder: boolean;
+}) {
+  if (emailIsCustom || emailIsDirty || hasExistingOrder) return null;
+  return accountEmail?.trim() || null;
+}
+
+export function saveBasicCheckoutInfoToStore(
+  data: BasicCheckoutInfoFormSchema,
+  emailWasEdited: boolean,
+) {
   useShopCheckoutStore.setState((state) => ({
-    ...state,
     email: data.email,
+    emailIsCustom:
+      Boolean(data.email.trim()) &&
+      (emailWasEdited || state.emailIsCustom || state.draftEmail !== null),
+    draftEmail: null,
     first_name: data.firstname,
     last_name: data.lastname,
     delivery_address: {

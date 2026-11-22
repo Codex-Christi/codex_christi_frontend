@@ -17,6 +17,7 @@ export function GenericCheckoutInfoInput({
   type,
   className,
   currentZodForm,
+  onValueChange,
 }: {
   inputName: keyof BasicCheckoutInfoFormSchema;
   labelString: string;
@@ -24,6 +25,7 @@ export function GenericCheckoutInfoInput({
   type?: HTMLInputTypeAttribute;
   className?: string;
   currentZodForm: UseFormReturn<BasicCheckoutInfoFormSchema>;
+  onValueChange?: (value: string) => void;
 }) {
   return (
     <FormField
@@ -36,6 +38,10 @@ export function GenericCheckoutInfoInput({
             <Input
               {...field}
               value={field.value ?? ''}
+              onChange={(event) => {
+                field.onChange(event);
+                onValueChange?.(event.target.value);
+              }}
               type={type}
               autoComplete={autoComplete}
               className='min-h-11 min-w-0 rounded-xl border-white/35 bg-transparent text-base focus-visible:ring-white/40'

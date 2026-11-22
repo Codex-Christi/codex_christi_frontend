@@ -60,6 +60,15 @@ test('a reload may resume the payment UI only for its recent verified recipient 
   );
 });
 
+test('a different unsubmitted email cannot resume payment using earlier verification', () => {
+  const { checkout, intent } = fixture();
+  assert.equal(
+    canResumeVerifiedCheckout({ ...checkout, draftEmail: 'recipient@example.test' }, intent, now),
+    false,
+  );
+  assert.equal(canResumeVerifiedCheckout({ ...checkout, draftEmail: null }, intent, now), true);
+});
+
 test('email case, address letter case and repeated spaces, country aliases, and empty optional address match server normalization', () => {
   const { checkout, intent } = fixture();
   checkout.email = ' CUSTOMER@EXAMPLE.TEST ';

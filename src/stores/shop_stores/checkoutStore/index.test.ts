@@ -27,14 +27,15 @@ test('sign-in profile autofill preserves the guest recipient and fills only miss
   store.resetCheckoutToInitial();
   store.setFirstName('Gift');
   store.setEmail('recipient@example.test');
-  store.hydrateFromShopProfile(profile, 'account@example.test');
+  store.hydrateFromShopProfile(profile);
   const saved = useShopCheckoutStore.getState();
   assert.equal(saved.first_name, 'Gift');
   assert.equal(saved.last_name, 'Customer');
   assert.equal(saved.email, 'recipient@example.test');
+  assert.equal(saved.emailIsCustom, true);
   assert.equal(saved.delivery_address.shipping_address_line_1, '10 Profile Street');
   store.setDeliveryAddress({ ...saved.delivery_address, shipping_address_line_1: 'Guest Address' });
-  store.hydrateFromShopProfile(profile, 'account@example.test');
+  store.hydrateFromShopProfile(profile);
   assert.equal(
     useShopCheckoutStore.getState().delivery_address.shipping_address_line_1,
     'Guest Address',
