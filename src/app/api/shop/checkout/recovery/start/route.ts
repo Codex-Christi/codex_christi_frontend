@@ -89,16 +89,16 @@ export async function POST(request: Request) {
     if (!challenge.otp && !challenge.hasActiveChallenge)
       throw new CheckoutRequestError('Please wait before requesting another recovery code.', 429);
     if (challenge.otp) {
-      const [{ sendMailFromPrimaryAgent }, { buildRecoveryOtpEmailHtml }] = await Promise.all([
+      const [{ sendMailFromPrimaryAgent }, { buildShopVerificationEmail }] = await Promise.all([
         import('@/lib/zeptomail/sendMailFromPrimaryAgent'),
-        import('@/lib/shop/checkout/checkoutRecovery/recoveryOtpEmailTemplate'),
+        import('@/lib/shop/email/templates'),
       ]);
       await sendMailFromPrimaryAgent({
         emailReceipents: [
           { email_address: { address: email, name: recipientName ?? email.split('@')[0] } },
         ],
-        subject: 'Your Codex Christi checkout recovery code',
-        htmlbody: buildRecoveryOtpEmailHtml({
+        ...buildShopVerificationEmail({
+          purpose: 'checkout-recovery',
           otp: challenge.otp,
           recipientName,
           expiresInMinutes: RECOVERY_OTP_EXPIRY_MINUTES,

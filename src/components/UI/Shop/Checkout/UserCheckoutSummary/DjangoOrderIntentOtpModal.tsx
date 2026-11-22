@@ -28,6 +28,92 @@ export type DjangoOrderIntentOtpModalProps = {
   email?: string;
 };
 
+type VerificationCodeFormProps = Required<
+  Pick<
+    DjangoOrderIntentOtpModalProps,
+    'length' | 'defaultValue' | 'isResendingOTP' | 'isVerifyingOTP'
+  >
+> &
+  Pick<DjangoOrderIntentOtpModalProps, 'onComplete' | 'onResendOTP'>;
+
+function VerificationCodeForm({
+  length,
+  defaultValue,
+  onComplete,
+  onResendOTP,
+  isResendingOTP,
+  isVerifyingOTP,
+}: VerificationCodeFormProps) {
+  const [value, setValue] = React.useState(defaultValue);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const submission = React.useRef(false);
+  const inputId = React.useId();
+  const verifying = submitting || isVerifyingOTP;
+  const busy = verifying || isResendingOTP;
+
+  return (
+    <form
+      className='mt-5 space-y-4'
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (submission.current || busy || value.length !== length || !onComplete) return;
+        submission.current = true;
+        setSubmitting(true);
+        setError(null);
+        try {
+          await onComplete(value);
+        } catch {
+          setError('We couldn’t verify this code. Please try again.');
+        } finally {
+          submission.current = false;
+          setSubmitting(false);
+        }
+      }}
+    >
+      <div>
+        <label htmlFor={inputId} className='mb-2 block text-sm font-medium'>
+          Verification code
+        </label>
+        <input
+          id={inputId}
+          type='text'
+          inputMode='numeric'
+          autoComplete='one-time-code'
+          autoFocus
+          maxLength={length}
+          value={value}
+          onChange={(event) => setValue(event.target.value.replace(/\D/gu, '').slice(0, length))}
+          className='min-h-12 w-full min-w-0 rounded-xl border border-white/40 bg-transparent px-4 text-center text-2xl tracking-[0.35em] outline-none focus:ring-2 focus:ring-sky-200/60'
+        />
+      </div>
+      {error && (
+        <p role='alert' className='text-sm text-amber-100'>
+          {error}
+        </p>
+      )}
+      <button
+        type='submit'
+        disabled={busy || value.length !== length}
+        className='inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0085ff] px-4 font-semibold disabled:opacity-50'
+      >
+        {verifying && <Loader2 size={18} className='animate-spin' aria-hidden='true' />}
+        {verifying ? 'Verifying…' : 'Verify email'}
+      </button>
+      {onResendOTP && (
+        <button
+          type='button'
+          disabled={busy}
+          onClick={() => void onResendOTP()}
+          className='min-h-11 w-full text-sm text-white/80 underline underline-offset-4 disabled:opacity-50'
+        >
+          {isResendingOTP ? 'Sending another code…' : 'Send another code'}
+        </button>
+      )}
+    </form>
+  );
+}
+
 export const DjangoOrderIntentOtpModal = React.forwardRef<
   DjangoOrderIntentOtpModalHandles,
   DjangoOrderIntentOtpModalProps
@@ -47,33 +133,18 @@ export const DjangoOrderIntentOtpModal = React.forwardRef<
   },
   ref,
 ) {
-  const [value, setValue] = React.useState(defaultValue);
-  const [submitting, setSubmitting] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const inputId = React.useId();
   useVisualViewportHeightCssVar(Boolean(isOpen));
-  const busy = submitting || isVerifyingOTP;
-  const handleOpenChange = React.useCallback(
-    (open: boolean) => {
-      if (!open) {
-        setValue('');
-        setError(null);
-      }
-      onOpenChange?.(open);
-    },
-    [onOpenChange],
-  );
   React.useImperativeHandle(
     ref,
     () => ({
-      open: () => handleOpenChange(true),
-      close: () => handleOpenChange(false),
+      open: () => onOpenChange?.(true),
+      close: () => onOpenChange?.(false),
     }),
-    [handleOpenChange],
+    [onOpenChange],
   );
 
   return (
-    <Drawer open={Boolean(isOpen)} onOpenChange={handleOpenChange}>
+    <Drawer open={Boolean(isOpen)} onOpenChange={onOpenChange}>
       <DrawerOverlay className='!bg-black/70 !backdrop-blur-[5px]' />
       <DrawerContent className='!fixed !inset-0 !z-[520] !m-0 flex !h-[var(--checkout-modal-vh,100dvh)] !max-h-[var(--checkout-modal-vh,100dvh)] !w-full items-center justify-center !rounded-none !border-0 !bg-transparent p-3'>
         <section
@@ -92,64 +163,16 @@ export const DjangoOrderIntentOtpModal = React.forwardRef<
             Enter the code sent to {email ?? 'your email'} to continue. This confirms where to send
             your order updates.
           </DrawerDescription>
-          <form
-            className='mt-5 space-y-4'
-            onSubmit={async (event) => {
-              event.preventDefault();
-              if (busy || value.length !== length || !onComplete) return;
-              setSubmitting(true);
-              setError(null);
-              try {
-                await onComplete(value);
-              } catch {
-                setError('We couldn’t verify this code. Please try again.');
-              } finally {
-                setSubmitting(false);
-              }
-            }}
-          >
-            <div>
-              <label htmlFor={inputId} className='mb-2 block text-sm font-medium'>
-                Verification code
-              </label>
-              <input
-                id={inputId}
-                type='text'
-                inputMode='numeric'
-                autoComplete='one-time-code'
-                autoFocus
-                maxLength={length}
-                value={value}
-                onChange={(event) =>
-                  setValue(event.target.value.replace(/\D/gu, '').slice(0, length))
-                }
-                className='min-h-12 w-full min-w-0 rounded-xl border border-white/40 bg-transparent px-4 text-center text-2xl tracking-[0.35em] outline-none focus:ring-2 focus:ring-sky-200/60'
-              />
-            </div>
-            {error && (
-              <p role='alert' className='text-sm text-amber-100'>
-                {error}
-              </p>
-            )}
-            <button
-              type='submit'
-              disabled={busy || value.length !== length}
-              className='inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0085ff] px-4 font-semibold disabled:opacity-50'
-            >
-              {busy && <Loader2 size={18} className='animate-spin' aria-hidden='true' />}
-              {busy ? 'Verifying…' : 'Verify email'}
-            </button>
-            {onResendOTP && (
-              <button
-                type='button'
-                disabled={busy || isResendingOTP}
-                onClick={() => void onResendOTP()}
-                className='min-h-11 w-full text-sm text-white/80 underline underline-offset-4 disabled:opacity-50'
-              >
-                {isResendingOTP ? 'Sending another code…' : 'Send another code'}
-              </button>
-            )}
-          </form>
+          {isOpen && (
+            <VerificationCodeForm
+              length={length}
+              defaultValue={defaultValue}
+              onComplete={onComplete}
+              onResendOTP={onResendOTP}
+              isResendingOTP={isResendingOTP}
+              isVerifyingOTP={isVerifyingOTP}
+            />
+          )}
         </section>
       </DrawerContent>
     </Drawer>

@@ -16,6 +16,8 @@ interface SendMailFromPrimaryAgentProps {
   emailReceipents: Sendmail['to'];
   subject: string;
   htmlbody: string;
+  textbody?: string;
+  senderName?: string;
 }
 
 export type EmailSendErrResp = {
@@ -41,17 +43,18 @@ export interface EmailSendSuccessResp {
 }
 
 export const sendMailFromPrimaryAgent = async (props: SendMailFromPrimaryAgentProps) => {
-  const { emailReceipents, subject, htmlbody } = props;
+  const { emailReceipents, subject, htmlbody, textbody, senderName = 'Codex Christi' } = props;
 
   return await client
     .sendMail({
       from: {
         address: 'noreply@codexchristi.org',
-        name: 'Codex Christi',
+        name: senderName,
       },
       to: emailReceipents,
       subject: subject,
       htmlbody: htmlbody,
+      ...(textbody === undefined ? {} : { textbody }),
     })
     .then((resp) => resp as EmailSendSuccessResp)
     .catch((err: EmailSendErrResp) => {

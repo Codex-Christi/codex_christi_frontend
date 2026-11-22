@@ -6,6 +6,7 @@ import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import {
   reserveRecoveryChallenge,
   consumeRecoveryChallenge,
+  RECOVERY_OTP_EXPIRY_MINUTES,
 } from '@/lib/shop/checkout/checkoutRecovery/recoveryChallenges';
 import {
   checkoutEmail,
@@ -14,7 +15,7 @@ import {
 } from '@/lib/shop/checkout/serverRequest';
 import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import { allowAuthAttempt } from '@/lib/auth/rate-limit';
-import { buildRecoveryOtpEmailHtml } from '@/lib/shop/checkout/checkoutRecovery/recoveryOtpEmailTemplate';
+import { buildShopVerificationEmail } from '@/lib/shop/email/templates';
 import { assertShopOpsMutationAllowed } from '@/lib/prisma/shop/shopOpsDataTarget';
 
 type GuestRow = {
@@ -115,8 +116,11 @@ export const linkGuestOrder = createGuestOrderLinker({
     const { sendMailFromPrimaryAgent } = await import('@/lib/zeptomail/sendMailFromPrimaryAgent');
     await sendMailFromPrimaryAgent({
       emailReceipents: [{ email_address: { address: email, name: 'Customer' } }],
-      subject: 'Link your Codex Christi guest order',
-      htmlbody: buildRecoveryOtpEmailHtml({ otp, purpose: 'order-link' }),
+      ...buildShopVerificationEmail({
+        otp,
+        purpose: 'order-link',
+        expiresInMinutes: RECOVERY_OTP_EXPIRY_MINUTES,
+      }),
     });
   },
   find: (reference, email) =>

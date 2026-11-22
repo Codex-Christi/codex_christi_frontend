@@ -61,7 +61,7 @@ export const DjangoOrderIntentOtpController = forwardRef<
   // Main JSX
   return (
     <DjangoOrderIntentOtpModal
-      key={`${email ?? ''}:${order_id ?? ''}:${Boolean(rest.isOpen)}`}
+      key={`${email ?? ''}:${order_id ?? ''}`}
       ref={ref}
       {...rest}
       onOpenChange={(open) => {
@@ -83,6 +83,8 @@ export const DjangoOrderIntentOtpController = forwardRef<
                 return;
               }
 
+              // Finish this dialog before the review step or another recovery dialog appears.
+              rest.onOpenChange?.(false);
               try {
                 await proceedToPaymentTrigger('payment-section');
               } catch {
@@ -91,7 +93,6 @@ export const DjangoOrderIntentOtpController = forwardRef<
                   message: 'Please try continuing checkout again to finish reviewing the order.',
                 });
               }
-              if (operation.current === request) rest.onOpenChange?.(false);
             }
           }
         },
