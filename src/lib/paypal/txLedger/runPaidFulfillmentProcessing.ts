@@ -958,12 +958,9 @@ export async function runPaidFulfillmentProcessing(
       }
 
       if (!pushVerification) {
-        const acknowledgedRecently =
-          readinessCheck.pushAcknowledgedAt &&
-          !readinessCheck.pushVerifiedAt &&
-          Date.now() - readinessCheck.pushAcknowledgedAt.getTime() < POST_PROCESSING_LEASE_MS;
         const shouldVerifyExistingPush =
-          readiness.providerPushState === 'pending' || acknowledgedRecently;
+          readiness.providerPushState === 'pending' ||
+          Boolean(readinessCheck.pushAcknowledgedAt || readinessCheck.pushVerifiedAt);
 
         if (!shouldVerifyExistingPush) {
           try {

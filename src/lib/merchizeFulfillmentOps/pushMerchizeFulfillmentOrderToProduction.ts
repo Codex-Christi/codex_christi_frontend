@@ -5,6 +5,7 @@ import {
   isMerchizeFulfillmentOpsDatabaseConfigured,
 } from '@/lib/prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOpsPrisma';
 import {
+  getMerchizeOrderByExternalNumber,
   MerchizeApiError,
   pushMerchizeExternalOrderToFulfillment,
   type MerchizeExternalOrderMutationResponse,
@@ -16,8 +17,15 @@ import {
   MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_STATUS,
+  MERCHIZE_ORDER_ON_HOLD,
 } from './status';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
+import {
+  canObserveOrderHold,
+  holdLookupVersion,
+  observedOrderHold,
+  readExternalOrderState,
+} from './merchizeOrderHold';
 
 const PUSH_ACTION = 'push_to_fulfillment';
 
@@ -202,27 +210,65 @@ export async function pushMerchizeFulfillmentOrderToProduction(
   const prisma = isMerchizeFulfillmentOpsDatabaseConfigured()
     ? getMerchizeFulfillmentOpsPrisma()
     : null;
-  const order = prisma
-    ? await prisma.merchizeFulfillmentOrder.findFirst({
+  const orders = prisma
+    ? await prisma.merchizeFulfillmentOrder.findMany({
         where: { orderToken: input.orderToken },
-        orderBy: { updatedAt: 'desc' },
+        take: 2,
       })
-    : null;
+    : [];
+  const order = orders[0];
+  if (!prisma || orders.length !== 1 || !order?.merchizeOrderId || order.duplicateDetectedAt ||
+      input.merchizeExternalOrderNumber !== order.merchizeExternalOrderNumber) {
+    throw new MerchizeFulfillmentPushError('The Merchize order could not be verified before release.', {
+      code: 'MERCHIZE_PUSH_REFERENCE_UNVERIFIED',
+    });
+  }
+  if (order.pushVerifiedAt || order.pushAcknowledgedAt || order.heldAt) {
+    throw new MerchizeFulfillmentPushError('The order is held or an earlier release needs verification.', {
+      code: order.heldAt ? MERCHIZE_ORDER_ON_HOLD : 'MERCHIZE_PUSH_EVIDENCE_EXISTS',
+    });
+  }
   const now = new Date();
+  // The operator may have paused the order in Merchize since readiness was checked.
+  const detail = await getMerchizeOrderByExternalNumber(
+    order.merchizeExternalOrderNumber,
+    order.merchizeIdentifier ?? input.identifier,
+  );
+  const state = detail?.success === true ? readExternalOrderState(order, detail.data) : null;
+  if (!state || !canObserveOrderHold(order, now)) {
+    throw new MerchizeFulfillmentPushError('The current Merchize release state could not be verified.', {
+      code: 'MERCHIZE_PUSH_STATE_UNVERIFIED',
+    });
+  }
+  const write = await prisma.merchizeFulfillmentOrder.updateMany({
+    where: {
+      ...holdLookupVersion(order),
+      duplicateDetectedAt: null,
+      heldAt: null,
+      pushAcknowledgedAt: null,
+      pushVerifiedAt: null,
+    },
+    data: {
+      ...observedOrderHold(order, state, now),
+      ...(state === 'unfulfilled'
+        ? {
+            syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_PENDING,
+            productionGateStatus: MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_PENDING,
+            lastSyncErrorCode: null,
+            lastSyncErrorMessage: null,
+          }
+        : {}),
+    },
+  });
+  if (write.count !== 1 || state !== 'unfulfilled') {
+    throw new MerchizeFulfillmentPushError('Merchize did not confirm this order was available for release.', {
+      code: state === 'on_hold' ? MERCHIZE_ORDER_ON_HOLD : 'MERCHIZE_PUSH_STATE_UNVERIFIED',
+    });
+  }
 
   let attemptId: string | null = null;
 
   if (prisma && order) {
-    await prisma.merchizeFulfillmentOrder.update({
-      where: { id: order.id },
-      data: {
-        syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_PENDING,
-        productionGateStatus: MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_PENDING,
-        lastSyncErrorCode: null,
-        lastSyncErrorMessage: null,
-      },
-    });
-
     const attempt = await prisma.merchizeFulfillmentSyncAttempt.create({
       data: {
         merchizeFulfillmentOrderId: order.id,

@@ -69,11 +69,13 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let holdChecks = 0;
     const controller = new AbortController();
     const poll = async () => {
       setRefreshing(true);
       try {
-        if (authenticatedOwner && !viewingEarlierOrder) await claimCurrentCheckout();
+        if (authenticatedOwner && !viewingEarlierOrder && holdChecks === 0)
+          await claimCurrentCheckout();
         if (cancelled) return;
         const response = await readCheckoutStatus(orderToken, { signal: controller.signal });
         if (cancelled) return;
@@ -111,6 +113,10 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
           }
         }
         const mapped = mapLedgerToProcessingState(next);
+        if (next.fulfillmentOnHold && next.status !== 'refunded') {
+          if (holdChecks++ < 20) timer = setTimeout(() => void poll(), 30_000);
+          return;
+        }
         if (
           mapped.flowStatus === 'completed' ||
           mapped.flowStatus === 'error' ||

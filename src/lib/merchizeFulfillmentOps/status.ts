@@ -1,3 +1,5 @@
+export const MERCHIZE_ORDER_ON_HOLD = 'MERCHIZE_ORDER_ON_HOLD';
+
 export const MERCHIZE_FULFILLMENT_SYNC_STATUS = {
   REGISTERED: 'registered',
   PROCESS_ACCEPTED: 'process_accepted',

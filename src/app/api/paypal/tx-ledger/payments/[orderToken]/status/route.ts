@@ -8,6 +8,8 @@ import { getCanonicalPaymentProjectionState } from '@/lib/paypal/txLedger/canoni
 import { getCapturedCartPurchase } from '@/lib/cart/purchase';
 import { receiptObjectKey, receiptDownloadPath } from '@/lib/shop/orderHistory/receiptReference';
 import { toCustomerOrderStatus } from '@/lib/shop/checkout/customerOrderStatus';
+import { readCustomerFulfillmentHold } from '@/lib/shop/checkout/readCustomerFulfillmentHold';
+import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 
 type PageProps = {
   params: Promise<{ orderToken: string }>;
@@ -108,6 +110,14 @@ export async function GET(_req: Request, { params }: PageProps) {
         : 'Your payment was received, but the amount needs review before we can prepare the order.'
     : getCustomerRecoveryReason(effectiveStatus);
   const receiptLink = receiptObjectKey(row) ? receiptDownloadPath(row.orderToken) : null;
+  const holdCheckedAt =
+    captureCompletion.ok &&
+    paymentState.paymentSafeForPostProcessing &&
+    row.status !== PAYPAL_LEDGER_STATUS.REFUNDED &&
+    row.djangoPaymentSaveCustomId &&
+    isAcceptedDjangoFulfillmentProcessResponse(row.merchizeFulfillmentResponsePayload)
+      ? await readCustomerFulfillmentHold(row.orderToken, row.djangoPaymentSaveCustomId)
+      : null;
 
   const customerStatus = toCustomerOrderStatus(row, {
     status: effectiveStatus,
@@ -117,6 +127,8 @@ export async function GET(_req: Request, { params }: PageProps) {
     cartPurchase: getCapturedCartPurchase(row, paymentState),
     customerRecoveryStatus: isCustomerProtectionVisible ? 'paid_unresolved' : null,
     recoveryReason: isCustomerProtectionVisible ? recoveryReason : null,
+    fulfillmentOnHold: Boolean(holdCheckedAt),
+    fulfillmentCheckedAt: holdCheckedAt,
     error: paymentFailure
       ? { message: recoveryReason }
       : row.lastErrorMessage

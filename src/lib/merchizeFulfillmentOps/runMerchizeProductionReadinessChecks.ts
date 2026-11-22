@@ -167,6 +167,7 @@ export async function runMerchizeProductionReadinessChecks(
       requireAttention,
       sendToFulfillment,
       buyerAddressMismatchFields,
+      providerOrderOnHold: Boolean(order.heldAt),
       allowStaleOrderManualRelease: options.allowStaleOrderManualRelease,
     });
     const checkedAt = new Date();

@@ -21,6 +21,8 @@ export type MappedProcessingState = {
   paidAmountLabel?: string;
   errorMessage?: string;
   supportReference: string;
+  fulfillmentOnHold?: boolean;
+  fulfillmentCheckedAt?: string;
   shortSupportReference: string;
   needsManualReview: boolean;
 };
@@ -84,6 +86,8 @@ export function mapLedgerToProcessingState(
     paidAmountLabel: data.paidAmountLabel ?? undefined,
     errorMessage: data.error?.message ?? undefined,
     supportReference: data.orderToken,
+    fulfillmentOnHold: data.fulfillmentOnHold,
+    fulfillmentCheckedAt: data.fulfillmentCheckedAt ?? undefined,
     shortSupportReference: data.orderToken.slice(0, 8),
     needsManualReview:
       data.customerRecoveryStatus === 'paid_unresolved' ||

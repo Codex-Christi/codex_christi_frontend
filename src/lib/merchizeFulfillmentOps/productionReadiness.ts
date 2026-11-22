@@ -1,3 +1,5 @@
+import { MERCHIZE_ORDER_ON_HOLD } from './status';
+
 export type MerchizeReadinessCategory =
   'address' | 'items' | 'artwork' | 'cost' | 'attention' | 'order' | 'provider' | 'age';
 
@@ -43,6 +45,7 @@ type ReadinessPayloads = {
   requireAttention: unknown;
   sendToFulfillment: unknown;
   buyerAddressMismatchFields?: string[] | null;
+  providerOrderOnHold?: boolean;
   now?: Date;
   allowStaleOrderManualRelease?: boolean;
 };
@@ -237,10 +240,19 @@ export function classifyMerchizeProductionReadiness({
   requireAttention,
   sendToFulfillment,
   buyerAddressMismatchFields,
+  providerOrderOnHold,
   now = new Date(),
   allowStaleOrderManualRelease = false,
 }: ReadinessPayloads): MerchizeProductionReadiness {
   const blockers: MerchizeReadinessBlocker[] = [];
+  if (providerOrderOnHold) {
+    addBlocker(blockers, {
+      code: MERCHIZE_ORDER_ON_HOLD,
+      message: 'Merchize reports the order is on hold. Verify its resume before release.',
+      category: 'order',
+      retryable: false,
+    });
+  }
   const detailData = getDataRecord(detail);
   const addressEvidence = getMerchizeAddressValidationEvidence(detail);
   const validationStatus = addressEvidence.status;

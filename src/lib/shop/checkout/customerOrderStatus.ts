@@ -47,6 +47,8 @@ export type CustomerOrderStatusFields = {
   cartPurchase?: CartPurchase | null;
   customerRecoveryStatus?: 'paid_unresolved' | null;
   recoveryReason?: string | null;
+  fulfillmentOnHold?: boolean;
+  fulfillmentCheckedAt?: Date | null;
   error?: { message?: string | null } | null;
 };
 
@@ -63,6 +65,8 @@ export type CustomerOrderStatus = {
   cartPurchase: CartPurchase | null;
   customerRecoveryStatus: 'paid_unresolved' | null;
   recoveryReason: string | null;
+  fulfillmentOnHold: boolean;
+  fulfillmentCheckedAt: string | null;
   updatedAt: string | null;
   error: { message: string } | null;
 };
@@ -114,6 +118,8 @@ export function toCustomerOrderStatus(
       : null,
     customerRecoveryStatus: fields.customerRecoveryStatus ?? null,
     recoveryReason: fields.recoveryReason ?? null,
+    fulfillmentOnHold: fields.fulfillmentOnHold === true,
+    fulfillmentCheckedAt: isoDate(fields.fulfillmentCheckedAt),
     updatedAt: isoDate(row.updatedAt),
     error: hasText(fields.error?.message) ? { message: fields.error.message } : null,
   };

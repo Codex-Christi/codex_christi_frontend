@@ -6,6 +6,7 @@ import {
   isMerchizeFulfillmentOpsDatabaseConfigured,
 } from '@/lib/prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOpsPrisma';
 import { createAccountOrderReader } from './reader';
+import { customerHoldSelect, savedFulfillmentHoldCheck } from '@/lib/shop/checkout/readCustomerFulfillmentHold';
 import {
   shipmentLabel,
   shipmentSummary,
@@ -28,6 +29,7 @@ export const accountOrders = createAccountOrderReader({
         merchizeExternalOrderNumber: true,
         progressStatus: true,
         lastTrackingSyncAt: true,
+        ...customerHoldSelect,
         merchizeProgressPayload: true,
         merchizeTrackingPayload: true,
       },
@@ -47,6 +49,7 @@ export const accountOrders = createAccountOrderReader({
           snapshotCheckedAt(row.merchizeTrackingPayload) ??
           row.lastTrackingSyncAt?.toISOString() ??
           null,
+        holdCheckedAt: savedFulfillmentHoldCheck(row)?.toISOString() ?? null,
         packages: shipment.packages,
         delivered: shipment.delivered,
       };

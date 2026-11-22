@@ -43,6 +43,7 @@ export type HistoryFulfillment = {
   tracking: string | null;
   progressCheckedAt: string | null;
   trackingCheckedAt: string | null;
+  holdCheckedAt?: string | null;
   packages?: ShipmentPackage[];
   delivered?: boolean;
 };

@@ -170,3 +170,15 @@ test('confirmation keeps its local support reference, receipt route, and action 
     assert.match(doc.body.textContent,/Keep reference local-or for updates/u);
   `);
 });
+
+test('a verified hold remains paid, is private, and clears on resume', async () => {
+  await checkConfirmation(`
+    const held = {...state,fulfillmentOnHold:true,fulfillmentCheckedAt:'2026-11-22T12:05:00.000Z'};
+    const doc = render({state:held});
+    assert.equal(doc.querySelector('h1').textContent,'Order on hold');
+    assert.match(doc.body.textContent,/Your payment was received. No action is needed right now./u);
+    assert.match(doc.body.textContent,/Fulfillment last checked: 22 Nov 2026, 12:05 UTC/u);
+    assert.doesNotMatch(render({state:held,accessRequired:true}).body.textContent,/Order on hold/u);
+    assert.doesNotMatch(render({state:{...held,fulfillmentOnHold:false}}).body.textContent,/Order on hold/u);
+  `);
+});

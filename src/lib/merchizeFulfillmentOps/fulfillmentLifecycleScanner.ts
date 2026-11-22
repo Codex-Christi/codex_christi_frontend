@@ -7,6 +7,8 @@ import {
 import { syncMerchizeFulfillmentOperationalSnapshots } from './syncMerchizeFulfillmentOperationalSnapshots';
 import { syncMerchizeFulfillmentOrder } from './syncMerchizeFulfillmentOrder';
 import { runMerchizeProductionReadinessChecks } from './runMerchizeProductionReadinessChecks';
+import { listMerchizeExternalOrdersDetail } from './merchizeClient';
+import { holdLookupSelect, holdLookupVersion, reconcileMerchizeOrderHolds } from './merchizeOrderHold';
 import { MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS } from './status';
 import { safeLogErrorMessage } from './redaction';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
@@ -143,12 +145,47 @@ export async function runMerchizeFulfillmentLifecycleScanner(
 
   const cutoff = new Date(scannedAt.getTime() - minAgeMinutes * 60_000);
   const prisma = getMerchizeFulfillmentOpsPrisma();
+  const pendingRelease = await prisma.merchizeFulfillmentOrder.findMany({
+    where: {
+      merchizeOrderId: { not: null },
+      duplicateDetectedAt: null,
+      pushVerifiedAt: null,
+      AND: [
+        { OR: [{ merchizeIsDeleted: null }, { merchizeIsDeleted: false }] },
+        { OR: [{ lastLookupAt: null }, { lastLookupAt: { lte: cutoff } }] },
+        { OR: [{ productionGateStatus: null }, { productionGateStatus: { not: 'push_verified' } }] },
+        { OR: [{ deliveryStatus: null }, { deliveryStatus: { notIn: [...TERMINAL_DELIVERY_STATUSES] } }] },
+      ],
+    },
+    orderBy: [{ lastLookupAt: { sort: 'asc', nulls: 'first' } }, { id: 'asc' }],
+    take: batchSize,
+    select: holdLookupSelect,
+  });
+  const holdSync = { candidates: pendingRelease.length, saved: 0, unavailable: 0 };
+  if (!dryRun && pendingRelease.length) {
+    try {
+      const observations = await reconcileMerchizeOrderHolds(pendingRelease, {
+        read: listMerchizeExternalOrdersDetail,
+        save: async (order, data) => {
+          const write = await prisma.merchizeFulfillmentOrder.updateMany({
+            where: { ...holdLookupVersion(order), duplicateDetectedAt: null },
+            data,
+          });
+          return write.count === 1;
+        },
+      });
+      holdSync.saved = observations.filter((observation) => observation.saved).length;
+      holdSync.unavailable = observations.filter((observation) => !observation.state).length;
+    } catch {
+      holdSync.unavailable = pendingRelease.length;
+    }
+  }
   const rows = await prisma.merchizeFulfillmentOrder.findMany({
     where: {
       merchizeOrderId: { not: null },
-      merchizeIsDeleted: { not: true },
       productionGateStatus: MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFIED,
       AND: [
+        { OR: [{ merchizeIsDeleted: null }, { merchizeIsDeleted: false }] },
         { OR: [{ lastProgressSyncAt: null }, { lastProgressSyncAt: { lte: cutoff } }] },
         {
           OR: [
@@ -226,7 +263,7 @@ export async function runMerchizeFulfillmentLifecycleScanner(
   }
 
   return {
-    ok: results.every((result) => result.ok),
+    ok: holdSync.unavailable === 0 && results.every((result) => result.ok),
     enabled: true,
     dryRun,
     scannedAt: scannedAt.toISOString(),
@@ -234,5 +271,6 @@ export async function runMerchizeFulfillmentLifecycleScanner(
     batchSize,
     candidates,
     results,
+    holdSync,
   };
 }

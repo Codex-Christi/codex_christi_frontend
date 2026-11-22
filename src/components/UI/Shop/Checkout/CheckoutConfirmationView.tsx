@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { Check, Copy, Download, Loader2, RefreshCw, TriangleAlert } from 'lucide-react';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import type { MappedProcessingState } from '@/lib/paypal/txLedger/mapLedgerToProcessingState';
+import { customerFulfillmentHold } from '@/lib/shop/checkout/customerFulfillmentHold';
 
 type CheckoutConfirmationViewProps = {
   orderToken: string;
@@ -81,8 +82,11 @@ export default function CheckoutConfirmationView({
   const completed = state?.flowStatus === 'completed' && paid && !refunded && !accessRequired;
   const manualReview = state?.needsManualReview;
   const delayed = paid && state?.flowStatus === 'error';
+  const onHold = paid && hasData && !accessRequired && !refunded && state?.fulfillmentOnHold;
   const shortReference = state?.shortSupportReference || orderToken.slice(0, 8);
-  const lastUpdated = !accessRequired && hasData ? readLastUpdated(state?.updatedAt) : null;
+  const lastUpdated = !accessRequired && hasData
+    ? readLastUpdated(onHold ? state?.fulfillmentCheckedAt : state?.updatedAt)
+    : null;
   const title = accessRequired
     ? 'View your order'
     : refunded
@@ -122,25 +126,26 @@ export default function CheckoutConfirmationView({
       >
         {storageNotice}
         <div
-          className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${completed ? 'bg-[#0085ff]' : manualReview || refunded ? 'bg-amber-100/10 text-amber-100' : 'bg-white/5 text-sky-200'}`}
+          className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${completed && !onHold ? 'bg-[#0085ff]' : manualReview || refunded || onHold ? 'bg-amber-100/10 text-amber-100' : 'bg-white/5 text-sky-200'}`}
         >
-          {completed ? (
+          {completed && !onHold ? (
             <Check size={32} aria-hidden='true' />
-          ) : manualReview || refunded || accessRequired ? (
+          ) : manualReview || refunded || accessRequired || onHold ? (
             <TriangleAlert size={28} aria-hidden='true' />
           ) : (
             <Loader2 size={28} className={refreshing ? 'animate-spin' : ''} aria-hidden='true' />
           )}
         </div>
         <h1 id='checkout-confirmation-title' className='mt-5 text-xl font-semibold sm:text-2xl'>
-          {title}
+          {onHold ? customerFulfillmentHold.title : title}
         </h1>
         <p className='mx-auto mt-3 max-w-lg text-sm leading-6 text-white/75' aria-live='polite'>
-          {description}
+          {onHold ? customerFulfillmentHold.description : description}
         </p>
         {lastUpdated && (
           <p className='mt-3 text-xs leading-5 text-white/55'>
-            Last updated: <time dateTime={lastUpdated.dateTime}>{lastUpdated.label}</time>
+            {onHold ? 'Fulfillment last checked: ' : 'Last updated: '}
+            <time dateTime={lastUpdated.dateTime}>{lastUpdated.label}</time>
           </p>
         )}
         {state?.paidAmountLabel && (

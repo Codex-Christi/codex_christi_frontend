@@ -39,6 +39,8 @@ test('the status response lists only public fields and rebuilds nested values', 
     },
     customerRecoveryStatus: 'paid_unresolved',
     recoveryReason: 'Your order needs review.',
+    fulfillmentOnHold: true,
+    fulfillmentCheckedAt: new Date('2026-01-01T12:05:00Z'),
     error: { message: 'Your order needs review.', code: 'PRIVATE_ERROR_CODE', stack: 'private' },
     privateField: 'private-extra-field',
   } as unknown as CustomerOrderStatusFields;
@@ -48,6 +50,8 @@ test('the status response lists only public fields and rebuilds nested values', 
     'cartPurchase',
     'customerRecoveryStatus',
     'error',
+    'fulfillmentCheckedAt',
+    'fulfillmentOnHold',
     'orderToken',
     'paidAmountLabel',
     'paymentProgressed',
@@ -61,6 +65,8 @@ test('the status response lists only public fields and rebuilds nested values', 
     'updatedAt',
   ]);
   assert.deepEqual(result.error, { message: 'Your order needs review.' });
+  assert.equal(result.fulfillmentOnHold, true);
+  assert.equal(result.fulfillmentCheckedAt, '2026-01-01T12:05:00.000Z');
   assert.deepEqual(result.cartPurchase, {
     orderId: source.orderToken,
     lines: [{ variantId: 'public-variant', quantity: 1 }],

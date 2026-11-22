@@ -3017,15 +3017,72 @@ Before starting Merchize Fulfillment Ops DB implementation:
 8. Remaining: dedicated address-review rows and customer correction-request messaging.
 9. Remaining: normalize richer cost-delta evidence when a correction changes fulfillment cost.
 
-## Phase 8 - Production hold/open controls
+## Phase 8 - Detect and display fulfillment holds
 
-1. Add hold/open adapter methods.
-2. Add admin hold action.
-3. Add admin open/release action.
-4. Require admin reason.
-5. Require step-up auth in production phase.
-6. Block open/release when `productionGateStatus = production_gate_blocked`.
-7. Persist admin action history.
+**Verified on November 22, 2026:** the recently paused seller order showed **On hold** and a
+**Resume order** button. An API-key read of `GET /order/external/orders/order-detail` returned
+`data.order_status = on_hold` for the same provider order ID. In contrast, seller in-depth detail
+still showed `order_status = open` and push progress `validating`; external progress still showed
+import complete with push and shipment pending. Send-state showed neither pushed nor failed. Do
+not use the in-depth status, absence of a hold history event, or a pending milestone as evidence
+that the order is not held.
+
+A follow-up read with the server API key used the documented
+`POST /order/external/orders/list-orders-detail` for the paused and delivered references. This
+endpoint reads order details; it does not change them. It returned `on_hold` and `delivered` in
+two rows whose provider order codes and `_id` values both matched the requested orders. This
+supports a bounded batch detail check for holds. Before enabling it in the worker, test reordered,
+missing, duplicate, and conflicting rows. Match by identity, never batch position; a missing row
+does not clear a hold or authorize release. The live check did not run a worker or test resume.
+
+The paused seller order had no matching row on the configured development Fulfillment Ops target.
+The other linked checkout was still in `manual_release_required`, which is not a provider hold.
+This verifies the provider response shape, not a customer-page result or a successful resume.
+Do not create or claim a checkout record from a seller-only order to make it appear in history.
+
+**Local implementation:** the pre-release lifecycle scan reconciles known orders in one bounded
+external detail batch. Routine external lookup also records holds for already-released orders.
+An inconclusive or superseded read cannot clear a saved hold; a final, matched external read must
+confirm an order is unfulfilled before push. Confirmation and authorized tracking show the hold
+without erasing shipment progress. The mock browser check on port 3001 covered hold, an
+inconclusive read, and verified resume. No migration, new admin mutation, or deployed run was
+part of this check. The seller dashboard remains the place to issue hold and resume commands.
+
+| Situation | Customer status | Operational behavior |
+| --- | --- | --- |
+| Verified hold, no action requested from the buyer | **Order on hold.** Your payment was received. We're reviewing your order. No action is needed right now. | Explain the verified hold and last checked time to admin. Do not show internal reasons or infer a payment problem |
+| Verified hold with a separately confirmed buyer action | Name the action, such as **Check your delivery address**, and show the existing secure correction or support path | Alert admin and queue the applicable deduplicated customer action email. A hold alone does not establish a reason or send an email |
+| Hold after verified release or while one package is in transit | Show the order-level notice alongside the last verified milestone and any existing package links | Keep verified release and package history. A production hold is not a carrier hold; continue relevant package checks |
+| Hold read fails or resume is unverified | Keep the last verified hold and show that the latest update is unavailable | Mark evidence stale or conflicting. Do not clear the hold or retry push to repair a read failure |
+| Resume confirmed by a fresh provider read | Return to the appropriate saved stage, not automatically **In production** | Recheck current readiness if pre-release or continue lifecycle sync if already released. Never recapture or reimport |
+
+Implementation order:
+
+1. Normalize the external `order_status` independently of seller/payment `status` and release
+   verification. Reuse `MerchizeFulfillmentOrder` and its existing external snapshot; use `heldAt`
+   for observed hold timing if needed. Keep the hold separate from the last completed milestone.
+   Only a newer, successful, identity-matched read with explicit state may clear it. No new table
+   is required for the first pass.
+2. Add a shared customer-safe hold projection to confirmation, Order History details, and tracking.
+   Keep the order-access checks and separate the order notice from per-package shipping status.
+   Render from Prisma; do not call Merchize each time a customer opens a page.
+3. Check for a hold before every explicit or automatic release decision. Add bounded, read-only
+   reconciliation of eligible registered pre-release and held orders, using the existing scheduled
+   job and admin refresh. The current lifecycle scan starts at verified push, so it cannot detect
+   all holds made in the seller dashboard today. After release, keep the hold as an additional
+   state so it does not accidentally exclude in-transit packages from sync. Skip stale or
+   conflicting release evidence rather than treating it as permission to push.
+4. The adapter already has `POST /order/external/orders/update-order-status` with `hold` and
+   `resume`. Any future admin controls must be separate from **Release to production**, require
+   a reason and production step-up, verify the current state after the command, and write an audit
+   entry. A release override must not bypass a verified hold. A resume is not a push or a payment
+   retry; verify the supplier's store-level auto-fulfillment behavior before exposing it in alpha.
+5. Test the observed `on_hold` versus seller `open` response, a dashboard hold before release, a
+   hold after release with an in-transit package, customer action versus no action, missing or stale
+   evidence, an ambiguous resume, and a verified resume. Assert that an unauthorized viewer cannot
+   see the order, the last package milestone is preserved, repeated sync does not duplicate alerts,
+   and no test issues a second capture, import, or push. Verify resume separately on an approved
+   test order; the observation above did not change either order.
 
 ## Phase 9 - Progress, history, and delivery sync
 
