@@ -23,7 +23,9 @@ Current checkpoint: 2026-11-21. P0.4 and the shared state picker are committed i
 425 recorded offline checks. P0.5's [read-only gap check](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#read-only-gap-check--2026-11-21)
 is complete, with 34 focused access/recovery checks. Its first three
 [customer-status fixes](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#local-customer-status-implementation--2026-11-21)
-passed 442 offline checks; the emailed viewing-link design and full P0.5 acceptance remain open.
+passed 442 offline checks. The [preparing-email button fix](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#local-preparing-email-button-fix--2026-11-21)
+passed 39 focused offline tests, and a [viewing-link access/storage proposal](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#viewing-link-access-and-storage-proposal--2026-11-21)
+is recorded. Credential implementation and full P0.5 acceptance remain open.
 These changes are not deployed. **P0.2 deployed E2E and live P0.4 acceptance remain pending**.
 Orders and migrations remain off-limits. The release guide owns the
 [current code and verification record](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#3-current-codebase-checkpoint)
@@ -158,9 +160,12 @@ The alpha must support a smooth real-customer flow:
    the public response and explicit progress/receipt flags, local order reference, UTC record-update
    time, clear status wording, receipt access, and details-only/account-switch tests. Missing progress
    flags must not permit clearing an earlier checkout. Ownership, code recovery, and payment
-   permissions are unchanged. Next define emailed-link/storage rules; do not force access state
-   into provider/review/outbox JSON to avoid a migration. Keep full P0.5 acceptance open and leave
-   other chats' recovery changes untouched.
+   permissions are unchanged. Preserve the preparing email's protected “View order” link while a
+   receipt is pending. Use the linked access/storage proposal before implementing emailed
+   credentials: confirm lifetime, replacement behavior, transport, and durable storage first.
+   Replacement must invalidate derived viewing cookies too. Do not force access state into
+   provider/review/outbox JSON to avoid a migration. Keep full P0.5 acceptance open and leave other
+   chats' recovery changes untouched.
 6. Centralize readiness disposition, US/non-US address policy, and address correction/read-back.
 7. Assess current push-configuration guards against their acceptance contract and complete only
    remaining gaps; unset/blank already disables push in the recorded source checkpoint.

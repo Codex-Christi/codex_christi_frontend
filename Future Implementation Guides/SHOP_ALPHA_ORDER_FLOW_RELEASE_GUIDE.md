@@ -939,8 +939,9 @@ Gaps recorded before the local fixes below:
 
 1. The [preparing-email link](../src/lib/shop/email/templates.ts) is an ordinary protected
    confirmation URL with `view=details`. It contains no contact details or provider identifier,
-   but it is not the proposed signed viewing credential. It is currently omitted when no receipt
-   is available. Styled templates do not establish the full viewing-link contract or all six
+   but it is not the proposed signed viewing credential. At the audit baseline it was omitted
+   when no receipt was available; the local email-button fix below removes that restriction.
+   Styled templates do not establish the full viewing-link contract or all six
    P0.8 notification triggers.
 2. Browser grants have expiry but no issued-at field, viewing-token version, or implemented
    per-order replacement/disable check. The [audited ledger schema](../prisma/shop/paypal/paypalTXLedger.schema.prisma)
@@ -978,12 +979,12 @@ Implementation order and remaining scope, without orders or migrations:
    progress flags, expired/tampered/wrong-purpose/order receipt access, and an unpaid receipt.
    The actual details page makes no ownership claim or cart/draft cleanup, and hides old paid
    data immediately on account switch, including while the next response is pending.
-4. **Pending:** define emailed-link issuance, redemption, expiry, renewal, replacement, and disabling before
-   choosing durable storage. Keep its implementation/sending pending where storage or product
-   decisions are unresolved. Do not repurpose provider-response JSON, review JSON, or email-outbox
-   payloads as access storage merely to avoid a migration. A small follow-up for the email owner
-   can offer “View order” without a receipt using the existing protected link; it does not require
-   sending a live email or changing notification triggers.
+4. **Proposal recorded; implementation pending:** use the [viewing-link access and storage proposal](#viewing-link-access-and-storage-proposal--2026-11-21)
+   for issuance, redemption, expiry, renewal, replacement, and disabling. The email-button fix below
+   offers “View order” without a receipt using the existing protected link. It does not issue the
+   proposed credential, send an email, or change notification triggers. Do not repurpose
+   provider-response JSON, review JSON, or email-outbox payloads as access storage merely to avoid
+   a migration.
 
 The other checkout chat's uncommitted optional `verifyPayPal`/`paypalRecoveryState` lookup and
 payment-resume work were inspected only to separate ownership. They are not P0.5 acceptance
@@ -1018,6 +1019,116 @@ preserved in shared working files and excluded from this commit candidate and it
 claims. Changes to the shared status response, client mapper, and separate-checkout guard were
 prepared separately so those unfinished changes are not committed by this chat. Full P0.5,
 P0.2 deployed E2E, and live P0.4 acceptance remain pending.
+
+#### Local preparing-email button fix — 2026-11-21
+
+The [preparing-email template](../src/lib/shop/email/templates.ts) now always offers the existing
+protected confirmation URL with `view=details`. Its label is “View order” while the receipt is
+unavailable and “View order & receipt” when it is ready. Both HTML and plain text retain the
+notice that viewing may require access verification. The link contains only the encoded local
+order reference and the details-view option; it is not an emailed access credential.
+
+The change affects rendering only. Recipient selection, sending, notification triggers, payment
+evidence, receipt authorization, and order ownership stay with their existing callers. No new
+preview route, fixture file, dependency, or database field is added.
+
+Verification: 39 focused offline tests passed: 8 email-rendering tests and 31 existing proof,
+recovery, and guest-link tests. The new pending-receipt assertion fails against the old renderer
+and passes with the fix. Checks used an isolated source copy over `bed79421`, existing local
+dependencies, and existing generated type files copied read-only. TypeScript, scoped ESLint,
+source formatting, guide-link, and diff checks passed. Fetch, HTTP(S), sockets, TLS, and DNS were
+blocked for the tests. No emails, orders, provider actions, schema commands, or migrations ran.
+Full P0.5, P0.2 deployed E2E, and live P0.4 acceptance remain pending.
+
+#### Viewing-link access and storage proposal — 2026-11-21
+
+**Proposal only:** these rules describe the next implementation; they do not change current
+30-day browser grants or issue a new kind of link. The button fix above works with current access.
+Final lifetime and storage approval remain open. No schema or migration file is part of this work.
+
+Access rules:
+
+- Issue a viewing credential only after saved completed-capture evidence exists. A PayPal status
+  label, accepted handoff, or ready receipt alone does not prove payment. Receipt preparation or a
+  fulfillment delay must not prevent a paid customer from viewing status.
+- Protect purpose (`order-view`), local `orderToken`, issued-at, expiry, token-format version,
+  signing-key identifier, and a random generation identifier against alteration. Use at least
+  32 random bytes for the generation. Include no email, name, address, PayPal id, or provider id.
+  Reuse the existing server cryptography with a separate purpose if it meets this envelope/key
+  contract; a new token library is not required by this proposal. Signing secrets stay outside
+  the database and client bundle.
+- Grant status and authorized receipt viewing only. The credential must never authorize payment,
+  checkout resumption, address changes, order claiming, or cart/draft cleanup. Retain `view=details`
+  and the existing signed-in owner path. Binding a link-derived cookie to the current owner/viewer
+  must preserve account-switch and guest-linking protections. Anyone holding a forwarded link can
+  use its viewing permission until expiry or disabling; explain that in the future email copy.
+- Recommend 90 days from issuance for the emailed credential, subject to confirmation. A cookie
+  derived from it should expire no later than the earlier of 30 days or the credential's expiry.
+  Page visits, polling, and delivery retries must not extend either lifetime.
+- Missing or expired access offers the existing checkout-email code flow. For a known paid order,
+  successful verification may issue a replacement even when fulfillment is resolved. Email-only
+  order discovery keeps its existing unresolved-order limit. No order details are returned before
+  access is verified.
+
+Recommended storage: one dedicated current viewing-access record per order in the **existing
+PayPal ledger database**, rather than a separate database or a provider JSON field. Proposed
+fields and their purpose:
+
+| Stored value                         | Purpose                                                           |
+| ------------------------------------ | ----------------------------------------------------------------- |
+| Unique `orderToken`                  | Bind one current record to the local order                        |
+| Random `generationId`                | Match the current link and its derived browser cookies            |
+| `formatVersion`, `keyId`             | Validate the expected envelope and select an allowed server key   |
+| `issuedAt`, `expiresAt`              | Enforce fixed dates independently of browser state                |
+| `ownerIdAtIssue`                     | Reject a stale binding after an order-owner change                |
+| `disabledAt`, fixed `disabledReason` | Stop access from this generation without deleting payment history |
+| `createdAt`, `updatedAt`             | Record when access state changed                                  |
+
+The generation identifier is not a usable credential without its valid cryptographic protection.
+The record need not store a raw emailed credential. Delivery work can reconstruct an envelope for
+the same stored generation and expiry; retries must not replace it or start a fresh lifetime.
+The email outbox may reference the intended generation, but it is not the access authority.
+Recovery-code rows remain short-lived code records. The current audited schema has no record with
+this contract; a dedicated model/columns change would require a later reviewed migration. Do not
+add or run one under the current restrictions, or hide the state in unrelated JSON to avoid it.
+
+Replacement and disabling:
+
+- One generation may be current per order. Multiple devices may use it until it expires. An
+  explicit renewal/replacement invalidates the previous generation on every device; include this
+  consequence in the final product decision.
+- Serialize initial issuance and replacement with a transaction or conditional update. Concurrent
+  requests must not leave two current generations. Tie replacement and queued delivery together
+  so a failed send can retry the intended generation, without holding a database transaction open
+  during sending. Skip a superseded generation before dispatch; an email already in flight may
+  still arrive later, but its old credential must fail the current-generation access check.
+- Check generation, dates, owner binding, and disabled state on **every status and receipt read**,
+  including reads made with a cookie derived from a link. Reject link-derived access if its
+  storage is unavailable; do not fall back to accepting the signature alone. Checking only the
+  emailed URL would leave previously issued cookies usable after replacement.
+- Keep link-derived viewing cookies distinguishable from current payment and email-code grants.
+  Disabling this link does not disable signed-in ownership or freeze future email-code recovery.
+  Freezing all recovery would be a separate policy, not an implied effect of link replacement.
+  Existing payment grants and current code-recovery behavior remain unchanged by this proposal.
+
+Proposed link opening: use a small same-origin landing page, preferably with the credential in the
+URL fragment so it is not sent in ordinary server request URLs. Require an explicit same-origin
+POST, with origin checks and no cross-origin access, to exchange it for a view-only HttpOnly cookie.
+Opening a GET must not consume, renew, replace, disable, or claim anything; email link scanners must
+not invalidate customer access. Remove the credential from browser history before loading analytics
+or external content, then open a fixed clean local details URL. Use private/no-store and no-referrer
+responses. Do not log the credential, expose it in errors, or put it through email click tracking.
+Fragment delivery and email-client compatibility still need acceptance checks before choosing the
+final transport. The ordinary protected button added above does not carry a credential.
+
+Before implementation, confirm the 90-day lifetime, one-generation replacement behavior, link
+transport, and reviewed storage change. Then implement and test issuance/redemption/renewal with
+fake storage and blocked networking before connecting live routes or email delivery. The future
+offline matrix must cover absent/expired/altered/wrong-purpose/wrong-order credentials, date
+boundaries, owner/account changes, replaced/disabled links **and derived cookies**, failed storage,
+concurrent renewal, delivery retries, and read-only receipt access. These future credential checks
+are a plan, not tests passed by the email-button change. Real cross-device delivery/access and full
+P0.5 acceptance remain pending.
 
 ### P0.6 Complete pre-push readiness and address policy
 

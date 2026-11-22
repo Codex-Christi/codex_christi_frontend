@@ -52,21 +52,40 @@ test('customer values are escaped in HTML while plain text keeps the original re
   assert.ok(message.textbody.includes('7 minutes'));
 });
 
-test('fulfillment uses a private order page and preserves the existing receipt condition', () => {
-  const input = {
-    customerName: 'Alex',
-    orderToken: 'sample/order?test=1',
-    supportReference: 'sample-reference-0001',
-    receiptAvailable: true,
-  };
-  const available = buildShopFulfillmentEmail(input);
-  assert.match(available.textbody, /payment has been received/u);
-  assert.ok(available.textbody.includes('sample-reference-0001'));
-  assert.ok(available.htmlbody.includes('sample%2Forder%3Ftest%3D1?view=details'));
-  assert.ok(!available.htmlbody.includes('/admin/'));
-  const pending = buildShopFulfillmentEmail({ ...input, receiptAvailable: false });
-  assert.ok(!pending.textbody.includes('View order & receipt'));
-  assert.ok(!pending.htmlbody.includes('/shop/checkout/confirmation/'));
+const fulfillmentInput = {
+  customerName: 'Alex',
+  orderToken: 'sample/order?test=1',
+  supportReference: 'sample-reference-0001',
+  receiptAvailable: true,
+};
+
+for (const receiptAvailable of [true, false]) {
+  test(`preparing email links to the protected order page with receipt ${receiptAvailable ? 'ready' : 'pending'}`, () => {
+    const message = buildShopFulfillmentEmail({ ...fulfillmentInput, receiptAvailable });
+    const label = receiptAvailable ? 'View order & receipt' : 'View order';
+    const action = message.textbody.split('\n\n').find((line) => line.startsWith(`${label}: `));
+    assert.ok(action, 'The plain-text email needs a usable order link.');
+    const href = action.slice(label.length + 2);
+    const url = new URL(href);
+    assert.ok(url.pathname.endsWith('/shop/checkout/confirmation/sample%2Forder%3Ftest%3D1'));
+    assert.equal(url.search, '?view=details');
+    assert.equal(url.hash, '');
+    assert.ok(message.htmlbody.includes(`href="${href}"`));
+    assert.ok(message.htmlbody.includes(`>${label.replace('&', '&amp;')}</a>`));
+    assert.ok(!href.includes(fulfillmentInput.customerName));
+    assert.ok(!href.includes(fulfillmentInput.supportReference));
+    assert.ok(!message.htmlbody.includes('/admin/'));
+    for (const body of [message.textbody, message.htmlbody]) {
+      assert.ok(body.includes('Your payment has been received'));
+      assert.ok(body.includes(fulfillmentInput.supportReference));
+      assert.ok(body.includes('you may need to verify access before viewing your order'));
+      if (!receiptAvailable) assert.ok(!body.includes('receipt'));
+    }
+  });
+}
+
+test('preparing email requires an order and support reference', () => {
+  const input = fulfillmentInput;
   assert.throws(() => buildShopFulfillmentEmail({ ...input, supportReference: '' }), /reference/u);
   assert.throws(() => buildShopFulfillmentEmail({ ...input, orderToken: '' }), /reference/u);
 });

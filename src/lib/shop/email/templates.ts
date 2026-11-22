@@ -98,14 +98,12 @@ export function buildShopFulfillmentEmail({
         { label: 'Order status', value: 'Preparing your order' },
         { label: 'Support reference', value: supportReference },
       ],
-      action: receiptAvailable
-        ? {
-            label: 'View order & receipt',
-            href: getShopSiteUrl(
-              `/shop/checkout/confirmation/${encodeURIComponent(orderToken)}?view=details`,
-            ),
-          }
-        : undefined,
+      action: {
+        label: receiptAvailable ? 'View order & receipt' : 'View order',
+        href: getShopSiteUrl(
+          `/shop/checkout/confirmation/${encodeURIComponent(orderToken)}?view=details`,
+        ),
+      },
       footerText: 'For your privacy, you may need to verify access before viewing your order.',
     }),
   };
