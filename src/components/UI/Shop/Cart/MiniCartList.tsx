@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, ReactNode, useCallback, useMemo, useState } from 'react';
+import { FC, ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import GlobalProductPrice from '../GlobalShopComponents/GlobalProductPrice';
 import { formatOrderMoney, type OrderPreviewTotals } from '@/lib/shop/checkout/orderMoney';
@@ -48,6 +48,7 @@ export const MiniCartList: FC<MiniCartListProps> = ({
   const isCompact = variant !== 'default';
   const [pendingRemoval, setPendingRemoval] = useState<CartVariant | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const removalTrigger = useRef<HTMLElement | null>(null);
 
   const removeItem = useCallback(
     async (variantId: string) => {
@@ -70,8 +71,13 @@ export const MiniCartList: FC<MiniCartListProps> = ({
   const cancelRemove = () => setPendingRemoval(null);
 
   const entries = useMemo(() => {
-    const requestRemove = (item: CartVariant) => {
-      if (confirmBeforeRemove) {
+    const requestRemove = (
+      item: CartVariant,
+      trigger: HTMLElement,
+      requireConfirmation = confirmBeforeRemove,
+    ) => {
+      if (requireConfirmation) {
+        removalTrigger.current = trigger;
         setPendingRemoval(item);
         return;
       }
@@ -136,7 +142,7 @@ export const MiniCartList: FC<MiniCartListProps> = ({
                   <button
                     type='button'
                     aria-label={`Remove ${title}`}
-                    onClick={() => requestRemove(cartItem)}
+                    onClick={(event) => requestRemove(cartItem, event.currentTarget)}
                     className='shrink-0 text-red-500 hover:text-red-300 text-lg transition font-semibold leading-none'
                   >
                     <Trash2Icon className='h-4 w-4' />
@@ -164,7 +170,11 @@ export const MiniCartList: FC<MiniCartListProps> = ({
 
           {showQuantityControls && (
             <div className='flex min-w-0 max-w-full flex-wrap items-center gap-3 justify-end'>
-              <ItemQuantityComponent className='flex w-auto' cartItem={cartItem} />
+              <ItemQuantityComponent
+                className='flex w-auto'
+                cartItem={cartItem}
+                onRequestRemove={(trigger) => requestRemove(cartItem, trigger, true)}
+              />
             </div>
           )}
         </div>
@@ -194,7 +204,15 @@ export const MiniCartList: FC<MiniCartListProps> = ({
       )}
       <div className={`min-w-0 max-w-full space-y-4 ${className ?? ''}`}>{entries}</div>
       <AlertDialog open={pendingRemoval !== null} onOpenChange={(open) => !open && cancelRemove()}>
-        <AlertDialogContent className='bg-black/70 backdrop-blur-xl backdrop-saturate-150 border border-white/10 text-white shadow-2xl shadow-black/70 rounded-2xl max-w-md w-[90vw]'>
+        <AlertDialogContent
+          className='bg-black/70 backdrop-blur-xl backdrop-saturate-150 border border-white/10 text-white shadow-2xl shadow-black/70 rounded-2xl max-w-md w-[90vw]'
+          onCloseAutoFocus={(event) => {
+            if (removalTrigger.current?.isConnected) {
+              event.preventDefault();
+              removalTrigger.current.focus();
+            }
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Remove item?</AlertDialogTitle>
             <AlertDialogDescription className='text-gray-200'>
