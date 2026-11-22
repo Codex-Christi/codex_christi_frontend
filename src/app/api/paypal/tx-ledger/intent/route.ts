@@ -155,8 +155,15 @@ export async function POST(req: Request) {
   try {
     const body = await readCheckoutBody(req);
     const checkoutSurface = getCheckoutSurfaceProvenance(req);
-    const { selections, customer, delivery_address, djangoOrderIntentUuid, attemptId, review } =
-      body;
+    const {
+      selections,
+      customer,
+      delivery_address,
+      djangoOrderIntentUuid,
+      attemptId,
+      review,
+      paymentSource,
+    } = body;
     const customerRecord = asRecord(customer);
     const sessionState = await getServerSessionState();
     const authenticatedUserId = sessionState.isAuthenticated ? (sessionState.userID ?? null) : null;
@@ -169,6 +176,9 @@ export async function POST(req: Request) {
     }
     if (!hasRequiredDeliveryAddress(delivery_address)) {
       return validationError('INVALID_DELIVERY_ADDRESS', 'Delivery address required');
+    }
+    if (paymentSource !== undefined && paymentSource !== 'paypal') {
+      return validationError('INVALID_PAYMENT_SOURCE', 'Unsupported payment source');
     }
 
     const email = checkoutEmail(customerRecord.email);
@@ -229,6 +239,12 @@ export async function POST(req: Request) {
       )
         throw new CheckoutRequestError(
           'This checkout attempt belongs to different order details. Review the order again.',
+          409,
+          'CHECKOUT_ATTEMPT_CHANGED',
+        );
+      if (savedInput?.paymentSource !== paymentSource)
+        throw new CheckoutRequestError(
+          'This checkout was started with a different payment method. Check the earlier payment before trying again.',
           409,
           'CHECKOUT_ATTEMPT_CHANGED',
         );
@@ -369,7 +385,7 @@ export async function POST(req: Request) {
             userId: authenticatedUserId,
             djangoOrderIntentUuid: proof.intentUuid,
             djangoOrderIntentOrderId: proof.orderId,
-            djangoOrderIntentPayload: toLedgerJson({ proof, requestFingerprint }),
+            djangoOrderIntentPayload: toLedgerJson({ proof, requestFingerprint, paymentSource }),
             djangoOrderIntentVerifyPayload: toLedgerJson({
               verified: true,
               intentUuid: proof.intentUuid,
@@ -424,6 +440,7 @@ export async function POST(req: Request) {
         country: existing?.countryIso2 ?? countrySupport.country.country_iso2,
         delivery_address:
           existing?.shippingSnapshot as ShopCheckoutStoreInterface['delivery_address'],
+        paymentSource,
       });
     } catch (createErr) {
       return fail({

@@ -256,6 +256,42 @@ test('a new checkout without the trusted item review cannot create a ledger or P
   assert.equal(effects.network.mock.callCount(), 0);
 });
 
+test('rejects an unsupported payment source before touching the ledger or provider', async (t) => {
+  const { proofCookies } = setup(t);
+  const effects = forbidCheckoutEffects(t, null);
+  const req = request({ ...body, paymentSource: 'venmo' }, proofCookies);
+  const response = await inRequest(req, () => intent(req));
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'INVALID_PAYMENT_SOURCE');
+  assert.equal(effects.reads(), 0);
+  assert.equal(effects.writes(), 0);
+  assert.equal(effects.network.mock.callCount(), 0);
+});
+
+test('an attempt cannot reuse an order created for a different payment source', async (t) => {
+  const { proof, proofCookies } = setup(t);
+  for (const paymentSource of [undefined, 'paypal'] as const) {
+    const row = savedReviewedCheckout(proof);
+    const effects = forbidCheckoutEffects(t, {
+      ...row,
+      djangoOrderIntentPayload: { ...row.djangoOrderIntentPayload, paymentSource },
+    });
+    const req = request(
+      {
+        ...body,
+        paymentSource: paymentSource === 'paypal' ? undefined : 'paypal',
+        review: { ...body.review, itemsHash: row.djangoOrderIntentVerifyPayload.review.itemsHash },
+      },
+      proofCookies,
+    );
+    const response = await inRequest(req, () => intent(req));
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).code, 'CHECKOUT_ATTEMPT_CHANGED');
+    assert.equal(effects.writes(), 0);
+    assert.equal(effects.network.mock.callCount(), 0);
+  }
+});
+
 test('a same-price item mismatch blocks both provider-order reuse and unfinished retry writes', async (t) => {
   const { proof, proofCookies } = setup(t);
   for (const paypalOrderId of ['PAYPAL-EXISTING', null]) {

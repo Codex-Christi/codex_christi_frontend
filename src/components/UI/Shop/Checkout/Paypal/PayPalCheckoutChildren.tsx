@@ -37,115 +37,129 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
   const { isFinalizingPayment, mainPayPalApproveCallback } =
     usePayPalTXApproveCallback(onPaymentError);
   const providerAttempt = useRef<CheckoutAttempt | null>(null);
-  const creating = useRef<Promise<string> | null>(null);
+  const creating = useRef<{ paymentSource?: 'paypal'; operation: Promise<string> } | null>(null);
 
-  const createOrder = useCallback((): Promise<string> => {
-    if (creating.current) return creating.current;
-    const operation = (async () => {
-      if (!review) throw new Error('Review the current order details before paying.');
-      try {
-        await flushCheckoutStorage();
-      } catch (error) {
-        onPaymentError(error instanceof Error ? error.message : 'Check your saved checkout.');
-        throw new Error('Failed to create PayPal order');
+  const createOrder = useCallback(
+    (paymentSource?: 'paypal'): Promise<string> => {
+      if (creating.current) {
+        if (creating.current.paymentSource === paymentSource) return creating.current.operation;
+        onPaymentError(
+          'Wait for the current payment attempt before choosing another payment method.',
+        );
+        return Promise.reject(new Error('Failed to create PayPal order'));
       }
-      if (originalCheckout) {
-        const attempt = captureCheckoutAttempt(originalCheckout.orderToken);
-        if (!attempt) throw new Error('Reopen your original purchase before continuing.');
+      const operation = (async () => {
+        if (!review) throw new Error('Review the current order details before paying.');
         try {
-          const providerId = await resumeOriginalPayPalOrder(originalCheckout, attempt);
-          await flushCheckoutStorage('paypal-intent-store');
-          if (!isCurrentCheckoutAttempt(attempt)) throw new Error('This checkout changed.');
-          providerAttempt.current = attempt;
-          return providerId;
+          await flushCheckoutStorage();
         } catch (error) {
-          if (isCurrentCheckoutAttempt(attempt))
+          onPaymentError(error instanceof Error ? error.message : 'Check your saved checkout.');
+          throw new Error('Failed to create PayPal order');
+        }
+        if (originalCheckout) {
+          const attempt = captureCheckoutAttempt(originalCheckout.orderToken);
+          if (!attempt) throw new Error('Reopen your original purchase before continuing.');
+          try {
+            const providerId = await resumeOriginalPayPalOrder(originalCheckout, attempt);
+            await flushCheckoutStorage('paypal-intent-store');
+            if (!isCurrentCheckoutAttempt(attempt)) throw new Error('This checkout changed.');
+            providerAttempt.current = attempt;
+            return providerId;
+          } catch (error) {
+            if (isCurrentCheckoutAttempt(attempt))
+              onPaymentError(
+                error instanceof Error ? error.message : 'Check the original order status.',
+              );
+            throw new Error('Failed to create PayPal order');
+          }
+        }
+        const input = checkoutInput();
+        const inputKey = checkoutInputIdentity(input, review);
+        const previousAttempt = captureCheckoutAttempt();
+        if (hasDifferentBoundCheckout(previousAttempt, inputKey)) {
+          onPaymentError(
+            'Your earlier checkout has different details. Check its payment status above before starting a separate order.',
+          );
+          throw new Error('Failed to create PayPal order');
+        }
+        const cartSnapshot = useCartStore.getState().createCheckoutSnapshot();
+        const attempt = beginCheckoutAttempt(inputKey);
+        try {
+          await flushCheckoutStorage('paypal-intent-store');
+          if (!isCurrentCheckoutAttempt(attempt))
+            throw new Error('This checkout has changed. Please review it again.');
+          const { response, payload } = await boundedCheckoutRequest(async (signal) => {
+            const response = await fetch('/next-api/paypal/tx-ledger/intent', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...input,
+                attemptId: attempt.attemptId,
+                review,
+                paymentSource,
+              }),
+              signal,
+            });
+            const payload = (await response.json()) as {
+              data?: { orderToken?: string; paypalOrderId?: string };
+              code?: string;
+              message?: string;
+              error?: { code?: string; message?: string };
+            };
+            return { response, payload };
+          });
+          if (!isCurrentCheckoutAttempt(attempt))
+            throw new Error('This checkout has changed. Please review it again.');
+          if (!response.ok || !payload.data?.orderToken || !payload.data.paypalOrderId) {
+            const failure = readCheckoutSetupFailure(payload);
+            onPaymentError(failure.message, failure.code);
+            throw new Error('Failed to create PayPal order');
+          }
+          if (checkoutInputIdentity(checkoutInput(), review) !== inputKey) {
+            onPaymentError('Your cart or delivery details changed. Review them before paying.');
+            throw new Error('Failed to create PayPal order');
+          }
+          await useCartStore.getState().recordCheckout(payload.data.orderToken, cartSnapshot);
+          if (
+            !completeCheckoutAttempt(attempt, {
+              orderToken: payload.data.orderToken,
+              paypalOrderId: payload.data.paypalOrderId,
+              stage: mode === 'paypal_buttons' ? 'paypal_window_opened' : 'paypal_order_created',
+              paymentSurface: mode === 'card' ? 'card' : 'paypal_buttons',
+            })
+          )
+            throw new Error('This checkout has changed. Please review it again.');
+          await flushCheckoutStorage('paypal-intent-store');
+          if (!isCurrentCheckoutAttempt(attempt))
+            throw new Error('This checkout has changed. Please review it again.');
+          providerAttempt.current = captureCheckoutAttempt(payload.data.orderToken);
+          return payload.data.paypalOrderId;
+        } catch (error) {
+          if (
+            isCurrentCheckoutAttempt(attempt) &&
+            !(error instanceof Error && error.message === 'Failed to create PayPal order')
+          )
             onPaymentError(
-              error instanceof Error ? error.message : 'Check the original order status.',
+              error instanceof Error
+                ? error.message
+                : 'We couldn’t prepare this payment. Please try again.',
             );
           throw new Error('Failed to create PayPal order');
         }
-      }
-      const input = checkoutInput();
-      const inputKey = checkoutInputIdentity(input, review);
-      const previousAttempt = captureCheckoutAttempt();
-      if (hasDifferentBoundCheckout(previousAttempt, inputKey)) {
-        onPaymentError(
-          'Your earlier checkout has different details. Check its payment status above before starting a separate order.',
-        );
-        throw new Error('Failed to create PayPal order');
-      }
-      const cartSnapshot = useCartStore.getState().createCheckoutSnapshot();
-      const attempt = beginCheckoutAttempt(inputKey);
-      try {
-        await flushCheckoutStorage('paypal-intent-store');
-        if (!isCurrentCheckoutAttempt(attempt))
-          throw new Error('This checkout has changed. Please review it again.');
-        const { response, payload } = await boundedCheckoutRequest(async (signal) => {
-          const response = await fetch('/next-api/paypal/tx-ledger/intent', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...input, attemptId: attempt.attemptId, review }),
-            signal,
-          });
-          const payload = (await response.json()) as {
-            data?: { orderToken?: string; paypalOrderId?: string };
-            code?: string;
-            message?: string;
-            error?: { code?: string; message?: string };
-          };
-          return { response, payload };
-        });
-        if (!isCurrentCheckoutAttempt(attempt))
-          throw new Error('This checkout has changed. Please review it again.');
-        if (!response.ok || !payload.data?.orderToken || !payload.data.paypalOrderId) {
-          const failure = readCheckoutSetupFailure(payload);
-          onPaymentError(failure.message, failure.code);
-          throw new Error('Failed to create PayPal order');
-        }
-        if (checkoutInputIdentity(checkoutInput(), review) !== inputKey) {
-          onPaymentError('Your cart or delivery details changed. Review them before paying.');
-          throw new Error('Failed to create PayPal order');
-        }
-        await useCartStore.getState().recordCheckout(payload.data.orderToken, cartSnapshot);
-        if (
-          !completeCheckoutAttempt(attempt, {
-            orderToken: payload.data.orderToken,
-            paypalOrderId: payload.data.paypalOrderId,
-            stage: mode === 'paypal_buttons' ? 'paypal_window_opened' : 'paypal_order_created',
-            paymentSurface: mode === 'card' ? 'card' : 'paypal_buttons',
-          })
-        )
-          throw new Error('This checkout has changed. Please review it again.');
-        await flushCheckoutStorage('paypal-intent-store');
-        if (!isCurrentCheckoutAttempt(attempt))
-          throw new Error('This checkout has changed. Please review it again.');
-        providerAttempt.current = captureCheckoutAttempt(payload.data.orderToken);
-        return payload.data.paypalOrderId;
-      } catch (error) {
-        if (
-          isCurrentCheckoutAttempt(attempt) &&
-          !(error instanceof Error && error.message === 'Failed to create PayPal order')
-        )
-          onPaymentError(
-            error instanceof Error
-              ? error.message
-              : 'We couldn’t prepare this payment. Please try again.',
-          );
-        throw new Error('Failed to create PayPal order');
-      }
-    })();
-    creating.current = operation;
-    void operation.then(
-      () => {
-        creating.current = null;
-      },
-      () => {
-        creating.current = null;
-      },
-    );
-    return operation;
-  }, [mode, review, onPaymentError, originalCheckout]);
+      })();
+      creating.current = { paymentSource, operation };
+      void operation.then(
+        () => {
+          creating.current = null;
+        },
+        () => {
+          creating.current = null;
+        },
+      );
+      return operation;
+    },
+    [mode, review, onPaymentError, originalCheckout],
+  );
 
   const handlePayPalCancel = useCallback(() => {
     const attempt = providerAttempt.current;
