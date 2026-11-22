@@ -28,6 +28,36 @@ type CheckoutConfirmationViewProps = {
   onCopy: () => void;
 };
 
+const UTC_MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+function readLastUpdated(value: string | undefined) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/u.test(value)) return null;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  const [base, fraction = ''] = value.slice(0, -1).split('.');
+  const dateTime = date.toISOString();
+  if (dateTime !== `${base}.${fraction.padEnd(3, '0')}Z`) return null;
+  const hour = String(date.getUTCHours()).padStart(2, '0');
+  const minute = String(date.getUTCMinutes()).padStart(2, '0');
+  return {
+    dateTime,
+    label: `${date.getUTCDate()} ${UTC_MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}, ${hour}:${minute} UTC`,
+  };
+}
+
 export default function CheckoutConfirmationView({
   orderToken,
   state,
@@ -48,8 +78,11 @@ export default function CheckoutConfirmationView({
   onDownload,
   onCopy,
 }: CheckoutConfirmationViewProps) {
-  const completed = state?.flowStatus === 'completed' && paid;
+  const completed = state?.flowStatus === 'completed' && paid && !refunded && !accessRequired;
   const manualReview = state?.needsManualReview;
+  const delayed = paid && state?.flowStatus === 'error';
+  const shortReference = state?.shortSupportReference || orderToken.slice(0, 8);
+  const lastUpdated = !accessRequired && hasData ? readLastUpdated(state?.updatedAt) : null;
   const title = accessRequired
     ? 'View your order'
     : refunded
@@ -58,24 +91,28 @@ export default function CheckoutConfirmationView({
         ? 'Thank you for your purchase'
         : manualReview && paid
           ? 'Payment received — order under review'
-          : paid
-            ? 'Payment received'
-            : hasData
-              ? 'Payment not confirmed yet'
-              : 'Checking your payment';
-  const description = completed
-    ? `Order #${state?.orderCustomId ?? orderToken.slice(0, 12)} has been confirmed.`
+          : delayed
+            ? 'Payment received — order delayed'
+            : paid
+              ? 'Payment received'
+              : hasData
+                ? 'Payment not confirmed yet'
+                : 'Checking your payment';
+  const description = accessRequired
+    ? 'Verify the checkout email or sign in to the account used for this order.'
     : refunded
       ? 'This payment has been refunded. Keep your reference for any follow-up.'
       : manualReview
-        ? 'Your order needs a final check before it can move forward. Keep the reference below.'
-        : paid
-          ? 'We’re preparing your receipt and completing the order. You can return to this page to check its progress.'
-          : accessRequired
-            ? 'Verify the checkout email or sign in to the account used for this order.'
-            : hasData
-              ? 'We haven’t confirmed a completed payment. If you approved it, check its status before paying again.'
-              : 'Please wait while we check the payment record.';
+        ? 'Our team needs to check the order before it can move forward. Keep the reference below.'
+        : delayed
+          ? 'Your payment is recorded, but the next order step has not finished. Check this page before trying another payment.'
+          : completed
+            ? `Your payment and order details are recorded. Keep reference ${shortReference} for updates.`
+            : paid
+              ? 'Your payment is recorded. We’re completing the remaining order steps. You can return here for updates.'
+              : hasData
+                ? 'We haven’t confirmed a completed payment. If you approved it, check its status before paying again.'
+                : 'Please wait while we check the payment record.';
 
   return (
     <main className='mx-auto flex w-full min-w-0 max-w-2xl flex-col px-3 py-8 text-white sm:px-5 sm:py-12'>
@@ -101,6 +138,11 @@ export default function CheckoutConfirmationView({
         <p className='mx-auto mt-3 max-w-lg text-sm leading-6 text-white/75' aria-live='polite'>
           {description}
         </p>
+        {lastUpdated && (
+          <p className='mt-3 text-xs leading-5 text-white/55'>
+            Last updated: <time dateTime={lastUpdated.dateTime}>{lastUpdated.label}</time>
+          </p>
+        )}
         {state?.paidAmountLabel && (
           <p className='mt-3 font-semibold'>
             {refunded ? 'Payment amount' : 'Paid'} {state.paidAmountLabel}

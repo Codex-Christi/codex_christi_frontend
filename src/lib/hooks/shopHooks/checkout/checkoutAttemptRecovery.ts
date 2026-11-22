@@ -20,7 +20,7 @@ export function canStartSeparateCheckout(
       ['paypal_order_created', 'paypal_window_opened', 'paypal_cancelled'].includes(stage)) &&
     status.orderToken === attempt.orderToken &&
     status.status === 'intent_created' &&
-    (!status.lastEventType || status.lastEventType === 'CHECKOUT.ORDER.CREATED') &&
+    status.paymentProgressed === false &&
     !status.error &&
     !status.cartPurchase &&
     !status.paidAmountLabel &&
@@ -28,7 +28,8 @@ export function canStartSeparateCheckout(
     !status.processingCompletedAt &&
     !status.receiptLink &&
     !status.receiptFile &&
-    !status.djangoPaymentSaveCustomId
+    !status.paymentSaved &&
+    !status.receiptReady
   );
 }
 

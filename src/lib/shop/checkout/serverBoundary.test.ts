@@ -509,6 +509,10 @@ test('payment status requires access, remains read-only, and never returns provi
     receiptFile: null,
     lastErrorCode: 'PROVIDER_FAILURE',
     lastErrorMessage: 'PRIVATE_PROVIDER_DIAGNOSTIC',
+    lastEventType: 'PRIVATE_PROVIDER_EVENT',
+    djangoPaymentSaveCustomId: 'PRIVATE_PAYMENT_SAVE_ID',
+    customerEmail: 'PRIVATE_CONTACT@example.test',
+    shippingSnapshot: { shipping_address_line_1: 'PRIVATE_STREET' },
   };
   global.__paypalTxLedger__ = {
     paypalIntent: { findUnique: async () => row },
@@ -527,7 +531,15 @@ test('payment status requires access, remains read-only, and never returns provi
   const response = await read(await accountCookie('alice'));
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
-  assert.equal((await response.text()).includes('PRIVATE_PROVIDER_DIAGNOSTIC'), false);
+  const body = await response.json();
+  assert.equal(JSON.stringify(body).includes('PRIVATE_'), false);
+  assert.equal('lastEventType' in body, false);
+  assert.equal('djangoPaymentSaveCustomId' in body, false);
+  assert.equal('code' in body.error, false);
+  assert.equal(body.paymentSaved, true);
+  assert.equal(body.paymentProgressed, true);
+  assert.equal(body.receiptReady, false);
+  assert.equal(body.paidAmountLabel, '$25.00');
 });
 
 test('exact-order recovery requires matching checkout email and completed payment evidence', async (t) => {
@@ -551,4 +563,41 @@ test('exact-order recovery requires matching checkout email and completed paymen
   assert.deepEqual(await findEmailRecoveryCheckouts('other@example.com', row.orderToken), []);
   row.capturePayload.status = 'PENDING';
   assert.deepEqual(await findEmailRecoveryCheckouts('customer@example.com', row.orderToken), []);
+});
+
+test('status without completed capture does not tell the customer their payment was received', async (t) => {
+  const { proof } = setup(t);
+  const row = {
+    ...savedReviewedCheckout(proof),
+    userId: 'alice',
+    status: 'captured',
+    authorizePayload: null,
+    capturePayload: null,
+    updatedAt: new Date(),
+  };
+  let writes = 0;
+  global.__paypalTxLedger__ = {
+    paypalIntent: {
+      findUnique: async () => row,
+      updateMany: async () => {
+        writes += 1;
+        return { count: 0 };
+      },
+    },
+  } as unknown as PrismaClient;
+  const network = t.mock.method(globalThis, 'fetch', async () => assert.fail('No network call'));
+  const req = new NextRequest(
+    `http://localhost:3000/next-api/paypal/tx-ledger/payments/${row.orderToken}/status`,
+    { headers: { cookie: await accountCookie('alice'), host: 'localhost:3000' } },
+  );
+  const response = await inRequest(req, () =>
+    status(req, { params: Promise.resolve({ orderToken: row.orderToken }) }),
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.paidAmountLabel, null);
+  assert.match(body.error.message, /payment details need review/u);
+  assert.doesNotMatch(body.error.message, /payment (?:was )?received/u);
+  assert.equal(writes, 0);
+  assert.equal(network.mock.callCount(), 0);
 });

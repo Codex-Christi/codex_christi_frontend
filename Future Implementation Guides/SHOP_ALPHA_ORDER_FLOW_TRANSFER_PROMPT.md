@@ -19,9 +19,12 @@ The release guide is canonical for priority and resolved product decisions. The 
 domain references. If an older guide says a different item is "next" or contains an unresolved
 decision already resolved by the release guide, follow the release guide.
 
-Current checkpoint: 2026-11-21. P0.3's October trace remains recorded; the P0.4 and state-picker
-commit candidate passed 425 offline checks against source `a90536f1`. These changes are not
-deployed. **P0.2 deployed E2E remains pending**.
+Current checkpoint: 2026-11-21. P0.4 and the shared state picker are committed in `6e97392c`, with
+425 recorded offline checks. P0.5's [read-only gap check](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#read-only-gap-check--2026-11-21)
+is complete, with 34 focused access/recovery checks. Its first three
+[customer-status fixes](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#local-customer-status-implementation--2026-11-21)
+passed 442 offline checks; the emailed viewing-link design and full P0.5 acceptance remain open.
+These changes are not deployed. **P0.2 deployed E2E and live P0.4 acceptance remain pending**.
 Orders and migrations remain off-limits. The release guide owns the
 [current code and verification record](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#3-current-codebase-checkpoint)
 and [P0.3 findings](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#p03-document-current-destination-behavior-without-changing-it).
@@ -91,8 +94,11 @@ The alpha must support a smooth real-customer flow:
 - Require an inline final address/size/variant/quantity acknowledgement before PayPal.
 - Codex Christi owns customer emails: payment received, address action, preparing, tracking,
   shipped, and delivered.
-- Guest cross-device confirmation uses an emailed, purpose-bound, long-lived viewing capability with
-  OTP reissue. Authenticated access uses `userId` ownership.
+- The target for guest cross-device confirmation is an emailed, purpose-bound viewing link with
+  code-based renewal and stored replacement/disable controls. Current code uses 30-day browser
+  access cookies and email-code recovery, including an exact known resolved paid order.
+  Authenticated access uses `userId` ownership. The emailed viewing credential is not implemented;
+  the guide's 90-day lifetime remains a recommendation.
 - Keep capture-route `after(...)` continuation as the explicitly enabled fast trigger; the scanner is
   the durable fallback. PayPal webhooks remain a payment safety net.
 - Merchize webhooks are P1. Synchronous API reads plus scheduled polling must make P0 complete.
@@ -148,8 +154,13 @@ The alpha must support a smooth real-customer flow:
    approval flow. Keep release gates unchecked until their deployed evidence exists.
 4. Use the recorded P0.4 local fixes and offline results. Keep live acceptance pending, reconcile
    later checkout edits with the same tests, and do not create orders to finish this checkpoint.
-5. Assess current owner/grant/OTP confirmation and recovery code against P0.5's full contract,
-   including the emailed capability and customer-safe lifecycle projection.
+5. Preserve P0.5's [first three customer-status fixes](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#local-customer-status-implementation--2026-11-21):
+   the public response and explicit progress/receipt flags, local order reference, UTC record-update
+   time, clear status wording, receipt access, and details-only/account-switch tests. Missing progress
+   flags must not permit clearing an earlier checkout. Ownership, code recovery, and payment
+   permissions are unchanged. Next define emailed-link/storage rules; do not force access state
+   into provider/review/outbox JSON to avoid a migration. Keep full P0.5 acceptance open and leave
+   other chats' recovery changes untouched.
 6. Centralize readiness disposition, US/non-US address policy, and address correction/read-back.
 7. Assess current push-configuration guards against their acceptance contract and complete only
    remaining gaps; unset/blank already disables push in the recorded source checkpoint.

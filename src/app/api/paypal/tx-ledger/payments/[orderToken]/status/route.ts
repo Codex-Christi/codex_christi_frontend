@@ -7,6 +7,7 @@ import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { getCanonicalPaymentProjectionState } from '@/lib/paypal/txLedger/canonicalPaymentProjectionState';
 import { getCapturedCartPurchase } from '@/lib/cart/purchase';
 import { receiptObjectKey, receiptDownloadPath } from '@/lib/shop/orderHistory/receiptReference';
+import { toCustomerOrderStatus } from '@/lib/shop/checkout/customerOrderStatus';
 
 type PageProps = {
   params: Promise<{ orderToken: string }>;
@@ -48,15 +49,15 @@ function getPaidAmountLabel(capturePayload: unknown) {
 
 function getCustomerRecoveryReason(status: string) {
   if (status === PAYPAL_LEDGER_STATUS.CAPTURED) {
-    return 'Payment was captured, but receipt preparation did not finish automatically.';
+    return 'Your payment was received. Your receipt is taking longer than expected.';
   }
 
   if (status === PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED) {
-    return 'Receipt was prepared, but payment-save or fulfillment handoff did not finish.';
+    return 'Your payment is recorded. Your order needs a check before preparation can continue.';
   }
 
   if (status === PAYPAL_LEDGER_STATUS.PAYMENT_SAVED) {
-    return 'Payment was saved, but fulfillment handoff did not finish.';
+    return 'Your payment is recorded. Your order needs a check before preparation can continue.';
   }
 
   if (
@@ -64,10 +65,10 @@ function getCustomerRecoveryReason(status: string) {
     status === PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED ||
     status === PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED
   ) {
-    return 'Fulfillment needs review before the order can move forward.';
+    return 'Your order needs a check before preparation can continue.';
   }
 
-  return 'Post-payment processing needs review before the order can move forward.';
+  return 'Your order is taking longer than expected. Keep your order reference for support.';
 }
 
 export async function GET(_req: Request, { params }: PageProps) {
@@ -100,36 +101,30 @@ export async function GET(_req: Request, { params }: PageProps) {
         unresolvedAgeMs >= CUSTOMER_RECOVERY_GRACE_MS));
   const effectiveStatus = paymentFailure ? PAYPAL_LEDGER_STATUS.ERROR : row.status;
   const recoveryReason = paymentFailure
-    ? paymentFailure.errorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED'
-      ? 'Your payment was received, but the delivery address needs review before preparation can continue.'
-      : 'Your payment was received, but its amount requires review before fulfillment.'
+    ? !captureCompletion.ok
+      ? 'Your payment details need review before you can continue. Keep your order reference for support.'
+      : paymentFailure.errorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED'
+        ? 'Your payment was received, but the delivery address needs review before we can prepare the order.'
+        : 'Your payment was received, but the amount needs review before we can prepare the order.'
     : getCustomerRecoveryReason(effectiveStatus);
   const receiptLink = receiptObjectKey(row) ? receiptDownloadPath(row.orderToken) : null;
 
-  return NextResponse.json(
-    {
-      orderToken: row.orderToken,
-      status: effectiveStatus,
-      lastEventType: row.lastEventType,
-      receiptLink,
-      receiptFile: receiptLink ? 'Codex-Christi-receipt' : null,
-      djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
-      processingCompletedAt: row.processingCompletedAt,
-      paidAmountLabel: getPaidAmountLabel(row.capturePayload),
-      cartPurchase: getCapturedCartPurchase(row, paymentState),
-      customerRecoveryStatus: isCustomerProtectionVisible ? 'paid_unresolved' : null,
-      recoveryReason: isCustomerProtectionVisible ? recoveryReason : null,
-      updatedAt: row.updatedAt,
-      error: paymentFailure
-        ? { code: paymentFailure.errorCode, message: recoveryReason }
-        : row.lastErrorMessage
-          ? {
-              code: row.lastErrorCode,
-              message:
-                'Your payment or order needs review. Please keep your order reference and contact support.',
-            }
-          : null,
-    },
-    { headers: privateHeaders },
-  );
+  const customerStatus = toCustomerOrderStatus(row, {
+    status: effectiveStatus,
+    receiptLink,
+    receiptFile: receiptLink ? 'Codex-Christi-receipt' : null,
+    paidAmountLabel: getPaidAmountLabel(row.capturePayload),
+    cartPurchase: getCapturedCartPurchase(row, paymentState),
+    customerRecoveryStatus: isCustomerProtectionVisible ? 'paid_unresolved' : null,
+    recoveryReason: isCustomerProtectionVisible ? recoveryReason : null,
+    error: paymentFailure
+      ? { message: recoveryReason }
+      : row.lastErrorMessage
+        ? {
+            message:
+              'Your payment or order needs review. Please keep your order reference and contact support.',
+          }
+        : null,
+  });
+  return NextResponse.json(customerStatus, { headers: privateHeaders });
 }

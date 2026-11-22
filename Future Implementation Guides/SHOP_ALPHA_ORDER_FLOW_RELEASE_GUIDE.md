@@ -758,8 +758,8 @@ and provider calls were not run. P0.2 deployed E2E remains pending.
 ### P0.4 Make final-order acknowledgement real
 
 Status, 2026-11-21: **local fixes and offline checks complete; live acceptance pending**.
-The commit candidate was checked against source `a90536f1` and is not a deployment.
-P0.2 deployed E2E remains pending.
+The P0.4 and state-picker changes are committed in `6e97392c`, based on `a90536f1`.
+This is not a deployment. P0.2 deployed E2E remains pending.
 Orders, payments, provider changes, and migrations remain off-limits during this verification.
 
 The current local changes close these review gaps:
@@ -897,6 +897,127 @@ All confirmation reads:
 The status endpoint must reject requests without authenticated ownership or a valid viewing
 capability. Current guards are present; the full contract above remains subject to
 P0.5 acceptance.
+
+#### Read-only gap check — 2026-11-21
+
+Status: **the initial source trace is complete; its first three fixes are implemented locally**.
+The full P0.5 contract is not complete. The initial audit baseline was `6e97392c` and changed guides
+only. The implementation checkpoint below records the later code changes. P0.2 deployed E2E and
+live P0.4 acceptance remain pending.
+
+Already implemented:
+
+- [Access grants](../src/lib/shop/checkout/checkoutProof.ts) are encrypted, purpose-bound browser
+  cookies with a 30-day expiry. They check the exact order and owner; a status grant cannot pay.
+  The [access guard](../src/lib/shop/checkout/serverAccess.ts) also accepts the signed-in order
+  owner. [Logout](../src/lib/auth/logout-cookies.ts) clears checkout access, proof, and browser
+  cookies; guest access surviving actual logout is not a confirmed gap.
+- [Email recovery codes](../src/lib/shop/checkout/checkoutRecovery/recoveryChallenges.ts) are
+  hashed, single-use, valid for 10 minutes, and protected by a 60-second resend cooldown, three
+  active challenges, five attempts, and serialized updates. A known order reference plus its
+  verified checkout email can recover any order with completed capture evidence, including a
+  resolved order. [Email-only discovery](../src/lib/shop/checkout/checkoutRecovery/findEmailRecoveryCheckouts.ts)
+  returns unresolved orders. Do not describe all recovery as limited to unresolved orders.
+- [Verification](../src/app/api/shop/checkout/recovery/verify/route.ts) issues status access rather
+  than payment permission. For an account-owned order, a different signed-in viewer who proves
+  the checkout email receives access bound to that viewer; this does not transfer ownership.
+  [Guest-order linking](../src/lib/shop/orderHistory/guestLink.ts) is a separate explicit operation
+  requiring a fresh session and scoped code before conditionally claiming an unowned paid order.
+- [Receipt reads](../src/app/api/shop/orders/[orderToken]/receipt/route.ts) recheck access, use
+  private/no-store responses, validate the stored receipt reference, and sign a download lasting
+  60 seconds. They do not claim ownership or grant payment access. The confirmation page's
+  [`view=details`](../src/app/shop/checkout/confirmation/[orderToken]/page.tsx) path suppresses
+  ownership claims and cart/draft cleanup, and hides an earlier account's payload after switching
+  accounts.
+- The [status response](../src/app/api/paypal/tx-ledger/payments/[orderToken]/status/route.ts)
+  already lists its fields explicitly. It does not return a full ledger row, contact details, or
+  street address. Raw provider errors are replaced with fixed customer messages, and the paid
+  amount requires completed capture evidence. A missing response allowlist or exposed full
+  address is not an established bug.
+
+Gaps recorded before the local fixes below:
+
+1. The [preparing-email link](../src/lib/shop/email/templates.ts) is an ordinary protected
+   confirmation URL with `view=details`. It contains no contact details or provider identifier,
+   but it is not the proposed signed viewing credential. It is currently omitted when no receipt
+   is available. Styled templates do not establish the full viewing-link contract or all six
+   P0.8 notification triggers.
+2. Browser grants have expiry but no issued-at field, viewing-token version, or implemented
+   per-order replacement/disable check. The [audited ledger schema](../prisma/shop/paypal/paypalTXLedger.schema.prisma)
+   has no dedicated viewing-token hash/version/revocation record. Its short-lived recovery-code
+   table and email-outbox payload are not an implemented durable viewing-link store. Storage
+   design remains open; this trace does not prove that a migration is necessary. The guide's
+   90-day lifetime remains a recommendation, not a change to the existing 30-day cookies.
+3. At `6e97392c`, the status response included `lastEventType`, `error.code`, and
+   `djangoPaymentSaveCustomId`. The client used the Django value for the completed-order reference
+   and receipt-readiness inference. The local fixes replace those uses before removing the fields.
+   Contact/street fields remain omitted; a masked confirmation-details summary is a separate
+   page-detail choice rather than a repair for a proven address leak.
+4. The confirmation view covered payment, receipt, handoff, manual review, and refund outcomes,
+   but did not display the returned `updatedAt`. That record-update time is now displayed locally.
+   Full production/tracking/shipped/delivered/cancelled evidence remains P0.10 work. Internal
+   completion does not establish shipment or delivery.
+
+Implementation order and remaining scope, without orders or migrations:
+
+1. **Implemented locally:** [customer status mapping](../src/lib/shop/checkout/customerOrderStatus.ts)
+   and its consumers share one public response type. Internal event/error codes and the Django
+   payment-save ID no longer leave the status response. The existing local order reference and
+   explicit `receiptReady`, `paymentSaved`, and `paymentProgressed` flags replace their uses.
+   Progress or uncertain saved evidence does not prove payment. A separate-checkout choice requires
+   explicit `paymentProgressed: false`; missing flags cannot clear the earlier purchase.
+   For older browser clients, an intent with saved activity or uncertain evidence is returned
+   as public `pending`, so removed internal fields cannot make it appear untouched. The stored
+   ledger status and server payment/recovery decisions are unchanged.
+2. **Implemented locally:** [confirmation wording and update time](../src/components/UI/Shop/Checkout/CheckoutConfirmationView.tsx)
+   use saved facts and the local reference. “Last updated” is a fixed UTC record timestamp, omitted
+   without access/data or for invalid dates. Paid delays, manual review, refunds, and confirmed
+   internal processing have distinct wording. No production, shipment, or delivery is inferred.
+3. **Implemented locally:** existing response/receipt tests were extended, with focused rendered
+   view/page checks. They cover internal/nested field exclusion, valid paid evidence, missing
+   progress flags, expired/tampered/wrong-purpose/order receipt access, and an unpaid receipt.
+   The actual details page makes no ownership claim or cart/draft cleanup, and hides old paid
+   data immediately on account switch, including while the next response is pending.
+4. **Pending:** define emailed-link issuance, redemption, expiry, renewal, replacement, and disabling before
+   choosing durable storage. Keep its implementation/sending pending where storage or product
+   decisions are unresolved. Do not repurpose provider-response JSON, review JSON, or email-outbox
+   payloads as access storage merely to avoid a migration. A small follow-up for the email owner
+   can offer “View order” without a receipt using the existing protected link; it does not require
+   sending a live email or changing notification triggers.
+
+The other checkout chat's uncommitted optional `verifyPayPal`/`paypalRecoveryState` lookup and
+payment-resume work were inspected only to separate ownership. They are not P0.5 acceptance
+evidence. Coordinate any later shared status-route changes with that owner. Merchize readiness,
+full notification triggers, and full lifecycle evidence stay with P0.6–P0.10 and their owners.
+
+Initial audit verification: 34 existing proof, recovery-code/policy/summary, and guest-link tests passed with
+fetch, HTTP(S), sockets, TLS, and DNS blocked. They used in-memory or mocked dependencies. This is
+focused offline evidence, not live confirmation, email delivery, viewing-token revocation, or
+full P0.5 acceptance. No real emails, orders, payment/provider actions, schema commands, or
+migrations ran. That initial read-only pass edited no application code or other chats' work.
+
+#### Local customer-status implementation — 2026-11-21
+
+The first three fixes above were prepared against `6e97392c`. The status response is rebuilt from
+approved fields, including nested cart/error data; raw contact details, PayPal/Django identifiers,
+event names, and error codes are excluded. The cart variant keys needed for existing cart cleanup
+remain. Receipt readiness comes from checked download fields rather than
+the presence of a Django ID. Payment-received wording still requires completed capture evidence.
+No viewing-token, access-storage, database, authorization/capture, fulfillment, or notification-trigger
+change is included.
+
+Verification passed in an isolated copy containing only this chat's changes: 389 checkout checks,
+37 canonical-snapshot checks, 12 shared-UI checks, and 4 generated-CSS checks (442 total). Requests,
+sockets, TLS, HTTP(S), and DNS were blocked. The copy used a frozen-lockfile installation with
+setup scripts disabled. TypeScript, scoped ESLint, formatting, and diff checks passed. No real
+emails, orders, provider actions, schema commands, or migrations ran. No demo route or new test
+dependency was added.
+
+The optional PayPal recovery lookup and its state type remain the other chat's work. They were
+preserved in shared working files and excluded from this commit candidate and its acceptance
+claims. Changes to the shared status response, client mapper, and separate-checkout guard were
+prepared separately so those unfinished changes are not committed by this chat. Full P0.5,
+P0.2 deployed E2E, and live P0.4 acceptance remain pending.
 
 ### P0.6 Complete pre-push readiness and address policy
 

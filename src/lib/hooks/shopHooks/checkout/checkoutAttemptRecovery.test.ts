@@ -23,7 +23,13 @@ function setup() {
   });
   return captureCheckoutAttempt()!;
 }
-const unpaid = { orderToken: 'original-order', status: 'intent_created' };
+const unpaid = {
+  orderToken: 'original-order',
+  status: 'intent_created',
+  paymentProgressed: false,
+  paymentSaved: false,
+  receiptReady: false,
+} as const;
 
 test('changed cart cannot replace its bound checkout until an explicit separate-order choice uses unpaid evidence', () => {
   const attempt = setup();
@@ -50,8 +56,10 @@ test('paid, authorized, pending, failed, mismatched, or ambiguous evidence never
   for (const evidence of [
     { paidAmountLabel: '$10' },
     { cartPurchase: { orderId: 'original-order', lines: [] } },
-    { lastEventType: 'CHECKOUT.ORDER.APPROVED' },
-    { error: { code: 'UNKNOWN' } },
+    { paymentProgressed: true },
+    { paymentSaved: true },
+    { receiptReady: true },
+    { error: { message: 'Payment status is unavailable.' } },
     { orderToken: 'another-order' },
     { receiptLink: '/receipt' },
   ])
@@ -79,4 +87,10 @@ test('a cancellation callback or hidden banner cannot make an in-flight authoriz
   response.resolve(Response.json({}, { status: 500 }));
   await assert.rejects(work);
   assert.equal(captureCheckoutAttempt()?.attemptId, attempt.attemptId);
+});
+
+test('missing explicit payment-progress evidence cannot clear the original checkout', () => {
+  const attempt = setup();
+  assert.equal(startSeparateCheckout(attempt, { ...unpaid, paymentProgressed: undefined }), false);
+  assert.equal(captureCheckoutAttempt()?.orderToken, 'original-order');
 });

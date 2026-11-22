@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import test from 'node:test';
 import { NextRequest } from 'next/server';
 import { createRequestStoreForAPI } from 'next/dist/server/async-storage/request-store';
@@ -12,7 +13,11 @@ import { buildAuthSessionCookies } from '@/lib/session/session-cookies';
 import { GET as receipt } from '@/app/api/shop/account/orders/[orderToken]/receipt/route';
 import { GET as checkoutReceipt } from '@/app/api/shop/orders/[orderToken]/receipt/route';
 import { POST as tracking } from '@/app/api/shop/account/orders/[orderToken]/tracking/route';
-import { createCheckoutGrant, checkoutGrantCookieName } from '@/lib/shop/checkout/checkoutProof';
+import {
+  createCheckoutGrant,
+  checkoutGrantCookieName,
+  sealCheckoutValue,
+} from '@/lib/shop/checkout/checkoutProof';
 import { accountOrders } from './server';
 
 function inRequest<T>(cookie: string, run: (req: NextRequest) => Promise<T>) {
@@ -172,5 +177,78 @@ test('real account reader and receipt route authenticate with server cookies and
     403,
     'An old guest grant cannot follow a claimed order',
   );
+  assert.equal(network.mock.callCount(), 0);
+});
+
+test('receipt access rejects invalid grants and unpaid records before signing or changing an order', async (t) => {
+  const previousClient = global.__paypalTxLedger__;
+  const previousSecret = process.env.SESSION_SECRET;
+  process.env.SESSION_SECRET = 'receipt-boundary-test-secret-of-at-least-32-bytes';
+  t.after(() => {
+    global.__paypalTxLedger__ = previousClient;
+    if (previousSecret === undefined) delete process.env.SESSION_SECRET;
+    else process.env.SESSION_SECRET = previousSecret;
+  });
+  const record = {
+    orderToken: 'token-1',
+    userId: null as string | null,
+    djangoOrderIntentUuid: null,
+    receiptLink: 'https://payment-receipts.codexchristi.shop/paypal/fixture.pdf',
+    receiptFile: 'fixture',
+    status: 'completed',
+    capturePayload: {
+      id: 'fixture-capture',
+      status: 'COMPLETED',
+      amount: { value: '35.00', currencyCode: 'USD' },
+    } as Record<string, unknown> | null,
+  };
+  const mutate = t.mock.fn(async () => assert.fail('Receipt reads cannot change an order'));
+  global.__paypalTxLedger__ = {
+    paypalIntent: {
+      findUnique: async () => record,
+      create: mutate,
+      update: mutate,
+      updateMany: mutate,
+      delete: mutate,
+    },
+  } as unknown as PrismaClient;
+  const signer = createRequire(import.meta.url)(
+    '@aws-sdk/s3-request-presigner',
+  ) as typeof import('@aws-sdk/s3-request-presigner');
+  const sign = t.mock.method(signer, 'getSignedUrl', async () =>
+    assert.fail('Invalid or unpaid receipt access cannot sign a download'),
+  );
+  const network = t.mock.method(globalThis, 'fetch', async () =>
+    assert.fail('Receipt boundary checks cannot call a provider'),
+  );
+  const access = createCheckoutGrant(record, 'status');
+  const value = { orderToken: record.orderToken, ownerId: null, viewerId: null, mode: 'status' };
+  const context = { params: Promise.resolve({ orderToken: record.orderToken }) };
+  for (const [name, token] of [
+    ['missing', ''],
+    ['expired', sealCheckoutValue(value, 'access', -1)],
+    ['tampered', `${access}x`],
+    ['wrong purpose', sealCheckoutValue(value, 'email-proof', 60)],
+    ['wrong order', createCheckoutGrant({ ...record, orderToken: 'another-order' }, 'status')],
+  ]) {
+    const cookie = token ? `${checkoutGrantCookieName(record.orderToken)}=${token}` : '';
+    const response = await inRequest(cookie, (request) => checkoutReceipt(request, context));
+    assert.equal(response.status, 403, name);
+    assert.equal(response.headers.get('location'), null, name);
+    assert.equal(response.headers.get('set-cookie'), null, name);
+    assert.equal(response.headers.get('cache-control'), 'private, no-store', name);
+    assert.equal(response.headers.get('referrer-policy'), 'no-referrer', name);
+  }
+  record.status = 'intent_created';
+  record.capturePayload = null;
+  const unpaid = await inRequest(
+    `${checkoutGrantCookieName(record.orderToken)}=${access}`,
+    (request) => checkoutReceipt(request, context),
+  );
+  assert.equal(unpaid.status, 404);
+  assert.equal(unpaid.headers.get('location'), null);
+  assert.equal(unpaid.headers.get('set-cookie'), null);
+  assert.equal(sign.mock.callCount(), 0);
+  assert.equal(mutate.mock.callCount(), 0);
   assert.equal(network.mock.callCount(), 0);
 });
