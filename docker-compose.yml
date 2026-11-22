@@ -11,6 +11,7 @@ services:
     mem_limit: ${APP_MEMORY_LIMIT:-768m}
     memswap_limit: ${APP_MEMORY_SWAP_LIMIT:-1g}
     environment:
+      APP_REVISION: ${DEPLOY_REVISION:?Set the verified frontend release commit}
       MERCHIZE_OFFLINE_CATALOG_DATABASE_URL: file:/app/data/db/shop/merchizeCatalog.db
       NODE_OPTIONS: --max-old-space-size=512
     init: true

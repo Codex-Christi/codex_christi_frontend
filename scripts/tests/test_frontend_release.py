@@ -14,6 +14,7 @@ import unittest
 
 SOURCE = Path(__file__).resolve().parents[2] / 'devScripts' / 'production.sh'
 WORKFLOW = Path(__file__).resolve().parents[2] / '.github/workflows/push-to-main.yml'
+COMPOSE_FILE = Path(__file__).resolve().parents[2] / 'docker-compose.yml'
 OLD = 'sha256:' + '1' * 64
 NEW = 'sha256:' + '2' * 64
 CHECK = 'sha256:' + '3' * 64
@@ -84,6 +85,53 @@ p=pathlib.Path(os.environ['RELEASE_FIXTURE']); s=json.loads(p.read_text())
 with p.with_suffix('.proxy').open('a') as f: f.write(sys.argv[-1]+'\n')
 raise SystemExit(1 if s['mode']=='proxy_failure' and sys.argv[-1]==s['new_revision'] else 0)
 '''
+
+
+class ComposeRevisionTests(unittest.TestCase):
+    def test_release_revision_overrides_stale_runtime_revision_without_changing_settings(self):
+        docker = shutil.which('docker')
+        if docker is None:
+            self.skipTest('Docker Compose CLI is unavailable; no daemon is needed for this check.')
+        with tempfile.TemporaryDirectory(prefix='codex-compose-revision-test-') as temporary:
+            root = Path(temporary)
+            config = root / 'docker-config'
+            config.mkdir()
+            # Docker Desktop keeps its public CLI plugins inside the application.
+            # Use that location without reading the user's Docker configuration.
+            plugins = Path('/Applications/Docker.app/Contents/Resources/cli-plugins')
+            if (plugins / 'docker-compose').is_file():
+                (config / 'config.json').write_text(json.dumps({'cliPluginsExtraDirs': [str(plugins)]}))
+            environment = {'PATH': os.environ.get('PATH', '/usr/bin:/bin'),
+                           'HOME': str(root), 'LANG': 'C', 'DOCKER_CONFIG': str(config),
+                           'DOCKER_HOST': 'unix://' + str(root / 'no-daemon.sock')}
+            version = subprocess.run([docker, 'compose', 'version', '--short'],
+                                     env=environment, capture_output=True, text=True, timeout=20)
+            if version.returncode:
+                self.skipTest('Docker Compose CLI plugin is unavailable; no daemon is needed for this check.')
+            runtime = root / 'runtime.env'
+            original = 'APP_REVISION=' + OLD_REV + '\nPRIVATE_FIXTURE=preserved-value\n'
+            runtime.write_text(original)
+            revision = 'b' * 40
+            release = root / 'release.env'
+            release.write_text('DEPLOY_REVISION=' + revision + '\nDEPLOY_IMAGE=' + NEW
+                               + '\nDATASTORE_CHECK_IMAGE=' + CHECK
+                               + '\nRUNTIME_ENV_FILE=' + str(runtime) + '\n')
+            result = subprocess.run([
+                docker, 'compose', '--project-directory', str(root), '--env-file', str(release),
+                '-f', str(COMPOSE_FILE), '--profile', 'verify', 'config', '--format', 'json'],
+                env=environment, capture_output=True, text=True, timeout=20)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            model = json.loads(result.stdout)
+            app = model['services']['app']
+            self.assertEqual(app['environment']['APP_REVISION'], revision)
+            self.assertEqual(app['environment']['PRIVATE_FIXTURE'], 'preserved-value')
+            self.assertEqual(runtime.read_text(), original)
+            self.assertFalse(app.get('ports'))
+            self.assertEqual(set(app['networks']), {'webserver-network', 'frontend-egress'})
+            self.assertEqual({mount['source'] for mount in app['volumes']},
+                             {'merchize_price_catalog_data', 'next_image_cache'})
+            self.assertEqual(model['networks']['webserver-network']['name'], 'codex-christi-network')
+            self.assertEqual(model['volumes']['merchize_price_catalog_data']['name'], 'codex-christi-next-data')
 
 
 class WorkflowContractTests(unittest.TestCase):
