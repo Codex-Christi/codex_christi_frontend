@@ -7,6 +7,7 @@ import {
   getCheckoutAccountEmail,
   getCheckoutValuesFromStore,
   saveBasicCheckoutInfoToStore,
+  toDjangoOrderIntentPayload,
 } from './basicCheckoutInfoHelpers';
 
 const accountDefault = {
@@ -109,4 +110,46 @@ test('clearing, invalidating, or reverting the email edit removes the pending dr
     assert.equal(useShopCheckoutStore.getState().draftEmail, null);
     assert.equal(getCheckoutValuesFromStore().email, accountDefault.accountEmail);
   }
+});
+
+test('checkout loads old U.S. state names and saves only their postal code', (t) => {
+  const before = useShopCheckoutStore.getState();
+  t.after(() => useShopCheckoutStore.setState(before));
+  before.resetCheckoutToInitial();
+  for (const state of ['California', 'ca', ' CA ']) {
+    useShopCheckoutStore.setState({
+      delivery_address: {
+        ...before.delivery_address,
+        shipping_country: 'USA',
+        shipping_state: state,
+      },
+    });
+    const draft = getCheckoutValuesFromStore('USA');
+    assert.equal(draft.adminArea1, 'CA');
+    saveBasicCheckoutInfoToStore({ ...draft, adminArea1: 'California' }, false);
+    assert.equal(useShopCheckoutStore.getState().delivery_address.shipping_state, 'CA');
+    assert.equal(toDjangoOrderIntentPayload({ ...draft, adminArea1: 'California' }).state, 'CA');
+  }
+});
+
+test('a country override clears the old state while non-U.S. drafts keep free text', (t) => {
+  const before = useShopCheckoutStore.getState();
+  t.after(() => useShopCheckoutStore.setState(before));
+  useShopCheckoutStore.setState({
+    delivery_address: { ...before.delivery_address, shipping_country: 'USA', shipping_state: 'CA' },
+  });
+  assert.equal(getCheckoutValuesFromStore('CAN').adminArea1, '');
+  useShopCheckoutStore.setState({
+    delivery_address: {
+      ...before.delivery_address,
+      shipping_country: 'NGA',
+      shipping_state: 'Lagos',
+    },
+  });
+  const draft = getCheckoutValuesFromStore('NGA');
+  assert.equal(draft.adminArea1, 'Lagos');
+  assert.equal(toDjangoOrderIntentPayload(draft).state, 'Lagos');
+  saveBasicCheckoutInfoToStore(draft, false);
+  assert.equal(useShopCheckoutStore.getState().delivery_address.shipping_state, 'Lagos');
+  assert.equal(getCheckoutValuesFromStore('USA').adminArea1, '');
 });

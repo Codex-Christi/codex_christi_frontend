@@ -89,7 +89,13 @@ test('sign-in resumes the original provider order while merged and later cart ad
   const provider = await resumeOriginalPayPalOrder(reviewed, attempt, {
     request: async (url, init) => {
       requests.push(`${init?.method ?? 'GET'} ${url}`);
-      return Response.json(init?.method === 'POST' ? { ok: true } : { checkout });
+      return Response.json(
+        init?.method !== 'POST'
+          ? { checkout }
+          : String(url).endsWith('/resume')
+            ? { ok: true, reviewKey: checkout.reviewKey, paypalOrderId: checkout.paypalOrderId }
+            : { ok: true },
+      );
     },
   });
   assert.equal(provider, attempt.paypalOrderId);
@@ -98,6 +104,7 @@ test('sign-in resumes the original provider order while merged and later cart ad
   assert.deepEqual(requests, [
     'POST /next-api/shop/checkout/claim',
     `GET /next-api/shop/checkout/${attempt.orderToken}/resume`,
+    `POST /next-api/shop/checkout/${attempt.orderToken}/resume`,
   ]);
   assert.equal(usePayPalIntentStore.getState().checkoutAttempt?.attemptId, attempt.attemptId);
   await controller.command({ type: 'add', line: cartLine('shirt-m', 1) });
@@ -177,4 +184,75 @@ test('a progressed attempt or failed account claim prevents any resume GET', asy
     }),
     /already needs checking/,
   );
+});
+
+test('reopening payment requires the original review to be saved without creating a new order', async () => {
+  const { attempt, checkout } = setup('renewed-review');
+  const requests: string[] = [];
+  const request: typeof fetch = async (url, init) => {
+    requests.push(`${init?.method ?? 'GET'} ${url}`);
+    if (init?.method !== 'POST') return Response.json({ checkout });
+    assert.deepEqual(JSON.parse(String(init.body)), {
+      acknowledged: true,
+      reviewKey: checkout.reviewKey,
+    });
+    return Response.json({
+      ok: true,
+      reviewKey: checkout.reviewKey,
+      paypalOrderId: checkout.paypalOrderId,
+    });
+  };
+  assert.equal(
+    await resumeOriginalPayPalOrder(checkout, attempt, { request }),
+    checkout.paypalOrderId,
+  );
+  assert.deepEqual(requests, [
+    `GET /next-api/shop/checkout/${attempt.orderToken}/resume`,
+    `POST /next-api/shop/checkout/${attempt.orderToken}/resume`,
+  ]);
+  for (const result of [
+    { ok: false },
+    { ok: true, reviewKey: 'changed', paypalOrderId: checkout.paypalOrderId },
+    { ok: true, reviewKey: checkout.reviewKey, paypalOrderId: 'different-payment' },
+  ])
+    await assert.rejects(
+      resumeOriginalPayPalOrder(checkout, attempt, {
+        request: async (_url, init) =>
+          Response.json(init?.method === 'POST' ? result : { checkout }),
+      }),
+      /changed/,
+    );
+  await assert.rejects(
+    resumeOriginalPayPalOrder(checkout, attempt, {
+      request: async (_url, init) =>
+        init?.method === 'POST'
+          ? Response.json({ ok: false }, { status: 409 })
+          : Response.json({ checkout }),
+    }),
+    /couldn’t save your review/,
+  );
+  assert.equal(captureCheckoutAttempt()?.paypalOrderId, checkout.paypalOrderId);
+});
+
+test('an account change while saving the original review cannot reopen payment', async () => {
+  const { attempt, checkout } = setup('review-account-change');
+  const gate = deferred<Response>();
+  const saving = deferred<void>();
+  const work = resumeOriginalPayPalOrder(checkout, attempt, {
+    request: async (_url, init) => {
+      if (init?.method !== 'POST') return Response.json({ checkout });
+      saving.resolve();
+      return gate.promise;
+    },
+  });
+  await saving.promise;
+  useAuthStore.setState({ isAuthenticated: true, accountOwnerId: 'another-account' });
+  gate.resolve(
+    Response.json({
+      ok: true,
+      reviewKey: checkout.reviewKey,
+      paypalOrderId: checkout.paypalOrderId,
+    }),
+  );
+  await assert.rejects(work, /changed/);
 });

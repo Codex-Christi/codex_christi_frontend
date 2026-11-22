@@ -36,6 +36,7 @@ const PAYMENT_RECONCILIATION_ERROR_CODES = new Set<string>([
   'CANONICAL_ORDER_SNAPSHOT_INVALID',
   'PAYPAL_AUTHORIZATION_AMOUNT_MISMATCH',
   'PAYPAL_CAPTURE_AMOUNT_MISMATCH',
+  'PAYPAL_REVIEW_ADDRESS_CHANGED',
   'PAYPAL_CAPTURE_RECONCILED_AUTHORIZE_PAYLOAD_MISSING',
   'PAYPAL_AUTHORIZATION_CAPTURED_WITHOUT_CAPTURE_PAYLOAD',
   'PAYPAL_AUTHORIZATION_DENIED',
@@ -57,6 +58,7 @@ export const PAYMENT_RECONCILIATION_ROW_SELECT = {
   canonicalOrderSnapshot: true,
   canonicalOrderSnapshotVersion: true,
   canonicalOrderSnapshotHash: true,
+  shippingSnapshot: true,
   authorizePayload: true,
   capturePayload: true,
   status: true,
@@ -91,7 +93,11 @@ function getCaptureAmountLabel(row: PaymentLedgerRow) {
   const amount = asRecord(getPath(row.authorizePayload, ['purchaseUnits', 0, 'amount']));
   const value = asString(amount?.value);
   const currency = asString(amount?.currencyCode) ?? asString(amount?.currency_code);
-  return value && currency ? `${value} ${currency}` : row.initialCurrency ? `- ${row.initialCurrency}` : '-';
+  return value && currency
+    ? `${value} ${currency}`
+    : row.initialCurrency
+      ? `- ${row.initialCurrency}`
+      : '-';
 }
 
 function getLocalReason(row: PaymentLedgerRow) {
@@ -101,13 +107,18 @@ function getLocalReason(row: PaymentLedgerRow) {
     return 'PayPal authorization exists, but the ledger does not contain a verified completed capture.';
   }
   if (row.lastErrorCode && PAYMENT_RECONCILIATION_ERROR_CODES.has(row.lastErrorCode)) {
-    return row.lastErrorMessage ?? `Payment-stage error ${row.lastErrorCode} requires reconciliation.`;
+    return (
+      row.lastErrorMessage ?? `Payment-stage error ${row.lastErrorCode} requires reconciliation.`
+    );
   }
   return 'Ledger payment state is stale and needs PayPal verification.';
 }
 
 function getRecommendedAction(row: PaymentLedgerRow) {
   const completion = getPayPalCaptureCompletion(row.capturePayload);
+  if (row.lastErrorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED') {
+    return 'Do not capture or fulfill. Review the delivery address saved at checkout and returned by PayPal.';
+  }
   if (
     row.lastErrorCode === 'CANONICAL_ORDER_SNAPSHOT_INVALID' ||
     row.lastErrorCode === 'PAYPAL_AUTHORIZATION_AMOUNT_MISMATCH' ||
@@ -131,6 +142,7 @@ function getRisk(row: PaymentLedgerRow): PayPalPaymentReconciliationRow['risk'] 
     row.lastErrorCode === 'CANONICAL_ORDER_SNAPSHOT_INVALID' ||
     row.lastErrorCode === 'PAYPAL_AUTHORIZATION_AMOUNT_MISMATCH' ||
     row.lastErrorCode === 'PAYPAL_CAPTURE_AMOUNT_MISMATCH' ||
+    row.lastErrorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED' ||
     (Date.now() - row.updatedAt.getTime()) / 3_600_000 >= 24
   ) {
     return 'critical';
@@ -141,8 +153,8 @@ function getRisk(row: PaymentLedgerRow): PayPalPaymentReconciliationRow['risk'] 
 function hasPaymentEvidence(row: PaymentLedgerRow) {
   return Boolean(
     row.paypalAuthorizationId ||
-      row.capturePayload ||
-      (row.lastErrorCode && PAYMENT_RECONCILIATION_ERROR_CODES.has(row.lastErrorCode)),
+    row.capturePayload ||
+    (row.lastErrorCode && PAYMENT_RECONCILIATION_ERROR_CODES.has(row.lastErrorCode)),
   );
 }
 
@@ -200,7 +212,8 @@ export async function findPayPalPaymentReconciliationRows(args?: {
     args?.batchSize ?? getPaymentReconciliationScannerBatchSize(),
   );
   const cutoff = new Date(
-    now.getTime() - (args?.minAgeMinutes ?? getPaymentReconciliationScannerMinAgeMinutes()) * 60_000,
+    now.getTime() -
+      (args?.minAgeMinutes ?? getPaymentReconciliationScannerMinAgeMinutes()) * 60_000,
   );
   const orderTokens = args?.orderTokens?.map((token) => token.trim()).filter(Boolean);
   const rows = await paypalTxLedger.paypalIntent.findMany({

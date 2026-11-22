@@ -2,6 +2,7 @@ import { useShopCheckoutStore } from '@/stores/shop_stores/checkoutStore';
 import type { PaidCheckoutRecoverySummary } from '@/lib/shop/checkout/checkoutRecovery/types';
 import type { DjangoOrderIntentPayload } from '@/lib/hooks/shopHooks/checkout/djangoOrderIntentMutationHooks';
 import type { BasicCheckoutInfoFormSchema } from './BasicCheckoutInfo';
+import { normalizeShippingState, stateAfterCountryChange } from '@/lib/shop/address/usStates';
 
 export type PaidCheckoutRecoveryStartResponse = {
   ok: boolean;
@@ -28,15 +29,20 @@ export function getCheckoutValuesFromStore(
 ): BasicCheckoutInfoFormSchema {
   const { delivery_address, draftEmail, email, first_name, last_name } =
     useShopCheckoutStore.getState();
+  const country = selectedCountryISO3 ?? delivery_address?.shipping_country ?? '';
 
   return {
-    country: selectedCountryISO3 ?? delivery_address?.shipping_country ?? '',
+    country,
     firstname: first_name ?? '',
     lastname: last_name ?? '',
     email: draftEmail ?? email ?? '',
     addressLine1: delivery_address?.shipping_address_line_1 ?? '',
     addressLine2: delivery_address?.shipping_address_line_2 ?? '',
-    adminArea1: delivery_address?.shipping_state ?? '',
+    adminArea1: stateAfterCountryChange(
+      delivery_address?.shipping_country,
+      country,
+      delivery_address?.shipping_state,
+    ),
     adminArea2: delivery_address?.shipping_city ?? '',
     postalCode: delivery_address?.zip_code ?? '',
   };
@@ -75,7 +81,7 @@ export function saveBasicCheckoutInfoToStore(
       shipping_address_line_1: data.addressLine1,
       shipping_address_line_2: data.addressLine2 ?? '',
       shipping_city: data.adminArea2,
-      shipping_state: data.adminArea1,
+      shipping_state: normalizeShippingState(data.country, data.adminArea1),
       zip_code: data.postalCode,
     },
   }));
@@ -91,7 +97,7 @@ export function toDjangoOrderIntentPayload(
     address: data.addressLine1,
     address_2: data.addressLine2 ?? '',
     city: data.adminArea2,
-    state: data.adminArea1,
+    state: normalizeShippingState(data.country, data.adminArea1),
     zip_code: data.postalCode,
     country: data.country,
   };

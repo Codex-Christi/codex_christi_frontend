@@ -3,7 +3,11 @@ import {
   checkoutInputFingerprint,
   readReviewedCheckoutQuote,
   requireMatchingReview,
+  readReviewedCheckoutItemsHash,
+  requireMatchingReviewItems,
+  requireSavedCheckoutReview,
 } from '@/lib/shop/checkout/checkoutReview';
+import { CHECKOUT_REVIEW_VERSION } from '@/lib/shop/checkout/checkoutReviewLines';
 import { cookies } from 'next/headers';
 import {
   checkoutAttemptToken,
@@ -35,7 +39,10 @@ import { getServerSessionState } from '@/lib/session/server-session';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 import { getCheckoutSurfaceProvenance } from '@/lib/paypal/txLedger/checkoutSurfaceProvenance';
 import { CanonicalOrderResolutionError } from '@/lib/paypal/orderSnapshot/resolver';
-import type { CanonicalOrderResolutionInput } from '@/lib/paypal/orderSnapshot/types';
+import type {
+  CanonicalOrderResolutionInput,
+  CanonicalOrderSnapshot,
+} from '@/lib/paypal/orderSnapshot/types';
 import { resolveCanonicalOrderSnapshotFromMerchize } from '@/lib/paypal/orderSnapshot/merchizeResolver';
 import { getCountrySupport } from '@/lib/datasetSearchers/shippingSupportMerchize';
 import { normalizeCountryToIso3 } from '@/lib/utils/shop/checkout/normalizeCountryToIso3';
@@ -190,6 +197,7 @@ export async function POST(req: Request) {
     const originalProof = proof;
     proof = bindCheckoutEmailProofOwner(proof, authenticatedUserId);
     const quote = readReviewedCheckoutQuote(review);
+    const itemsHash = readReviewedCheckoutItemsHash(review);
     const requestFingerprint = checkoutInputFingerprint({
       selections,
       email,
@@ -199,6 +207,7 @@ export async function POST(req: Request) {
     });
     orderToken = checkoutAttemptToken(attemptId, proof);
     let existing = await paypalTxLedger.paypalIntent.findUnique({ where: { orderToken } });
+    let existingSnapshot: CanonicalOrderSnapshot | null = null;
     const respond = (paypalOrderId: string) => {
       const response = grantCheckoutAccess(
         paypalRouteSuccess({ requestId, data: { orderToken: orderToken!, paypalOrderId } }),
@@ -223,6 +232,31 @@ export async function POST(req: Request) {
           409,
           'CHECKOUT_ATTEMPT_CHANGED',
         );
+      try {
+        existingSnapshot = parseCanonicalOrderSnapshotFromLedger(existing).snapshot;
+      } catch {
+        throw new CheckoutRequestError(
+          'This saved purchase could not be confirmed. Check its payment status before continuing.',
+          409,
+          'CHECKOUT_REVIEW_CHANGED',
+        );
+      }
+      requireSavedCheckoutReview(existingSnapshot, existing.djangoOrderIntentVerifyPayload);
+      const savedReview = asRecord(asRecord(existing.djangoOrderIntentVerifyPayload)?.review);
+      if (existingSnapshot) {
+        requireMatchingReview(existingSnapshot, quote);
+        requireMatchingReviewItems(
+          existingSnapshot,
+          itemsHash,
+          savedReview?.version !== CHECKOUT_REVIEW_VERSION,
+        );
+      } else if (itemsHash || !existing.paypalOrderId) {
+        throw new CheckoutRequestError(
+          'This saved purchase needs review. Reopen its order status before continuing.',
+          409,
+          'CHECKOUT_REVIEW_CHANGED',
+        );
+      }
       if (authenticatedUserId && (await cookies()).has(checkoutGrantCookieName(orderToken)))
         await requireCheckoutAccess(existing, true, req);
       if (existing.paypalOrderId) return respond(existing.paypalOrderId);
@@ -262,7 +296,12 @@ export async function POST(req: Request) {
           'CHECKOUT_ATTEMPT_PENDING',
         );
       creationVersion = claimVersion;
-    }
+    } else if (!itemsHash)
+      throw new CheckoutRequestError(
+        'Review and confirm your order before paying.',
+        409,
+        'CHECKOUT_REVIEW_REQUIRED',
+      );
 
     const countryIso3 = normalizeCountryToIso3(delivery_address.shipping_country);
     if (!countryIso3) {
@@ -285,7 +324,7 @@ export async function POST(req: Request) {
     let canonicalOrderSnapshot;
     try {
       canonicalOrderSnapshot = existing
-        ? parseCanonicalOrderSnapshotFromLedger(existing).snapshot
+        ? existingSnapshot
         : await resolveCanonicalOrderSnapshotFromMerchize({
             selections: selections as CanonicalOrderResolutionInput['selections'],
             destination: {
@@ -318,6 +357,7 @@ export async function POST(req: Request) {
     if (!canonicalOrderSnapshot)
       throw new CheckoutRequestError('This checkout requires review before payment.', 409);
     requireMatchingReview(canonicalOrderSnapshot, quote);
+    requireMatchingReviewItems(canonicalOrderSnapshot, itemsHash, Boolean(existing));
     if (!existing)
       try {
         existing = await paypalTxLedger.paypalIntent.create({
@@ -335,10 +375,12 @@ export async function POST(req: Request) {
               intentUuid: proof.intentUuid,
               email: proof.email,
               review: {
-                version: 'checkout-review-v1',
+                version: CHECKOUT_REVIEW_VERSION,
                 acknowledgedAt: new Date().toISOString(),
                 quote,
                 requestFingerprint,
+                itemsHash,
+                canonicalSnapshotHash: canonicalOrderSnapshot.hash,
               },
             }),
             countryIso2: countrySupport.country.country_iso2,

@@ -46,3 +46,18 @@ test('unknown and malformed failures keep details and display a retry message', 
     assert.doesNotMatch(failure.message, /SECRET/);
   }
 });
+
+test('a PayPal address difference clears review without starting another quote or payment', () => {
+  const { events, failure } = handle({
+    error: { code: 'PAYPAL_REVIEW_ADDRESS_CHANGED', message: 'SECRET_ADDRESS' },
+  });
+  assert.deepEqual(events, ['message', 'clear-acknowledgment']);
+  assert.match(failure.message, /different delivery address/);
+  assert.doesNotMatch(failure.message, /SECRET/);
+});
+
+test('missing saved review asks for fresh confirmation without retrying payment', () => {
+  const { events, failure } = handle({ error: { code: 'CHECKOUT_REVIEW_REQUIRED' } });
+  assert.deepEqual(events, ['message', 'clear-acknowledgment']);
+  assert.match(failure.message, /Review and confirm this purchase/);
+});

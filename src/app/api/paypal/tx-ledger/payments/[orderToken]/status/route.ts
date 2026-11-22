@@ -100,7 +100,9 @@ export async function GET(_req: Request, { params }: PageProps) {
         unresolvedAgeMs >= CUSTOMER_RECOVERY_GRACE_MS));
   const effectiveStatus = paymentFailure ? PAYPAL_LEDGER_STATUS.ERROR : row.status;
   const recoveryReason = paymentFailure
-    ? 'Your payment was received, but its amount requires review before fulfillment.'
+    ? paymentFailure.errorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED'
+      ? 'Your payment was received, but the delivery address needs review before preparation can continue.'
+      : 'Your payment was received, but its amount requires review before fulfillment.'
     : getCustomerRecoveryReason(effectiveStatus);
   const receiptLink = receiptObjectKey(row) ? receiptDownloadPath(row.orderToken) : null;
 

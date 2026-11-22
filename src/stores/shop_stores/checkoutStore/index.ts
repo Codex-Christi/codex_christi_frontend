@@ -1,6 +1,7 @@
 import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
 import type { IUserShopProfile } from '@/lib/types/user-shop-interface';
 import { normalizeCountryToIso3 } from '@/lib/utils/shop/checkout/normalizeCountryToIso3';
+import { normalizeShippingState, stateAfterCountryChange } from '@/lib/shop/address/usStates';
 import { emailSchema } from '@/lib/formSchemas/auth-fields';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { create } from 'zustand';
@@ -133,7 +134,15 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
       setDeliveryAddress: (delivery_address) => set({ delivery_address }),
       setShippingCountryISO3: (iso3) =>
         set((state) => ({
-          delivery_address: { ...state.delivery_address, shipping_country: iso3 },
+          delivery_address: {
+            ...state.delivery_address,
+            shipping_country: iso3,
+            shipping_state: stateAfterCountryChange(
+              state.delivery_address.shipping_country,
+              iso3,
+              state.delivery_address.shipping_state,
+            ),
+          },
         })),
       hydrateFromShopProfile: (profile) => {
         const data = profile.data;
@@ -145,7 +154,15 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
               state.delivery_address.shipping_address_line_1 || data.shipping_address || '',
             shipping_address_line_2: state.delivery_address.shipping_address_line_2 ?? '',
             shipping_city: state.delivery_address.shipping_city || data.shipping_city || '',
-            shipping_state: state.delivery_address.shipping_state || data.shipping_state || '',
+            shipping_state: normalizeShippingState(
+              state.delivery_address.shipping_country ?? data.shipping_country,
+              state.delivery_address.shipping_state ||
+                stateAfterCountryChange(
+                  data.shipping_country,
+                  state.delivery_address.shipping_country ?? data.shipping_country,
+                  data.shipping_state,
+                ),
+            ),
             // Preserve the checkout/currency-selected country when it already exists.
             shipping_country:
               state.delivery_address.shipping_country ??

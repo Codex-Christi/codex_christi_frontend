@@ -18,6 +18,7 @@ export const historyOrderSelect = {
   canonicalOrderSnapshot: true,
   canonicalOrderSnapshotVersion: true,
   canonicalOrderSnapshotHash: true,
+  shippingSnapshot: true,
   authorizePayload: true,
   capturePayload: true,
 } satisfies Prisma.PaypalIntentSelect;

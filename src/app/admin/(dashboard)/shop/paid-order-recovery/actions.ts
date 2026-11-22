@@ -299,6 +299,7 @@ function getPaidOrderPaymentGate(row: {
   canonicalOrderSnapshot: unknown | null;
   canonicalOrderSnapshotVersion: string | null;
   canonicalOrderSnapshotHash: string | null;
+  shippingSnapshot: unknown;
 }) {
   const captureCompletion = getPayPalCaptureCompletion(row.capturePayload);
   if (!captureCompletion.ok) {
@@ -373,6 +374,7 @@ async function regeneratePaidOrderReceiptFromLedger(row: {
   canonicalOrderSnapshot: unknown | null;
   canonicalOrderSnapshotVersion: string | null;
   canonicalOrderSnapshotHash: string | null;
+  shippingSnapshot: unknown;
   customerName: string;
   customerEmail: string;
   djangoOrderIntentOrderId: string | null;
@@ -838,6 +840,7 @@ export async function retryAdminPaidOrderRecoveryAction({
         canonicalOrderSnapshot: true,
         canonicalOrderSnapshotVersion: true,
         canonicalOrderSnapshotHash: true,
+        shippingSnapshot: true,
         processingCompletedAt: true,
         postProcessingLockExpiresAt: true,
         merchizeFulfillmentResponsePayload: true,
@@ -999,6 +1002,7 @@ export async function retryAdminMerchizeFulfillmentAction({
         canonicalOrderSnapshot: true,
         canonicalOrderSnapshotVersion: true,
         canonicalOrderSnapshotHash: true,
+        shippingSnapshot: true,
         djangoPaymentSaveCustomId: true,
         merchizeFulfillmentResponsePayload: true,
         postProcessingLockExpiresAt: true,
@@ -1205,6 +1209,7 @@ export async function releaseMerchizeFulfillmentToProductionAction({
         canonicalOrderSnapshot: true,
         canonicalOrderSnapshotVersion: true,
         canonicalOrderSnapshotHash: true,
+        shippingSnapshot: true,
         lastErrorCode: true,
         processingCompletedAt: true,
         postProcessingLockExpiresAt: true,
@@ -1781,6 +1786,7 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
         canonicalOrderSnapshot: true,
         canonicalOrderSnapshotVersion: true,
         canonicalOrderSnapshotHash: true,
+        shippingSnapshot: true,
         customerName: true,
         customerEmail: true,
         djangoOrderIntentUuid: true,
@@ -2029,6 +2035,7 @@ export async function regeneratePaidOrderReceiptAction({
         canonicalOrderSnapshot: true,
         canonicalOrderSnapshotVersion: true,
         canonicalOrderSnapshotHash: true,
+        shippingSnapshot: true,
         customerName: true,
         customerEmail: true,
         djangoOrderIntentOrderId: true,

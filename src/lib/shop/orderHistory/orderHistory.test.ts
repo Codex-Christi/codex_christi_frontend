@@ -60,6 +60,7 @@ function row(index = 1, owner = 'owner-a'): HistoryLedgerRow {
     canonicalOrderSnapshot: snapshot as unknown as Prisma.JsonValue,
     canonicalOrderSnapshotHash: snapshot.hash,
     canonicalOrderSnapshotVersion: snapshot.version,
+    shippingSnapshot: null,
     authorizePayload: { amount: { value: '35.00', currencyCode: 'USD' } },
     capturePayload: {
       id: 'capture-1',

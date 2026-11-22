@@ -5,7 +5,7 @@ import successToast from '@/lib/success-toast';
 import { toast } from 'sonner';
 import { ArrowLeftIcon } from 'lucide-react';
 import { type SetStateAction, useEffect, useRef } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, useWatch, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/UI/primitives/button';
 import { cn } from '@/lib/utils';
@@ -25,9 +25,10 @@ import { updateMyShippingAddress } from '@/actions/account/profile';
 import { normalizeCountryToIso2 } from '@/lib/utils/shop/checkout/normalizeCountryToIso3';
 import { getAuthGeneration } from '@/lib/auth/session-generation';
 import { useAccountAccess } from '@/components/UI/Auth/AccountAccessContext';
+import ShippingStateField from '@/components/UI/Shop/Address/ShippingStateField';
+import { normalizeShippingState, stateAfterCountryChange } from '@/lib/shop/address/usStates';
 
 const ADDRESS_FIELDS = [
-  { name: 'shipping_state', label: 'State', placeholder: 'Enter state' },
   { name: 'shipping_city', label: 'City', placeholder: 'Enter city' },
   { name: 'shipping_address', label: 'Street address', placeholder: 'Enter street address' },
 ] as const;
@@ -51,6 +52,8 @@ const ShippingAddressModal = ({
     control,
     reset,
     trigger,
+    getValues,
+    setValue,
     formState: { errors, isSubmitting, isValid, isDirty },
   } = useForm<ShippingAddressFormData>({
     resolver: zodResolver(shippingAddressSchema),
@@ -63,6 +66,7 @@ const ShippingAddressModal = ({
       shipping_country: '',
     },
   });
+  const selectedCountry = useWatch({ control, name: 'shipping_country' });
 
   // Rechecking the account must not replace an open, unsaved draft.
   useEffect(() => {
@@ -78,11 +82,12 @@ const ShippingAddressModal = ({
     }
     if (userShopProfile?.data) {
       initialized.current = true;
+      const country = normalizeCountryToIso2(userShopProfile.data.shipping_country) ?? '';
       reset({
-        shipping_state: userShopProfile.data.shipping_state || '',
+        shipping_state: normalizeShippingState(country, userShopProfile.data.shipping_state || ''),
         shipping_city: userShopProfile.data.shipping_city || '',
         shipping_address: userShopProfile.data.shipping_address || '',
-        shipping_country: normalizeCountryToIso2(userShopProfile.data.shipping_country) ?? '',
+        shipping_country: country,
       });
 
       void trigger();
@@ -96,7 +101,10 @@ const ShippingAddressModal = ({
     });
 
     try {
-      const result = await updateMyShippingAddress(data);
+      const result = await updateMyShippingAddress({
+        ...data,
+        shipping_state: normalizeShippingState(data.shipping_country, data.shipping_state),
+      });
       if (generation !== getAuthGeneration()) return;
       if (!result.success) throw new Error(result.error);
 
@@ -166,7 +174,19 @@ const ShippingAddressModal = ({
                     render={({ field: { onChange, value } }) => (
                       <EditCountry
                         value={value ?? null}
-                        onChange={onChange}
+                        onChange={(country: string) => {
+                          const state = stateAfterCountryChange(
+                            value,
+                            country,
+                            getValues('shipping_state'),
+                          );
+                          setValue('shipping_state', state, {
+                            shouldDirty: true,
+                            shouldValidate: false,
+                          });
+                          onChange(country);
+                          void trigger('shipping_state');
+                        }}
                         showLabel={false}
                         className='rounded-xl'
                       />
@@ -175,6 +195,32 @@ const ShippingAddressModal = ({
 
                   {errors?.shipping_country && (
                     <span className='text-red-500 text-xs'>{errors?.shipping_country.message}</span>
+                  )}
+                </label>
+
+                <label className='grid gap-2' htmlFor='shipping_state'>
+                  <span className='text-[#F3F3F399] text-sm'>State / province</span>
+                  <Controller
+                    name='shipping_state'
+                    control={control}
+                    render={({ field }) => (
+                      <ShippingStateField
+                        {...field}
+                        country={selectedCountry}
+                        id='shipping_state'
+                        className='input rounded-xl'
+                        placeholder='Enter state or province'
+                        aria-invalid={Boolean(errors.shipping_state)}
+                        aria-describedby={
+                          errors.shipping_state ? 'shipping_state-error' : undefined
+                        }
+                      />
+                    )}
+                  />
+                  {errors.shipping_state && (
+                    <span id='shipping_state-error' className='text-red-500 text-xs'>
+                      {errors.shipping_state.message}
+                    </span>
                   )}
                 </label>
 

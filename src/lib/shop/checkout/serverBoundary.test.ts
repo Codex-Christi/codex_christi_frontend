@@ -25,6 +25,8 @@ import {
   type CheckoutEmailProof,
 } from './checkoutProof';
 import { checkoutInputFingerprint } from './checkoutReview';
+import { finalizeCanonicalOrderSnapshot } from '@/lib/paypal/orderSnapshot/canonicalize';
+import { canonicalReviewItemsHash, CHECKOUT_REVIEW_VERSION } from './checkoutReviewLines';
 import { buildAuthSessionCookies } from '@/lib/session/session-cookies';
 
 const address = {
@@ -87,6 +89,89 @@ function setup(t: TestContext) {
   return { proof, proofCookies };
 }
 
+function savedReviewedCheckout(proof: CheckoutEmailProof) {
+  const snapshot = finalizeCanonicalOrderSnapshot({
+    version: 'shop-alpha-order-v1',
+    hashAlgorithm: 'sha256',
+    createdAt: '2026-11-21T00:00:00.000Z',
+    destination: { countryIso3: 'NGA', region: 'Lagos' },
+    currency: 'USD',
+    lines: [
+      {
+        lineId: 'p:v',
+        productId: 'p',
+        variantId: 'v',
+        supplierProductId: 'supplier-p',
+        supplierVariantId: 'supplier-v',
+        sku: 'SKU',
+        sellerSku: null,
+        title: 'Verified shirt',
+        selectedOptions: [{ name: 'Size', value: 'M' }],
+        imageUrl: '/media/shirt.jpg',
+        quantity: 2,
+        unitAmount: { currency: 'USD', value: '10.00' },
+        lineAmount: { currency: 'USD', value: '20.00' },
+        shippingAllocation: { currency: 'USD', value: '5.00' },
+      },
+    ],
+    subtotal: { currency: 'USD', value: '20.00' },
+    shipping: { currency: 'USD', value: '5.00' },
+    total: { currency: 'USD', value: '25.00' },
+  });
+  const requestFingerprint = checkoutInputFingerprint({
+    selections: body.selections,
+    email: body.customer.email,
+    name: body.customer.name,
+    address,
+    quote,
+  });
+  return {
+    orderToken: checkoutAttemptToken(body.attemptId, proof),
+    userId: null,
+    customerEmail: body.customer.email,
+    paypalOrderId: 'PAYPAL-EXISTING',
+    canonicalOrderSnapshot: snapshot,
+    canonicalOrderSnapshotVersion: snapshot.version,
+    canonicalOrderSnapshotHash: snapshot.hash,
+    djangoOrderIntentPayload: { requestFingerprint },
+    djangoOrderIntentVerifyPayload: {
+      verified: true,
+      review: {
+        version: CHECKOUT_REVIEW_VERSION,
+        acknowledgedAt: '2026-11-21T00:00:00.000Z',
+        requestFingerprint,
+        quote,
+        itemsHash: canonicalReviewItemsHash(snapshot),
+        canonicalSnapshotHash: snapshot.hash,
+      },
+    },
+  };
+}
+
+function forbidCheckoutEffects(t: TestContext, row: unknown) {
+  let reads = 0;
+  let writes = 0;
+  const noWrite = async () => {
+    writes += 1;
+    throw new Error('No ledger write allowed');
+  };
+  global.__paypalTxLedger__ = {
+    paypalIntent: {
+      findUnique: async () => {
+        reads += 1;
+        return row;
+      },
+      create: noWrite,
+      update: noWrite,
+      updateMany: noWrite,
+    },
+  } as unknown as PrismaClient;
+  const network = t.mock.method(globalThis, 'fetch', async () => {
+    throw new Error('No provider request allowed');
+  });
+  return { reads: () => reads, writes: () => writes, network };
+}
+
 function request(input: unknown, cookie = '', path = '/next-api/paypal/tx-ledger/intent') {
   return new NextRequest(`http://localhost:3000${path}`, {
     method: 'POST',
@@ -141,6 +226,112 @@ test('browser verification claims never authorize intent creation', async (t) =>
   assert.equal(fetch.mock.callCount(), 0);
 });
 
+test('missing acknowledgement and malformed item review stop before ledger or provider work', async (t) => {
+  const { proofCookies } = setup(t);
+  const effects = forbidCheckoutEffects(t, null);
+  for (const review of [
+    undefined,
+    { acknowledged: false, quote },
+    { acknowledged: true, quote, itemsHash: 'invalid' },
+  ]) {
+    const req = request({ ...body, review }, proofCookies);
+    const response = await inRequest(req, () => intent(req));
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).code, 'CHECKOUT_REVIEW_REQUIRED');
+  }
+  assert.equal(effects.reads(), 0);
+  assert.equal(effects.writes(), 0);
+  assert.equal(effects.network.mock.callCount(), 0);
+});
+
+test('a new checkout without the trusted item review cannot create a ledger or PayPal order', async (t) => {
+  const { proofCookies } = setup(t);
+  const effects = forbidCheckoutEffects(t, null);
+  const req = request(body, proofCookies);
+  const response = await inRequest(req, () => intent(req));
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).code, 'CHECKOUT_REVIEW_REQUIRED');
+  assert.equal(effects.reads(), 1);
+  assert.equal(effects.writes(), 0);
+  assert.equal(effects.network.mock.callCount(), 0);
+});
+
+test('a same-price item mismatch blocks both provider-order reuse and unfinished retry writes', async (t) => {
+  const { proof, proofCookies } = setup(t);
+  for (const paypalOrderId of ['PAYPAL-EXISTING', null]) {
+    const row = {
+      ...savedReviewedCheckout(proof),
+      paypalOrderId,
+      status: 'error',
+      updatedAt: new Date(0),
+    };
+    const effects = forbidCheckoutEffects(t, row);
+    const req = request(
+      { ...body, review: { ...body.review, itemsHash: '0'.repeat(64) } },
+      proofCookies,
+    );
+    const response = await inRequest(req, () => intent(req));
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).code, 'CHECKOUT_REVIEW_CHANGED');
+    assert.equal(effects.writes(), 0);
+    assert.equal(effects.network.mock.callCount(), 0);
+  }
+});
+
+test('v2 retries require the saved item review and reuse the exact existing order without side effects', async (t) => {
+  const { proof, proofCookies } = setup(t);
+  const row = savedReviewedCheckout(proof);
+  const effects = forbidCheckoutEffects(t, row);
+  const missing = request(body, proofCookies);
+  const blocked = await inRequest(missing, () => intent(missing));
+  assert.equal(blocked.status, 409);
+  assert.equal((await blocked.json()).code, 'CHECKOUT_REVIEW_REQUIRED');
+  const req = request(
+    {
+      ...body,
+      review: { ...body.review, itemsHash: row.djangoOrderIntentVerifyPayload.review.itemsHash },
+    },
+    proofCookies,
+  );
+  const response = await inRequest(req, () => intent(req));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.paypalOrderId, row.paypalOrderId);
+  assert.equal(effects.writes(), 0);
+  assert.equal(effects.network.mock.callCount(), 0);
+});
+
+test('canonical purchases without saved acknowledgement cannot bypass review on an intent retry', async (t) => {
+  const { proof, proofCookies } = setup(t);
+  const row = { ...savedReviewedCheckout(proof), djangoOrderIntentVerifyPayload: null };
+  const effects = forbidCheckoutEffects(t, row);
+  const req = request(body, proofCookies);
+  const response = await inRequest(req, () => intent(req));
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).code, 'CHECKOUT_REVIEW_REQUIRED');
+  assert.equal(effects.writes(), 0);
+  assert.equal(effects.network.mock.callCount(), 0);
+});
+
+test('a complete v1 acknowledgement preserves its bound purchase without a new item hash', async (t) => {
+  const { proof, proofCookies } = setup(t);
+  const row = savedReviewedCheckout(proof);
+  const { itemsHash, canonicalSnapshotHash, ...review } = row.djangoOrderIntentVerifyPayload.review;
+  assert.ok(itemsHash && canonicalSnapshotHash);
+  const effects = forbidCheckoutEffects(t, {
+    ...row,
+    djangoOrderIntentVerifyPayload: {
+      verified: true,
+      review: { ...review, version: 'checkout-review-v1' },
+    },
+  });
+  const req = request(body, proofCookies);
+  const response = await inRequest(req, () => intent(req));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.paypalOrderId, row.paypalOrderId);
+  assert.equal(effects.writes(), 0);
+  assert.equal(effects.network.mock.callCount(), 0);
+});
+
 test('a lost intent response reuses its immutable provider order and rejects changed selections', async (t) => {
   const { proof, proofCookies } = setup(t);
   const row = {
@@ -148,6 +339,9 @@ test('a lost intent response reuses its immutable provider order and rejects cha
     userId: null,
     customerEmail: body.customer.email,
     paypalOrderId: 'PAYPAL-EXISTING',
+    canonicalOrderSnapshot: null,
+    canonicalOrderSnapshotVersion: null,
+    canonicalOrderSnapshotHash: null,
     djangoOrderIntentPayload: {
       requestFingerprint: checkoutInputFingerprint({
         selections: body.selections,
@@ -229,6 +423,9 @@ test('a guest email proof is bound to the signed-in owner when an existing payme
     userId: 'alice',
     customerEmail: body.customer.email,
     paypalOrderId: 'PAYPAL-EXISTING',
+    canonicalOrderSnapshot: null,
+    canonicalOrderSnapshotVersion: null,
+    canonicalOrderSnapshotHash: null,
     djangoOrderIntentPayload: {
       requestFingerprint: checkoutInputFingerprint({
         selections: body.selections,

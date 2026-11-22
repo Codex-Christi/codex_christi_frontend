@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { CartVariant } from '@/lib/cart/types';
 import type { OrderPreviewTotals } from '@/lib/shop/checkout/orderMoney';
+import type { CheckoutReviewLine } from '@/lib/shop/checkout/checkoutReviewTypes';
 import {
   checkoutReviewIdentity,
   createCheckoutReview,
@@ -21,6 +22,7 @@ const line = (variantId: string, quantity = 1): CartVariant => ({
     retail_price: 20,
     is_default: false,
     title: 'Hoodie',
+    product: 'product-a',
     options: [],
   },
 });
@@ -46,13 +48,36 @@ const prices: OrderPreviewTotals = {
   linePricesByVariantId: { a: { unitPriceNum: 20, lineTotalNum: 20 } },
 };
 
+const reviewLine = (variantId: string, quantity = 1): CheckoutReviewLine => ({
+  productId: 'product-a',
+  variantId,
+  title: 'Verified hoodie',
+  selectedOptions: [
+    { name: 'Size', value: 'M' },
+    { name: 'Label', value: 'Grace design' },
+  ],
+  quantity,
+  unitAmount: '20.00',
+  lineAmount: (20 * quantity).toFixed(2),
+});
+
+function identity(
+  cart: CartVariant[],
+  contact = checkout,
+  totals = prices,
+  reviewLines = cart.map(({ variantId, quantity }) => reviewLine(variantId, quantity)),
+  itemsHash = 'trusted-items-hash',
+) {
+  return checkoutReviewIdentity(cart, contact, totals, reviewLines, itemsHash);
+}
+
 test('review acknowledgment changes with quantities, variants, customer, delivery, or quote', () => {
-  const reviewed = checkoutReviewIdentity([line('a')], checkout, prices);
+  const reviewed = identity([line('a')]);
   const changed = [
-    checkoutReviewIdentity([line('a', 2)], checkout, prices),
-    checkoutReviewIdentity([line('b')], checkout, prices),
-    checkoutReviewIdentity([line('a')], { ...checkout, email: 'different@example.test' }, prices),
-    checkoutReviewIdentity(
+    identity([line('a', 2)]),
+    identity([line('b')]),
+    identity([line('a')], { ...checkout, email: 'different@example.test' }),
+    identity(
       [line('a')],
       {
         ...checkout,
@@ -63,20 +88,62 @@ test('review acknowledgment changes with quantities, variants, customer, deliver
       },
       prices,
     ),
-    checkoutReviewIdentity([line('a')], checkout, {
+    identity([line('a')], checkout, {
       ...prices,
       shippingPriceNum: 8,
       totalPriceNum: 28,
     }),
-    checkoutReviewIdentity([line('a')], checkout, { ...prices, currency: 'CAD' }),
+    identity([line('a')], checkout, { ...prices, currency: 'CAD' }),
   ];
   assert.ok(changed.every((identity) => identity !== reviewed));
 });
 
 test('row order alone does not invalidate an unchanged reviewed purchase', () => {
+  assert.equal(identity([line('a'), line('b')]), identity([line('b'), line('a')]));
+});
+
+test('review acknowledgment changes for every rendered item fact even when totals stay equal', () => {
+  const original = reviewLine('a');
+  const reviewed = identity([line('a')], checkout, prices, [original]);
+  for (const changed of [
+    { ...original, title: 'Updated product title' },
+    { ...original, productId: 'different-product' },
+    { ...original, quantity: 2 },
+    { ...original, unitAmount: '21.00' },
+    { ...original, lineAmount: '21.00' },
+    {
+      ...original,
+      selectedOptions: [
+        { name: 'Size', value: 'L' },
+        { name: 'Label', value: 'Grace design' },
+      ],
+    },
+    {
+      ...original,
+      selectedOptions: [
+        { name: 'Size', value: 'M' },
+        { name: 'Design', value: 'New artwork' },
+      ],
+    },
+  ]) {
+    assert.notEqual(identity([line('a')], checkout, prices, [changed]), reviewed);
+  }
+  assert.notEqual(
+    identity([line('a')], checkout, prices, [original], 'renewed-items-hash'),
+    reviewed,
+  );
+  const changedProduct = line('a');
+  changedProduct.itemDetail.product = 'different-product';
+  assert.notEqual(identity([changedProduct], checkout, prices, [original]), reviewed);
+});
+
+test('option order alone does not invalidate the same reviewed selection', () => {
+  const original = reviewLine('a');
   assert.equal(
-    checkoutReviewIdentity([line('a'), line('b')], checkout, prices),
-    checkoutReviewIdentity([line('b'), line('a')], checkout, prices),
+    identity([line('a')], checkout, prices, [original]),
+    identity([line('a')], checkout, prices, [
+      { ...original, selectedOptions: [...original.selectedOptions].reverse() },
+    ]),
   );
 });
 
@@ -92,6 +159,21 @@ test('review sends the displayed server totals without using cached product pric
     acknowledged: true,
     quote: { currency: 'JPY', subtotal: 3000, shipping: 500, total: 3500 },
   });
+});
+
+test('new review requests carry the trusted item hash while original reviews remain compatible', () => {
+  assert.equal(createCheckoutReview(prices, 'trusted-items-hash').itemsHash, 'trusted-items-hash');
+  assert.equal('itemsHash' in createCheckoutReview(prices), false);
+  assert.notEqual(
+    checkoutInputIdentity(
+      createCheckoutInput([line('a')], checkout, 'verified-intent'),
+      createCheckoutReview(prices, 'first-hash'),
+    ),
+    checkoutInputIdentity(
+      createCheckoutInput([line('a')], checkout, 'verified-intent'),
+      createCheckoutReview(prices, 'changed-hash'),
+    ),
+  );
 });
 
 test('a guest checkout remains bound when sign-in merges extra cart quantities', () => {

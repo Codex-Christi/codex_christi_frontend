@@ -27,6 +27,12 @@ import {
 } from 'react';
 import { CheckoutAccordionContext } from '../ProductCheckout';
 import { checkoutDeliveryAddressSchema } from '../checkoutAddress';
+import {
+  isUsCountry,
+  normalizeShippingState,
+  normalizeUsState,
+  stateAfterCountryChange,
+} from '@/lib/shop/address/usStates';
 import CheckoutAccountPrompt from '../CheckoutAccountPrompt';
 import { GenericCheckoutInfoInput } from './GenericCheckoutInfoInput';
 import { DeliveryAddressInputFields } from './DeliveryAddressInputFields';
@@ -82,7 +88,19 @@ const BasicCheckoutInfoFormSchema = z
     country: z.string().trim().length(3, { message: 'Please select a country.' }),
   })
   .merge(signupExtSchema)
-  .merge(checkoutDeliveryAddressSchema);
+  .merge(checkoutDeliveryAddressSchema)
+  .superRefine((data, context) => {
+    if (isUsCountry(data.country) && !normalizeUsState(data.adminArea1))
+      context.addIssue({
+        code: 'custom',
+        path: ['adminArea1'],
+        message: 'Choose a U.S. state.',
+      });
+  })
+  .transform((data) => ({
+    ...data,
+    adminArea1: normalizeShippingState(data.country, data.adminArea1),
+  }));
 
 export type BasicCheckoutInfoFormSchema = z.infer<typeof BasicCheckoutInfoFormSchema>;
 
@@ -231,17 +249,24 @@ export const BasicCheckoutInfo = () => {
   ]);
 
   useEffect(() => {
-    if (
-      !checkoutHydrated ||
-      !selectedCountryISO3 ||
-      delivery_address?.shipping_country === selectedCountryISO3
-    ) {
-      return;
+    if (!checkoutHydrated || !selectedCountryISO3) return;
+    const previousCountry = basicCheckoutInfoForm.getValues('country');
+    if (previousCountry !== selectedCountryISO3) {
+      setValue(
+        'adminArea1',
+        stateAfterCountryChange(
+          previousCountry,
+          selectedCountryISO3,
+          basicCheckoutInfoForm.getValues('adminArea1'),
+        ),
+        { shouldDirty: true, shouldValidate: true },
+      );
+      setValue('country', selectedCountryISO3, { shouldDirty: false });
     }
-
-    setShippingCountryISO3(selectedCountryISO3);
-    setValue('country', selectedCountryISO3, { shouldDirty: false });
+    if (delivery_address?.shipping_country !== selectedCountryISO3)
+      setShippingCountryISO3(selectedCountryISO3);
   }, [
+    basicCheckoutInfoForm,
     checkoutHydrated,
     delivery_address?.shipping_country,
     selectedCountryISO3,
@@ -486,6 +511,15 @@ export const BasicCheckoutInfo = () => {
                     value={field.value}
                     classNames={{ trigger: 'min-h-11 rounded-xl border-white/35 text-base' }}
                     onChange={(country) => {
+                      basicCheckoutInfoForm.setValue(
+                        'adminArea1',
+                        stateAfterCountryChange(
+                          field.value,
+                          country.alpha3,
+                          basicCheckoutInfoForm.getValues('adminArea1'),
+                        ),
+                        { shouldDirty: true, shouldValidate: true },
+                      );
                       field.onChange(country.alpha3);
                       startTransition(() => {
                         changeCookieStoreCountry(country.alpha3);

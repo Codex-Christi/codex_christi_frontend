@@ -25,6 +25,7 @@ import {
 } from './checkoutReview';
 import { applyCheckoutSetupFailure } from './checkoutSetupFailure';
 import type { OriginalCheckout } from '@/lib/shop/checkout/originalCheckout';
+import CheckoutReviewItems from './CheckoutReviewItems';
 
 const PayPalCheckout = dynamic(() => import('./Paypal/PayPalMainCheckoutComponent'));
 export type CheckoutOptions = 'card' | 'paypal_buttons' | '';
@@ -65,7 +66,7 @@ export default function PaymentSection() {
   const inputKey = details
     ? checkoutInputIdentity(
         createCheckoutInput(cart, checkout, intentUuid),
-        createCheckoutReview(details.finalPricesWithShippingFee),
+        createCheckoutReview(details.finalPricesWithShippingFee, details.reviewItemsHash),
       )
     : '';
   const paymentBlocked = hasDifferentBoundCheckout(attempt, inputKey);
@@ -101,12 +102,18 @@ export function CheckoutPaymentView({
   const [acceptedReview, setAcceptedReview] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const prices = details?.finalPricesWithShippingFee;
-  const reviewKey = prices ? checkoutReviewIdentity(cart, checkout, prices) : null;
-  const acknowledged = Boolean(reviewKey && acceptedReview === reviewKey && canContinue);
+  const reviewLines = details?.reviewLines ?? [];
+  const reviewItemsHash = details?.reviewItemsHash;
+  const reviewKey =
+    prices && reviewLines.length > 0 && reviewItemsHash
+      ? checkoutReviewIdentity(cart, checkout, prices, reviewLines, reviewItemsHash)
+      : null;
+  const reviewReady = Boolean(reviewKey && canContinue);
+  const acknowledged = Boolean(reviewReady && acceptedReview === reviewKey);
   const address = checkout.delivery_address;
-  const quantity = cart.reduce((total, line) => total + line.quantity, 0);
+  const quantity = reviewLines.reduce((total, line) => total + line.quantity, 0);
   const countryName = details?.countrySupport.country?.country_name ?? address.shipping_country;
-  const review = acknowledged && prices ? createCheckoutReview(prices) : null;
+  const review = acknowledged && prices ? createCheckoutReview(prices, reviewItemsHash) : null;
   const onPaymentError = (message: string, code?: string) => {
     applyCheckoutSetupFailure(
       { message, code },
@@ -160,9 +167,19 @@ export function CheckoutPaymentView({
               {countryName}
             </address>
           </div>
-          <p className='mt-3 text-sm text-white/75'>
-            {quantity} {quantity === 1 ? 'item' : 'items'} in your order
-          </p>
+          {reviewLines.length > 0 && (
+            <p className='mt-3 text-sm text-white/75'>
+              {quantity} {quantity === 1 ? 'item' : 'items'} in your order
+            </p>
+          )}
+          {prices && reviewLines.length > 0 && (
+            <section aria-labelledby='checkout-items-to-review' className='mt-4'>
+              <h3 id='checkout-items-to-review' className='mb-3 font-semibold'>
+                Items to review
+              </h3>
+              <CheckoutReviewItems lines={reviewLines} currency={prices.currency} />
+            </section>
+          )}
           <div className='mt-4 flex min-w-0 flex-wrap items-baseline justify-between gap-2 border-t border-white/20 pt-4'>
             <span className='font-semibold'>Total to pay</span>
             <strong className='text-lg [overflow-wrap:anywhere]'>
@@ -176,7 +193,7 @@ export function CheckoutPaymentView({
           <input
             type='checkbox'
             checked={acknowledged}
-            disabled={!canContinue}
+            disabled={!reviewReady}
             onChange={(event) => setAcceptedReview(event.target.checked ? reviewKey : null)}
             className='mt-1 h-5 w-5 shrink-0 accent-[#0085ff]'
           />

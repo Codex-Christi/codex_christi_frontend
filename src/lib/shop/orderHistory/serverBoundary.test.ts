@@ -76,6 +76,7 @@ test('real account reader and receipt route authenticate with server cookies and
     canonicalOrderSnapshot: null,
     canonicalOrderSnapshotVersion: null,
     canonicalOrderSnapshotHash: null,
+    shippingSnapshot: null,
     authorizePayload: null,
     capturePayload: {
       id: 'capture',

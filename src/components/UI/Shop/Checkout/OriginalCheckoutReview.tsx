@@ -21,7 +21,8 @@ export default function OriginalCheckoutReview({
   onBack: () => void;
   renderPayment: (mode: CheckoutOptions) => ReactNode;
 }) {
-  const [acknowledged, setAcknowledged] = useState(false);
+  const [acceptedReview, setAcceptedReview] = useState<string | null>(null);
+  const acknowledged = acceptedReview === checkout.reviewKey;
   const [mode, setMode] = useState<CheckoutOptions>('');
   const [error, setError] = useState<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -38,7 +39,7 @@ export default function OriginalCheckoutReview({
         review: acknowledged ? { acknowledged: true, quote: checkout.quote } : null,
         onPaymentError: (message) => {
           setError(message);
-          setAcknowledged(false);
+          setAcceptedReview(null);
         },
       }}
     >
@@ -140,7 +141,9 @@ export default function OriginalCheckoutReview({
           <input
             type='checkbox'
             checked={acknowledged}
-            onChange={(event) => setAcknowledged(event.target.checked)}
+            onChange={(event) =>
+              setAcceptedReview(event.target.checked ? checkout.reviewKey : null)
+            }
             className='mt-1 h-5 w-5 shrink-0 accent-[#0085ff]'
           />
           <span>I’ve checked this original purchase, delivery address, and total.</span>

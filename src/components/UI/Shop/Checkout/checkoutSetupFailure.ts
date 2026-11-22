@@ -8,11 +8,15 @@ export function readCheckoutSetupFailure(payload: unknown): CheckoutSetupFailure
   const rawCode = outer.code ?? nested.code;
   const code = typeof rawCode === 'string' ? rawCode : undefined;
   const message =
-    code === 'CHECKOUT_REVIEW_CHANGED'
-      ? 'Prices or delivery changed. Check the updated total and confirm your order again.'
-      : code === 'CHECKOUT_EMAIL_VERIFICATION_REQUIRED'
-        ? 'Please continue from your contact and delivery details to verify this checkout again.'
-        : 'We couldn’t prepare this payment. Your details are still here. Please try again.';
+    code === 'PAYPAL_REVIEW_ADDRESS_CHANGED'
+      ? 'PayPal returned a different delivery address. Check the saved checkout before continuing.'
+      : code === 'CHECKOUT_REVIEW_REQUIRED'
+        ? 'Review and confirm this purchase before continuing.'
+        : code === 'CHECKOUT_REVIEW_CHANGED'
+          ? 'Your order details changed. Check the updated total and item details, then confirm again.'
+          : code === 'CHECKOUT_EMAIL_VERIFICATION_REQUIRED'
+            ? 'Please continue from your contact and delivery details to verify this checkout again.'
+            : 'We couldn’t prepare this payment. Your details are still here. Please try again.';
   return { code, message };
 }
 
@@ -26,7 +30,12 @@ export function applyCheckoutSetupFailure(
   },
 ) {
   actions.showMessage(failure.message);
-  if (failure.code === 'CHECKOUT_REVIEW_CHANGED') {
+  if (
+    failure.code === 'PAYPAL_REVIEW_ADDRESS_CHANGED' ||
+    failure.code === 'CHECKOUT_REVIEW_REQUIRED'
+  ) {
+    actions.resetReview();
+  } else if (failure.code === 'CHECKOUT_REVIEW_CHANGED') {
     actions.resetReview();
     actions.refreshQuote();
   } else if (failure.code === 'CHECKOUT_EMAIL_VERIFICATION_REQUIRED') {

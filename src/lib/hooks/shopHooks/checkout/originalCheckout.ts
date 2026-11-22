@@ -121,8 +121,39 @@ export async function resumeOriginalPayPalOrder(
   attempt: CheckoutAttempt,
   options?: Parameters<typeof loadOriginalCheckout>[1],
 ) {
+  const scope = originalCheckoutScope();
   const current = await loadOriginalCheckout(attempt, options);
   if (current.reviewKey !== reviewed.reviewKey)
     throw new Error('The saved purchase changed. Reopen it and review the details again.');
+  const isCurrent = () =>
+    originalCheckoutScope() === scope &&
+    isCurrentCheckoutAttempt(attempt) &&
+    canReopenCheckoutPayment(usePayPalIntentStore.getState().activeCheckout?.stage);
+  if (!isCurrent()) throw new Error('This checkout changed. Reopen its order status.');
+  const confirmed = await boundedCheckoutRequest(async (signal) => {
+    const response = await (options?.request ?? fetch)(
+      `/next-api/shop/checkout/${encodeURIComponent(current.orderToken)}/resume`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acknowledged: true, reviewKey: reviewed.reviewKey }),
+        signal,
+      },
+    );
+    if (!response.ok)
+      throw new Error('We couldn’t save your review. Reopen the purchase and try again.');
+    return (await response.json()) as {
+      ok?: boolean;
+      reviewKey?: string;
+      paypalOrderId?: string;
+    };
+  }, options?.timeoutMs);
+  if (
+    !isCurrent() ||
+    confirmed.ok !== true ||
+    confirmed.reviewKey !== reviewed.reviewKey ||
+    confirmed.paypalOrderId !== current.paypalOrderId
+  )
+    throw new Error('This checkout changed. Reopen it and review the details again.');
   return current.paypalOrderId;
 }

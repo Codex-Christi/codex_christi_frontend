@@ -19,8 +19,9 @@ The release guide is canonical for priority and resolved product decisions. The 
 domain references. If an older guide says a different item is "next" or contains an unresolved
 decision already resolved by the release guide, follow the release guide.
 
-Current checkpoint: 2026-10-27, source through `eb9794b0` (including checkout commit `85160428`).
-P0.3's static destination/shipping trace is complete; **P0.2 deployed E2E remains pending**.
+Current checkpoint: 2026-11-21. P0.3's October trace remains recorded; the P0.4 and state-picker
+commit candidate passed 425 offline checks against source `a90536f1`. These changes are not
+deployed. **P0.2 deployed E2E remains pending**.
 Orders and migrations remain off-limits. The release guide owns the
 [current code and verification record](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#3-current-codebase-checkpoint)
 and [P0.3 findings](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#p03-document-current-destination-behavior-without-changing-it).
@@ -108,8 +109,18 @@ The alpha must support a smooth real-customer flow:
   Only an all-null snapshot/version/hash triple is legacy. See the
   [ledger checkpoint](PAYPAL_TX_LEDGER_GUIDE.md#p02-canonical-order-ledger-checkpoint) for its contracts.
 - Commit `85160428` adds final review, verified email/address binding, stable checkout attempts,
-  owner/grant access, recovery controls, and explicit push guards. Their full P0.4/P0.5 and deployed
-  acceptance remain open; draft terms/privacy pages are not approved policy.
+  owner/grant access, recovery controls, and explicit push guards. The latest
+  [P0.4 checkpoint](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#p04-make-final-order-acknowledgement-real)
+  adds trusted item display/hash binding, saved review checks, renewed original-purchase review,
+  and returned-address checks. Full live acceptance and P0.5 remain open; draft terms/privacy
+  pages are not approved policy.
+- Checkout and saved shipping addresses share a local U.S. state field: full names are shown,
+  postal codes are saved, old names/codes load, and other countries keep free text. Changing the
+  country clears the previous state, including the saved checkout draft. This does not change
+  destination coverage, payment, fulfillment, or shipping prices.
+  Use the shared searchable combobox for U.S. states, built from the existing Popover and Command
+  components; keep its dark, scrollable menu and keyboard controls. Search accepts names and
+  postal codes. Check the local checkout at desktop and phone widths without submitting it.
 - Public purchase controls and checkout verify supplier evidence; cart edits can save offline.
   Follow the [cart contract](../src/lib/cart/README.md), not a live-check-on-every-increment assumption.
 - The release guide owns [remaining alpha work](SHOP_ALPHA_ORDER_FLOW_RELEASE_GUIDE.md#remaining-alpha-work)
@@ -135,8 +146,8 @@ The alpha must support a smooth real-customer flow:
    payment/receipt/handoff/recovery acceptance cases. Recheck production migration status read-only
    before any later rollout; deploy only genuinely pending reviewed changes through the normal
    approval flow. Keep release gates unchecked until their deployed evidence exists.
-4. Assess current final-review/acknowledgement code against P0.4's full acceptance contract before
-   implementing missing pieces; presence is not deployed acceptance.
+4. Use the recorded P0.4 local fixes and offline results. Keep live acceptance pending, reconcile
+   later checkout edits with the same tests, and do not create orders to finish this checkpoint.
 5. Assess current owner/grant/OTP confirmation and recovery code against P0.5's full contract,
    including the emailed capability and customer-safe lifecycle projection.
 6. Centralize readiness disposition, US/non-US address policy, and address correction/read-back.

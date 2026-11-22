@@ -207,7 +207,9 @@ export function mapRecoveryCheckoutSummary(row: RecoveryLedgerRow) {
       ? null
       : getShippingSummary(row.shippingSnapshot, canonicalSnapshot?.destination),
     message: !canonicalPaymentChain.ok
-      ? 'Your payment was received, but its amount requires review before fulfillment.'
+      ? canonicalPaymentChain.reconciliation.errorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED'
+        ? 'Your payment was received, but the delivery address needs review before preparation can continue.'
+        : 'Your payment was received, but its amount requires review before fulfillment.'
       : row.lastErrorMessage || row.status === 'error'
         ? 'Your payment was received, but fulfillment needs review.'
         : 'Your payment was received and is still being processed.',

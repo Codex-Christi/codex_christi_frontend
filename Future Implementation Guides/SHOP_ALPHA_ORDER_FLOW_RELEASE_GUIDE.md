@@ -414,10 +414,10 @@ their recorded source checkpoints.
   absent or blank. Its final push guard runs after Django handoff/provider registration, so this
   setting does not make sandbox capture safe under the no-order instruction. Deployment and
   explicit configuration acceptance remain separate.
-- Current code includes inline final-order review, server-persisted acknowledgement,
-  and owner/grant checks for payment and confirmation status. Do not describe these controls as
-  absent. P0.4/P0.5 acceptance is still open; this trace does not establish the full emailed,
-  long-lived, rotatable/revocable cross-device viewing contract.
+- Current code includes inline order review and owner/grant checks for payment and confirmation
+  status. The [P0.4 checkpoint](#p04-make-final-order-acknowledgement-real) records the November 21
+  local fixes and offline checks. Live P0.4 acceptance and the full P0.5 emailed-access contract
+  remain open.
 - Only the preparing/push-verified customer email is implemented. The other five lifecycle messages
   are not complete.
 - Most footer policy links are placeholders. The existing Shipping and POD policy overstates some
@@ -682,8 +682,9 @@ Sources: [zone mapping](../src/lib/datasetSearchers/merchize/dest-map.ts),
   blocks. Current per-option shipping evidence remains the actual quote gate.
 - State/region is stored and forwarded, but is not used to select shipping rates or limit the US
   surcharge. An unused state-surcharge helper does not change this behavior. Required state and
-  postal-code fields predate this pass; there are no country-specific address rules. Form validity
-  and email/address binding do not establish provider address acceptance.
+  postal-code fields predate this pass. The later November 21 state-field update validates U.S.
+  state choices in checkout and saved shipping addresses; other countries still use free text.
+  Form validity and email/address binding do not establish provider address acceptance.
 - Shipping-country labels are matched as exact ISO2 tokens, `rest…`, or generic/all. This is not a
   general parser for supplier restrictions. Positive scoped evidence can lag supplier changes by
   the configured TTL (normally 48 hours); static supplemental surcharge data has no live renewal
@@ -755,6 +756,91 @@ TypeScript, formatting, and local guide-link checks passed. Integration fixtures
 and provider calls were not run. P0.2 deployed E2E remains pending.
 
 ### P0.4 Make final-order acknowledgement real
+
+Status, 2026-11-21: **local fixes and offline checks complete; live acceptance pending**.
+The commit candidate was checked against source `a90536f1` and is not a deployment.
+P0.2 deployed E2E remains pending.
+Orders, payments, provider changes, and migrations remain off-limits during this verification.
+
+The current local changes close these review gaps:
+
+- The preview uses the existing canonical order resolver and returns customer-safe item details
+  with its totals. The final review and summary display those checked titles, every selected
+  option, quantities, and unit/line amounts. The full item list appears before the checkbox on
+  small screens too; it does not depend on opening the separate summary.
+- A stable item hash binds the review to product/variant IDs, titles, options, quantities, amounts,
+  and currency. A changed design, size, or title requires another review even if the total stays
+  the same. Reordering unchanged rows/options does not invalidate it. Supplier IDs/SKUs and image
+  URLs are excluded from this customer-facing projection.
+- New intents require the matching item hash and reviewed totals before creating a ledger row or
+  PayPal order. Bound retries validate the saved snapshot and review before reuse or retry writes.
+  `checkout-review-v2` records the item hash, canonical snapshot hash, time, quote, and request
+  fingerprint in existing ledger JSON. Owner and checkout surface remain recorded.
+- Reopening an original purchase keeps its GET read-only. A separate POST on the same resume path
+  saves the renewed review of that exact purchase before its existing PayPal order can reopen.
+  Access, origin, current review key, and a concurrent-change check are required. It creates no new
+  purchase and makes no provider call. Missing old acknowledgement can be renewed this way;
+  complete v1 records remain compatible, while malformed v2 records cannot fall back to v1.
+- Authorization and capture check the saved acknowledgement. When PayPal supplies a shipping
+  address, reconciliation compares it with the original checked address. A material difference
+  pauses capture and fulfillment, stays recorded across later matching replies, and clears the
+  browser confirmation with a customer-safe message. No extra provider request is added. The
+  authorization response may already represent a payment hold; this check does not claim to
+  prevent that hold. Responses that normally omit shipping do not prove an address match.
+
+The country picker also uses its data source's Country type, removing a duplicate type that failed
+the current TypeScript check. Its country choices and filters are unchanged.
+
+Checkout Contact & delivery and the saved shipping address editor now share a local U.S. state
+field. It uses a searchable combobox built from the existing Popover and Command components,
+with a dark, scrollable menu and keyboard controls. Users can search by state name or postal code.
+It displays full names and saves postal codes such as `CA`; existing saved names and codes load
+correctly. The local list retains all states, DC, and the existing postal territories/military
+regions. Other countries keep free text. Country changes clear the old state in both the form and
+the saved checkout draft, and profile autofill does not import a state from another country.
+Saved-address server validation applies the same normalization. These form changes do not alter
+payment, fulfillment, destination coverage, or shipping prices. Focused offline checks cover both
+real form components, legacy values, submitted codes, invalid U.S. entries, and country changes.
+The open menu was checked on the local test copy at port 3001 at 1280 × 720 and 390 × 844;
+it stayed within the screen. Name/code search and keyboard selection worked. No checkout or
+saved-address form was submitted during those browser checks. The subsequent
+[UI cleanup checkpoint](#ui-library-and-shared-component-cleanup--2026-11-21) records the corrected
+library pairing and shared-component changes.
+
+An earlier broader run passed 393 offline tests with live `fetch` blocked. Coverage includes real React
+rendering with sample data and an injected payment control; changed item facts, payment gating,
+saved review validation, renewed original review, retry races, address differences, and existing
+payment/receipt/recovery checks. The searchable combobox then passed 19 focused offline form/state
+tests, whole-workspace TypeScript, and scoped ESLint. Its checks include partial names, postal
+codes, no matches, Escape, keyboard choices, labels, and forwarded focus. No integration fixture
+or schema command was run.
+
+The in-app browser reached Contact & delivery with a populated cart at
+`http://localhost:3001/shop/checkout`. The `/en/shop/checkout` path returned 404; localhost's checked
+route is `/shop/checkout`. Full review interaction used offline sample data, not a live order.
+Responsive payment/review checks, real PayPal replies, and deployed payment-to-fulfillment behavior
+remain unverified. P0.2 deployed E2E and the live release checklist below stay unchecked.
+
+Commit verification, 2026-11-21: 425 offline checks passed in a separate copy containing only this
+chat's P0.4 and state-picker changes: 372 checkout, 37 canonical-snapshot, 12 shared-UI, and 4
+generated-CSS checks. Requests and sockets were blocked. The prepared copy used a frozen lockfile
+installation with setup scripts disabled. TypeScript, scoped lint, formatting, and diff checks
+also passed. Concurrent recovery, profile, fulfillment, and deployment changes were excluded.
+
+The final address comparison recognizes equivalent U.S. names and codes, including older saved
+values such as `California` and returned values such as `CA`. Different or missing states still
+stop the comparison. Six route tests also confirm that missing, malformed, or changed saved
+reviews stop authorization/capture with no payment calls or ledger writes. No real orders,
+provider actions, schema commands, or migrations ran during these checks.
+
+Implementation references: [preview](../src/actions/shop/checkout/getOrderFinalDetails.ts),
+[review lines/hash](../src/lib/shop/checkout/checkoutReviewLines.ts),
+[review UI](../src/components/UI/Shop/Checkout/PaymentSection.tsx),
+[saved review checks](../src/lib/shop/checkout/checkoutReview.ts),
+[original review](../src/lib/shop/checkout/originalCheckoutServer.ts),
+[PayPal address comparison](../src/lib/paypal/txLedger/payPalReviewAddress.ts).
+
+The acceptance contract remains:
 
 Before PayPal controls become active, show the exact:
 
