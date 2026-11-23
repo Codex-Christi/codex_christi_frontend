@@ -1226,6 +1226,60 @@ order by "createdAt" asc;
 
 Do not select raw payload columns during normal verification. Use the admin detail UI or a redacted debug path when payload inspection is required.
 
+### Pass 1: address review and recovery actions
+
+Use a short checkout note near the address: **Double-check your delivery address, including any
+apartment or unit number.** Keep confirmation inline, not in another modal. Before payment,
+validate required fields and let buyers edit them. Do not make checkout wait for Merchize's
+post-import check or promise that a well-formed address is deliverable.
+
+[Merchize's U.S. address guide](https://merchize.com/helpdesk/verify-us-shipping-address/)
+describes a SmartyStreets check after import that typically takes up to five minutes under
+default settings. Use that as context, not a deadline or permission to bypass a pending check.
+Track the validation result separately from whether Merchize saved the correct address and whether
+production release was acknowledged. In the sandbox walkthrough, `validate_shipping_address`
+was `valid` on read-back while `push_to_fulfillment_progress` remained `validating`.
+
+| Address evidence | Buyer experience | Ops action |
+| --- | --- | --- |
+| U.S. check pending | **We're checking your delivery address. No action is needed right now.** | Wait and recheck server-side. Escalate persistent uncertainty to admin, not to the buyer. |
+| U.S. check valid and saved address matches | **Preparing your order.** | Continue only if the separate hold, readiness, and release guards pass. |
+| Confirmed invalid address or missing unit | **Check your delivery address.** Send one email with a link to the verified order page. | Pause release. Review the correction submitted through the verified flow. Save, read it back from Merchize, and recheck validation before release. Never silently apply a provider suggestion. |
+| Buyer confirms an address still flagged by Merchize | Acknowledge the confirmation; do not promise release yet. | **Mark address as valid** is an audited master-admin exception for the exact, matched address. Require evidence of buyer confirmation and a reason. This action does not push the order. |
+| Non-U.S. address with expected unsupported validation result | **Preparing your order.** Do not claim a postal validation passed. | Do not require a U.S. result or a blanket override. Continue only with a complete, matching address and no explicit provider problem, under the saved country rules. |
+| Address read missing, mismatched, or inconclusive | **We're reviewing your order.** No correction request unless there is a confirmed issue. | Block automatic release and show the evidence needing review. A provider read failure is not proof that the address is wrong. |
+
+**Implemented locally:** Manual release distinguishes a check that sent no new push from a newly
+acknowledged push that still needs verification. For a confirmed invalid U.S. address, the
+verified order page now offers one correction, and the payment runner queues one branded
+address-action notice. Pending address validation does not send that notice. The correction API
+saves a request without a provider call, payment grant, or new shipment. The existing recovery
+scanner applies the address under its order lock, only to the single matched, unreleased order.
+It checks the original provider address before writing, reads back all address fields, and waits
+for separate postal validation. A repeat check that finds the correction already saved does not
+write it again. If Merchize still flags the matched correction after five minutes, or read-back
+cannot be verified, the order requires master-admin review. The buyer can see that review but
+cannot submit a second correction. No financial records, receipts, account details, or Django
+records are rewritten by the buyer flow. All existing release checks still apply, including the
+hold, age, and automatic-push settings. No migration is required for this implementation.
+
+The correction depends on a working `PAYPAL_TX_LEDGER_RECOVERY_SCANNER_ENABLED` job on the
+same data target. Existing orders that reached an invalid-address state before this change can
+show the correction form; they are not automatically emailed by deploying this change. Live
+delivery of the notice, deployed scanner health, and release verification are not yet proven.
+
+**Email ownership:** The correction notice uses the same branded shop layout as Next.js checkout
+codes, order-access codes, guest-order linking, and fulfillment confirmation. A first-time
+checkout can still receive its code directly from Django when Django creates an intent with OTP
+pending. The Next.js template does not style that message. Check fresh-checkout and recovery
+inboxes separately before marking OTP styling complete. The checkout email work is tracked in
+**Shop Checkout, Recovery, Sandbox Payments & UX**.
+
+**Exit test:** Pending, valid, invalid, corrected, confirmed override, mismatched, and non-U.S.
+fixtures render the right next action for customer and admin on mobile and desktop. Only a
+confirmed address problem asks the customer to act. No correction or retry repeats payment or
+imports another order.
+
 ## Address and buyer detail endpoints
 
 These endpoints support address review and correction:

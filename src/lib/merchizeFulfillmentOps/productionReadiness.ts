@@ -124,6 +124,11 @@ export function canManuallyConfirmMerchizeAddressStatus(status: string) {
   return BUYER_CONFIRMABLE_ADDRESS_STATUSES.has(status.toLowerCase());
 }
 
+export function hasConfirmedInvalidMerchizeAddress(detail: unknown) {
+  const evidence = getMerchizeAddressValidationEvidence(detail);
+  return !evidence.markedValid && INVALID_ADDRESS_STATUSES.has(evidence.status);
+}
+
 function getDataArray(payload: unknown) {
   if (Array.isArray(payload)) return payload;
   const data = asRecord(payload)?.data;

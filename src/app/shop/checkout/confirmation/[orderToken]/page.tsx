@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useRef, useState } from 'react';
 import CheckoutConfirmationView from '@/components/UI/Shop/Checkout/CheckoutConfirmationView';
 import CheckoutAccessRecovery from '@/components/UI/Shop/Checkout/CheckoutAccessRecovery';
+import CustomerAddressCorrection from '@/components/UI/Shop/Checkout/CustomerAddressCorrection';
 import CheckoutStorageNotice from '@/components/UI/Shop/Checkout/CheckoutStorageNotice';
 import { useAuthStore } from '@/stores/authStore';
 import { claimCurrentCheckout } from '@/lib/hooks/shopHooks/checkout/claimCurrentCheckout';
@@ -113,7 +114,7 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
           }
         }
         const mapped = mapLedgerToProcessingState(next);
-        if (next.fulfillmentOnHold && next.status !== 'refunded') {
+        if ((next.fulfillmentOnHold || next.addressCorrection === 'checking') && next.status !== 'refunded') {
           if (holdChecks++ < 20) timer = setTimeout(() => void poll(), 30_000);
           return;
         }
@@ -166,6 +167,15 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
       copied={copied}
       storageNotice={<CheckoutStorageNotice />}
       recovery={<CheckoutAccessRecovery orderToken={orderToken} onVerified={refresh} />}
+      addressCorrectionState={data?.addressCorrection}
+      addressCorrection={data?.addressCorrection && (
+        <CustomerAddressCorrection
+          key={`${orderToken}:${authenticatedOwner ?? 'guest'}`}
+          orderToken={orderToken}
+          state={data.addressCorrection}
+          onRefresh={refresh}
+        />
+      )}
       onRefresh={refresh}
       onDownload={() => void downloadReceipt()}
       onCopy={() => {

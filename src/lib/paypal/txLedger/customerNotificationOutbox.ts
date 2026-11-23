@@ -1,12 +1,14 @@
 import 'server-only';
 
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
-import { buildShopFulfillmentEmail } from '@/lib/shop/email/templates';
+import { buildShopAddressCorrectionEmail, buildShopFulfillmentEmail } from '@/lib/shop/email/templates';
+import { customerAddressCorrectionState } from '@/lib/shop/checkout/customerAddressCorrection';
 
 const DEFAULT_PENDING_SEND_LIMIT = 25;
 
 export const CUSTOMER_NOTIFICATION_TYPE = {
   PAID_ORDER_FULFILLMENT_PUSH_VERIFIED: 'paid_order_fulfillment_push_verified',
+  PAID_ORDER_ADDRESS_CORRECTION_REQUIRED: 'paid_order_address_correction_required',
 } as const;
 
 export const CUSTOMER_NOTIFICATION_STATUS = {
@@ -46,15 +48,15 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-function buildDedupeKey(orderToken: string, recipient: string) {
-  return [
-    CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_VERIFIED,
-    orderToken,
-    recipient,
-  ].join(':');
+export async function enqueueCustomerFulfillmentPushVerifiedNotification(props: EnqueueCustomerFulfillmentPushVerifiedProps) {
+  return enqueueCustomerNotification(CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_VERIFIED, props);
 }
 
-export async function enqueueCustomerFulfillmentPushVerifiedNotification({
+export async function enqueueCustomerAddressCorrectionNotification(props: EnqueueCustomerFulfillmentPushVerifiedProps) {
+  return enqueueCustomerNotification(CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_ADDRESS_CORRECTION_REQUIRED, props);
+}
+
+async function enqueueCustomerNotification(type: (typeof CUSTOMER_NOTIFICATION_TYPE)[keyof typeof CUSTOMER_NOTIFICATION_TYPE], {
   db = paypalTxLedger,
   orderToken,
   paypalOrderId,
@@ -89,9 +91,9 @@ export async function enqueueCustomerFulfillmentPushVerifiedNotification({
       {
         orderToken,
         paypalOrderId,
-        type: CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_VERIFIED,
+        type,
         status: CUSTOMER_NOTIFICATION_STATUS.PENDING,
-        dedupeKey: buildDedupeKey(orderToken, recipient),
+        dedupeKey: [type, orderToken, recipient].join(':'),
         recipient,
         payload,
       },
@@ -122,6 +124,21 @@ async function sendCustomerNotificationRow(
   const payload = row.payload as CustomerFulfillmentPushVerifiedPayload;
 
   try {
+    const isAddressNotice = row.type === CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_ADDRESS_CORRECTION_REQUIRED;
+    if (isAddressNotice) {
+      const current = await paypalTxLedger.paypalIntent.findUnique({
+        where: { orderToken: row.orderToken },
+        select: {
+          status: true, lastErrorCode: true, fulfillmentAddressOverriddenAt: true,
+          fulfillmentAddressOverriddenBy: true, processingCompletedAt: true, customerEmail: true,
+        },
+      });
+      if (!current || current.processingCompletedAt || normalizeEmail(current.customerEmail) !== row.recipient ||
+        customerAddressCorrectionState(current) !== 'required') {
+        await outbox.update({ where: { id: row.id }, data: { status: CUSTOMER_NOTIFICATION_STATUS.SUPPRESSED } });
+        return { id: row.id, ok: false as const, error: 'This order no longer needs an address correction notice.' };
+      }
+    }
     const { sendMailFromPrimaryAgent } = await import('@/lib/zeptomail/sendMailFromPrimaryAgent');
 
     await sendMailFromPrimaryAgent({
@@ -133,12 +150,12 @@ async function sendCustomerNotificationRow(
           },
         },
       ],
-      ...buildShopFulfillmentEmail({
+      ...(isAddressNotice ? buildShopAddressCorrectionEmail(row.orderToken) : buildShopFulfillmentEmail({
         customerName: payload.customerName,
         orderToken: payload.orderToken,
         supportReference: payload.supportReference,
         receiptAvailable: Boolean(payload.receiptLink),
-      }),
+      })),
     });
 
     await outbox.update({

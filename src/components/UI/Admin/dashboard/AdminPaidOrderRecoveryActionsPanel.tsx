@@ -207,10 +207,14 @@ export default function AdminPaidOrderRecoveryActionsPanel({
         setProductionRetryOpen(false);
         setProductionRetryPassword('');
         setProductionRetryReason('');
-        successToast({
-          header: 'Recovery completed',
-          message: result.message,
-        });
+        if (result.tone === 'warning') {
+          toast.warning('Waiting on Merchize', { description: result.message });
+        } else {
+          successToast({
+            header: 'Recovery completed',
+            message: result.message,
+          });
+        }
         router.refresh();
       } catch (error) {
         toast.dismiss(toastId);
@@ -328,10 +332,11 @@ export default function AdminPaidOrderRecoveryActionsPanel({
         setOverridePassword('');
         setOverrideReason('');
         setReleaseFormOpen(false);
-        successToast({
-          header: 'Order released',
-          message: result.message,
-        });
+        if (result.tone === 'warning') {
+          toast.warning('Release not confirmed', { description: result.message });
+        } else {
+          successToast({ header: 'Order released', message: result.message });
+        }
         router.refresh();
       } catch (error) {
         toast.dismiss(toastId);

@@ -46,6 +46,7 @@ export type MerchizeProductionReadinessCheckResult =
       merchizeOrderId: string;
       pushAcknowledgedAt: Date | null;
       pushVerifiedAt: Date | null;
+      providerAddressUpdatedAt: Date | null;
       readiness: ReturnType<typeof classifyMerchizeProductionReadiness>;
     }
   | {
@@ -263,6 +264,7 @@ export async function runMerchizeProductionReadinessChecks(
       merchizeOrderId: order.merchizeOrderId,
       pushAcknowledgedAt: order.pushAcknowledgedAt,
       pushVerifiedAt: order.pushVerifiedAt,
+      providerAddressUpdatedAt: order.providerAddressUpdatedAt,
       readiness,
     };
   } catch (error) {

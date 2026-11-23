@@ -32,6 +32,13 @@ import { runMerchizeProductionReadinessChecks } from '@/lib/merchizeFulfillmentO
 import { verifyMerchizeFulfillmentPush } from '@/lib/merchizeFulfillmentOps/verifyMerchizeFulfillmentPush';
 import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from '@/lib/merchizeFulfillmentOps/merchizeMapper';
 import { getMerchizeBuyerAddressExpectationFromLedger } from '@/lib/merchizeFulfillmentOps/addressCorrectionVerification';
+import { applyMerchizeFulfillmentAddressCorrection } from '@/lib/merchizeFulfillmentOps/applyMerchizeFulfillmentAddressCorrection';
+import {
+  classifyBuyerCorrectionFlag,
+  CUSTOMER_ADDRESS_CORRECTION_ACTOR,
+  CUSTOMER_ADDRESS_CORRECTION_REQUESTED,
+  CUSTOMER_ADDRESS_CORRECTION_REVIEW,
+} from '@/lib/shop/checkout/customerAddressCorrection';
 import {
   enqueueAdminFulfillmentPushVerifiedNotification,
   enqueueAdminRecoveryNotification,
@@ -39,6 +46,7 @@ import {
   sendPendingAdminRecoveryNotificationsForOrder,
 } from '@/lib/paypal/txLedger/adminNotificationOutbox';
 import {
+  enqueueCustomerAddressCorrectionNotification,
   enqueueCustomerFulfillmentPushVerifiedNotification,
   sendPendingCustomerNotificationsForOrder,
 } from '@/lib/paypal/txLedger/customerNotificationOutbox';
@@ -295,6 +303,7 @@ async function markFulfillmentAttentionRequiredAndNotify(args: {
   };
   errorCode: string;
   errorMessage: string;
+  notifyBuyerToCorrectAddress?: boolean;
   issueSummary?: string[];
   requestPayload?: unknown;
   responsePayload?: unknown;
@@ -302,7 +311,7 @@ async function markFulfillmentAttentionRequiredAndNotify(args: {
   merchizeProviderOrderId?: string | null;
   merchizeProviderOrderCode?: string | null;
 }) {
-  await paypalTxLedger.$transaction(async (tx) => {
+  const buyerNoticeCreated = await paypalTxLedger.$transaction(async (tx) => {
     const updated = await tx.paypalIntent.updateMany({
       where: {
         orderToken: args.orderToken,
@@ -340,6 +349,17 @@ async function markFulfillmentAttentionRequiredAndNotify(args: {
       receiptLink: args.row.receiptLink,
       severity: ADMIN_NOTIFICATION_SEVERITY.WARNING,
     });
+    if (args.notifyBuyerToCorrectAddress) {
+      const notice = await enqueueCustomerAddressCorrectionNotification({
+        db: tx,
+        orderToken: args.orderToken,
+        paypalOrderId: args.row.paypalOrderId,
+        customerName: args.row.customerName,
+        customerEmail: args.row.customerEmail,
+      });
+      return notice.created === 1;
+    }
+    return false;
   });
   await refreshPaidOrderRecoveryProjectionSafely(args.orderToken);
 
@@ -354,6 +374,13 @@ async function markFulfillmentAttentionRequiredAndNotify(args: {
       });
     },
   );
+  if (buyerNoticeCreated) {
+    await sendPendingCustomerNotificationsForOrder(args.orderToken).catch(() => {
+      console.error('[CustomerNotificationOutbox] address correction notice could not be sent', {
+        orderToken: args.orderToken,
+      });
+    });
+  }
 }
 
 async function markFulfillmentLookupPendingForAutomaticRetry(args: {
@@ -589,13 +616,16 @@ export async function runPaidFulfillmentProcessing(
       throw new DjangoOrderError({ ...djangoReview, outcome: 'uncertain' });
     }
 
-    if (options.executionScope === 'merchize_fulfillment_only') {
+    const applyingBuyerCorrection = row.lastErrorCode === CUSTOMER_ADDRESS_CORRECTION_REQUESTED;
+    if (row.lastErrorCode === CUSTOMER_ADDRESS_CORRECTION_REVIEW) return;
+    if (options.executionScope === 'merchize_fulfillment_only' || applyingBuyerCorrection ||
+      row.fulfillmentAddressOverriddenBy === CUSTOMER_ADDRESS_CORRECTION_ACTOR) {
       const acceptedDjangoHandoff = isAcceptedDjangoFulfillmentProcessResponse(
         row.merchizeFulfillmentResponsePayload,
       );
       const merchizeExternalOrderNumber = acceptedDjangoHandoff
         ? extractMerchizeExternalOrderNumberFromDjangoProcessResponse(
-            row.merchizeFulfillmentResponsePayload,
+            row.merchizeFulfillmentResponsePayload, row.djangoOrderIntentOrderId,
           )
         : null;
       const eligibility = getMerchizeFulfillmentRetryEligibility({
@@ -741,6 +771,49 @@ export async function runPaidFulfillmentProcessing(
         )
       : null;
 
+    if (applyingBuyerCorrection) {
+      activeStage = 'merchize_readiness';
+      const address = getMerchizeBuyerAddressExpectationFromLedger(row.fulfillmentAddressOverride);
+      const originalAddress = getMerchizeBuyerAddressExpectationFromLedger(row.shippingSnapshot);
+      const correction = address?.country_code === 'US' && address.state && originalAddress?.country_code === 'US' && merchizeExternalOrderNumber &&
+        row.fulfillmentAddressOverriddenBy === CUSTOMER_ADDRESS_CORRECTION_ACTOR
+        ? await applyMerchizeFulfillmentAddressCorrection({
+            orderToken,
+            customerName: row.customerName,
+            address: {
+              line1: address.address,
+              line2: address.address2,
+              city: address.city,
+              state: address.state,
+              postalCode: address.postal_code,
+              country: address.country_code,
+            },
+            buyerRequest: {
+              externalNumber: merchizeExternalOrderNumber,
+              djangoPaymentSaveCustomId,
+              originalAddress,
+              assertProcessingLease: processingLease.assertOwned,
+            },
+          })
+        : null;
+
+      await processingLease.assertOwned();
+      if (!correction?.ok) {
+        await markFulfillmentAttentionRequiredAndNotify({
+          orderToken, lockId, row,
+          errorCode: CUSTOMER_ADDRESS_CORRECTION_REVIEW,
+          errorMessage: 'The buyer submitted an address correction, but Merchize could not verify it. Review before release.',
+        });
+        return;
+      }
+      // The provider saved the exact address. Give postal validation a separate check.
+      await markFulfillmentProviderPendingForAutomaticRetry({
+        orderToken, lockId, errorCode: 'MERCHIZE_ADDRESS_VALIDATION_PENDING',
+      });
+      await refreshPaidOrderRecoveryProjectionSafely(orderToken);
+      return;
+    }
+
     if (!merchizeExternalOrderNumber) {
       activeStage = 'django_fulfillment_handoff';
       await processingLease.assertOwned();
@@ -883,12 +956,20 @@ export async function runPaidFulfillmentProcessing(
           primaryBlocker?.message ?? 'Merchize production-readiness checks did not pass.';
         const retryableOnly =
           readiness.blockers.length > 0 && readiness.blockers.every((blocker) => blocker.retryable);
+        const correctionFlag = classifyBuyerCorrectionFlag({
+          actor: row.fulfillmentAddressOverriddenBy,
+          primaryCode: errorCode,
+          readback: readiness.addressReadbackStatus,
+          blockers: readiness.blockers,
+          providerAddressUpdatedAt: readinessCheck.providerAddressUpdatedAt,
+        });
+        const waitingOnCorrectedAddress = correctionFlag === 'waiting';
 
-        if (retryableOnly) {
+        if (retryableOnly || waitingOnCorrectedAddress) {
           await markFulfillmentProviderPendingForAutomaticRetry({
             orderToken,
             lockId,
-            errorCode,
+            errorCode: waitingOnCorrectedAddress ? 'MERCHIZE_ADDRESS_VALIDATION_PENDING' : errorCode,
             requestPayload: fulfillmentRequestPayload,
             responsePayload: fulfillmentResponsePayload,
             merchizeFulfillmentProcessingId,
@@ -902,8 +983,12 @@ export async function runPaidFulfillmentProcessing(
           orderToken,
           lockId,
           row,
-          errorCode,
+          errorCode: correctionFlag === 'review' ? CUSTOMER_ADDRESS_CORRECTION_REVIEW : errorCode,
           errorMessage,
+          notifyBuyerToCorrectAddress:
+            errorCode === 'MERCHIZE_ADDRESS_INVALID' && !row.fulfillmentAddressOverriddenAt &&
+            getMerchizeBuyerAddressExpectationFromLedger(fulfillmentAddress)?.country_code === 'US' &&
+            readiness.addressReadbackStatus === 'matched' && readiness.providerPushState !== 'pushed',
           issueSummary: readiness.blockers.map((blocker) => blocker.message),
           requestPayload: fulfillmentRequestPayload,
           responsePayload: fulfillmentResponsePayload,
@@ -915,6 +1000,7 @@ export async function runPaidFulfillmentProcessing(
       }
 
       let pushVerification: Awaited<ReturnType<typeof verifyMerchizeFulfillmentPush>> | null = null;
+      let newPushAcknowledged = false;
       if (readiness.providerPushState === 'pushed') {
         activeStage = 'merchize_push_verification';
         await processingLease.assertOwned();
@@ -972,6 +1058,7 @@ export async function runPaidFulfillmentProcessing(
               merchizeOrderCode: merchizeProviderOrderCode,
               identifier: CODEX_CHRISTI_FULFILLMENT_IDENTIFIER,
             });
+            newPushAcknowledged = true;
           } catch (pushError) {
             if (pushError instanceof ProcessingLeaseLostError) throw pushError;
             await processingLease.assertOwned();
@@ -1015,7 +1102,7 @@ export async function runPaidFulfillmentProcessing(
           merchizeProviderOrderId,
           merchizeProviderOrderCode,
         });
-        return;
+        return { status: 'push_verification_pending' as const, newPushAcknowledged };
       }
 
       if (pushVerification.status === 'failed') {

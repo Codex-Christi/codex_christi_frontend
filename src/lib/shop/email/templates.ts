@@ -108,3 +108,24 @@ export function buildShopFulfillmentEmail({
     }),
   };
 }
+
+export function buildShopAddressCorrectionEmail(orderToken: string) {
+  return {
+    subject: `Check your delivery address · ${senderName}`,
+    senderName,
+    ...buildShopEmailLayout({
+      previewText: 'Your payment was received. Please review your delivery address.',
+      eyebrow: 'Order update',
+      heading: 'Check your delivery address',
+      paragraphs: [
+        'Your payment was received. We need a corrected delivery address before preparing your order.',
+        'Open your order and verify access to submit the correction. You do not need to pay again.',
+      ],
+      action: {
+        label: 'View your order',
+        href: getShopSiteUrl(`/shop/checkout/confirmation/${encodeURIComponent(orderToken)}?view=details`),
+      },
+      footerText: 'For your privacy, do not reply with your delivery address.',
+    }),
+  };
+}

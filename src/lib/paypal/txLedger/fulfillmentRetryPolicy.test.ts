@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getMerchizeFulfillmentRetryEligibility } from './fulfillmentRetryPolicy';
+import {
+  getMerchizeFulfillmentRetryEligibility,
+  getPendingFulfillmentRetryMessage,
+  getPushVerificationPendingMessage,
+} from './fulfillmentRetryPolicy';
 
 const completeCheckpoints = {
   captureComplete: true,
@@ -38,4 +42,48 @@ test('does not accept a Django response without an external Merchize number', ()
   assert.equal(result.eligible, false);
   if (result.eligible) return;
   assert.equal(result.missingCheckpoint, 'merchize_external_order');
+});
+
+test('reports a pending Merchize check only after an accepted handoff on a saved payment', () => {
+  const pending = {
+    status: 'payment_saved',
+    lastErrorCode: 'MERCHIZE_ADDRESS_VALIDATION_PENDING',
+    hasAcceptedDjangoHandoff: true,
+  };
+  assert.match(
+    getPendingFulfillmentRetryMessage(pending) ?? '',
+    /delivery address check is still pending/u,
+  );
+  assert.match(
+    getPendingFulfillmentRetryMessage({
+      ...pending,
+      lastErrorCode: 'MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING',
+    }) ?? '',
+    /still making the order available/u,
+  );
+  assert.equal(
+    getPendingFulfillmentRetryMessage({
+      ...pending,
+      lastErrorCode: 'MERCHIZE_PUSH_VERIFICATION_PENDING',
+    }),
+    getPushVerificationPendingMessage(),
+  );
+  assert.equal(
+    getPendingFulfillmentRetryMessage({ ...pending, hasAcceptedDjangoHandoff: false }),
+    null,
+  );
+  assert.equal(getPendingFulfillmentRetryMessage({ ...pending, status: 'captured' }), null);
+  assert.equal(
+    getPendingFulfillmentRetryMessage({ ...pending, lastErrorCode: 'MERCHIZE_ADDRESS_INVALID' }),
+    null,
+  );
+});
+
+test('distinguishes a new push acknowledgement from a check of an existing release', () => {
+  assert.match(getPushVerificationPendingMessage(true), /acknowledged the push request/u);
+  assert.match(getPushVerificationPendingMessage(false), /did not send a new push request/u);
+  assert.doesNotMatch(getPushVerificationPendingMessage(), /acknowledged|did not send/u);
+  for (const acknowledged of [true, false, undefined]) {
+    assert.match(getPushVerificationPendingMessage(acknowledged), /Refresh Merchize state/u);
+  }
 });

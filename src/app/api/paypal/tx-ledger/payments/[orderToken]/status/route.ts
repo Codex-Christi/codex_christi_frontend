@@ -8,6 +8,7 @@ import { getCanonicalPaymentProjectionState } from '@/lib/paypal/txLedger/canoni
 import { getCapturedCartPurchase } from '@/lib/cart/purchase';
 import { receiptObjectKey, receiptDownloadPath } from '@/lib/shop/orderHistory/receiptReference';
 import { toCustomerOrderStatus } from '@/lib/shop/checkout/customerOrderStatus';
+import { getBuyerAddressCorrectionSetup } from '@/lib/shop/checkout/customerAddressCorrectionServer';
 import { readCustomerFulfillmentHold } from '@/lib/shop/checkout/readCustomerFulfillmentHold';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 
@@ -119,14 +120,20 @@ export async function GET(_req: Request, { params }: PageProps) {
       ? await readCustomerFulfillmentHold(row.orderToken, row.djangoPaymentSaveCustomId)
       : null;
 
+  const addressCorrection = holdCheckedAt ? null : getBuyerAddressCorrectionSetup(row, paymentState)?.state;
+  const waitingForAddress = captureCompletion.ok && !isResolved && !paymentFailure &&
+    row.lastErrorCode === 'MERCHIZE_ADDRESS_VALIDATION_PENDING';
   const customerStatus = toCustomerOrderStatus(row, {
+    addressCorrection,
     status: effectiveStatus,
     receiptLink,
     receiptFile: receiptLink ? 'Codex-Christi-receipt' : null,
     paidAmountLabel: getPaidAmountLabel(row.capturePayload),
     cartPurchase: getCapturedCartPurchase(row, paymentState),
     customerRecoveryStatus: isCustomerProtectionVisible ? 'paid_unresolved' : null,
-    recoveryReason: isCustomerProtectionVisible ? recoveryReason : null,
+    recoveryReason: waitingForAddress
+      ? "We're checking your delivery address. No action is needed right now."
+      : isCustomerProtectionVisible ? recoveryReason : null,
     fulfillmentOnHold: Boolean(holdCheckedAt),
     fulfillmentCheckedAt: holdCheckedAt,
     error: paymentFailure

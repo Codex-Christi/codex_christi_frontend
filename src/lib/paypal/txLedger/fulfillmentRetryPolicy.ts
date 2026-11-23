@@ -1,4 +1,44 @@
+import { isMerchizeLookupPendingProviderProcessingError } from '@/lib/merchizeFulfillmentOps/lookupPending';
+import { CUSTOMER_ADDRESS_CORRECTION_REQUESTED } from '@/lib/shop/checkout/customerAddressCorrection';
+import { PAYPAL_LEDGER_STATUS } from './status';
+
 export type PaidOrderRetryMode = 'none' | 'resume_post_payment' | 'retry_merchize_fulfillment';
+
+export function getPushVerificationPendingMessage(newPushAcknowledged?: boolean) {
+  const nextStep = 'Refresh Merchize state before trying to release again.';
+  if (newPushAcknowledged === true) {
+    return `Merchize acknowledged the push request, but production release is not yet confirmed. ${nextStep}`;
+  }
+  if (newPushAcknowledged === false) {
+    return `This action did not send a new push request. Merchize has not confirmed production release. ${nextStep}`;
+  }
+  return `Merchize has not confirmed production release. ${nextStep}`;
+}
+
+export function getPendingFulfillmentRetryMessage({
+  status,
+  lastErrorCode,
+  hasAcceptedDjangoHandoff,
+}: {
+  status: string;
+  lastErrorCode: string | null;
+  hasAcceptedDjangoHandoff: boolean;
+}) {
+  if (status !== PAYPAL_LEDGER_STATUS.PAYMENT_SAVED || !hasAcceptedDjangoHandoff) return null;
+  if (lastErrorCode === 'MERCHIZE_ADDRESS_VALIDATION_PENDING') {
+    return 'Payment is saved and Merchize received the order. Its delivery address check is still pending. Refresh Merchize state to check again.';
+  }
+  if (lastErrorCode === CUSTOMER_ADDRESS_CORRECTION_REQUESTED) {
+    return 'The buyer submitted a corrected address. Merchize has not verified it yet.';
+  }
+  if (lastErrorCode === 'MERCHIZE_PUSH_VERIFICATION_PENDING') {
+    return getPushVerificationPendingMessage();
+  }
+  if (isMerchizeLookupPendingProviderProcessingError(lastErrorCode)) {
+    return 'Payment is saved and Django accepted the order. Merchize is still making the order available. Refresh Merchize state to check again.';
+  }
+  return null;
+}
 
 export type MerchizeFulfillmentRetryCheckpoint =
   | 'capture'

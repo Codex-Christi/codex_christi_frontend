@@ -169,9 +169,9 @@ function RecoveryActionsPanel({
   const addressReviewStatus = detail.merchizeFulfillmentOps?.addressReviewStatus;
   const canConfirmProviderAddress =
     Boolean(detail.merchizeFulfillmentOps?.merchizeOrderId) &&
-    ['blocked', 'pending', 'provider_update_pending_validation'].includes(
-      addressReviewStatus ?? '',
-    );
+    detail.buyerAddressCorrectionState !== 'checking' &&
+    (detail.buyerAddressCorrectionState === 'review' ||
+      ['blocked', 'pending', 'provider_update_pending_validation'].includes(addressReviewStatus ?? ''));
 
   return (
     <AdminGlassPanel className='overflow-hidden'>
@@ -189,7 +189,7 @@ function RecoveryActionsPanel({
           requiresManualRelease={detail.requiresManualRelease}
           canConfirmProviderAddress={canConfirmProviderAddress}
           manualReleaseReadinessWarning={manualReleaseReadinessWarning}
-          retryMode={detail.retryMode}
+          retryMode={detail.buyerAddressCorrectionState ? 'none' : detail.retryMode}
           shopOpsDataTarget={shopOpsDataTarget}
         />
       </div>

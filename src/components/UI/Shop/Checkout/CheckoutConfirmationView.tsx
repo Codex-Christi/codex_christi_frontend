@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { Check, Copy, Download, Loader2, RefreshCw, TriangleAlert } from 'lucide-react';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import type { MappedProcessingState } from '@/lib/paypal/txLedger/mapLedgerToProcessingState';
+import type { CustomerAddressCorrectionState } from '@/lib/shop/checkout/customerAddressCorrection';
 import { customerFulfillmentHold } from '@/lib/shop/checkout/customerFulfillmentHold';
 
 type CheckoutConfirmationViewProps = {
@@ -24,6 +25,8 @@ type CheckoutConfirmationViewProps = {
   actionsDisabled?: boolean;
   storageNotice?: ReactNode;
   recovery?: ReactNode;
+  addressCorrection?: ReactNode;
+  addressCorrectionState?: CustomerAddressCorrectionState;
   onRefresh: () => void;
   onDownload: () => void;
   onCopy: () => void;
@@ -75,6 +78,8 @@ export default function CheckoutConfirmationView({
   actionsDisabled,
   storageNotice,
   recovery,
+  addressCorrection,
+  addressCorrectionState,
   onRefresh,
   onDownload,
   onCopy,
@@ -83,6 +88,14 @@ export default function CheckoutConfirmationView({
   const manualReview = state?.needsManualReview;
   const delayed = paid && state?.flowStatus === 'error';
   const onHold = paid && hasData && !accessRequired && !refunded && state?.fulfillmentOnHold;
+  const correction = paid && hasData && !accessRequired && !refunded && !onHold
+    ? addressCorrectionState
+    : null;
+  const correctionTitle = correction === 'required' ? 'Check your delivery address'
+    : correction === 'checking' ? 'Checking your delivery address' : null;
+  const correctionDescription = correction === 'required'
+    ? 'Your payment was received. Please correct your address so we can prepare your order.'
+    : correction === 'checking' ? 'We received your correction. No action is needed right now.' : null;
   const shortReference = state?.shortSupportReference || orderToken.slice(0, 8);
   const lastUpdated = !accessRequired && hasData
     ? readLastUpdated(onHold ? state?.fulfillmentCheckedAt : state?.updatedAt)
@@ -113,7 +126,7 @@ export default function CheckoutConfirmationView({
           : completed
             ? `Your payment and order details are recorded. Keep reference ${shortReference} for updates.`
             : paid
-              ? 'Your payment is recorded. We’re completing the remaining order steps. You can return here for updates.'
+              ? (state?.recoveryReason ?? 'Your payment is recorded. We’re completing the remaining order steps. You can return here for updates.')
               : hasData
                 ? 'We haven’t confirmed a completed payment. If you approved it, check its status before paying again.'
                 : 'Please wait while we check the payment record.';
@@ -137,10 +150,10 @@ export default function CheckoutConfirmationView({
           )}
         </div>
         <h1 id='checkout-confirmation-title' className='mt-5 text-xl font-semibold sm:text-2xl'>
-          {onHold ? customerFulfillmentHold.title : title}
+          {onHold ? customerFulfillmentHold.title : correctionTitle ?? title}
         </h1>
         <p className='mx-auto mt-3 max-w-lg text-sm leading-6 text-white/75' aria-live='polite'>
-          {onHold ? customerFulfillmentHold.description : description}
+          {onHold ? customerFulfillmentHold.description : correctionDescription ?? description}
         </p>
         {lastUpdated && (
           <p className='mt-3 text-xs leading-5 text-white/55'>
@@ -170,6 +183,7 @@ export default function CheckoutConfirmationView({
           </div>
         )}
         {accessRequired && recovery}
+        {correction && <div className='mt-5 text-left'>{addressCorrection}</div>}
         {!accessRequired && (
           <div className='mt-6 grid gap-3'>
             <button

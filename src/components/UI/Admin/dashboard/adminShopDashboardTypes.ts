@@ -175,6 +175,7 @@ export type PaidOrderRecoveryScannerState = {
 };
 
 export type PaidOrderRecoveryDetail = {
+  buyerAddressCorrectionState?: import('@/lib/shop/checkout/customerAddressCorrection').CustomerAddressCorrectionState | null;
   customerName: string;
   customerEmail: string;
   createdAt: string;

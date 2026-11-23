@@ -104,6 +104,24 @@ test('confirmation shows the same UTC last-update record across browser timezone
     );
 });
 
+test('the verified order offers the address correction and hides it without access', async () => {
+  await checkConfirmation(`
+    const { default: CustomerAddressCorrection } = require('./src/components/UI/Shop/Checkout/CustomerAddressCorrection');
+    const required = {addressCorrectionState:'required',addressCorrection:<CustomerAddressCorrection orderToken='local-order-1234' state='required' onRefresh={()=>actions++} />};
+    const doc = render(required);
+    assert.equal(doc.querySelector('h1').textContent,'Check your delivery address');
+    assert.ok(button(doc,'Submit corrected address'));
+    assert.ok(doc.querySelector('input[name=confirmed]').required);
+    assert.ok(doc.querySelector('[role=combobox]'));
+    assert.equal(doc.querySelector('input[name=line1]').value,'');
+    assert.equal(button(render({...required,accessRequired:true}),'Submit corrected address'),undefined);
+    assert.equal(button(render({...required,refunded:true}),'Submit corrected address'),undefined);
+    const checking = render({addressCorrectionState:'checking'});
+    assert.equal(checking.querySelector('h1').textContent,'Checking your delivery address');
+    assert.match(checking.body.textContent,/No action is needed right now/u);
+  `);
+});
+
 test('confirmation omits missing, invalid, or unauthorized update timestamps', async () => {
   await checkConfirmation(`
     for (const updatedAt of [undefined,null,'','not-a-date','2026-11-21','2026-11-21T14:32:00','2026-02-30T14:32:00.000Z','2026-11-21T25:32:00.000Z']) {

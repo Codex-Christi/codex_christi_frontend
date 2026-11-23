@@ -1,5 +1,11 @@
 import 'server-only';
 
+import {
+  customerAddressCorrectionState,
+  CUSTOMER_ADDRESS_CORRECTION_ACTOR,
+  CUSTOMER_ADDRESS_CORRECTION_REQUESTED,
+} from '@/lib/shop/checkout/customerAddressCorrection';
+
 import { formatDistanceToNowStrict } from 'date-fns';
 
 import { formatAdminSystemTimestamp } from '@/lib/admin/formatAdminSystemTimestamp';
@@ -831,6 +837,7 @@ function buildActivity(row: {
   djangoPaymentSaveCustomId: string | null;
   fulfillmentAddressOverriddenAt: Date | null;
   fulfillmentAddressOverrideReason: string | null;
+  fulfillmentAddressOverriddenBy: string | null;
   processingCompletedAt: Date | null;
   processingTriggeredAt?: Date | null;
   processingTriggerDetail?: string | null;
@@ -906,7 +913,9 @@ function buildActivity(row: {
 
   if (row.fulfillmentAddressOverriddenAt) {
     activity.push({
-      label: 'Fulfillment address overridden',
+      label: row.fulfillmentAddressOverriddenBy === CUSTOMER_ADDRESS_CORRECTION_ACTOR
+        ? 'Buyer submitted a corrected address'
+        : 'Fulfillment address overridden',
       description:
         row.fulfillmentAddressOverrideReason ?? 'Admin saved a fulfillment address override.',
       time: formatLongDate(row.fulfillmentAddressOverriddenAt),
@@ -1136,6 +1145,7 @@ function buildDetail(
   );
 
   return {
+    buyerAddressCorrectionState: customerAddressCorrectionState(row),
     customerName: row.customerName,
     customerEmail: row.customerEmail,
     createdAt: formatLongDate(row.createdAt),
@@ -1147,6 +1157,7 @@ function buildDetail(
     addressCorrectionProviderApplied: Boolean(
       overrideAddress &&
       row.merchizeFulfillmentOps?.providerAddressUpdatedAt &&
+      row.lastErrorCode !== CUSTOMER_ADDRESS_CORRECTION_REQUESTED &&
       row.merchizeFulfillmentOps.addressReviewStatus !== 'provider_update_failed',
     ),
     addressOverrideReason: row.fulfillmentAddressOverrideReason,

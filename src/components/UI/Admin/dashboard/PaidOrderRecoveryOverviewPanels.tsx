@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS } from '@/lib/merchizeFulfillmentOps/status';
 import AdminCopyValueButton from './AdminCopyValueButton';
 import AdminGlassPanel from './AdminGlassPanel';
 import PaidOrderRecoveryFulfillmentEvidencePanel from './PaidOrderRecoveryFulfillmentEvidencePanel';
@@ -589,6 +590,24 @@ function getRecommendedAction(
     return 'No recovery action is required. Review the audit trail and close the case.';
   }
 
+  const releaseStatus = detail.merchizeFulfillmentOps?.productionGateStatus;
+  if (
+    releaseStatus === MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_ACKNOWLEDGED ||
+    releaseStatus === MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFICATION_PENDING
+  ) {
+    return 'Refresh Merchize state to verify release. Do not send another push request yet.';
+  }
+
+  if (detail.buyerAddressCorrectionState === 'required') {
+    return 'Wait for the buyer to submit a corrected address from their order page.';
+  }
+  if (detail.buyerAddressCorrectionState === 'checking') {
+    return 'Wait for the delivery address check. Refresh Merchize state to see the latest result.';
+  }
+  if (detail.buyerAddressCorrectionState === 'review') {
+    return 'A master admin must review the address before the order can continue.';
+  }
+
   if (detail.needsProviderDetailSync) {
     return 'Refresh Merchize state before retrying the fulfillment handoff.';
   }
@@ -602,7 +621,7 @@ function getRecommendedAction(
   }
 
   if (detail.requiresManualRelease) {
-    return 'Non-bypassable readiness checks are clear. A master admin can now review the seven-day age override.';
+    return 'A master admin can review whether this order is eligible for manual release.';
   }
 
   if (recovery.status === 'recovery') {

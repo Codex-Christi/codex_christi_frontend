@@ -200,7 +200,7 @@ export function CheckoutPaymentView({
           <span>I’ve checked the delivery address, items, quantities, and total.</span>
         </label>
         <p className='-mt-3 text-xs leading-5 text-white/60'>
-          Please review your details carefully; these items are made to order.{' '}
+          Double-check your delivery address, including any apartment or unit number. These items are made to order.{' '}
           <CustomShopLink href='/shop/terms-of-use' className='underline'>
             Terms (draft)
           </CustomShopLink>{' '}
