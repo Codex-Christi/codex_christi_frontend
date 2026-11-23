@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 import {
@@ -25,6 +25,8 @@ export default function CheckoutAttemptRecovery({ children }: { children: ReactN
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<{ scope: string; message: string } | null>(null);
   const [version, setVersion] = useState(0);
+  const reviewId = useId();
+  const [focusRequest, setFocusRequest] = useState(0);
   const sequence = useRef(0);
   useEffect(
     () => () => {
@@ -36,14 +38,20 @@ export default function CheckoutAttemptRecovery({ children }: { children: ReactN
 
   const openOriginal = async () => {
     if (!attempt || pending === scope) return;
+    if (original) {
+      setFocusRequest((value) => value + 1);
+      return;
+    }
     const request = ++sequence.current;
     const started = originalCheckoutScope();
     setPending(scope);
     setError(null);
     try {
       const checkout = await loadOriginalCheckout(attempt);
-      if (sequence.current === request && originalCheckoutScope() === started)
+      if (sequence.current === request && originalCheckoutScope() === started) {
         setLoaded({ scope, checkout });
+        setFocusRequest((value) => value + 1);
+      }
     } catch (failure) {
       if (sequence.current === request && originalCheckoutScope() === started)
         setError({
@@ -62,6 +70,8 @@ export default function CheckoutAttemptRecovery({ children }: { children: ReactN
           <ActivePayPalCheckoutRecoveryBanner
             onContinueOriginal={() => void openOriginal()}
             reviewing={pending === scope}
+            originalOpen={Boolean(original)}
+            reviewId={reviewId}
             onStartSeparateOrder={() => {
               sequence.current += 1;
               setLoaded(null);
@@ -77,6 +87,8 @@ export default function CheckoutAttemptRecovery({ children }: { children: ReactN
           {original && (
             <OriginalCheckoutReview
               key={`${scope}:${original.reviewKey}`}
+              id={reviewId}
+              focusRequest={focusRequest}
               checkout={original}
               onBack={() => setLoaded(null)}
               renderPayment={(mode) => <PayPalCheckout mode={mode} />}

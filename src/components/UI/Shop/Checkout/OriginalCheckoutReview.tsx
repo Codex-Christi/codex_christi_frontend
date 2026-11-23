@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Package } from 'lucide-react';
 import type { OriginalCheckout } from '@/lib/shop/checkout/originalCheckout';
 import { formatOrderMoney } from '@/lib/shop/checkout/orderMoney';
@@ -16,19 +16,33 @@ export default function OriginalCheckoutReview({
   checkout,
   onBack,
   renderPayment,
+  id,
+  focusRequest = 0,
 }: {
   checkout: OriginalCheckout;
   onBack: () => void;
   renderPayment: (mode: CheckoutOptions) => ReactNode;
+  id?: string;
+  focusRequest?: number;
 }) {
+  const generatedId = useId();
+  const reviewId = id ?? generatedId;
   const [acceptedReview, setAcceptedReview] = useState<string | null>(null);
   const acknowledged = acceptedReview === checkout.reviewKey;
   const [mode, setMode] = useState<CheckoutOptions>('');
   const [error, setError] = useState<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    heading.current?.focus();
-  }, []);
+    const target = heading.current;
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView?.({
+      block: 'start',
+      behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        ? 'instant'
+        : 'smooth',
+    });
+  }, [focusRequest]);
   const money = (amount: number | string) =>
     formatOrderMoney(Number(amount), checkout.quote.currency);
   const address = checkout.deliveryAddress;
@@ -43,10 +57,19 @@ export default function OriginalCheckoutReview({
         },
       }}
     >
-      <div className='mt-5 min-w-0 space-y-5 border-t border-white/20 pt-5'>
+      <section
+        id={reviewId}
+        aria-labelledby={`${reviewId}-heading`}
+        className='mt-5 min-w-0 space-y-5 border-t border-white/20 pt-5'
+      >
         <header className='flex flex-wrap items-start justify-between gap-3'>
           <div>
-            <h2 ref={heading} tabIndex={-1} className='text-xl font-semibold outline-none'>
+            <h2
+              id={`${reviewId}-heading`}
+              ref={heading}
+              tabIndex={-1}
+              className='scroll-mt-24 rounded-sm text-xl font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#0085ff]'
+            >
               Your original purchase
             </h2>
             <p className='mt-2 text-sm leading-6 text-white/75'>
@@ -165,7 +188,7 @@ export default function OriginalCheckoutReview({
           </p>
         )}
         {acknowledged && mode && renderPayment(mode)}
-      </div>
+      </section>
     </CheckoutPaymentReviewContext.Provider>
   );
 }

@@ -63,12 +63,16 @@ function getStageCopy(stage: ActivePayPalCheckoutStage, paymentLabel: string) {
 type ActivePayPalCheckoutRecoveryBannerProps = {
   onContinueOriginal: () => void;
   reviewing?: boolean;
+  originalOpen?: boolean;
+  reviewId?: string;
   onStartSeparateOrder?: () => void;
 };
 
 export default function ActivePayPalCheckoutRecoveryBanner({
   onContinueOriginal,
   reviewing = false,
+  originalOpen = false,
+  reviewId,
   onStartSeparateOrder,
 }: ActivePayPalCheckoutRecoveryBannerProps) {
   const { push } = useShopRouter();
@@ -94,6 +98,11 @@ export default function ActivePayPalCheckoutRecoveryBanner({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const paymentLabel = activeCheckout?.paymentSurface === 'card' ? 'card form' : 'PayPal checkout';
   const copy = getStageCopy(activeCheckout?.stage ?? 'paypal_order_created', paymentLabel);
+  const reviewLabel = reviewing
+    ? 'Opening original purchase…'
+    : originalOpen
+      ? 'Go to original purchase'
+      : 'Review original purchase';
 
   const loadStatus = useCallback(async (captured: CheckoutAttempt) => {
     const scope = originalCheckoutScope();
@@ -244,12 +253,13 @@ export default function ActivePayPalCheckoutRecoveryBanner({
             </Button>
             {canReopenCheckoutPayment(activeCheckout.stage) && (
               <Button
-                name='Review original purchase'
+                name={reviewLabel}
+                aria-controls={originalOpen ? reviewId : undefined}
                 onClick={onContinueOriginal}
                 disabled={reviewing || isChecking}
                 className='h-auto rounded-full border border-white/25 bg-white/[0.045] px-4 py-2 text-xs font-semibold text-white hover:bg-white/[0.08]'
               >
-                {reviewing ? 'Opening original purchase…' : 'Review original purchase'}
+                {reviewLabel}
               </Button>
             )}
             <CustomShopLink
