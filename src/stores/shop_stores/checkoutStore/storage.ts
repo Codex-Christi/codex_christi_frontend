@@ -3,13 +3,14 @@ import {
   revealBrowserText,
   revealLegacyCryptoJsBrowserText,
 } from '@/lib/crypto/browserObfuscatedStorage';
+import { loadPublicRuntimeConfig } from '@/lib/runtime-config/client';
 import type { PersistStorage, StorageValue } from 'zustand/middleware';
 
-const PUBLIC_KEY = process.env.NEXT_PUBLIC_CART_KEY || 'fallback-secret';
 export type CheckoutStorageIssue = {
   purpose: string;
   message: string;
   severity: 'warning' | 'error';
+  recovery?: 'reload';
 };
 export const EMPTY_CHECKOUT_STORAGE_ISSUES: readonly CheckoutStorageIssue[] = [];
 let issues = EMPTY_CHECKOUT_STORAGE_ISSUES;
@@ -24,7 +25,11 @@ export const subscribeCheckoutStorageIssues = (listener: () => void) => {
   };
 };
 function report(purpose: string, issue?: Omit<CheckoutStorageIssue, 'purpose'>, saved = false) {
-  if (!saved && issues.some((item) => item.purpose === purpose && item.severity === 'error'))
+  if (
+    !saved &&
+    issue?.recovery !== 'reload' &&
+    issues.some((item) => item.purpose === purpose && item.severity === 'error')
+  )
     return;
   if (issues.find((item) => item.purpose === purpose)?.message === issue?.message) return;
   issues = [
@@ -49,9 +54,9 @@ export async function flushCheckoutStorage(purpose?: string) {
     )
       break;
   }
-  const failure = issues.find(
-    (item) => (!purpose || item.purpose === purpose) && item.severity === 'error',
-  );
+  const failure =
+    issues.find((item) => item.recovery === 'reload') ??
+    issues.find((item) => (!purpose || item.purpose === purpose) && item.severity === 'error');
   if (failure) throw new Error(failure.message);
 }
 
@@ -67,6 +72,7 @@ export async function retryCheckoutStorage(purpose?: string) {
 type StorageOptions = {
   getStorage?: () => Storage;
   cryptoAvailable?: () => boolean;
+  getCartKey?: () => Promise<string>;
 };
 
 /** Old email-wide flags and recovery summaries no longer authorize checkout. */
@@ -85,11 +91,19 @@ export function createCheckoutObfuscatedStorage<S>(
   {
     getStorage = () => window.localStorage,
     cryptoAvailable = () => Boolean(globalThis.crypto?.subtle),
+    getCartKey = async () => (await loadPublicRuntimeConfig()).cartKey,
   }: StorageOptions = {},
 ): PersistStorage<S, Promise<void>> {
   let generation = 0;
   let queue = Promise.resolve();
+  let runtimeReadBlocked = false;
   let latestOperation: (() => Promise<void> | void) | undefined;
+  const readBlockedIssue = {
+    severity: 'error',
+    recovery: 'reload',
+    message:
+      'A saved checkout couldn’t be opened. Its original copy is safe. Reload this page before paying.',
+  } as const;
   const enqueue = (operation: () => Promise<void> | void, remember = true) => {
     if (remember) latestOperation = operation;
     generation += 1;
@@ -97,11 +111,16 @@ export function createCheckoutObfuscatedStorage<S>(
       .then(operation)
       .then(() => report(purpose, undefined, true))
       .catch(() => {
-        report(purpose, {
-          severity: 'error',
-          message:
-            'Checkout changes could not be saved on this device. Keep this page open and try again before paying.',
-        });
+        report(
+          purpose,
+          runtimeReadBlocked
+            ? readBlockedIssue
+            : {
+                severity: 'error',
+                message:
+                  'Checkout changes could not be saved on this device. Keep this page open and try again before paying.',
+              },
+        );
       });
     pending.set(purpose, queue);
     return queue;
@@ -132,11 +151,30 @@ export function createCheckoutObfuscatedStorage<S>(
         if (!stored) return null;
         if (!stored.startsWith('{') && !cryptoAvailable())
           throw new Error('Decryption unavailable');
-        const json = stored.startsWith('{')
-          ? stored
-          : stored.startsWith('ob1.')
-            ? await revealBrowserText(stored, PUBLIC_KEY, purpose)
-            : await revealLegacyCryptoJsBrowserText(stored, PUBLIC_KEY);
+        let json = stored;
+        if (!stored.startsWith('{')) {
+          let publicKey: string;
+          try {
+            publicKey = await getCartKey();
+          } catch {
+            // Do not overwrite a potentially active payment attempt after an unavailable
+            // configuration prevents hydration. A reload can restore the saved state.
+            let originalStillPresent = true;
+            try {
+              originalStillPresent = (storage.getItem(`${name}:v2`) ?? storage.getItem(name)) === stored;
+            } catch {
+              // If storage became unavailable, assume the saved record still needs protection.
+            }
+            if (originalStillPresent) {
+              runtimeReadBlocked = true;
+              report(purpose, readBlockedIssue);
+            }
+            return null;
+          }
+          json = stored.startsWith('ob1.')
+            ? await revealBrowserText(stored, publicKey, purpose)
+            : await revealLegacyCryptoJsBrowserText(stored, publicKey);
+        }
         const decoded = validate(JSON.parse(json));
         if (started !== generation) return null;
         report(purpose);
@@ -154,9 +192,15 @@ export function createCheckoutObfuscatedStorage<S>(
     setItem: (name, value) => {
       const saved = JSON.stringify(value);
       return enqueue(async () => {
+        if (runtimeReadBlocked) throw new Error('Checkout must be restored before saving.');
         const storage = getStorage();
         const key = `${name}:v2`;
         const encrypted = cryptoAvailable();
+        const serialized = encrypted
+          ? await obfuscateBrowserText(saved, await getCartKey(), purpose)
+          : saved;
+        // Recheck after awaiting the key in case a concurrent hydration failed.
+        if (runtimeReadBlocked) throw new Error('Checkout must be restored before saving.');
         const previous = storage.getItem(key);
         if (
           previous &&
@@ -165,16 +209,14 @@ export function createCheckoutObfuscatedStorage<S>(
           !storage.getItem(`${name}:recovery`)
         )
           storage.setItem(`${name}:recovery`, previous);
-        storage.setItem(
-          key,
-          encrypted ? await obfuscateBrowserText(saved, PUBLIC_KEY, purpose) : saved,
-        );
+        storage.setItem(key, serialized);
       });
     },
     removeItem: (name) =>
       enqueue(() => {
         const storage = getStorage();
         for (const key of [name, `${name}:v2`, `${name}:recovery`]) storage.removeItem(key);
+        runtimeReadBlocked = false;
       }),
   };
 }

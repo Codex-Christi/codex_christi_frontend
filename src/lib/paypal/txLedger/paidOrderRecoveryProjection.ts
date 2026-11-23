@@ -6,6 +6,7 @@ import {
   getPayPalLedgerInferredProcessingSourceDisplay,
   getPayPalLedgerProcessingSourceDisplay,
 } from '@/lib/paypal/txLedger/paypalLedgerProvenance';
+import { readRuntimeSiteOrigins } from '@/lib/siteBaseUrls.server';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import {
   getMerchizeFulfillmentOpsPrisma,
@@ -430,11 +431,14 @@ function buildProjectionData({
       processingTriggerDetail: ledgerRow.processingTriggerDetail,
       processingTriggerSource: ledgerRow.processingTriggerSource,
     },
-    getPayPalLedgerInferredProcessingSourceDisplay({
-      checkoutSurfaceLabel: ledgerRow.checkoutSurfaceLabel,
-      hasCapturePayload: Boolean(ledgerRow.capturePayload),
-      ledgerStatus: ledgerRow.status,
-    }) ?? undefined,
+    getPayPalLedgerInferredProcessingSourceDisplay(
+      {
+        checkoutSurfaceLabel: ledgerRow.checkoutSurfaceLabel,
+        hasCapturePayload: Boolean(ledgerRow.capturePayload),
+        ledgerStatus: ledgerRow.status,
+      },
+      readRuntimeSiteOrigins(),
+    ) ?? undefined,
   );
   const merchizeExternalOrderNumber =
     merchizeOpsRow?.merchizeExternalOrderNumber ??

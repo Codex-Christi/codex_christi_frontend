@@ -1,5 +1,8 @@
 import 'server-only';
 
+import { readRuntimeSiteOrigins } from '@/lib/siteBaseUrls.server';
+import { getSiteHostnameAliases } from '@/lib/siteBaseUrls';
+
 type CheckoutSurfaceProvenance = {
   checkoutSurfaceHost: string | null;
   checkoutSurfaceOrigin: string | null;
@@ -56,11 +59,12 @@ function buildLabel(host: string | null) {
   if (isLocalhost(host)) return 'localhost development';
   if (isPrivateIpv4(host)) return `${host} local network checkout`;
 
-  const shopHost = getConfiguredHost(process.env.NEXT_PUBLIC_SHOP_SITE_URL);
-  const mainHost = getConfiguredHost(process.env.NEXT_PUBLIC_SITE_URL);
+  const origins = readRuntimeSiteOrigins();
+  const shopHost = getConfiguredHost(origins.shopSiteUrl);
+  const mainHost = getConfiguredHost(origins.siteUrl);
 
-  if (shopHost && host === shopHost) return `${host} shop checkout`;
-  if (mainHost && host === mainHost) return `${host} main-site checkout`;
+  if (shopHost && getSiteHostnameAliases(shopHost).includes(host)) return `${host} shop checkout`;
+  if (mainHost && getSiteHostnameAliases(mainHost).includes(host)) return `${host} main-site checkout`;
 
   return `${host} checkout`;
 }

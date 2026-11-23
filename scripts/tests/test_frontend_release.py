@@ -16,6 +16,8 @@ import unittest
 SOURCE = Path(__file__).resolve().parents[2] / 'devScripts' / 'production.sh'
 WORKFLOW = Path(__file__).resolve().parents[2] / '.github/workflows/push-to-main.yml'
 COMPOSE_FILE = Path(__file__).resolve().parents[2] / 'docker-compose.yml'
+DOCKERFILE = Path(__file__).resolve().parents[2] / 'Dockerfile'
+RUNTIME_IMAGE_CHECK = Path(__file__).resolve().parent / 'check-runtime-image-config.sh'
 OLD = 'sha256:' + '1' * 64
 NEW = 'sha256:' + '2' * 64
 CHECK = 'sha256:' + '3' * 64
@@ -41,7 +43,12 @@ if a[:2] == ['image','inspect']:
     if '--format' in a:
         image=a[-1]
         if 'org.codex-christi.release-settings' in a[a.index('--format')+1]:
-            print('1' if (image==s['new'] and s['mode']!='missing_settings_label') or (image==s['old'] and s.get('modern_old')) else '')
+            feature=''
+            if image==s['new'] and s['mode']!='missing_settings_label':
+                feature='1' if s['mode']=='compiled_settings_label' else '2'
+            elif image==s['old'] and s.get('modern_old'):
+                feature='1'
+            print(feature)
             raise SystemExit(0)
         print(image+(' linux/arm64' if s['mode']=='wrong_platform' else ' linux/amd64'))
     else:
@@ -150,17 +157,75 @@ class WorkflowContractTests(unittest.TestCase):
 
     def test_only_enabled_main_pushes_or_manual_runs_can_stage(self):
         workflow = WORKFLOW.read_text()
-        condition = re.search(r'^    if: (.+)$', workflow, re.MULTILINE)[1]
-        self.assertEqual(condition, "(github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && vars.LEASEWEB_FRONTEND_STAGE_ENABLED == 'true'")
+        condition = "(github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && vars.LEASEWEB_FRONTEND_STAGE_ENABLED == 'true'"
+        for name in ('Package exactly the tested image pair for staging', 'Prepare pinned SSH host authentication',
+                     'Submit the checked image pair to the private inbox'):
+            step = workflow.split(f'      - name: {name}\n', 1)[1].split('\n      -', 1)[0]
+            self.assertIn('        if: ' + condition + '\n', step)
+        for marker in ('      - name: Prepare staging evidence', '      - uses: actions/upload-artifact@'):
+            step = workflow.split(marker, 1)[1].split('\n      -', 1)[0]
+            self.assertIn('        if: always() && ' + condition + '\n', step)
         self.assertIn('  workflow_dispatch:', workflow)
-        self.assertIn('needs: [verify, container-build]', workflow)
+        self.assertIn('needs: verify', workflow)
         self.assertNotIn('LEASEWEB_FRONTEND_DEPLOY_ENABLED', workflow)
         self.assertIn('secrets.LEASEWEB_STAGE_SSH_KEY', workflow)
         self.assertIn('secrets.LEASEWEB_STAGE_SSH_HOST_KEYS', workflow)
+        self.assertEqual(workflow.count('secrets.'), 2)
         self.assertNotIn('git fetch origin main', workflow)
         self.assertNotIn('docker load', workflow)
         self.assertNotIn('scp ', workflow)
         self.assertNotIn('release/leaseweb', workflow)
+
+    def test_node_policy_is_version_controlled_and_images_need_no_application_environment(self):
+        workflow = WORKFLOW.read_text()
+        dockerfile = DOCKERFILE.read_text()
+        self.assertNotIn('vars.CODEX_NODE_IMAGE', workflow)
+        self.assertNotIn('vars.CODEX_NEXT_PUBLIC_BUILD_ENV', workflow)
+        self.assertEqual(workflow.count('scripts/resolve-node-image.py --github-output'), 1)
+        self.assertEqual(workflow.count('NODE_IMAGE: ${{ needs.verify.outputs.node_image }}'), 1)
+        self.assertEqual(workflow.count('NODE_VERSION: ${{ needs.verify.outputs.node_version }}'), 1)
+        self.assertIn('node-version: ${{ steps.node-base.outputs.node_version }}', workflow)
+        for removed in ('config/public-build.env', 'production_env', 'release-public-settings.json'):
+            self.assertNotIn(removed, workflow)
+            self.assertNotIn(removed, dockerfile)
+        self.assertIn('RUN yarn build', dockerfile)
+        self.assertIn('LABEL org.codex-christi.release-settings=2', dockerfile)
+        self.assertIn('COPY scripts/runtime-config.mjs ./scripts/runtime-config.mjs', dockerfile)
+        self.assertEqual(workflow.count('/checks/node-runtime.mjs native'), 1)
+        self.assertEqual(workflow.count('--env "EXPECTED_NODE_VERSION=$NODE_VERSION"'), 1)
+
+    def test_exact_built_images_are_tested_then_packaged_without_rebuild(self):
+        workflow = WORKFLOW.read_text()
+        self.assertEqual(workflow.count('docker buildx build --load'), 2)
+        self.assertEqual(workflow.count('--target runtime'), 1)
+        self.assertEqual(workflow.count('--target datastore-check'), 1)
+        self.assertIn('bash scripts/tests/check-runtime-image-config.sh "$RUNTIME_IMAGE" "$CHECKER_IMAGE"', workflow)
+        self.assertEqual(workflow.count('RUNTIME_IMAGE: ${{ steps.build.outputs.runtime_image }}'), 3)
+        self.assertEqual(workflow.count('CHECKER_IMAGE: ${{ steps.build.outputs.checker_image }}'), 3)
+        self.assertLess(workflow.index('Verify the exact built images offline'),
+                        workflow.index('Package exactly the tested image pair for staging'))
+        self.assertIn('test "$(docker image inspect --format \'{{.Id}}\' "codex-christi-next:$GITHUB_SHA")" = "$RUNTIME_IMAGE"', workflow)
+        self.assertIn('test "$(docker image inspect --format \'{{.Id}}\' "codex-christi-datastore-check:$GITHUB_SHA")" = "$CHECKER_IMAGE"', workflow)
+        self.assertIn('docker save "codex-christi-next:$GITHUB_SHA" "codex-christi-datastore-check:$GITHUB_SHA"', workflow)
+        checks = RUNTIME_IMAGE_CHECK.read_text()
+        self.assertIn('for mode in sandbox live; do', checks)
+        self.assertIn('/checks/runtime-config.mjs "$mode"', checks)
+        self.assertTrue(all('--network none --read-only' in line for line in checks.splitlines() if 'docker run ' in line))
+
+    def test_no_production_source_uses_static_next_public_environment_lookups(self):
+        root = DOCKERFILE.parent
+        static_lookup = re.compile(r"\bprocess\s*\.\s*env\s*(?:\.\s*NEXT_PUBLIC_\w+|\[\s*['\"]NEXT_PUBLIC_\w+['\"]\s*\])")
+        paths = [root / 'next.config.mjs', *(root / 'src').rglob('*')]
+        offenders = []
+        for path in paths:
+            if (path.suffix not in ('.ts', '.tsx', '.js', '.jsx', '.mjs') or not path.is_file()
+                    or 'generated' in path.parts or re.search(r'\.(?:test|spec)\.', path.name)):
+                continue
+            if static_lookup.search(path.read_text()):
+                offenders.append(str(path.relative_to(root)))
+        self.assertEqual(offenders, [], 'Static browser build lookups must be replaced with runtime configuration.')
+        self.assertIn('config/public-build.env', (root / '.dockerignore').read_text())
+        self.assertIn('/config/public-build.env', (root / '.gitignore').read_text())
 
     def test_stage_transmits_only_fixed_request_and_checks_receipt(self):
         workflow = WORKFLOW.read_text()
@@ -209,17 +274,28 @@ print('wrong-receipt' if os.environ['BAD_RECEIPT'] == '1' else f'CODEX_RELEASE_S
             revision, digest = 'a' * 40, 'b' * 64
             valid = f'CODEX_RELEASE_STAGED=frontend:{revision}:{digest}:10\n'
             env = dict(os.environ, RUNNER_TEMP=folder, GITHUB_SHA=revision, GITHUB_SERVER_URL='https://github.com',
-                       GITHUB_REPOSITORY='fixture/frontend', GITHUB_RUN_ID='1', GITHUB_RUN_ATTEMPT='2')
-            for raw, outcome, staged in ((valid, 'success', True), (valid, 'failure', False), (valid + '\n', 'success', False)):
+                       GITHUB_REPOSITORY='fixture/frontend', GITHUB_RUN_ID='1', GITHUB_RUN_ATTEMPT='2',
+                       NODE_IMAGE='docker.io/library/node@sha256:' + 'a' * 64, NODE_VERSION='26.13.1',
+                       RUNTIME_IMAGE=NEW, CHECKER_IMAGE=CHECK)
+            for raw, outcome, image_outcome, staged in ((valid, 'success', 'success', True),
+                                                       (valid, 'failure', 'success', False),
+                                                       (valid + '\n', 'success', 'success', False),
+                                                       (valid, 'success', 'failure', False)):
                 receipt.write_text(raw)
-                result = subprocess.run(['bash', '-c', script], cwd=root, env={**env, 'STAGE_OUTCOME': outcome},
+                result = subprocess.run(['bash', '-c', script], cwd=root, env={**env, 'STAGE_OUTCOME': outcome,
+                                        'IMAGE_CHECK_OUTCOME': image_outcome},
                                         capture_output=True, text=True, timeout=10)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 proof = json.loads((root / 'staging-proof' / 'proof.json').read_text())
                 self.assertEqual(proof['staged'], staged)
                 self.assertFalse(proof['deployment_verified'])
                 self.assertEqual(proof['run_attempt'], '2')
+                self.assertEqual(proof['node_image'], env['NODE_IMAGE'])
+                self.assertEqual(proof['node_version'], env['NODE_VERSION'])
                 self.assertEqual('sha256' in proof, staged)
+                self.assertEqual(proof['images_verified'], image_outcome == 'success')
+                self.assertEqual(proof.get('runtime_image'), NEW if image_outcome == 'success' else None)
+                self.assertEqual(proof.get('checker_image'), CHECK if image_outcome == 'success' else None)
 
 
 class ReleaseTests(unittest.TestCase):
@@ -330,9 +406,11 @@ except BlockingIOError:
         self.assertFalse(any('run' in call['args'] or call['args'][:2]==['container','rm'] for call in self.calls))
 
     def test_ordinary_release_cannot_skip_settings_by_omitting_the_image_feature_label(self):
-        result=self.run_release('missing_settings_label')
-        self.assertNotEqual(result.returncode,0)
-        self.assertFalse(any('run' in call['args'] or 'up' in call['args'] for call in self.calls))
+        for mode in ('missing_settings_label', 'compiled_settings_label'):
+            with self.subTest(mode=mode):
+                result=self.run_release(mode)
+                self.assertNotEqual(result.returncode,0)
+                self.assertFalse(any('run' in call['args'] or 'up' in call['args'] for call in self.calls))
 
     def test_neon_failure_keeps_current_service(self):
         result=self.run_release('database_failure')

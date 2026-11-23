@@ -1,12 +1,15 @@
 import { merchizeCatalogPrisma as db } from '@/lib/prisma/shop/merchize/merchizeCatalogPrisma';
 import { assertAuthConfiguration } from '@/lib/session/session-config';
+import { getPublicRuntimeConfig } from '../../../../../scripts/runtime-config.mjs';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const headers = { 'Cache-Control': 'no-store' };
-  let check = 'authentication configuration';
+  let check = 'runtime configuration';
   try {
+    getPublicRuntimeConfig(process.env);
+    check = 'authentication configuration';
     assertAuthConfiguration();
     check = 'local catalog';
     // Validate the local schema without scanning products or contacting suppliers.

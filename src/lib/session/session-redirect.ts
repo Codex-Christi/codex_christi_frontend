@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRequestUrl } from '@/lib/siteBaseUrls';
-import { getAuthRoutes, publicShopPath, safeAuthReturnPath } from '../auth/domain-routing';
+import { getRequestUrl } from '@/lib/siteBaseUrls.server';
+import { getAuthRoutes, publicShopPath, safeAuthReturnPath } from '../auth/domain-routing.server';
 import { getRequestSessionState } from './request-session';
 
 export const basicRedirect = (destination: string, req: NextRequest) =>

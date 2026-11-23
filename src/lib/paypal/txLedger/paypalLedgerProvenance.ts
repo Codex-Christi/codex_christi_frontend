@@ -1,3 +1,5 @@
+import type { SiteOrigins } from '@/lib/siteBaseUrls';
+
 const PROCESSING_SOURCE_DISPLAY = {
   capture_route: { label: 'Capture route', tone: 'slate' },
   manual_admin: { label: 'Manual admin', tone: 'rose' },
@@ -82,10 +84,10 @@ export function getPayPalLedgerProcessingSourceDisplay(
     : fallback;
 }
 
-function getCheckoutSurfaceLabel() {
+function getCheckoutSurfaceLabel(origins?: SiteOrigins | null) {
   if (process.env.NODE_ENV !== 'production') return 'Local checkout';
 
-  const shopUrl = process.env.NEXT_PUBLIC_SHOP_SITE_URL?.trim();
+  const shopUrl = origins?.shopSiteUrl?.trim();
   if (!shopUrl) return 'Shop checkout';
 
   try {
@@ -95,11 +97,10 @@ function getCheckoutSurfaceLabel() {
   }
 }
 
-export function getPayPalLedgerInferredProcessingSourceDisplay({
-  checkoutSurfaceLabel,
-  hasCapturePayload,
-  ledgerStatus,
-}: PayPalLedgerInferredSourceFields): { label: string; tone: PayPalLedgerSourceTone } | null {
+export function getPayPalLedgerInferredProcessingSourceDisplay(
+  { checkoutSurfaceLabel, hasCapturePayload, ledgerStatus }: PayPalLedgerInferredSourceFields,
+  origins?: SiteOrigins | null,
+): { label: string; tone: PayPalLedgerSourceTone } | null {
   if (checkoutSurfaceLabel) return { label: checkoutSurfaceLabel, tone: 'slate' };
   if (!hasCapturePayload) return null;
 
@@ -109,7 +110,7 @@ export function getPayPalLedgerInferredProcessingSourceDisplay({
     ledgerStatus === 'payment_saved'
   ) {
     return {
-      label: `${getCheckoutSurfaceLabel()} capture route`,
+      label: `${getCheckoutSurfaceLabel(origins)} capture route`,
       tone: 'slate',
     };
   }

@@ -2,12 +2,9 @@
 
 import Script from 'next/script';
 import { useSyncExternalStore } from 'react';
+import { usePublicRuntimeConfig } from '@/lib/runtime-config/hooks';
 
 const BEACON_URL = 'https://static.cloudflareinsights.com/beacon.min.js';
-const SITE_TOKENS: Record<string, string | undefined> = {
-  'codexchristi.org': process.env.NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_ORG_TOKEN,
-  'codexchristi.shop': process.env.NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_SHOP_TOKEN,
-};
 
 function subscribeToLoad(onLoad: () => void) {
   window.addEventListener('load', onLoad, { once: true });
@@ -20,12 +17,24 @@ const serverSnapshot = () => false;
 export default function CloudflareWebAnalytics() {
   const pageLoaded = useSyncExternalStore(subscribeToLoad, hasPageLoaded, serverSnapshot);
   if (process.env.NODE_ENV !== 'production' || !pageLoaded) return null;
+  return <ConfiguredAnalytics />;
+}
 
-  const hostname = window.location.hostname.replace(/^www\./, '');
-  const token = SITE_TOKENS[hostname]?.trim();
+const normalizedHost = (hostname: string) => hostname.replace(/^www\./, '');
+
+function ConfiguredAnalytics() {
+  const config = usePublicRuntimeConfig();
+  if (!config) return null;
+  const hostname = normalizedHost(window.location.hostname);
+  const token =
+    hostname === normalizedHost(new URL(config.siteUrl).hostname)
+      ? config.analyticsOrgToken
+      : hostname === normalizedHost(new URL(config.shopSiteUrl).hostname)
+        ? config.analyticsShopToken
+        : null;
 
   // Check after load so an automatic tag near the end of streamed HTML is not missed.
-  if (!token || document.querySelector(`script[src^="${BEACON_URL}"]`)) return null;
+  if (!token?.trim() || document.querySelector(`script[src^="${BEACON_URL}"]`)) return null;
 
   return (
     <Script
@@ -35,7 +44,7 @@ export default function CloudflareWebAnalytics() {
       strategy='lazyOnload'
       fetchPriority='low'
       crossOrigin='anonymous'
-      data-cf-beacon={JSON.stringify({ token, spa: true })}
+      data-cf-beacon={JSON.stringify({ token: token.trim(), spa: true })}
     />
   );
 }

@@ -44,7 +44,7 @@ services:
         max-size: '20m'
         max-file: '3'
 
-  # Check compiled settings against Compose-parsed runtime values without any network or data mount.
+  # Validate Compose-parsed runtime configuration without any network or data mount.
   release-settings-check:
     profiles: ['verify']
     image: ${DEPLOY_IMAGE:?Set the verified frontend release image ID or digest}

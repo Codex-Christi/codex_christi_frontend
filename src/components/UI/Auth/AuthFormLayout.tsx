@@ -1,6 +1,6 @@
 import { headers } from 'next/headers';
 import { Suspense, type ReactNode } from 'react';
-import { getAuthRoutes } from '@/lib/auth/domain-routing';
+import { getAuthRoutes } from '@/lib/auth/domain-routing.server';
 import AuthRoutesProvider from './AuthRoutesProvider';
 import FormContainer from './FormContainer';
 

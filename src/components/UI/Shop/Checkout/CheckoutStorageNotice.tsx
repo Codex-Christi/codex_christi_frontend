@@ -19,14 +19,26 @@ export default function CheckoutStorageNotice() {
   );
   if (!issues.length) return null;
   const hasError = issues.some((issue) => issue.severity === 'error');
-  const message = issues.find((issue) => issue.severity === 'error')?.message ?? issues[0].message;
+  const reloadRequired = issues.find((issue) => issue.recovery === 'reload');
+  const message =
+    reloadRequired?.message ??
+    issues.find((issue) => issue.severity === 'error')?.message ??
+    issues[0].message;
   return (
     <div
       role='alert'
       className='mb-5 rounded-xl border border-amber-200/30 bg-amber-100/5 p-3 text-sm leading-6 text-amber-100'
     >
       <p>{message}</p>
-      {hasError && (
+      {reloadRequired ? (
+        <button
+          type='button'
+          onClick={() => window.location.reload()}
+          className='mt-3 inline-flex min-h-11 items-center gap-2 rounded-lg border border-current px-3 font-semibold'
+        >
+          Reload checkout
+        </button>
+      ) : hasError ? (
         <>
           {retryError && (
             <p className='mt-2'>Saving is still unavailable. Keep this page open and try again.</p>
@@ -55,7 +67,7 @@ export default function CheckoutStorageNotice() {
             {retrying ? 'Retrying…' : 'Retry saving'}
           </button>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

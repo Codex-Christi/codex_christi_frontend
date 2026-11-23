@@ -4,7 +4,7 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { r2 } from '@/lib/cloudflare/r2';
 import { uploadPaymentReceiptToR2 } from '@/actions/shop/checkout/transactions/uploadPaymentReceipt';
 import { receiptDownloadPath } from './receiptReference';
-import { getShopSiteUrl } from '@/lib/siteBaseUrls';
+import { getShopSiteUrl } from '@/lib/siteBaseUrls.server';
 
 test('receipt upload uses the existing bucket with an opaque PDF key and returns a protected link', async (t) => {
   const previous = process.env.R2_PAYMENT_DOCS_BUCKET_NAME;

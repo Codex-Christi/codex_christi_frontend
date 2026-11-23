@@ -26,7 +26,7 @@ import {
   adminTransferStartSchema,
 } from '../formSchemas/admin-transfer';
 import { getEncodedAdminSessionSecret } from '../session/session-config';
-import { getMainSiteBaseUrl } from '../siteBaseUrls';
+import { getMainSiteBaseUrl } from '../siteBaseUrls.server';
 import { buildAdminTransferAcceptancePath } from './admin-paths';
 import type { z } from 'zod';
 

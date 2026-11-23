@@ -1,27 +1,19 @@
-export type PublicPayPalPaymentMode = 'sandbox' | 'live';
+import type { PublicRuntimeConfig } from '@/lib/runtime-config/client';
 
-function getPublicPayPalPaymentMode(): PublicPayPalPaymentMode {
-  const configured = (process.env.NEXT_PUBLIC_PAYPAL_PAYMENT_MODE ?? '').toLowerCase();
-
-  if (configured === 'live') return 'live';
-  if (configured === 'sandbox') return 'sandbox';
-
-  throw new Error('Invalid NEXT_PUBLIC_PAYPAL_PAYMENT_MODE. Expected "sandbox" or "live".');
-}
-
-// Client code only needs the public PayPal client ID; keep that logic separate
-// from the server-only secret and webhook configuration.
-export function getPublicPayPalClientId() {
-  const paymentMode = getPublicPayPalPaymentMode();
-  const isLive = paymentMode === 'live';
-
-  const clientId = isLive
-    ? process.env.NEXT_PUBLIC_PAYPAL_LIVE_CLIENT_ID
-    : process.env.NEXT_PUBLIC_PAYPAL_SANDBOX_CLIENT_ID;
-
-  if (!clientId) {
-    throw new Error(`Missing NEXT_PUBLIC PayPal ${paymentMode} client ID.`);
-  }
-
-  return clientId;
+// Do not create SDK options until the server's public payment config is available.
+export function getPublicPayPalOptions(
+  config: PublicRuntimeConfig | null,
+  currency: string | undefined,
+  buyerCountry: string | null | undefined,
+) {
+  if (!config || !currency) return null;
+  return {
+    clientId: config.paymentClientId,
+    'enable-funding': 'venmo',
+    'buyer-country': buyerCountry ?? 'US',
+    intent: 'authorize',
+    components: 'buttons,card-fields',
+    'data-sdk-integration-source': 'developer-studio',
+    currency,
+  } as const;
 }

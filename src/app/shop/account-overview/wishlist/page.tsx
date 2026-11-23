@@ -1,6 +1,6 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { isShopSiteHostname } from '@/lib/siteBaseUrls';
+import { isShopSiteHostname } from '@/lib/siteBaseUrls.server';
 
 export default async function WishlistRedirect() {
   const requestHeaders = await headers();

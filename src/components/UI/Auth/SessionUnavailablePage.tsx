@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import { getAuthRoutes, safeAuthReturnPath } from '@/lib/auth/domain-routing';
+import { getAuthRoutes, safeAuthReturnPath } from '@/lib/auth/domain-routing.server';
 import AuthUnavailable from './AuthUnavailable';
 
 export const sessionUnavailableMetadata = {

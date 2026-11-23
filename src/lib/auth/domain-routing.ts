@@ -1,4 +1,9 @@
-import { getHostnameFromHostHeader, getMainSiteUrl, isShopSiteHostname } from '../siteBaseUrls';
+import {
+  getHostnameFromHostHeader,
+  getMainSiteUrl,
+  isShopSiteHostname,
+  type SiteOrigins,
+} from '../siteBaseUrls';
 import { getSafeAdminReturnPath } from '../admin/admin-paths';
 
 export type AuthRoutes = ReturnType<typeof getAuthRoutes>;
@@ -11,14 +16,14 @@ const SHOP_RETURN_PATHS = [
   '/categories',
 ];
 
-export function publicShopPath(path: string, hostname: string) {
-  if (!isShopSiteHostname(hostname)) return path;
+export function publicShopPath(path: string, hostname: string, origins?: SiteOrigins | null) {
+  if (!isShopSiteHostname(hostname, origins)) return path;
   if (path === '/shop' || path.startsWith('/shop?')) return `/${path.slice(5)}`;
   return path.startsWith('/shop/') ? path.slice(5) : path;
 }
 
-export function getAuthRoutes(hostname: string, shop = false) {
-  const shopDomain = isShopSiteHostname(getHostnameFromHostHeader(hostname));
+export function getAuthRoutes(hostname: string, shop = false, origins?: SiteOrigins | null) {
+  const shopDomain = isShopSiteHostname(getHostnameFromHostHeader(hostname), origins);
   const isShop = shop || shopDomain;
   const prefix = isShop && !shopDomain ? '/shop' : '';
   return {
@@ -27,7 +32,7 @@ export function getAuthRoutes(hostname: string, shop = false) {
     login: `${prefix}/auth/${isShop ? 'login' : 'sign-in'}`,
     signup:
       isShop && process.env.NODE_ENV === 'production'
-        ? getMainSiteUrl('/auth/signup')
+        ? getMainSiteUrl('/auth/signup', origins)
         : '/auth/signup',
     verify: `${prefix}/auth/verify-otp`,
     forgot: `${prefix}/auth/forgot-password`,

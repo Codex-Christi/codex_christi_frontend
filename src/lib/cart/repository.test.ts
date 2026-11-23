@@ -10,6 +10,7 @@ import {
 } from './model';
 import { CartRepository } from './repository';
 import {
+  CART_KEY_FIXTURE,
   cartLine,
   deferred,
   MemoryCartDriver,
@@ -25,7 +26,7 @@ test('legacy carts migrate once across repository instances while preserving the
       state: { variants: [cartLine('shirt-m', 2), { quantity: 'damaged' }] },
       version: 0,
     }),
-    process.env.NEXT_PUBLIC_CART_KEY || 'fallback-secret',
+    CART_KEY_FIXTURE,
     'cart-storage',
   );
   legacy.setItem('cart-storage', original);
@@ -53,6 +54,29 @@ test('a decryption failure preserves the original instead of recording a complet
   assert.equal(legacy.getItem('cart-storage'), 'ob1.unreadable.ciphertext');
   assert.equal(driver.records.has('migration:cart-storage:v1'), false);
   assert.equal(driver.records.has('cart:guest'), false);
+});
+
+test('legacy migration waits for the original runtime key and can retry without losing the existing cart', async () => {
+  const driver = new MemoryCartDriver();
+  const legacy = new MemoryLegacyStorage();
+  const original = await obfuscateBrowserText(
+    JSON.stringify({ state: { variants: [cartLine('shirt-m', 2)] }, version: 0 }),
+    CART_KEY_FIXTURE,
+    'cart-storage',
+  );
+  legacy.setItem('cart-storage', original);
+  let unavailable = true;
+  const repository = new CartRepository(driver, () => legacy, undefined, async () => {
+    if (unavailable) throw new Error('Runtime configuration unavailable.');
+    return CART_KEY_FIXTURE;
+  });
+  await assert.rejects(repository.read('guest'), /original copy is safe/);
+  assert.equal(legacy.getItem('cart-storage'), original);
+  assert.equal(driver.records.has('migration:cart-storage:v1'), false);
+  assert.equal(driver.records.has('cart:guest'), false);
+  unavailable = false;
+  assert.equal(projectCart(await repository.read('guest'))[0].quantity, 2);
+  assert.equal(legacy.getItem('cart-storage'), original);
 });
 
 test('transactions combine independent tab edits and same-item increments from fresh stored state', async () => {

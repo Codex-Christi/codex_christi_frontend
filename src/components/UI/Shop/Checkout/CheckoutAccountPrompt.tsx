@@ -3,6 +3,8 @@
 import { useAuthStore } from '@/stores/authStore';
 import { authFlowUrl, getAuthRoutes, publicShopPath } from '@/lib/auth/domain-routing';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
+import { useHasMounted } from '@/lib/hooks/useHasMounted';
+import { usePublicRuntimeConfig } from '@/lib/runtime-config/hooks';
 
 export default function CheckoutAccountPrompt({
   onSignIn,
@@ -12,10 +14,12 @@ export default function CheckoutAccountPrompt({
   returnPath?: string;
 }) {
   const authenticated = useAuthStore((state) => state.isAuthenticated);
+  const origins = usePublicRuntimeConfig();
+  const mounted = useHasMounted();
   if (authenticated) return null;
-  const hostname = typeof window === 'undefined' ? 'localhost' : window.location.hostname;
-  const href = authFlowUrl(getAuthRoutes(hostname, true).login, {
-    next: publicShopPath(returnPath, hostname),
+  const hostname = mounted ? window.location.hostname : 'localhost';
+  const href = authFlowUrl(getAuthRoutes(hostname, true, origins).login, {
+    next: publicShopPath(returnPath, hostname, origins),
   });
   return (
     <p className='mb-6 text-sm leading-6 text-white/70'>

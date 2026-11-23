@@ -13,6 +13,7 @@ import { accountViewState } from '@/lib/auth/account-view-state';
 import type { AuthSessionState } from '@/lib/auth/session-snapshot';
 import { AccountAccessContext } from './AccountAccessContext';
 import AuthUnavailable from './AuthUnavailable';
+import { usePublicRuntimeConfig } from '@/lib/runtime-config/hooks';
 
 export default function RequireAccount({
   children,
@@ -26,6 +27,7 @@ export default function RequireAccount({
   const state = useAuthStore();
   const view = accountViewState(state, initialSession);
   const router = useRouter();
+  const origins = usePublicRuntimeConfig();
 
   useEffect(() => {
     if (initialSession) useAuthStore.getState().seedServerSession(initialSession);
@@ -33,13 +35,14 @@ export default function RequireAccount({
 
   useEffect(() => {
     if (state.status !== 'anonymous') return;
-    const routes = getAuthRoutes(window.location.hostname, shop);
+    const routes = getAuthRoutes(window.location.hostname, shop, origins);
     const path = publicShopPath(
       `${window.location.pathname}${window.location.search}`,
       window.location.hostname,
+      origins,
     );
     router.replace(authFlowUrl(routes.login, { next: safeAuthReturnPath(path, routes) }));
-  }, [router, shop, state.status]);
+  }, [router, shop, state.status, origins]);
 
   return (
     <>

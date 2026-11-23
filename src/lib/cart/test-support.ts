@@ -78,5 +78,7 @@ export function memoryRepository(
   driver = new MemoryCartDriver(),
   legacy = new MemoryLegacyStorage(),
 ) {
-  return new CartRepository(driver, () => legacy);
+  return new CartRepository(driver, () => legacy, undefined, async () => CART_KEY_FIXTURE);
 }
+
+export const CART_KEY_FIXTURE = 'cart-key-test-fixture';

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useHasMounted } from '@/lib/hooks/useHasMounted';
 import { publicShopPath } from '@/lib/auth/domain-routing';
 import { getMainSiteBaseUrl, isMainSiteHostname, isShopSiteHostname } from '@/lib/siteBaseUrls';
+import { usePublicRuntimeConfig } from '@/lib/runtime-config/hooks';
 
 interface ActiveInactiveProps {
   className?: string;
@@ -37,13 +38,14 @@ const CustomShopLink: FC<CustomShopLinkProps> = ({
   // Hooks
   const pathname = usePathname();
   const hasMounted = useHasMounted();
+  const origins = usePublicRuntimeConfig();
 
   // Parent & shop domains
-  const parentSiteProdHref = getMainSiteBaseUrl();
+  const parentSiteProdHref = getMainSiteBaseUrl(origins);
   const domain = hasMounted ? window.location.hostname : null;
   const isDev = domain === 'localhost';
   const isOnShopRouteParentSite =
-    hasMounted && window.location.pathname.startsWith('/shop') && isMainSiteHostname(domain);
+    hasMounted && window.location.pathname.startsWith('/shop') && isMainSiteHostname(domain, origins);
   const isActive =
     typeof href === 'string' ? pathname === href || pathname.startsWith(`${href}/`) : false;
 
@@ -54,9 +56,9 @@ const CustomShopLink: FC<CustomShopLinkProps> = ({
     if (isOnShopRouteParentSite) {
       newHref = '/shop'; // Ensure "/" keeps them inside the shop
     }
-  } else if (typeof newHref === 'string' && !isDev && isShopSiteHostname(domain)) {
+  } else if (typeof newHref === 'string' && !isDev && isShopSiteHostname(domain, origins)) {
     if (newHref === '/shop' || newHref.startsWith('/shop/') || newHref.startsWith('/shop?')) {
-      newHref = publicShopPath(newHref, domain ?? '');
+      newHref = publicShopPath(newHref, domain ?? '', origins);
     } else if (redirectToParentSite) {
       newHref = `${parentSiteProdHref}${newHref}`; // Redirect non-shop links to parent site
     }

@@ -37,6 +37,8 @@ yarn-error.log*
 # Env files (all excluded for safety)
 .env*
 !.env.example
+config/public-build.env
+release-public-settings.json
 
 # Vercel
 .vercel

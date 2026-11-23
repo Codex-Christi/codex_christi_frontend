@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { useDeferredClientEnhancement } from '@/lib/hooks/useDeferredClientEnhancement';
 import { isShopSiteHostname } from '@/lib/siteBaseUrls';
+import { usePublicRuntimeConfig } from '@/lib/runtime-config/hooks';
 
 const LoggedinProvider = dynamic(() => import('./LoggedinProvider'));
 const CartProvider = dynamic(() => import('./Shop/CartProvider'));
@@ -37,10 +38,11 @@ function DeferredProgressProvider() {
 
 const AllRootProviders: FC = () => {
   const pathname = usePathname();
+  const origins = usePublicRuntimeConfig();
   const needsResponsiveMediaProvider = pathname.startsWith('/shop/checkout');
   const onShop =
     pathname.startsWith('/shop') ||
-    (typeof window !== 'undefined' && isShopSiteHostname(window.location.hostname));
+    (typeof window !== 'undefined' && isShopSiteHostname(window.location.hostname, origins));
 
   return (
     <>

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { MemoryLegacyStorage } from '@/lib/cart/test-support';
+import { CART_KEY_FIXTURE, deferred, MemoryLegacyStorage } from '@/lib/cart/test-support';
 import {
   clearLegacyCheckoutCaches,
   createCheckoutObfuscatedStorage,
@@ -11,6 +11,7 @@ import {
 import { obfuscateBrowserText } from '@/lib/crypto/browserObfuscatedStorage';
 
 const value = { state: { orderToken: 'order-one' }, version: 0 };
+const getCartKey = async () => CART_KEY_FIXTURE;
 
 test('obsolete verification caches are removed without deleting the active checkout', async () => {
   const storage = new MemoryLegacyStorage();
@@ -48,6 +49,7 @@ test('unavailable decryption and malformed checkout state are preserved and repo
   storage.setItem('broken-test', original);
   const adapter = createCheckoutObfuscatedStorage('broken-test', undefined, {
     getStorage: () => storage,
+    getCartKey,
   });
   assert.equal(await adapter.getItem('broken-test'), null);
   assert.equal(storage.getItem('broken-test'), original);
@@ -84,6 +86,7 @@ test('clearing checkout waits for queued writes and removes every owned record',
   storage.setItem('clear-test:recovery', 'recovery');
   const adapter = createCheckoutObfuscatedStorage('clear-test', undefined, {
     getStorage: () => storage,
+    getCartKey,
   });
   const write = adapter.setItem('clear-test', value);
   const removal = adapter.removeItem('clear-test');
@@ -96,7 +99,7 @@ test('a current encrypted record has a recovery copy before an HTTP-compatible w
   const storage = new MemoryLegacyStorage();
   const encrypted = await obfuscateBrowserText(
     JSON.stringify(value),
-    process.env.NEXT_PUBLIC_CART_KEY || 'fallback-secret',
+    CART_KEY_FIXTURE,
     'fallback-test',
   );
   storage.setItem('fallback-test:v2', encrypted);
@@ -181,4 +184,85 @@ test('storage retry replays the latest removal rather than resurrecting an earli
   await retryCheckoutStorage('retry-removal');
   assert.equal(storage.getItem('retry-removal:v2'), null);
   assert.equal(await adapter.getItem('retry-removal'), null);
+});
+
+test('a runtime key outage leaves the saved checkout untouched until a write can be retried', async () => {
+  const storage = new MemoryLegacyStorage();
+  const purpose = 'runtime-write-retry';
+  const original = await obfuscateBrowserText(JSON.stringify(value), CART_KEY_FIXTURE, purpose);
+  storage.setItem(`${purpose}:v2`, original);
+  let unavailable = true;
+  const adapter = createCheckoutObfuscatedStorage(purpose, undefined, {
+    getStorage: () => storage,
+    getCartKey: async () => {
+      if (unavailable) throw new Error('Runtime configuration unavailable.');
+      return CART_KEY_FIXTURE;
+    },
+  });
+  const updated = { state: { orderToken: 'order-two' }, version: 0 };
+  await adapter.setItem(purpose, updated);
+  await assert.rejects(flushCheckoutStorage(purpose), /could not be saved/);
+  assert.equal(storage.getItem(`${purpose}:v2`), original);
+  assert.equal(storage.getItem(`${purpose}:recovery`), null);
+  unavailable = false;
+  await retryCheckoutStorage(purpose);
+  assert.deepEqual(await adapter.getItem(purpose), updated);
+});
+
+test('failed runtime config during checkout restoration blocks payment and new writes until reload', async () => {
+  const storage = new MemoryLegacyStorage();
+  const purpose = 'runtime-read-reload';
+  const original = await obfuscateBrowserText(JSON.stringify(value), CART_KEY_FIXTURE, purpose);
+  storage.setItem(`${purpose}:v2`, original);
+  let unavailable = true;
+  const adapter = createCheckoutObfuscatedStorage(purpose, undefined, {
+    getStorage: () => storage,
+    getCartKey: async () => {
+      if (unavailable) throw new Error('Runtime configuration unavailable.');
+      return CART_KEY_FIXTURE;
+    },
+  });
+  assert.equal(await adapter.getItem(purpose), null);
+  assert.equal(getCheckoutStorageIssues().find((issue) => issue.purpose === purpose)?.recovery, 'reload');
+  unavailable = false;
+  await adapter.setItem(purpose, { state: { orderToken: 'new-order' }, version: 0 });
+  await assert.rejects(retryCheckoutStorage(purpose), /Reload this page before paying/);
+  await assert.rejects(flushCheckoutStorage('paypal-intent-store'), /Reload this page before paying/);
+  assert.equal(storage.getItem(`${purpose}:v2`), original);
+  assert.equal(storage.getItem(`${purpose}:recovery`), null);
+
+  // A new page receives the configured key and can restore the original attempt.
+  const reloaded = createCheckoutObfuscatedStorage(purpose, undefined, {
+    getStorage: () => storage,
+    getCartKey,
+  });
+  assert.deepEqual(await reloaded.getItem(purpose), value);
+  // Explicit sign-out/state removal is still allowed even after a failed restore.
+  await adapter.removeItem(purpose);
+  await flushCheckoutStorage(purpose);
+  assert.equal(storage.getItem(`${purpose}:v2`), null);
+});
+
+test('a failed runtime restore also protects the original from a concurrent queued write', async () => {
+  const storage = new MemoryLegacyStorage();
+  const purpose = 'runtime-read-race';
+  const original = await obfuscateBrowserText(JSON.stringify(value), CART_KEY_FIXTURE, purpose);
+  storage.setItem(`${purpose}:v2`, original);
+  const started = deferred();
+  const gate = deferred<string>();
+  const adapter = createCheckoutObfuscatedStorage(purpose, undefined, {
+    getStorage: () => storage,
+    getCartKey: async () => {
+      started.resolve();
+      return gate.promise;
+    },
+  });
+  const read = adapter.getItem(purpose);
+  await started.promise;
+  const write = adapter.setItem(purpose, { state: { orderToken: 'new-order' }, version: 0 });
+  gate.resolve(Promise.reject(new Error('Runtime configuration unavailable.')));
+  await Promise.all([read, write]);
+  await assert.rejects(flushCheckoutStorage(purpose), /Reload this page before paying/);
+  assert.equal(storage.getItem(`${purpose}:v2`), original);
+  await adapter.removeItem(purpose);
 });

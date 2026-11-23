@@ -3,6 +3,7 @@ import {
   revealBrowserText,
   revealLegacyCryptoJsBrowserText,
 } from '@/lib/crypto/browserObfuscatedStorage';
+import { loadPublicRuntimeConfig } from '@/lib/runtime-config/client';
 import {
   createCartDocument,
   editCart,
@@ -133,6 +134,7 @@ export class CartRepository {
     private legacyStorage: () => Storage | undefined = () =>
       typeof window === 'undefined' ? undefined : window.localStorage,
     private notify: () => void = () => {},
+    private getCartKey: () => Promise<string> = async () => (await loadPublicRuntimeConfig()).cartKey,
   ) {}
 
   private announce() {
@@ -164,12 +166,13 @@ export class CartRepository {
         let lines: ReturnType<typeof normalizeCartLines> = [];
         if (original) {
           try {
-            const publicKey = process.env.NEXT_PUBLIC_CART_KEY || 'fallback-secret';
-            const json = original.startsWith('{')
-              ? original
-              : original.startsWith('ob1.')
+            let json = original;
+            if (!original.startsWith('{')) {
+              const publicKey = await this.getCartKey();
+              json = original.startsWith('ob1.')
                 ? await revealBrowserText(original, publicKey, 'cart-storage')
                 : await revealLegacyCryptoJsBrowserText(original, publicKey);
+            }
             const decoded: unknown = JSON.parse(json);
             const state =
               decoded && typeof decoded === 'object' && 'state' in decoded ? decoded.state : null;

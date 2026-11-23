@@ -1,4 +1,5 @@
-import { getShopSiteBaseUrl } from '@/lib/siteBaseUrls';
+import { getShopSiteBaseUrl } from '@/lib/siteBaseUrls.server';
+import { getSiteHostnameAliases } from '@/lib/siteBaseUrls';
 
 export function receiptDownloadPath(orderToken: string) {
   return `/next-api/shop/orders/${encodeURIComponent(orderToken)}/receipt`;
@@ -21,8 +22,15 @@ export function receiptObjectKey(row: {
   try {
     const url = new URL(row.receiptLink);
     if (url.username || url.password || url.hash) return null;
+    // A change between the approved apex and www addresses must not invalidate
+    // receipts written by an earlier release. Never accept a wildcard host.
+    const shop = new URL(getShopSiteBaseUrl());
+    const sameShopOrigin =
+      url.protocol === shop.protocol &&
+      url.port === shop.port &&
+      getSiteHostnameAliases(shop.hostname).includes(url.hostname);
     if (
-      url.origin === new URL(getShopSiteBaseUrl()).origin &&
+      sameShopOrigin &&
       url.pathname === receiptDownloadPath(row.orderToken) &&
       opaqueReceiptFile(row.receiptFile)
     )

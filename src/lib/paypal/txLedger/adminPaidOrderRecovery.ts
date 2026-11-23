@@ -14,6 +14,7 @@ import {
   getPayPalLedgerProcessingSourceDisplay,
   getPayPalLedgerRunnerSourceLabel,
 } from '@/lib/paypal/txLedger/paypalLedgerProvenance';
+import { readRuntimeSiteOrigins } from '@/lib/siteBaseUrls.server';
 import {
   getMerchizeFulfillmentOpsPrisma,
   isMerchizeFulfillmentOpsDatabaseConfigured,
@@ -339,11 +340,14 @@ function mapLedgerRowToPaidOrderRecoveryRow(
   );
   const processingSource = getPayPalLedgerProcessingSourceDisplay(
     row,
-    getPayPalLedgerInferredProcessingSourceDisplay({
-      checkoutSurfaceLabel: row.checkoutSurfaceLabel,
-      hasCapturePayload: Boolean(row.capturePayload),
-      ledgerStatus: row.status,
-    }) ?? undefined,
+    getPayPalLedgerInferredProcessingSourceDisplay(
+      {
+        checkoutSurfaceLabel: row.checkoutSurfaceLabel,
+        hasCapturePayload: Boolean(row.capturePayload),
+        ledgerStatus: row.status,
+      },
+      readRuntimeSiteOrigins(),
+    ) ?? undefined,
   );
   const currentIssue = resolvePaidOrderRecoveryIssue({
     ledgerIssue: {
@@ -1122,11 +1126,14 @@ function buildDetail(
     hasPersistedReceipt: Boolean(row.receiptLink && row.receiptFile),
   });
   const captureAmount = asNumber(captureCompletion.amount?.value);
-  const inferredProcessingSource = getPayPalLedgerInferredProcessingSourceDisplay({
-    checkoutSurfaceLabel: row.checkoutSurfaceLabel,
-    hasCapturePayload: Boolean(row.capturePayload),
-    ledgerStatus: row.status,
-  });
+  const inferredProcessingSource = getPayPalLedgerInferredProcessingSourceDisplay(
+    {
+      checkoutSurfaceLabel: row.checkoutSurfaceLabel,
+      hasCapturePayload: Boolean(row.capturePayload),
+      ledgerStatus: row.status,
+    },
+    readRuntimeSiteOrigins(),
+  );
 
   return {
     customerName: row.customerName,

@@ -30,6 +30,7 @@ yarn-error.log*
 .env.*
 !.env.example
 !.env.cloudflare.example
+/config/public-build.env
 
 # vercel
 .vercel

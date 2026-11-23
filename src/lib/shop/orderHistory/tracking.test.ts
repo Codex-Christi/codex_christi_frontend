@@ -8,7 +8,7 @@ import {
   snapshotCheckedAt,
 } from '@/lib/merchizeFulfillmentOps/customerTracking';
 import { receiptObjectKey, receiptDownloadPath } from './receiptReference';
-import { getShopSiteUrl } from '@/lib/siteBaseUrls';
+import { getShopSiteUrl } from '@/lib/siteBaseUrls.server';
 import { canSupportReadReceipt } from './receiptStorage';
 
 test('package delivery requires explicit evidence and complete coverage; fulfilled does not mean delivered', () => {

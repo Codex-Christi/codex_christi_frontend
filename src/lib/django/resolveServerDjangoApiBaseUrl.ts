@@ -1,5 +1,13 @@
+import 'server-only';
+
+import { readRuntimeSetting } from '../../../scripts/runtime-config.mjs';
+
 export function resolveServerDjangoApiBaseUrl() {
-  const publicBaseUrl = process.env.NEXT_PUBLIC_DJANGO_API_BASE_URL;
+  const publicBaseUrl = readRuntimeSetting(
+    process.env,
+    'DJANGO_API_BASE_URL',
+    'NEXT_PUBLIC_DJANGO_API_BASE_URL',
+  );
   const internalBaseUrl = process.env.DJANGO_INTERNAL_BASE_URL;
   const shouldPreferInternalBaseUrl =
     process.env.NODE_ENV === 'production' ||

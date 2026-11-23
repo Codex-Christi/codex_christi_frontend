@@ -43,6 +43,12 @@ const PayPalCheckoutChildren: FC<{ mode: CheckoutOptions }> = ({ mode }) => {
     if (creating.current) return creating.current;
     const operation = (async () => {
       if (!review) throw new Error('Review the current order details before paying.');
+      try {
+        await flushCheckoutStorage();
+      } catch (error) {
+        onPaymentError(error instanceof Error ? error.message : 'Check your saved checkout.');
+        throw new Error('Failed to create PayPal order');
+      }
       if (originalCheckout) {
         const attempt = captureCheckoutAttempt(originalCheckout.orderToken);
         if (!attempt) throw new Error('Reopen your original purchase before continuing.');

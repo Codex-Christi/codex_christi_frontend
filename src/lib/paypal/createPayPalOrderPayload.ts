@@ -6,7 +6,7 @@ import type {
   OrderRequest,
 } from '@paypal/paypal-server-sdk';
 import type { CanonicalOrderSnapshot } from '@/lib/paypal/orderSnapshot/types';
-import { getShopSiteUrl } from '@/lib/siteBaseUrls';
+import { getShopSiteUrl } from '@/lib/siteBaseUrls.server';
 import type { ShopCheckoutStoreInterface } from '@/stores/shop_stores/checkoutStore';
 
 export type BuildPayPalOrderCreatePayloadInput = Readonly<{

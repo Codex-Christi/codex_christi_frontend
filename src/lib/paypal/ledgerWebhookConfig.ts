@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { getMainSiteUrl } from '@/lib/siteBaseUrls';
+import { getMainSiteUrl } from '@/lib/siteBaseUrls.server';
 
 export type PayPalPaymentMode = 'sandbox' | 'live';
 export type PayPalLedgerWebhookActivationSource = 'env' | 'db_hybrid';

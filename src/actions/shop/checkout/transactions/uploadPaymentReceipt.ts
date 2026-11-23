@@ -1,6 +1,6 @@
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { r2 } from '@/lib/cloudflare/r2';
-import { getShopSiteUrl } from '@/lib/siteBaseUrls';
+import { getShopSiteUrl } from '@/lib/siteBaseUrls.server';
 import { receiptDownloadPath, opaqueReceiptFile } from '@/lib/shop/orderHistory/receiptReference';
 
 export async function uploadPaymentReceiptToR2({

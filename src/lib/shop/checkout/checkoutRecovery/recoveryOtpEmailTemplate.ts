@@ -1,4 +1,4 @@
-import { getMainSiteUrl } from '@/lib/siteBaseUrls';
+import { getMainSiteUrl } from '@/lib/siteBaseUrls.server';
 
 type RecoveryOtpEmailTemplateProps = {
   otp: string;

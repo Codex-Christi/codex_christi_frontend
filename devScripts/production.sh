@@ -207,10 +207,10 @@ chmod 600 "$checkpoint/previous.env" "$checkpoint/docker-compose.yml" "$checkpoi
 
 settings_feature="$(docker image inspect --format '{{index .Config.Labels "org.codex-christi.release-settings"}}' "$DEPLOY_IMAGE")"
 settings_services="$(compose --profile verify config --services 2>>"$log")"
-if [[ "$settings_feature" == 1 ]]; then
+if [[ "$settings_feature" == 2 || ( "$mode" == rollback && "$settings_feature" == 1 ) ]]; then
   printf '%s\n' "$settings_services" | grep -Fxq release-settings-check \
-    || fail 'The release-settings-check service is missing for this manifest-capable image.'
-  echo 'Checking compiled public settings against runtime payment settings offline...'
+    || fail 'The release-settings-check service is missing for this configuration-aware image.'
+  echo 'Checking the candidate runtime configuration offline...'
   if docker container inspect "$settings_name" >/dev/null 2>&1; then
     fail 'The one-off release-settings-check container name is already in use.'
   fi
@@ -222,12 +222,13 @@ if [[ "$settings_feature" == 1 ]]; then
   cleanup_oneoff "$settings_name" release-settings-check "$settings_started"
   settings_started=0
 else
-  # Recorded legacy rollback images predate the embedded manifest and checker service.
+  # Recorded legacy rollback images may predate the checker service entirely.
+  # Version 1 images retain their own compiled-settings check for recorded rollback.
   # Their retained image, revision, Compose and runtime environment remain pinned above.
   [[ "$mode" == rollback && ( -z "$settings_feature" || "$settings_feature" == '<no value>' ) ]] \
     || fail 'The candidate image does not support the required release-settings check.'
   if printf '%s\n' "$settings_services" | grep -Fxq release-settings-check; then
-    fail 'A legacy rollback image cannot use a manifest-capable Compose configuration.'
+    fail 'A legacy rollback image cannot use a Compose configuration with a release-settings check.'
   fi
   echo 'Using the recorded rollback image and runtime settings; retaining legacy compatibility.'
 fi

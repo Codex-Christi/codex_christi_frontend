@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.4
 
-# Supplied by release configuration after verifying the official amd64 image.
-# A digest is required by the build scripts; no moving LTS tag is deployed.
-ARG NODE_IMAGE
+# Keep the Node major and Debian distribution stable. CI resolves this policy
+# to one immutable linux/amd64 digest for every build in the release.
+ARG NODE_IMAGE=node:26-bookworm-slim
 
 ########################
 # 1) Base image
@@ -10,8 +10,6 @@ ARG NODE_IMAGE
 FROM ${NODE_IMAGE} AS base
 ARG NODE_IMAGE
 WORKDIR /app
-
-RUN case "$NODE_IMAGE" in *@sha256:*) ;; *) echo 'NODE_IMAGE must include its verified digest' >&2; exit 1 ;; esac
 
 # Prisma wants OpenSSL present
 RUN apt-get update -y \
@@ -73,19 +71,9 @@ ENV DEPLOYMENT_VERSION=${APP_REVISION}
 ENV NODE_OPTIONS="--max-old-space-size=1792"
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Parse configuration as data, not shell commands. Only public settings enter the build.
-RUN --mount=type=secret,id=production_env,target=/run/secrets/production_env,required=true node --input-type=module <<'JS'
-import { readFileSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
-import { parse } from 'dotenv';
-import { validatePublicSettings } from './scripts/check-release-settings.mjs';
-const publicEnv = validatePublicSettings(parse(readFileSync('/run/secrets/production_env')));
-// This exact approved map is compiled and retained for the offline runtime check.
-writeFileSync('/app/release-public-settings.json', JSON.stringify(publicEnv) + '\n');
-const result = spawnSync('yarn', ['build'], { stdio: 'inherit', env: { ...process.env, ...publicEnv } });
-if (result.error) throw new Error('Next.js compilation could not start.');
-process.exit(result.status ?? 1);
-JS
+# Application environment is supplied only when this image runs. Do not mount
+# environment files, or inject application configuration during compilation.
+RUN yarn build
 
 ########################
 # 5) Runtime (small)
@@ -93,8 +81,10 @@ JS
 FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app
 ARG APP_REVISION=unknown
+ARG NODE_IMAGE
 LABEL org.opencontainers.image.revision=${APP_REVISION}
-LABEL org.codex-christi.release-settings=1
+LABEL org.codex-christi.release-settings=2
+LABEL org.codex-christi.node.base=${NODE_IMAGE}
 
 # Retain OpenSSL and trusted CA certificates for runtime TLS connections.
 RUN apt-get update -y \
@@ -114,7 +104,7 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY scripts/check-deployment-health.mjs ./scripts/check-deployment-health.mjs
 COPY scripts/check-release-settings.mjs ./scripts/check-release-settings.mjs
-COPY --from=builder /app/release-public-settings.json ./release-public-settings.json
+COPY scripts/runtime-config.mjs ./scripts/runtime-config.mjs
 
 # Next config may still be read at runtime (images/rewrites)
 COPY --from=builder /app/next.config.* ./
@@ -140,7 +130,9 @@ CMD ["node", "server.js"]
 FROM deps AS datastore-check
 WORKDIR /app
 ARG APP_REVISION=unknown
+ARG NODE_IMAGE
 LABEL org.opencontainers.image.revision=${APP_REVISION}
+LABEL org.codex-christi.node.base=${NODE_IMAGE}
 ENV APP_REVISION=${APP_REVISION}
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

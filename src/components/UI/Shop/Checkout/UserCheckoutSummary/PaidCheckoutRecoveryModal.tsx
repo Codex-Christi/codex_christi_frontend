@@ -11,6 +11,7 @@ import {
 import type { PaidCheckoutRecoverySummary } from '@/lib/shop/checkout/checkoutRecovery/types';
 import { publicShopPath } from '@/lib/auth/domain-routing';
 import { useHasMounted } from '@/lib/hooks/useHasMounted';
+import { usePublicRuntimeConfig } from '@/lib/runtime-config/hooks';
 import { checkoutPanelClassName } from '../checkoutStyles';
 
 type PaidCheckoutRecoveryModalProps = {
@@ -31,6 +32,7 @@ export function PaidCheckoutRecoveryModal({
   const [error, setError] = useState<string | null>(null);
   const operation = useRef(0);
   const mounted = useHasMounted();
+  const origins = usePublicRuntimeConfig();
   const hostname = mounted ? window.location.hostname : '';
 
   useEffect(
@@ -101,6 +103,7 @@ export function PaidCheckoutRecoveryModal({
                 href={publicShopPath(
                   `/shop/checkout/confirmation/${encodeURIComponent(checkout.orderToken)}?view=details`,
                   hostname,
+                  origins,
                 )}
                 target='_blank'
                 rel='noopener noreferrer'

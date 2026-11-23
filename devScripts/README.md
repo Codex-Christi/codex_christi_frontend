@@ -4,12 +4,12 @@
 
 Pushes to any branch and pull requests targeting `main` run lint, TypeScript,
 the existing storefront/authentication/checkout suites, release-settings and
-recovery tests, and a synthetic-settings Linux container build. Use one temporary
+recovery tests, and an environment-independent Linux container build. Use one temporary
 `review/leaseweb` branch for these deployment changes. A review-branch push runs
 checks and cannot deploy.
 
 Artifact staging runs only for pushes to `main` or manual runs on `main`, after
-both verification jobs pass and the explicit staging gate is enabled. This
+source and actual image verification pass and the explicit staging gate is enabled. This
 candidate starts from deployed
 revision `e7a7599e93338d1d6b270d1aeee5f68d21e34848`; current local `main` contains
 later application changes. Verify the complete application that will result
@@ -18,15 +18,30 @@ remove those later changes. The review branch can be deleted after merging;
 ordinary releases continue from `main`.
 The production Docker build uses Turbopack.
 
-The CI job builds the runtime image and matching read-only datastore checker,
-compresses the two images into one artifact, and sends it to a restricted VPS
+The Dockerfile declares the Node 26 Bookworm Slim policy. For every workflow
+run, CI resolves the current official Linux/amd64 image to one digest, verifies
+its Node and Debian versions, and uses that same image for the verification
+and release images. Node 26 security and minor updates are picked up on
+future builds; a Node major or Debian distribution change requires review.
+The resolved digest and Node version are recorded in the staging proof.
+
+The Docker build does not receive production application environment values.
+The existing private `.env.production` on the VPS supplies runtime settings when
+Compose starts the app. Browser code reads only the approved public projection
+from `/next-api/runtime-config`, never the entire environment. There is no
+tracked `config/public-build.env` or GitHub variable for application settings.
+The offline release check refuses invalid runtime settings and inconsistent
+PayPal configuration before replacement.
+
+The CI job builds the runtime image and matching read-only datastore checker
+once, tests the exact images with synthetic runtime values, and, if staging is
+enabled, compresses those tested images and sends them to a restricted VPS
 inbox with its exact revision, length and SHA-256 checksum. The inbox accepts
 one candidate at a time; the administrator must review it before activation.
 The deployment key cannot run a shell, Docker, Git, or a release command.
 
 The separate owner-run release procedure deploys exact destination image IDs.
-The VPS script first compares the candidate image's
-compiled public settings with its Compose-parsed runtime settings in a one-off
+The VPS script first validates Compose-parsed runtime settings in a one-off
 container with no network or data mounts. It then checks existing data read-only
 before replacing only the frontend, waits for revision readiness, refreshes Nginx, and
 checks both HTTPS routes. A failed replacement or proxy check attempts recovery
@@ -97,9 +112,9 @@ do not control analytics loading.
 Copy the two settings from [`.env.cloudflare.example`](../.env.cloudflare.example)
 into the existing production environment and fill them with each site's Web
 Analytics token. These are public site identifiers, not Cloudflare API keys.
-`NEXT_PUBLIC_*` values are embedded during `yarn build`; changing a token requires
-a rebuild, not only a container restart. The existing Docker build already passes
-these public variables through, so no Docker or dependency change is needed.
+The app now reads these identifiers at runtime. Changing a token requires
+recreating the container with the updated runtime environment, not rebuilding
+the image. Visitors receive the updated configuration on a fresh page load.
 
 After deploying, switch each site under Cloudflare Web Analytics > Manage Site
 to **Enable with JS Snippet installation**. The loader skips its manual copy if
@@ -126,8 +141,8 @@ and [Next.js script strategies](https://nextjs.org/docs/app/api-reference/compon
 ## Readiness
 
 `/next-api/health/ready` (also `/api/health/ready` inside Next) returns `200` only
-when the app can query its required local catalog tables and its authentication
-configuration is valid. The Next container must have separate random
+when the app can query its required local catalog tables and its runtime and
+authentication configurations are valid. The Next container must have separate random
 `SESSION_SECRET` and `ADMIN_SESSION_SECRET` values of at least 32 UTF-8 bytes
 each, an HTTP(S) Django API base URL without credentials, query
 or fragment, and a valid `DJANGO_AUTH_REFRESH_PATH` if overriding the default

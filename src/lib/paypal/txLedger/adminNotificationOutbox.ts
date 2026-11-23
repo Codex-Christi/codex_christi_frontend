@@ -5,7 +5,7 @@ import {
   resolveAdminNotificationRecipients,
 } from '@/lib/admin/admin-notification-recipients';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
-import { getMainSiteUrl } from '@/lib/siteBaseUrls';
+import { getMainSiteUrl } from '@/lib/siteBaseUrls.server';
 
 const DEFAULT_PENDING_SEND_LIMIT = 25;
 

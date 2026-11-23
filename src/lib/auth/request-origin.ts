@@ -3,7 +3,8 @@ import {
   getHostnameFromHostHeader,
   getMainSiteHostname,
   getShopSiteHostname,
-} from '../siteBaseUrls';
+  getSiteHostnameAliases,
+} from '../siteBaseUrls.server';
 
 export function isSameOriginMutation(request: Request) {
   const origin = request.headers.get('origin');
@@ -14,10 +15,8 @@ export function isSameOriginMutation(request: Request) {
     if (
       process.env.NODE_ENV === 'production' &&
       ![
-        getMainSiteHostname(),
-        getShopSiteHostname(),
-        `www.${getMainSiteHostname()}`,
-        `www.${getShopSiteHostname()}`,
+        ...getSiteHostnameAliases(getMainSiteHostname()),
+        ...getSiteHostnameAliases(getShopSiteHostname()),
       ].includes(host)
     )
       return false;

@@ -26,13 +26,13 @@ import {
   type AuthCookieDefinition,
   SESSION_REFRESH_GUARD_PARAM,
 } from '../session/session-cookies';
-import { getRequestUrl } from '../siteBaseUrls';
+import { getRequestUrl } from '../siteBaseUrls.server';
 import {
   authFlowUrl,
   getAuthRoutes,
   publicShopPath,
   safeAuthReturnPath,
-} from '../auth/domain-routing';
+} from '../auth/domain-routing.server';
 
 export const redirectLoggedInUserToProfileMiddleware = (req: NextRequest) =>
   redirectLoggedInUserToProfile(req);
