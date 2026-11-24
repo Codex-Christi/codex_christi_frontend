@@ -137,8 +137,8 @@ test('the original purchase action returns focus to the saved review without rel
 
             loading = deferred();
             await click(button('Review original purchase'));
-            await act(async () => loading.reject(new Error('The saved purchase could not be loaded.')));
-            assert.match(container.querySelector('[role="alert"]').textContent, /could not be loaded/);
+            await act(async () => loading.reject(new Error('We couldn’t load your purchase review. Please try again.')));
+            assert.equal(container.querySelector('[role="alert"]').textContent, 'We couldn’t load your purchase review. Please try again.');
             assert.equal(button('Review original purchase').disabled, false);
             assert.ok(container.querySelector('[data-current-cart]'));
             loading = deferred();
