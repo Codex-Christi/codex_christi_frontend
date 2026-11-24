@@ -2,6 +2,9 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { mkdtempSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const expectedByMode = {
@@ -20,11 +23,31 @@ const mode = process.argv[2];
 const expected = expectedByMode[mode];
 if (!expected || process.argv.length !== 3) process.exit(2);
 
+// Build a minimal disposable catalog solely for the existing readiness probe.
+// The container is network-isolated and /tmp is its only writable filesystem;
+// no application DB, fixtures from the developer machine, or real secrets enter.
+const requireApp = createRequire('/app/server.js');
+const Database = requireApp('better-sqlite3');
+const catalog = join(mkdtempSync('/tmp/codex-readiness-'), 'catalog.db');
+const database = new Database(catalog);
+try {
+  database.exec('CREATE TABLE StorefrontProductSnapshot (id INTEGER PRIMARY KEY);'
+    + 'CREATE TABLE SupplierCatalogProductEvidence (id INTEGER PRIMARY KEY);');
+} finally {
+  database.close();
+}
+const imageRevision = process.env.APP_REVISION;
+assert.match(imageRevision ?? '', /^[0-9a-f]{40}$/);
+// Sandbox checks the exact image revision. Live additionally proves the route
+// reads the runtime revision, rather than a value captured by Next compilation.
+const expectedRevision = mode === 'sandbox' ? imageRevision : (imageRevision === 'f'.repeat(40) ? 'e'.repeat(40) : 'f'.repeat(40));
 const address = 'http://127.0.0.1:39271';
 // The server has no network except localhost in the fixture container. Do not
 // forward process output: the harness reports only fixed pass/fail diagnostics.
 const server = spawn(process.execPath, ['/app/server.js'], {
-  cwd: '/app', env: { ...process.env, HOSTNAME: '127.0.0.1', PORT: '39271' }, stdio: 'ignore',
+  cwd: '/app', env: { ...process.env, HOSTNAME: '127.0.0.1', PORT: '39271',
+    APP_REVISION: expectedRevision, ADMIN_SESSION_SECRET: 'private-benchmark-admin-session-not-public',
+    MERCHIZE_OFFLINE_CATALOG_DATABASE_URL: `file:${catalog}` }, stdio: 'ignore',
 });
 server.on('error', () => {});
 let stage = 'startup';
@@ -51,6 +74,12 @@ try {
     assert.deepEqual(JSON.parse(raw), expected);
   }
   console.log('Runtime HTTP configuration=OK; fixture=' + mode);
+  stage = 'readiness and runtime revision';
+  const ready = await fetch(`${address}/api/health/ready`, { signal: AbortSignal.timeout(3000), redirect: 'error' });
+  assert.equal(ready.status, 200);
+  assert.match(ready.headers.get('cache-control') ?? '', /(?:^|,\s*)no-store(?:,|$)/i);
+  assert.deepEqual(await ready.json(), { status: 'ready', revision: expectedRevision });
+  console.log('Runtime readiness and runtime revision=OK; fixture=' + mode);
 } catch {
   console.error('Runtime HTTP configuration check failed at ' + stage + '.');
   process.exitCode = 1;

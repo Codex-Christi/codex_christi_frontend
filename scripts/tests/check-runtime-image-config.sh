@@ -69,6 +69,13 @@ if output="$(docker run --rm --pull never --network none --read-only --env-file 
 fi
 test "$output" = 'Release settings check failed; runtime configuration is invalid.'
 
+# The negative configuration check below cannot reach the generated client
+# imports. Also test the actual checker dependency graph and native SQLite
+# binding with a synthetic tmpfs fixture and no external connection.
+docker run --rm --pull never --network none --read-only --tmpfs /tmp:rw,nosuid,nodev,mode=1777,size=16m \
+  --mount "type=bind,src=$root/scripts/tests/check-checker-image.mjs,dst=/app/scripts/check-checker-image.mjs,readonly" \
+  --entrypoint node "$checker_image" --import tsx /app/scripts/check-checker-image.mjs
+
 # Exercise the actual checker image's CLI without connecting to any datastore.
 # Missing datastore configuration must be rejected, not silently accepted.
 if output="$(docker run --rm --pull never --network none --read-only --tmpfs /tmp:rw,nosuid,nodev,mode=1777,size=16m "$checker_image" 2>&1)"; then

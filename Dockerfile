@@ -5,16 +5,19 @@
 ARG NODE_IMAGE=node:26-bookworm-slim
 
 ########################
-# 1) Base image
+# 1) Shared runtime OS; one TLS/OpenSSL layer for both release targets
 ########################
-FROM ${NODE_IMAGE} AS base
+FROM ${NODE_IMAGE} AS os-base
 ARG NODE_IMAGE
 WORKDIR /app
 
-# Prisma wants OpenSSL present
+# Build-time Prisma generation and runtime TLS need the same native libraries.
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
+
+# Only dependency-installing stages need the pinned package manager.
+FROM os-base AS base
 
 # Match the package manager used by CI instead of following a moving Corepack default.
 RUN npm install --global yarn@1.22.22 --force
@@ -30,9 +33,18 @@ WORKDIR /app
 # Copy dependency manifests first for better layer caching
 COPY package.json yarn.lock .yarnrc.yml ./
 
-# Cache Yarn downloads
-RUN --mount=type=cache,target=/root/.cache/yarn \
-  yarn install --frozen-lockfile --non-interactive
+# Both dependency installs share the download cache; lock concurrent writers.
+RUN --mount=type=cache,target=/root/.cache/yarn,sharing=locked \
+  yarn install --cache-folder /root/.cache/yarn --frozen-lockfile --non-interactive
+
+# The isolated datastore checker needs only its own runtime dependencies.
+# Use the same Yarn lock and root manifest selectors (including the TS loader)
+# to retain the exact versions used by the application's generated clients.
+FROM base AS checker-deps
+COPY scripts/datastore-check.package.json ./package.json
+COPY yarn.lock .yarnrc.yml ./
+RUN --mount=type=cache,target=/root/.cache/yarn,sharing=locked \
+  yarn install --cache-folder /root/.cache/yarn --frozen-lockfile --non-interactive --production=true
 
 ########################
 # 3) Generate the four production clients, without connecting to any database
@@ -40,7 +52,10 @@ RUN --mount=type=cache,target=/root/.cache/yarn \
 FROM deps AS generated
 WORKDIR /app
 
-COPY . .
+# Keep generation cached when UI/app source changes. tsconfig.json preserves
+# Prisma's module-format inference; .dockerignore excludes local generated clients.
+COPY prisma.config.ts tsconfig.json ./
+COPY prisma ./prisma
 
 # New database-backed features must be explicitly reconciled with the release build.
 # This guard leaves the working checkout alone and prevents partial client releases.
@@ -65,31 +80,26 @@ RUN yarn prisma generate --schema prisma/shop/merchize/priceCatalog.prisma \
 # 4) Next.js compilation, after all clients exist
 ########################
 FROM generated AS builder
-ARG APP_REVISION=unknown
-ENV APP_REVISION=${APP_REVISION}
-ENV DEPLOYMENT_VERSION=${APP_REVISION}
+COPY . .
 ENV NODE_OPTIONS="--max-old-space-size=1792"
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Application environment is supplied only when this image runs. Do not mount
 # environment files, or inject application configuration during compilation.
+# The final runtime and checker stages attach the revision, so changing a
+# release ID alone does not invalidate a source-identical Next.js build.
 RUN yarn build
 
 ########################
 # 5) Runtime (small)
 ########################
-FROM ${NODE_IMAGE} AS runtime
+FROM os-base AS runtime
 WORKDIR /app
 ARG APP_REVISION=unknown
 ARG NODE_IMAGE
 LABEL org.opencontainers.image.revision=${APP_REVISION}
 LABEL org.codex-christi.release-settings=2
 LABEL org.codex-christi.node.base=${NODE_IMAGE}
-
-# Retain OpenSSL and trusted CA certificates for runtime TLS connections.
-RUN apt-get update -y \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -127,7 +137,7 @@ CMD ["node", "server.js"]
 ########################
 # 6) Explicit read-only preflight runner (keeps tooling out of runtime image)
 ########################
-FROM deps AS datastore-check
+FROM checker-deps AS datastore-check
 WORKDIR /app
 ARG APP_REVISION=unknown
 ARG NODE_IMAGE
@@ -138,9 +148,9 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 # Keep public assets, application routes and migration/operator tooling out of
 # the checker artifact. Only generated clients and pure connection selectors run.
-COPY --from=generated /app/scripts/check-production-datastores.mjs ./scripts/check-production-datastores.mjs
-COPY --from=generated /app/src/lib/prisma/postgresSslMode.ts ./src/lib/prisma/postgresSslMode.ts
-COPY --from=generated /app/src/lib/prisma/shop/shopOpsDataTarget.ts ./src/lib/prisma/shop/shopOpsDataTarget.ts
+COPY scripts/check-production-datastores.mjs ./scripts/check-production-datastores.mjs
+COPY src/lib/prisma/postgresSslMode.ts ./src/lib/prisma/postgresSslMode.ts
+COPY src/lib/prisma/shop/shopOpsDataTarget.ts ./src/lib/prisma/shop/shopOpsDataTarget.ts
 COPY --from=generated /app/src/lib/prisma/shop/merchize/generated ./src/lib/prisma/shop/merchize/generated
 COPY --from=generated /app/src/lib/prisma/adminOpsLedger/generated ./src/lib/prisma/adminOpsLedger/generated
 COPY --from=generated /app/src/lib/prisma/shop/paypal/txLedger/generated ./src/lib/prisma/shop/paypal/txLedger/generated

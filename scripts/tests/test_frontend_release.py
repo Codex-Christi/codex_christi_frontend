@@ -196,9 +196,28 @@ class WorkflowContractTests(unittest.TestCase):
 
     def test_exact_built_images_are_tested_then_packaged_without_rebuild(self):
         workflow = WORKFLOW.read_text()
-        self.assertEqual(workflow.count('docker buildx build --load'), 2)
-        self.assertEqual(workflow.count('--target runtime'), 1)
-        self.assertEqual(workflow.count('--target datastore-check'), 1)
+        bake = (DOCKERFILE.parent / 'docker-bake.hcl').read_text()
+        self.assertEqual(workflow.count('docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e'), 1)
+        self.assertIn('source: .', workflow)
+        self.assertIn('files: docker-bake.hcl', workflow)
+        self.assertIn('builder: default', workflow)
+        self.assertIn('targets: default', workflow)
+        self.assertIn('load: true', workflow)
+        self.assertIn('push: false', workflow)
+        self.assertIn('APP_REVISION: ${{ github.sha }}', workflow)
+        self.assertNotIn('docker buildx build ', workflow)
+        self.assertIn('test "$(git rev-parse HEAD)" = "$GITHUB_SHA"', workflow)
+        self.assertIn('test -z "$(git status --porcelain=v1 --untracked-files=normal)"', workflow)
+        self.assertIn('targets = ["runtime", "datastore-check"]', bake)
+        self.assertIn('platforms  = ["linux/amd64"]', bake)
+        self.assertIn('NODE_IMAGE   = NODE_IMAGE', bake)
+        self.assertIn('APP_REVISION = APP_REVISION', bake)
+        for target, tag in (('runtime', 'codex-christi-next'),
+                            ('datastore-check', 'codex-christi-datastore-check')):
+            definition = bake.split(f'target "{target}" {{', 1)[1].split('\n}', 1)[0]
+            self.assertIn(f'target     = "{target}"', definition)
+            self.assertIn('inherits   = ["_shared"]', definition)
+            self.assertIn(f'tags       = ["{tag}:${{APP_REVISION}}"]', definition)
         self.assertIn('bash scripts/tests/check-runtime-image-config.sh "$RUNTIME_IMAGE" "$CHECKER_IMAGE"', workflow)
         self.assertEqual(workflow.count('RUNTIME_IMAGE: ${{ steps.build.outputs.runtime_image }}'), 3)
         self.assertEqual(workflow.count('CHECKER_IMAGE: ${{ steps.build.outputs.checker_image }}'), 3)
@@ -210,7 +229,142 @@ class WorkflowContractTests(unittest.TestCase):
         checks = RUNTIME_IMAGE_CHECK.read_text()
         self.assertIn('for mode in sandbox live; do', checks)
         self.assertIn('/checks/runtime-config.mjs "$mode"', checks)
+        self.assertIn('node "$checker_image" --import tsx /app/scripts/check-checker-image.mjs', checks)
         self.assertTrue(all('--network none --read-only' in line for line in checks.splitlines() if 'docker run ' in line))
+
+    def test_persistent_caches_require_trusted_main_and_supported_runner(self):
+        workflow = WORKFLOW.read_text()
+        bake = (DOCKERFILE.parent / 'docker-bake.hcl').read_text()
+        condition = "(github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && inputs.cold_build != true"
+        self.assertIn('cache: ${{ ' + condition + " && 'yarn' || '' }}", workflow)
+        self.assertIn('package-manager-cache: false', workflow)
+        self.assertIn('cache-dependency-path: yarn.lock', workflow)
+        self.assertIn('CACHE_REQUESTED: ${{ ' + condition + ' }}', workflow)
+        self.assertIn('cache_enabled=false', workflow)
+        self.assertIn('[[ "$CACHE_REQUESTED" == true ]]', workflow)
+        self.assertIn('driver-type io.containerd.snapshotter.v1', workflow)
+        self.assertIn('TRUSTED_BUILDKIT_CACHE: ${{ steps.prepare-build.outputs.trusted_cache }}', workflow)
+        self.assertIn('default = false', bake)
+        for target, scope in (('runtime', 'runtime'), ('datastore-check', 'checker')):
+            definition = bake.split(f'target "{target}" {{', 1)[1].split('\n}', 1)[0]
+            self.assertEqual(definition.count('TRUSTED_BUILDKIT_CACHE ? ["type=gha,version=2,'), 2)
+            self.assertEqual(definition.count(f'scope=codex-christi-frontend-{scope}-amd64-v1,'), 2)
+            self.assertEqual(definition.count('] : []'), 2)
+            self.assertIn('mode=max,ignore-error=true,timeout=90s', definition)
+        self.assertNotIn('cache-to=', workflow)
+        self.assertNotIn('ACTIONS_RUNTIME_TOKEN', workflow)
+        self.assertIn("permissions:\n  contents: read\n", workflow)
+        self.assertEqual(workflow.count('secrets.'), 2)
+        self.assertIn("DOCKER_BUILD_RECORD_UPLOAD: 'false'", workflow)
+        for action in re.findall(r'(?m)^\s*(?:- )?uses: (\S+)', workflow):
+            self.assertRegex(action, r'^[^@]+@[0-9a-f]{40}$')
+
+    def test_cache_capability_gate_falls_back_without_a_daemon_configuration_change(self):
+        workflow = WORKFLOW.read_text()
+        body = workflow.split('      - name: Qualify the exact base and select the supported cache mode\n', 1)[1]
+        body = body.split('        run: |\n', 1)[1].split('\n      - name:', 1)[0]
+        script = '\n'.join(line[10:] for line in body.splitlines()) + '\n'
+        with tempfile.TemporaryDirectory(prefix='codex-cache-gate-fixture-') as folder:
+            root = Path(folder)
+            git = root / 'git'
+            git.write_text("""#!/usr/bin/env python3
+import os, sys
+if sys.argv[1:] == ['rev-parse', 'HEAD']: print(os.environ['GITHUB_SHA'])
+elif sys.argv[1] != 'status': raise SystemExit(1)
+""")
+            docker = root / 'docker'
+            docker.write_text("""#!/usr/bin/env python3
+import os, pathlib, sys
+a = sys.argv[1:]
+with pathlib.Path(os.environ['CALLS']).open('a') as f: f.write(a[0] + '\\n')
+if a[0] == 'pull': pass
+elif a[0] == 'run': print(os.environ['NODE_VERSION'] + ' linux/x64')
+elif a[0] == 'version':
+    if os.environ['ENGINE'] == 'unavailable': raise SystemExit(1)
+    print(os.environ['ENGINE'])
+elif a[:2] == ['buildx', 'version']: print('github.com/docker/buildx ' + os.environ['BUILDX'])
+elif a[0] == 'info': print(os.environ['DRIVER'])
+else: raise SystemExit(1)
+""")
+            git.chmod(0o700)
+            docker.chmod(0o700)
+            env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH'],
+                       CALLS=str(root / 'calls'), GITHUB_OUTPUT=str(root / 'outputs'),
+                       GITHUB_SHA='a' * 40, NODE_VERSION='26.13.1', NODE_IMAGE='docker.io/library/node@sha256:' + 'a' * 64)
+            containerd = 'driver-type io.containerd.snapshotter.v1'
+            cases = [
+                ('true', '28.0.1', 'v0.21.0', containerd, True),
+                ('true', '30.0.1', 'v0.32.0', containerd, True),
+                ('true', '27.9.9', 'v0.32.0', containerd, False),
+                ('true', '30.0.1', 'v0.20.9', containerd, False),
+                ('true', '30.0.1', 'v0.32.0', 'Backing Filesystem extfs', False),
+                ('true', 'unavailable', 'v0.32.0', containerd, False),
+                ('false', '30.0.1', 'v0.32.0', containerd, False),
+            ]
+            for request, engine, buildx, driver, enabled in cases:
+                with self.subTest(request=request, engine=engine, buildx=buildx, driver=driver):
+                    (root / 'calls').write_text('')
+                    (root / 'outputs').write_text('')
+                    result = subprocess.run(['bash', '-c', script], env={**env, 'CACHE_REQUESTED': request,
+                                            'ENGINE': engine, 'BUILDX': buildx, 'DRIVER': driver},
+                                            capture_output=True, text=True, timeout=15)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    outputs = dict(line.split('=', 1) for line in (root / 'outputs').read_text().splitlines())
+                    self.assertEqual(outputs['trusted_cache'], str(enabled).lower())
+                    self.assertRegex(outputs['base_elapsed_s'], r'^\d+$')
+                    self.assertRegex(outputs['bake_started_s'], r'^\d+$')
+                    calls = (root / 'calls').read_text().splitlines()
+                    self.assertEqual(calls[:2], ['pull', 'run'])
+                    if request == 'false':
+                        self.assertEqual(calls, ['pull', 'run'])
+
+    def test_bake_resolves_exact_local_targets_and_optional_cache_without_daemon(self):
+        docker = shutil.which('docker')
+        if docker is None:
+            self.skipTest('Docker CLI unavailable; Bake print requires no daemon.')
+        with tempfile.TemporaryDirectory(prefix='codex-bake-print-test-') as folder:
+            root = Path(folder)
+            plugins = Path('/Applications/Docker.app/Contents/Resources/cli-plugins')
+            if (plugins / 'docker-buildx').is_file():
+                (root / 'config.json').write_text(json.dumps({'cliPluginsExtraDirs': [str(plugins)]}))
+            node = 'docker.io/library/node@sha256:' + 'a' * 64
+            revision = 'b' * 40
+            env = {'PATH': os.environ.get('PATH', '/usr/bin:/bin'), 'DOCKER_CONFIG': str(root),
+                   'DOCKER_HOST': 'unix://' + str(root / 'no-daemon.sock'),
+                   'NODE_IMAGE': node, 'APP_REVISION': revision}
+            version = subprocess.run([docker, 'buildx', 'version'], env=env,
+                                     capture_output=True, text=True, timeout=20)
+            if version.returncode:
+                self.skipTest('Docker Buildx CLI plugin unavailable; no daemon is needed.')
+            for cache in ('false', 'true'):
+                result = subprocess.run([docker, 'buildx', 'bake', '--print', '--load', '--file', 'docker-bake.hcl', 'default'],
+                                        cwd=DOCKERFILE.parent, env={**env, 'TRUSTED_BUILDKIT_CACHE': cache},
+                                        capture_output=True, text=True, timeout=20)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                model = json.loads(result.stdout)
+                self.assertEqual(set(model['group']['default']['targets']), {'runtime', 'datastore-check'})
+                self.assertEqual(set(model['target']), {'runtime', 'datastore-check'})
+                for key, image, scope in (('runtime', 'codex-christi-next', 'runtime'),
+                                          ('datastore-check', 'codex-christi-datastore-check', 'checker')):
+                    target = model['target'][key]
+                    self.assertEqual(target['context'], '.')
+                    self.assertEqual(target['dockerfile'], 'Dockerfile')
+                    self.assertEqual(target['args'], {'NODE_IMAGE': node, 'APP_REVISION': revision})
+                    self.assertEqual(target['platforms'], ['linux/amd64'])
+                    self.assertEqual(target['target'], key)
+                    self.assertEqual(target['tags'], [f'{image}:{revision}'])
+                    self.assertEqual(target['output'], [{'type': 'docker'}])
+                    self.assertFalse(target.get('secret'))
+                    self.assertFalse(target.get('ssh'))
+                    for direction in ('cache-from', 'cache-to'):
+                        if cache == 'true':
+                            self.assertEqual(len(target[direction]), 1)
+                            record = target[direction][0]
+                            self.assertEqual(record['scope'], f'codex-christi-frontend-{scope}-amd64-v1')
+                            self.assertEqual(record['type'], 'gha')
+                            self.assertEqual(record['version'], '2')
+                        else:
+                            self.assertFalse(target.get(direction))
 
     def test_no_production_source_uses_static_next_public_environment_lookups(self):
         root = DOCKERFILE.parent
@@ -253,11 +407,12 @@ print('wrong-receipt' if os.environ['BAD_RECEIPT'] == '1' else f'CODEX_RELEASE_S
             stub.chmod(0o700)
             env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH'],
                        RUNNER_TEMP=str(root), GITHUB_SHA=revision, VPS_USER='codex-christi-frontend-deploy',
-                       VPS_HOST='216.22.53.127', BAD_RECEIPT='0')
+                       VPS_HOST='216.22.53.127', BAD_RECEIPT='0', GITHUB_OUTPUT=str(root / 'outputs'))
             result = subprocess.run(['bash', '-c', script], env=env, capture_output=True, text=True, timeout=15)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual((root / 'frontend-stage-receipt').read_text(),
                              f'CODEX_RELEASE_STAGED=frontend:{revision}:{digest}:{len(artifact)}\n')
+            self.assertRegex((root / 'outputs').read_text(), r'archive_hash_s=\d+\ntransfer_and_receipt_s=\d+\n')
             (root / 'frontend-stage-receipt').unlink()
             env['BAD_RECEIPT'] = '1'
             result = subprocess.run(['bash', '-c', script], env=env, capture_output=True, text=True, timeout=15)
