@@ -25,8 +25,22 @@ function workflowStep(job: string, name: string) {
   const prefix = `      - name: ${name}\n`;
   const start = job.indexOf(prefix);
   assert.ok(start >= 0, `The workflow must run ${name}.`);
-  const end = job.indexOf('\n      - ', start + prefix.length);
-  return { start, body: job.slice(start, end < 0 ? undefined : end) };
+  assert.equal(job.indexOf(prefix, start + prefix.length), -1, `The workflow must run ${name} exactly once.`);
+  const next = job.indexOf('\n      - ', start + prefix.length);
+  const end = next < 0 ? job.length : next;
+  return { start, end, body: job.slice(start, end) };
+}
+
+// Move complete steps, including their ids, conditions and commands. A label
+// substitution that assumes the next YAML field is `if:` can accidentally
+// remove the verification step instead of testing its position.
+function swapWorkflowSteps(workflow: string, jobName: string, firstName: string, secondName: string) {
+  const job = workflowJob(workflow, jobName);
+  const first = workflowStep(job, firstName);
+  const second = workflowStep(job, secondName);
+  assert.ok(first.end <= second.start, 'Expected distinct steps in their original order.');
+  return workflow.replace(job, () => job.slice(0, first.start) + second.body +
+    job.slice(first.end, second.start) + first.body + job.slice(second.end));
 }
 
 function assertRequiredStep(step: string) {
@@ -44,14 +58,16 @@ function assertWorkflowSafeguards(workflow: string) {
   assertDependency(build, 'container-build', 'verify');
   assert.doesNotMatch(build, /^    (?:if|continue-on-error):/m, 'The image build job is mandatory.');
   const imageBuild = workflowStep(build, 'Build both revision-tagged images without application configuration');
+  const loadedImages = workflowStep(build, 'Verify and identify the locally loaded image pair');
   const imageChecks = workflowStep(build, 'Verify the exact built images offline');
   const packageImages = workflowStep(build, 'Package exactly the tested image pair for staging');
   const authentication = workflowStep(build, 'Prepare pinned SSH host authentication');
   const stage = workflowStep(build, 'Submit the checked image pair to the private inbox');
-  const steps = [imageBuild, imageChecks, packageImages, authentication, stage];
+  const steps = [imageBuild, loadedImages, imageChecks, packageImages, authentication, stage];
   assert.deepEqual(steps.map((step) => step.start), steps.map((step) => step.start).sort((a, b) => a - b),
     'Image creation and verification must precede packaging and staging.');
   assertRequiredStep(imageBuild.body);
+  assertRequiredStep(loadedImages.body);
   assertRequiredStep(imageChecks.body);
   const gate = "        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && vars.LEASEWEB_FRONTEND_STAGE_ENABLED == 'true'";
   for (const step of [packageImages, authentication, stage]) {
@@ -86,8 +102,19 @@ test('deployment safeguards reject misplaced auth checks and missing dependencie
       /Mandatory checks must not be skipped or allowed to fail/,
     ],
     [
-      workflow.replace('      - name: Verify the exact built images offline', '      - name: Package exactly the tested image pair for staging')
-        .replace('      - name: Package exactly the tested image pair for staging\n        if:', '      - name: Verify the exact built images offline\n        if:'),
+      workflow.replace('      - name: Verify and identify the locally loaded image pair', '      - name: Missing loaded image identification'),
+      /The workflow must run Verify and identify the locally loaded image pair/,
+    ],
+    [
+      workflow.replace('      - name: Verify and identify the locally loaded image pair', '      - name: Verify and identify the locally loaded image pair\n        if: false'),
+      /Mandatory checks must not be skipped or allowed to fail/,
+    ],
+    [
+      swapWorkflowSteps(workflow, 'container-build', 'Verify and identify the locally loaded image pair', 'Verify the exact built images offline'),
+      /Image creation and verification must precede packaging and staging/,
+    ],
+    [
+      swapWorkflowSteps(workflow, 'container-build', 'Verify the exact built images offline', 'Package exactly the tested image pair for staging'),
       /Image creation and verification must precede packaging and staging/,
     ],
     [

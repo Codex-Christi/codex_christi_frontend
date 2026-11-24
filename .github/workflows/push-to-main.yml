@@ -5,6 +5,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      cold_build:
+        description: Disable persistent dependency and BuildKit caches to measure a cold run
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -20,17 +25,32 @@ jobs:
           persist-credentials: false
       - name: Resolve and verify the Dockerfile Node image policy
         id: node-base
-        run: python3 scripts/resolve-node-image.py --github-output "$GITHUB_OUTPUT"
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: ${{ steps.node-base.outputs.node_version }}
-      - name: Install dependencies
-        run: |
-          npm install --global yarn@1.22.22 --force
-          yarn install --frozen-lockfile
-      - name: Generate all four clients without database access
         run: |
           set -euo pipefail
+          printf 'started_s=%s\n' "$(date +%s)" >> "$GITHUB_OUTPUT"
+          python3 scripts/resolve-node-image.py --github-output "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        id: node-setup
+        with:
+          node-version: ${{ steps.node-base.outputs.node_version }}
+          # Persist only package downloads, never node_modules or generated clients.
+          # Untrusted branch/PR runs do not write either persistent cache.
+          package-manager-cache: false
+          cache: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && inputs.cold_build != true && 'yarn' || '' }}
+          cache-dependency-path: yarn.lock
+      - name: Install dependencies
+        id: dependencies
+        run: |
+          set -euo pipefail
+          SECONDS=0
+          npm install --global yarn@1.22.22 --force
+          yarn install --frozen-lockfile
+          printf 'elapsed_s=%s\n' "$SECONDS" >> "$GITHUB_OUTPUT"
+      - name: Generate all four clients without database access
+        id: clients
+        run: |
+          set -euo pipefail
+          SECONDS=0
           test "$(find prisma -name '*.prisma' -type f | wc -l | tr -d ' ')" = 4
           yarn merchize-offline-catalog:generate
           NEON_ADMIN_OPS_LEDGER_URL=postgresql://user:password@127.0.0.1:5432/admin_ops_ledger \
@@ -41,6 +61,7 @@ jobs:
           MERCHIZE_FULFILLMENT_OPS_NEON_BRANCH=prod \
             MERCHIZE_FULFILLMENT_OPS_NEON_DB_STRING=postgresql://user:password@127.0.0.1:5432/merchize_fulfillment_ops \
             yarn prisma generate --schema prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOps.schema.prisma
+          printf 'elapsed_s=%s\n' "$SECONDS" >> "$GITHUB_OUTPUT"
       - name: Verify read-only production datastore checks
         run: node --import tsx --test scripts/tests/check-production-datastores.test.mjs
       - name: Verify release settings and recovery behavior
@@ -60,6 +81,30 @@ jobs:
         run: yarn test:auth
       - name: Checkout and payment safeguards
         run: yarn test:checkout
+      - name: Report verification timings
+        if: always()
+        env:
+          VERIFY_STARTED: ${{ steps.node-base.outputs.started_s }}
+          YARN_CACHE_HIT: ${{ steps.node-setup.outputs.cache-hit }}
+          DEPENDENCY_SECONDS: ${{ steps.dependencies.outputs.elapsed_s }}
+          CLIENT_SECONDS: ${{ steps.clients.outputs.elapsed_s }}
+          CACHE_REQUESTED: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && inputs.cold_build != true }}
+        run: |
+          set -euo pipefail
+          if [[ "$VERIFY_STARTED" =~ ^[0-9]+$ ]]; then
+            total=$(( $(date +%s) - VERIFY_STARTED ))
+          else
+            total=unavailable
+          fi
+          {
+            echo '### Frontend verification timing'
+            printf '| Metric | Value |\n| --- | --- |\n'
+            printf '| Persistent Yarn cache requested | %s |\n' "$CACHE_REQUESTED"
+            printf '| Exact Yarn cache hit | %s |\n' "${YARN_CACHE_HIT:-not reported}"
+            printf '| Yarn install (s) | %s |\n' "${DEPENDENCY_SECONDS:-unavailable}"
+            printf '| Prisma generation (s) | %s |\n' "${CLIENT_SECONDS:-unavailable}"
+            printf '| Verification since Node policy, excluding post-job cache save (s) | %s |\n' "$total"
+          } >> "$GITHUB_STEP_SUMMARY"
   container-build:
     needs: verify
     runs-on: ubuntu-latest
@@ -75,20 +120,60 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - name: Build both revision-tagged images without application configuration
-        id: build
+      - name: Qualify the exact base and select the supported cache mode
+        id: prepare-build
+        env:
+          CACHE_REQUESTED: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && inputs.cold_build != true }}
         run: |
           set -euo pipefail
+          SECONDS=0
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           test -z "$(git status --porcelain=v1 --untracked-files=normal)"
           docker pull --platform linux/amd64 "$NODE_IMAGE"
           test "$(docker run --rm --pull never --network none --platform linux/amd64 --entrypoint node "$NODE_IMAGE" -p 'process.versions.node + " " + process.platform + "/" + process.arch')" = "$NODE_VERSION linux/x64"
-          docker buildx build --load --platform linux/amd64 --target runtime \
-            --build-arg "NODE_IMAGE=$NODE_IMAGE" --build-arg "APP_REVISION=$GITHUB_SHA" \
-            --tag "codex-christi-next:$GITHUB_SHA" .
-          docker buildx build --load --platform linux/amd64 --target datastore-check \
-            --build-arg "NODE_IMAGE=$NODE_IMAGE" --build-arg "APP_REVISION=$GITHUB_SHA" \
-            --tag "codex-christi-datastore-check:$GITHUB_SHA" .
+          # GitHub's v2 cache backend requires Buildx >= 0.21 and, for the
+          # default docker driver, Engine >= 28 with the containerd image store.
+          # Do not change runner Docker configuration to enable caching.
+          cache_enabled=false
+          if [[ "$CACHE_REQUESTED" == true ]]; then
+            if engine="$(docker version --format '{{.Server.Version}}')" \
+              && buildx="$(docker buildx version)" \
+              && [[ "$engine" =~ ^([0-9]+)\. ]] && (( BASH_REMATCH[1] >= 28 )) \
+              && [[ "$buildx" =~ v([0-9]+)\.([0-9]+)\. ]] \
+              && (( BASH_REMATCH[1] > 0 || BASH_REMATCH[2] >= 21 )) \
+              && docker info --format '{{range .DriverStatus}}{{println (index . 0) (index . 1)}}{{end}}' | grep -qx 'driver-type io.containerd.snapshotter.v1'; then
+              cache_enabled=true
+            else
+              echo 'Building without persistent BuildKit cache: unsupported runner cache backend.'
+            fi
+          fi
+          printf 'trusted_cache=%s\nbase_elapsed_s=%s\nbake_started_s=%s\n' "$cache_enabled" "$SECONDS" "$(date +%s)" >> "$GITHUB_OUTPUT"
+      - name: Build both revision-tagged images without application configuration
+        # Official Docker action supplies the GitHub Actions cache runtime
+        # context to BuildKit. No registry, push, application secrets, or
+        # extra repository permissions; keep the existing local image store.
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
+        env:
+          APP_REVISION: ${{ github.sha }}
+          TRUSTED_BUILDKIT_CACHE: ${{ steps.prepare-build.outputs.trusted_cache }}
+          DOCKER_BUILD_SUMMARY: 'false'
+          DOCKER_BUILD_RECORD_UPLOAD: 'false'
+        with:
+          builder: default
+          source: .
+          files: docker-bake.hcl
+          targets: default
+          load: true
+          push: false
+          github-token: ''
+      - name: Verify and identify the locally loaded image pair
+        id: build
+        env:
+          BAKE_STARTED: ${{ steps.prepare-build.outputs.bake_started_s }}
+        run: |
+          set -euo pipefail
+          [[ "$BAKE_STARTED" =~ ^[0-9]+$ ]]
+          bake_elapsed=$(( $(date +%s) - BAKE_STARTED ))
           for image in "codex-christi-next:$GITHUB_SHA" "codex-christi-datastore-check:$GITHUB_SHA"; do
             test "$(docker image inspect --format '{{ index .Config.Labels "org.codex-christi.node.base" }}' "$image")" = "$NODE_IMAGE"
             test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image")" = "$GITHUB_SHA"
@@ -98,7 +183,10 @@ jobs:
           checker_image="$(docker image inspect --format '{{.Id}}' "codex-christi-datastore-check:$GITHUB_SHA")"
           [[ "$runtime_image" =~ ^sha256:[0-9a-f]{64}$ && "$checker_image" =~ ^sha256:[0-9a-f]{64}$ ]]
           test "$(docker image inspect --format '{{ index .Config.Labels "org.codex-christi.release-settings" }}' "$runtime_image")" = 2
-          printf 'runtime_image=%s\nchecker_image=%s\n' "$runtime_image" "$checker_image" >> "$GITHUB_OUTPUT"
+          runtime_bytes="$(docker image inspect --format '{{.Size}}' "$runtime_image")"
+          checker_bytes="$(docker image inspect --format '{{.Size}}' "$checker_image")"
+          [[ "$runtime_bytes" =~ ^[0-9]+$ && "$checker_bytes" =~ ^[0-9]+$ ]]
+          printf 'runtime_image=%s\nchecker_image=%s\nbake_elapsed_s=%s\nruntime_bytes=%s\nchecker_bytes=%s\n' "$runtime_image" "$checker_image" "$bake_elapsed" "$runtime_bytes" "$checker_bytes" >> "$GITHUB_OUTPUT"
       - name: Verify the exact built images offline
         id: image-check
         env:
@@ -106,24 +194,30 @@ jobs:
           CHECKER_IMAGE: ${{ steps.build.outputs.checker_image }}
         run: |
           set -euo pipefail
+          SECONDS=0
           docker run --rm --pull never --network none --read-only --tmpfs /tmp:rw,nosuid,nodev,mode=1777,size=64m \
             --mount "type=bind,src=$GITHUB_WORKSPACE/scripts/tests/check-node-image-runtime.mjs,dst=/checks/node-runtime.mjs,readonly" \
             --env "EXPECTED_NODE_VERSION=$NODE_VERSION" --entrypoint node "$RUNTIME_IMAGE" /checks/node-runtime.mjs native
           bash scripts/tests/check-runtime-image-config.sh "$RUNTIME_IMAGE" "$CHECKER_IMAGE"
+          printf 'elapsed_s=%s\n' "$SECONDS" >> "$GITHUB_OUTPUT"
       # Staging is separate from deployment; the old deploy gate cannot enable it.
       # The following steps do not rebuild or load a replacement image.
       - name: Package exactly the tested image pair for staging
+        id: package
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && vars.LEASEWEB_FRONTEND_STAGE_ENABLED == 'true'
         env:
           RUNTIME_IMAGE: ${{ steps.build.outputs.runtime_image }}
           CHECKER_IMAGE: ${{ steps.build.outputs.checker_image }}
         run: |
           set -euo pipefail
+          SECONDS=0
           test "$(docker image inspect --format '{{.Id}}' "codex-christi-next:$GITHUB_SHA")" = "$RUNTIME_IMAGE"
           test "$(docker image inspect --format '{{.Id}}' "codex-christi-datastore-check:$GITHUB_SHA")" = "$CHECKER_IMAGE"
           umask 077
           docker save "codex-christi-next:$GITHUB_SHA" "codex-christi-datastore-check:$GITHUB_SHA" \
             | gzip -n -1 > "$RUNNER_TEMP/frontend-release.tar.gz"
+          bytes="$(wc -c < "$RUNNER_TEMP/frontend-release.tar.gz" | tr -d '[:space:]')"
+          printf 'elapsed_s=%s\nbytes=%s\n' "$SECONDS" "$bytes" >> "$GITHUB_OUTPUT"
       - name: Prepare pinned SSH host authentication
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && vars.LEASEWEB_FRONTEND_STAGE_ENABLED == 'true'
         env:
@@ -162,9 +256,11 @@ jobs:
           VPS_HOST: '216.22.53.127'
         run: |
           set -euo pipefail
+          SECONDS=0
           archive="$RUNNER_TEMP/frontend-release.tar.gz"
           bytes="$(wc -c < "$archive" | tr -d '[:space:]')"
           sha="$(sha256sum "$archive" | cut -d ' ' -f 1)"
+          printf 'archive_hash_s=%s\n' "$SECONDS" >> "$GITHUB_OUTPUT"
           [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ && "$sha" =~ ^[0-9a-f]{64}$ && "$bytes" =~ ^[1-9][0-9]{0,9}$ ]] || exit 1
           (( bytes <= 4294967296 )) || exit 1
           ssh_options=(-F /dev/null -T -i "$RUNNER_TEMP/codex-ssh/key" -o BatchMode=yes \
@@ -173,12 +269,14 @@ jobs:
             -o GlobalKnownHostsFile=/dev/null -o ClearAllForwardings=yes \
             -o HostKeyAlgorithms=ssh-ed25519 -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no \
             -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
+          SECONDS=0
           ssh "${ssh_options[@]}" "$VPS_USER@$VPS_HOST" "stage $GITHUB_SHA $bytes $sha" < "$archive" > "$RUNNER_TEMP/frontend-stage-response"
           receipt="CODEX_RELEASE_STAGED=frontend:$GITHUB_SHA:$sha:$bytes"
           if ! printf '%s\n' "$receipt" | cmp -s - "$RUNNER_TEMP/frontend-stage-response"; then
             echo 'The server did not return the expected staging receipt.' >&2; exit 1;
           fi
           printf '%s\n' "$receipt" > "$RUNNER_TEMP/frontend-stage-receipt"
+          printf 'transfer_and_receipt_s=%s\n' "$SECONDS" >> "$GITHUB_OUTPUT"
           printf '%s\n' 'Frontend artifact staged. No deployment was requested or performed.'
       - name: Prepare staging evidence
         if: always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && vars.LEASEWEB_FRONTEND_STAGE_ENABLED == 'true'
@@ -232,3 +330,35 @@ jobs:
         if: always()
         run: |
           rm -f "$RUNNER_TEMP/codex-ssh/key" "$RUNNER_TEMP/codex-ssh/known_hosts" "$RUNNER_TEMP/frontend-release.tar.gz" "$RUNNER_TEMP/frontend-stage-receipt" "$RUNNER_TEMP/frontend-stage-response"
+      - name: Report build, verification and staging timings
+        if: always()
+        env:
+          CACHE_ENABLED: ${{ steps.prepare-build.outputs.trusted_cache }}
+          BASE_SECONDS: ${{ steps.prepare-build.outputs.base_elapsed_s }}
+          BAKE_SECONDS: ${{ steps.build.outputs.bake_elapsed_s }}
+          RUNTIME_BYTES: ${{ steps.build.outputs.runtime_bytes }}
+          CHECKER_BYTES: ${{ steps.build.outputs.checker_bytes }}
+          CHECK_SECONDS: ${{ steps.image-check.outputs.elapsed_s }}
+          PACKAGE_SECONDS: ${{ steps.package.outputs.elapsed_s }}
+          ARCHIVE_BYTES: ${{ steps.package.outputs.bytes }}
+          HASH_SECONDS: ${{ steps.stage.outputs.archive_hash_s }}
+          TRANSFER_SECONDS: ${{ steps.stage.outputs.transfer_and_receipt_s }}
+        run: |
+          set -euo pipefail
+          {
+            echo '### Frontend container and staging timing'
+            printf '| Metric | Value |\n| --- | --- |\n'
+            printf '| Persistent BuildKit cache enabled | %s |\n' "${CACHE_ENABLED:-unavailable}"
+            printf '| Exact base pull and qualification (s) | %s |\n' "${BASE_SECONDS:-unavailable}"
+            printf '| Shared Bake, including both image loads and cache I/O (s) | %s |\n' "${BAKE_SECONDS:-unavailable}"
+            printf '| Runtime image bytes | %s |\n' "${RUNTIME_BYTES:-unavailable}"
+            printf '| Checker image bytes | %s |\n' "${CHECKER_BYTES:-unavailable}"
+            printf '| Exact image offline checks (s) | %s |\n' "${CHECK_SECONDS:-unavailable}"
+            printf '| Save and compression (s) | %s |\n' "${PACKAGE_SECONDS:-not staged}"
+            printf '| Compressed pair bytes | %s |\n' "${ARCHIVE_BYTES:-not staged}"
+            printf '| Archive checksum (s) | %s |\n' "${HASH_SECONDS:-not staged}"
+            printf '| Transfer and confirmed receipt (s) | %s |\n' "${TRANSFER_SECONDS:-not confirmed}"
+            echo ''
+            echo 'An enabled BuildKit cache is not a confirmed hit; see Bake CACHED vertices and cache import/export logs.'
+            echo 'A cold run can be requested using workflow_dispatch cold_build. No deployment is performed.'
+          } >> "$GITHUB_STEP_SUMMARY"
