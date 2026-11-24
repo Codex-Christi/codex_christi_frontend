@@ -27,6 +27,7 @@ import type {
   TimelineItem,
 } from './adminShopDashboardTypes';
 import type { ShopOpsDataTargetView } from '@/lib/prisma/shop/shopOpsDataTarget';
+import { getMerchizeReleaseReview } from '@/lib/paypal/txLedger/fulfillmentRetryPolicy';
 import ShopOpsDataTargetBadge from './ShopOpsDataTargetBadge';
 
 type PaidOrderRecoveryDetailPanelProps = {
@@ -167,6 +168,9 @@ function RecoveryActionsPanel({
   shopOpsDataTarget: ShopOpsDataTargetView;
 }) {
   const addressReviewStatus = detail.merchizeFulfillmentOps?.addressReviewStatus;
+  const releaseVerificationPending =
+    recovery.status !== 'completed' &&
+    getMerchizeReleaseReview(detail.merchizeFulfillmentOps).verificationPending;
   const canConfirmProviderAddress =
     Boolean(detail.merchizeFulfillmentOps?.merchizeOrderId) &&
     detail.buyerAddressCorrectionState !== 'checking' &&
@@ -187,6 +191,7 @@ function RecoveryActionsPanel({
           isCompleted={recovery.status === 'completed'}
           needsProviderDetailSync={detail.needsProviderDetailSync}
           requiresManualRelease={detail.requiresManualRelease}
+          releaseVerificationPending={releaseVerificationPending}
           canConfirmProviderAddress={canConfirmProviderAddress}
           manualReleaseReadinessWarning={manualReleaseReadinessWarning}
           retryMode={detail.buyerAddressCorrectionState ? 'none' : detail.retryMode}

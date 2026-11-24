@@ -1,8 +1,54 @@
 import { isMerchizeLookupPendingProviderProcessingError } from '@/lib/merchizeFulfillmentOps/lookupPending';
+import { MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS as GATE } from '@/lib/merchizeFulfillmentOps/status';
 import { CUSTOMER_ADDRESS_CORRECTION_REQUESTED } from '@/lib/shop/checkout/customerAddressCorrection';
 import { PAYPAL_LEDGER_STATUS } from './status';
 
 export type PaidOrderRetryMode = 'none' | 'resume_post_payment' | 'retry_merchize_fulfillment';
+
+export function getMerchizeReleaseReview(
+  evidence?: {
+    productionGateStatus: string | null;
+    providerPushProgress: string | null;
+    pushAcknowledgedAt: string | null;
+    pushVerifiedAt: string | null;
+  } | null,
+) {
+  const gate = evidence?.productionGateStatus;
+  const acknowledgementRecorded = Boolean(evidence?.pushAcknowledgedAt);
+  const verified = Boolean(evidence?.pushVerifiedAt) || gate === GATE.PUSH_VERIFIED;
+  const verificationPending =
+    !verified &&
+    gate !== GATE.PUSH_FAILED &&
+    (acknowledgementRecorded ||
+      gate === GATE.PUSH_PENDING ||
+      gate === GATE.PUSH_ACKNOWLEDGED ||
+      gate === GATE.PUSH_VERIFICATION_PENDING ||
+      ['validating', 'scheduled', 'paused'].includes(evidence?.providerPushProgress ?? ''));
+
+  return { acknowledgementRecorded, verified, verificationPending };
+}
+
+export function getMerchizeReadyRefreshFeedback(releaseVerified: boolean, snapshotsSynced: boolean) {
+  if (!releaseVerified) {
+    return {
+      tone: 'warning',
+      heading: 'Release not confirmed',
+      message:
+        'Readiness checks passed. This refresh did not send a push. Refresh Merchize state again before retrying.',
+    } as const;
+  }
+  if (!snapshotsSynced) {
+    return {
+      tone: 'warning',
+      heading: 'Release confirmed',
+      message: 'Merchize confirmed release, but some details could not be refreshed.',
+    } as const;
+  }
+  return {
+    tone: 'success',
+    message: 'Merchize confirmed that the order was released for fulfillment.',
+  } as const;
+}
 
 export function getPushVerificationPendingMessage(newPushAcknowledged?: boolean) {
   const nextStep = 'Refresh Merchize state before trying to release again.';

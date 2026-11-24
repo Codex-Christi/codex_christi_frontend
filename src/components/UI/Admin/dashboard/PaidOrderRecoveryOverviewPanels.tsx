@@ -10,7 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS } from '@/lib/merchizeFulfillmentOps/status';
+import { getMerchizeReleaseReview } from '@/lib/paypal/txLedger/fulfillmentRetryPolicy';
 import AdminCopyValueButton from './AdminCopyValueButton';
 import AdminGlassPanel from './AdminGlassPanel';
 import PaidOrderRecoveryFulfillmentEvidencePanel from './PaidOrderRecoveryFulfillmentEvidencePanel';
@@ -590,11 +590,7 @@ function getRecommendedAction(
     return 'No recovery action is required. Review the audit trail and close the case.';
   }
 
-  const releaseStatus = detail.merchizeFulfillmentOps?.productionGateStatus;
-  if (
-    releaseStatus === MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_ACKNOWLEDGED ||
-    releaseStatus === MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFICATION_PENDING
-  ) {
+  if (getMerchizeReleaseReview(detail.merchizeFulfillmentOps).verificationPending) {
     return 'Refresh Merchize state to verify release. Do not send another push request yet.';
   }
 

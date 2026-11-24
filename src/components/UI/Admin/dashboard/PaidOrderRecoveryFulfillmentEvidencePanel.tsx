@@ -29,6 +29,7 @@ import {
   DialogTrigger,
 } from '@/components/UI/primitives/dialog';
 import { cn } from '@/lib/utils';
+import { getMerchizeReleaseReview } from '@/lib/paypal/txLedger/fulfillmentRetryPolicy';
 import { getAdminGlassPanelClassName } from './AdminGlassPanel';
 import type { MerchizeFulfillmentOpsAdminSummary } from './adminShopDashboardTypes';
 
@@ -124,15 +125,12 @@ function getEvidenceTone(value: string | null | undefined): EvidenceTone {
 
 function getPushAcknowledgement(summary: MerchizeFulfillmentOpsAdminSummary) {
   const gateStatus = summary.productionGateStatus;
-  const acknowledgementStored =
-    Boolean(summary.pushAcknowledgedAt) ||
-    gateStatus === 'push_acknowledged' ||
-    gateStatus === 'push_verification_pending';
+  const { verified, verificationPending } = getMerchizeReleaseReview(summary);
 
-  if (acknowledgementStored) {
+  if (summary.pushAcknowledgedAt) {
     return {
       value: 'Acknowledged',
-      detail: summary.pushAcknowledgedAt ?? 'Provider acknowledgement stored',
+      detail: summary.pushAcknowledgedAt,
       tone: 'good' as const,
       meaning: 'Merchize acknowledged the production-release command.',
       nextStep: 'Review Push Verification for final provider confirmation.',
@@ -141,38 +139,42 @@ function getPushAcknowledgement(summary: MerchizeFulfillmentOpsAdminSummary) {
 
   const failed = gateStatus === 'push_failed';
   const disabled = gateStatus === 'push_disabled';
-  const pending = gateStatus === 'push_pending';
 
   return {
-    value: humanizeStatus(
-      disabled ? 'disabled' : failed ? 'failed' : pending ? 'pending' : 'not_sent',
-    ),
-    detail: 'No provider acknowledgement recorded',
+    value: 'No acknowledgement recorded',
+    detail: verified
+      ? 'Release confirmed separately'
+      : disabled
+        ? 'Automatic release disabled'
+        : failed
+          ? 'Release failed'
+          : humanizeStatus(summary.providerPushProgress, 'No push response saved'),
     tone:
       failed || disabled
         ? ('blocked' as const)
-        : pending
+        : verificationPending
           ? ('pending' as const)
           : ('neutral' as const),
     meaning: failed
       ? (summary.lastSyncErrorMessage ?? 'Merchize rejected the production-release command.')
       : disabled
         ? 'Automatic production release is disabled by configuration.'
-        : pending
-          ? 'The production-release command is awaiting provider acknowledgement.'
-          : 'No production-release command has been recorded.',
-    nextStep: failed
-      ? 'Review the Merchize error, correct the cause, and retry the fulfillment handoff.'
-      : disabled
-        ? 'A master admin can review manual release after all non-bypassable checks are clear.'
-        : pending
-          ? 'Refresh Merchize state to check for provider acknowledgement.'
-          : 'Resolve readiness blockers before requesting production release.',
+        : 'A pending release check does not mean Merchize accepted a push.',
+    nextStep: verified
+      ? 'Monitor fulfillment progress.'
+      : verificationPending
+        ? 'Refresh Merchize state before retrying.'
+        : failed
+          ? 'Review and resolve the Merchize error before retrying.'
+          : disabled
+            ? 'A master admin can review manual release once readiness checks pass.'
+            : 'Review readiness checks before requesting release.',
   };
 }
 
 function getPushVerification(summary: MerchizeFulfillmentOpsAdminSummary) {
-  if (summary.pushVerifiedAt || summary.productionGateStatus === 'push_verified') {
+  const { acknowledgementRecorded, verified, verificationPending } = getMerchizeReleaseReview(summary);
+  if (verified) {
     return {
       value: 'Verified',
       detail: summary.pushVerifiedAt ?? 'Provider push state verified',
@@ -192,16 +194,14 @@ function getPushVerification(summary: MerchizeFulfillmentOpsAdminSummary) {
     };
   }
 
-  if (
-    summary.pushAcknowledgedAt ||
-    summary.productionGateStatus === 'push_acknowledged' ||
-    summary.productionGateStatus === 'push_verification_pending'
-  ) {
+  if (verificationPending) {
     return {
       value: 'Verification pending',
       detail: humanizeStatus(summary.providerPushProgress, 'Waiting for provider state'),
       tone: 'pending' as const,
-      meaning: 'The release command was acknowledged, but final provider verification is pending.',
+      meaning: acknowledgementRecorded
+        ? 'Merchize acknowledged the push but has not confirmed release.'
+        : 'Merchize has not confirmed release. No push acknowledgement is recorded.',
       nextStep: 'Refresh Merchize state to check for final production confirmation.',
     };
   }

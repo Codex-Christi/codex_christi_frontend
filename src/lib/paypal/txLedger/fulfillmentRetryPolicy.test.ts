@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   getMerchizeFulfillmentRetryEligibility,
+  getMerchizeReadyRefreshFeedback,
+  getMerchizeReleaseReview,
   getPendingFulfillmentRetryMessage,
   getPushVerificationPendingMessage,
 } from './fulfillmentRetryPolicy';
@@ -86,4 +88,56 @@ test('distinguishes a new push acknowledgement from a check of an existing relea
   for (const acknowledged of [true, false, undefined]) {
     assert.match(getPushVerificationPendingMessage(acknowledged), /Refresh Merchize state/u);
   }
+});
+
+test('keeps refresh primary without inventing an acknowledgement before or after refresh', () => {
+  const order = {
+    productionGateStatus: 'push_verification_pending',
+    providerPushProgress: 'validating',
+    pushAcknowledgedAt: null,
+    pushVerifiedAt: null,
+  };
+  for (const gate of ['push_verification_pending', 'ready', 'push_acknowledged', 'push_pending']) {
+    assert.deepEqual(getMerchizeReleaseReview({ ...order, productionGateStatus: gate }), {
+      acknowledgementRecorded: false,
+      verified: false,
+      verificationPending: true,
+    });
+  }
+  assert.equal(getMerchizeReleaseReview({
+    ...order, productionGateStatus: 'ready', providerPushProgress: null,
+  }).verificationPending, false);
+  assert.equal(getMerchizeReleaseReview({
+    ...order, productionGateStatus: 'manual_release_required', providerPushProgress: null,
+  }).verificationPending, false);
+});
+
+test('keeps actual acknowledgement separate from verified release and explicit failure', () => {
+  const order = {
+    productionGateStatus: 'push_acknowledged',
+    providerPushProgress: 'validating',
+    pushAcknowledgedAt: '2026-11-23T18:00:00Z',
+    pushVerifiedAt: null,
+  };
+  assert.deepEqual(getMerchizeReleaseReview(order), {
+    acknowledgementRecorded: true, verified: false, verificationPending: true,
+  });
+  assert.deepEqual(getMerchizeReleaseReview({
+    ...order, productionGateStatus: 'push_verified', pushAcknowledgedAt: null,
+  }), {
+    acknowledgementRecorded: false, verified: true, verificationPending: false,
+  });
+  assert.equal(getMerchizeReleaseReview({
+    ...order, productionGateStatus: 'push_failed',
+  }).verificationPending, false);
+});
+
+test('refresh feedback distinguishes readiness, release verification, and saved details', () => {
+  const pending = getMerchizeReadyRefreshFeedback(false, true);
+  assert.equal(pending.tone, 'warning');
+  assert.equal(pending.heading, 'Release not confirmed');
+  assert.match(pending.message, /did not send a push/u);
+  assert.match(pending.message, /Refresh Merchize state/u);
+  assert.equal(getMerchizeReadyRefreshFeedback(true, false).heading, 'Release confirmed');
+  assert.equal(getMerchizeReadyRefreshFeedback(true, true).tone, 'success');
 });

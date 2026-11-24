@@ -42,6 +42,7 @@ type AdminRecoveryActionsPanelProps = {
   isCompleted: boolean;
   needsProviderDetailSync: boolean;
   requiresManualRelease: boolean;
+  releaseVerificationPending: boolean;
   canConfirmProviderAddress: boolean;
   retryMode: PaidOrderRetryMode;
   shopOpsDataTarget: ShopOpsDataTargetView;
@@ -60,6 +61,7 @@ export default function AdminPaidOrderRecoveryActionsPanel({
   isCompleted,
   needsProviderDetailSync,
   requiresManualRelease,
+  releaseVerificationPending,
   canConfirmProviderAddress,
   retryMode,
   shopOpsDataTarget,
@@ -82,6 +84,7 @@ export default function AdminPaidOrderRecoveryActionsPanel({
   const resumesFullPostPaymentFlow = retryMode === 'resume_post_payment';
   const retriesMerchizeFulfillment = retryMode === 'retry_merchize_fulfillment';
   const requiresLocalProductionConfirmation = shopOpsDataTarget.isLocalProductionTarget;
+  const canReviewManualRelease = requiresManualRelease && !releaseVerificationPending;
   const isAnyActionPending = pendingAction !== null;
   const shopOpsConfigurationDisabledReason = !shopOpsDataTarget.aligned
     ? (shopOpsDataTarget.configurationError ?? 'Shop Ops data target is not aligned.')
@@ -125,7 +128,7 @@ export default function AdminPaidOrderRecoveryActionsPanel({
     runAction('refresh-merchize', async () => {
       const toastId = loadingToast({
         header: 'Refreshing Merchize state',
-        message: 'Looking up the accepted Merchize order and refreshing detail snapshots.',
+          message: 'Checking the existing order. This does not send a push.',
       });
 
       try {
@@ -142,7 +145,7 @@ export default function AdminPaidOrderRecoveryActionsPanel({
         }
 
         if (result.tone === 'warning') {
-          toast.warning('Merchize refresh pending', {
+          toast.warning(result.heading ?? 'Merchize refresh pending', {
             description: result.message,
           });
         } else {
@@ -462,7 +465,7 @@ export default function AdminPaidOrderRecoveryActionsPanel({
           </p>
         ) : null}
 
-        {requiresManualRelease ? (
+        {canReviewManualRelease ? (
           <div className='sm:col-span-2 xl:col-span-1 2xl:col-span-2 rounded-lg border border-amber-300/18 bg-amber-300/[0.06] p-3'>
             <div className='flex items-start gap-2'>
               <KeyRound size={16} className='mt-0.5 shrink-0 text-amber-100' />
@@ -555,6 +558,7 @@ export default function AdminPaidOrderRecoveryActionsPanel({
         <ActionButton
           icon={SearchCheck}
           tone='cyan'
+          fullWidth={releaseVerificationPending}
           busy={pendingAction === 'refresh-merchize'}
           disabled={
             isAnyActionPending ||
@@ -574,31 +578,33 @@ export default function AdminPaidOrderRecoveryActionsPanel({
             : 'Refresh Merchize state'}
         </ActionButton>
 
-        <ActionButton
-          icon={RefreshCw}
-          tone='cyan'
-          busy={pendingAction === 'retry-recovery'}
-          disabled={
-            isAnyActionPending ||
-            isCompleted ||
-            retryMode === 'none' ||
-            Boolean(shopOpsConfigurationDisabledReason || localProductionLockedReason)
-          }
-          disabledReason={
-            isCompleted
-              ? 'Post-payment processing is already complete; no retry is needed.'
-              : retryMode === 'none'
-                ? 'This row does not require another recovery action.'
-                : (shopOpsConfigurationDisabledReason ?? localProductionLockedReason)
-          }
-          onClick={handleRetry}
-        >
-          {isCompleted
-            ? 'Post-payment processing complete'
-            : pendingAction === 'retry-recovery'
-              ? retryPendingLabel
-              : retryActionLabel}
-        </ActionButton>
+        {!releaseVerificationPending ? (
+          <ActionButton
+            icon={RefreshCw}
+            tone='cyan'
+            busy={pendingAction === 'retry-recovery'}
+            disabled={
+              isAnyActionPending ||
+              isCompleted ||
+              retryMode === 'none' ||
+              Boolean(shopOpsConfigurationDisabledReason || localProductionLockedReason)
+            }
+            disabledReason={
+              isCompleted
+                ? 'Post-payment processing is already complete; no retry is needed.'
+                : retryMode === 'none'
+                  ? 'This row does not require another recovery action.'
+                  : (shopOpsConfigurationDisabledReason ?? localProductionLockedReason)
+            }
+            onClick={handleRetry}
+          >
+            {isCompleted
+              ? 'Post-payment processing complete'
+              : pendingAction === 'retry-recovery'
+                ? retryPendingLabel
+                : retryActionLabel}
+          </ActionButton>
+        ) : null}
 
         {canConfirmProviderAddress ? (
           <ActionButton
@@ -644,7 +650,7 @@ export default function AdminPaidOrderRecoveryActionsPanel({
             : 'Regenerate receipt'}
         </ActionButton>
 
-        {needsProviderDetailSync ? (
+        {needsProviderDetailSync && !releaseVerificationPending ? (
           <p className='sm:col-span-2 xl:col-span-1 2xl:col-span-2 rounded-lg border border-cyan-300/14 bg-cyan-300/[0.05] px-3 py-2 text-xs leading-5 text-cyan-50/80'>
             Django accepted the fulfillment process. Refreshing Merchize state or continuing
             fulfillment starts from that accepted state without replaying payment capture, receipt
@@ -653,7 +659,7 @@ export default function AdminPaidOrderRecoveryActionsPanel({
         ) : null}
       </div>
 
-      {requiresLocalProductionConfirmation ? (
+      {requiresLocalProductionConfirmation && !releaseVerificationPending ? (
         <AlertDialog
           open={productionRetryOpen}
           onOpenChange={(open) => {
@@ -729,7 +735,7 @@ export default function AdminPaidOrderRecoveryActionsPanel({
         </AlertDialog>
       ) : null}
 
-      {requiresManualRelease ? (
+      {canReviewManualRelease ? (
         <AlertDialog open={releaseConfirmOpen} onOpenChange={setReleaseConfirmOpen}>
           <AlertDialogContent className='w-[min(94vw,560px)] rounded-xl border border-amber-300/20 bg-slate-950/95 p-5 text-slate-50 shadow-2xl shadow-black/70 backdrop-blur-xl sm:p-6'>
             <AlertDialogHeader>
@@ -847,6 +853,7 @@ function ActionButton({
   icon: Icon,
   tone,
   children,
+  fullWidth,
   disabled,
   disabledReason,
   busy = false,
@@ -855,6 +862,7 @@ function ActionButton({
   icon: AdminIcon;
   tone?: 'cyan' | 'amber';
   children: ReactNode;
+  fullWidth?: boolean;
   disabled?: boolean;
   disabledReason?: string | null;
   busy?: boolean;
@@ -864,7 +872,7 @@ function ActionButton({
   const showDisabledReason = Boolean(disabled && disabledReason && !busy);
 
   return (
-    <div className='min-w-0'>
+    <div className={cn('min-w-0', fullWidth && 'col-span-full')}>
       <button
         type='button'
         disabled={disabled || busy}

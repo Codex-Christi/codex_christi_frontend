@@ -37,6 +37,7 @@ import {
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import {
   getMerchizeFulfillmentRetryEligibility,
+  getMerchizeReadyRefreshFeedback,
   getPendingFulfillmentRetryMessage,
   getPushVerificationPendingMessage,
 } from '@/lib/paypal/txLedger/fulfillmentRetryPolicy';
@@ -86,6 +87,8 @@ type AdminNotificationActionResult =
       errorCode?: string;
       stage?: string;
     };
+
+type MerchizeRefreshActionResult = AdminNotificationActionResult & { heading?: string };
 
 async function releaseAddressActionLock(orderToken: string, lockId: string | null) {
   if (!lockId) return;
@@ -1658,7 +1661,7 @@ export async function syncAdminMerchizeProviderDetailsAction({
   orderToken,
 }: {
   orderToken: string;
-}): Promise<AdminNotificationActionResult> {
+}): Promise<MerchizeRefreshActionResult> {
   try {
     const admin = await requireAdminAction('shop.recovery.run');
     assertShopOpsMutationAllowed();
@@ -1818,12 +1821,10 @@ export async function syncAdminMerchizeProviderDetailsAction({
 
     return {
       ok: true,
-      tone:
-        readiness.readiness.providerPushState === 'pushed' && snapshots.ok ? 'success' : 'warning',
-      message:
-        readiness.readiness.providerPushState === 'pushed'
-          ? `Merchize provider state is verified for ${sync.merchizeOrderId}.`
-          : `Production readiness passed for ${sync.merchizeOrderId}, but the order is not yet verified as pushed.`,
+      ...getMerchizeReadyRefreshFeedback(
+        readiness.readiness.providerPushState === 'pushed',
+        snapshots.ok,
+      ),
     };
   } catch (error) {
     return {
