@@ -1465,6 +1465,63 @@ The test also checked the saved progress and package evidence that drives custom
 This does not prove production scheduler health, live mail delivery, or a real release for
 the latest checkout. Those are still required before live PayPal.
 
+##### Read-only follow-up: release not confirmed
+
+The development ledgers matched the $40 sandbox capture, accepted Django handoff, and one
+Merchize order. Our recorded push was skipped because the switch was off. The later
+verification did not acknowledge a new push. Merchize reported a valid address and
+`validating`, but its send-state read returned `pushed: false` and `is_failed: false`.
+External progress showed import complete and push pending. Seller history showed import
+and item mapping only; there were no packages. This does not confirm a queue entry or
+prove that another push would be safe.
+
+The seller detail returned `estimated_ffm_cost.total: 21.30`. The estimate has no currency
+of its own; the order invoice currency is USD. The external supplier invoice still returned
+`fulfillment_cost: 0`, so the estimate is not a final supplier charge. The operator identified
+store balance as the issue. The order reads did not independently report a balance hold.
+No order, invoice, balance, or notification was changed.
+
+- **Admin:** Show the estimated supplier cost separately from the invoice and buyer payment.
+  Show “Imported; release not confirmed” when that is all the evidence supports. Offer a
+  read-only recheck of release, progress and invoice after staff top up, rather than a push.
+  Pass 2 alerts on an unpaid invoice after verified release; separately handle a future
+  explicit pre-release balance hold and use [Merchize's store balance alert](https://merchize.com/helpdesk/complete-guide-how-to-get-started-set-up-fulfillment-on-merchize/)
+  for low funds before an order is affected.
+- **Buyer:** Until a later milestone is confirmed, show that the order was received and no
+  action is needed. Do not show supplier funding, costs, or a second payment prompt.
+- **Merchize:** Evaluate the unpaid and paid supplier-cost events as prompts to refresh the
+  invoice and progress, not as authorization to push or email the buyer. Confirm each event
+  in the simulator and keep the scheduled check as a fallback.
+
+##### Fulfillment status in Order History
+
+The delivered reference and the linked sandbox order verified that Merchize progress and
+package data can distinguish import, release, production, shipment, and delivery. The local Order
+History list now uses the same saved fulfillment milestones as **View status**. Orders without
+usable fulfillment evidence still show a safe status from the payment ledger.
+
+- **Buyer list:** Show one compact badge per order, using the same status rules as confirmation.
+  Use **Order received**, **In production**, **Shipped**, or **Delivered** when the saved evidence
+  supports it. The imported but unreleased sandbox order should show **Order received**, with no
+  buyer action implied. A tracking label alone is not shipment, and one delivered package is not
+  proof that a split order is fully delivered.
+- **One fulfillment read per page:** Filter and paginate the signed-in buyer's orders first, then
+  load the saved fulfillment evidence for that page in one Prisma query. Match on order token
+  and Django payment-save ID. Do not call Merchize from the page or expose raw provider data.
+  Keep the last verified status when provider evidence is stale; without sufficient evidence,
+  fall back to the safe payment status. Do not guess a later milestone.
+- **Admin list:** Keep buyer payment, address, release, and supplier invoice separate. Do not
+  copy supplier charges, raw states, or provider diagnostics into the buyer list.
+- **Acceptance:** Check that the list and confirmation agree for imported, on-hold, in-production,
+  label-only, split-shipment, and delivered fixtures. Verify that another account cannot read
+  those orders and that **View status** and **Back to orders** preserve the list position on
+  desktop and mobile. Use mocks for later stages; no real release is needed for this UI check.
+
+**Local verification:** The imported sandbox order showed **Order received** in Order History
+and confirmation at desktop and mobile widths. Returning through order details preserved the
+selected sort. Tests use fixtures for later milestones, ownership, and unavailable or duplicate
+snapshots. No provider writes or payment actions were needed.
+
 #### 3. Evaluate Merchize webhooks after scheduled reads work
 
 The [Merchize webhook guide](https://merchize.com/helpdesk/merchize-webhooks-guide/) lists

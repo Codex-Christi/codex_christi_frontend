@@ -3,12 +3,25 @@ import { z } from 'zod';
 import type { Prisma } from '@/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger/client';
 import type { AuthSessionState } from '@/lib/auth/session-snapshot';
 import { isFreshServerSession } from '@/lib/auth/session-snapshot';
+import { getCanonicalPaymentProjectionState } from '@/lib/paypal/txLedger/canonicalPaymentProjectionState';
+import { customerFulfillmentHold } from '@/lib/shop/checkout/customerFulfillmentHold';
+import { customerPostPurchaseTitles } from '@/lib/shop/checkout/customerPostPurchaseStage';
+import {
+  getCustomerFulfillmentLookup,
+  getCustomerPostPurchaseStage,
+} from '@/lib/shop/checkout/customerRecoveryCopy';
+import type {
+  CustomerFulfillmentLookup,
+  SavedFulfillmentMilestone,
+} from '@/lib/shop/checkout/readCustomerFulfillmentMilestone';
 import {
   HISTORY_PAGE_SIZE,
   HISTORY_POST_CAPTURE_STATUSES,
+  historyListOrderSelect,
   historyOrderSelect,
   toHistoryOrder,
   type HistoryLedgerRow,
+  type HistoryListLedgerRow,
   type HistoryFulfillment,
 } from './model';
 import { receiptObjectKey } from './receiptReference';
@@ -67,15 +80,16 @@ function purchaseWhere(): Prisma.PaypalIntentWhereInput {
 
 type ListQuery = {
   where: Prisma.PaypalIntentWhereInput;
-  select: typeof historyOrderSelect;
+  select: typeof historyListOrderSelect;
   take: number;
   orderBy: Prisma.PaypalIntentOrderByWithRelationInput[];
 };
-type DetailQuery = Pick<ListQuery, 'where' | 'select'>;
+type DetailQuery = { where: ListQuery['where']; select: typeof historyOrderSelect };
 type Dependencies = {
   session: () => Promise<AuthSessionState>;
-  list: (query: ListQuery) => Promise<HistoryLedgerRow[]>;
+  list: (query: ListQuery) => Promise<HistoryListLedgerRow[]>;
   detail: (query: DetailQuery) => Promise<HistoryLedgerRow | null>;
+  milestones: (orders: CustomerFulfillmentLookup[]) => Promise<Map<string, SavedFulfillmentMilestone>>;
   fulfillment: (tokens: string[]) => Promise<HistoryFulfillment[]>;
 };
 
@@ -109,6 +123,44 @@ export function createAccountOrderReader(deps: Dependencies) {
       row: row?.userId === session.user_id && row.orderToken === orderToken ? row : null,
     };
   }
+
+  async function listOrders(page: HistoryListLedgerRow[]) {
+    const purchases = page.map((row) => {
+      const payment = getCanonicalPaymentProjectionState(row);
+      const paymentConfirmed = payment.captureCompletion.ok && payment.paymentSafeForPostProcessing;
+      return {
+        row,
+        order: toHistoryOrder(row, payment),
+        lookup: getCustomerFulfillmentLookup(row, paymentConfirmed),
+      };
+    });
+    const lookups = purchases.flatMap(({ lookup }) => lookup ? [lookup] : []);
+    if (!lookups.length) return purchases.map(({ order }) => order);
+
+    const milestones = await deps.milestones(lookups);
+    return purchases.map(({ row, order, lookup }) => {
+      if (!lookup) return order;
+      const milestone = milestones.get(row.orderToken);
+      if (milestone?.onHold) {
+        return { ...order, status: customerFulfillmentHold.title, needsReview: true };
+      }
+      const stage = milestone?.stage ?? getCustomerPostPurchaseStage({
+        status: row.status,
+        lastErrorCode: row.lastErrorCode,
+        fulfillmentResponse: row.merchizeFulfillmentResponsePayload,
+        paymentConfirmed: true,
+        postPaymentComplete: Boolean(row.processingCompletedAt),
+      });
+      return stage
+        ? {
+            ...order,
+            status: customerPostPurchaseTitles[stage],
+            needsReview: stage === 'preparation_under_review',
+          }
+        : order;
+    });
+  }
+
   return {
     async list(input: { filter?: unknown; cursor?: unknown } = {}) {
       const session = await owner();
@@ -124,7 +176,7 @@ export function createAccountOrderReader(deps: Dependencies) {
         });
       const rows = await deps.list({
         where: { userId: session.user_id, AND: conditions },
-        select: historyOrderSelect,
+        select: historyListOrderSelect,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: HISTORY_PAGE_SIZE + 1,
       });
@@ -134,7 +186,7 @@ export function createAccountOrderReader(deps: Dependencies) {
       return {
         session,
         filter,
-        orders: page.map(toHistoryOrder),
+        orders: await listOrders(page),
         nextCursor: rows.length > HISTORY_PAGE_SIZE ? cursorFor(page[page.length - 1]) : null,
       };
     },

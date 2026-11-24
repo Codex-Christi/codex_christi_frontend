@@ -22,6 +22,7 @@ export type MappedProcessingState = {
   errorMessage?: string;
   supportReference: string;
   recoveryReason?: string;
+  postPurchaseStage?: CustomerOrderStatus['postPurchaseStage'];
   fulfillmentOnHold?: boolean;
   fulfillmentCheckedAt?: string;
   shortSupportReference: string;
@@ -88,6 +89,7 @@ export function mapLedgerToProcessingState(
     errorMessage: data.error?.message ?? undefined,
     supportReference: data.orderToken,
     recoveryReason: data.recoveryReason ?? undefined,
+    postPurchaseStage: data.postPurchaseStage,
     fulfillmentOnHold: data.fulfillmentOnHold,
     fulfillmentCheckedAt: data.fulfillmentCheckedAt ?? undefined,
     shortSupportReference: data.orderToken.slice(0, 8),

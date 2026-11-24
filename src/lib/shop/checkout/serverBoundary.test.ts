@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
+import type { PrismaClient as FulfillmentPrismaClient } from '@/lib/prisma/shop/merchizeFulfillmentOps/generated/merchizeFulfillmentOps/client';
 import { NextRequest } from 'next/server';
 import { createRequestStoreForAPI } from 'next/dist/server/async-storage/request-store';
 import {
@@ -636,4 +637,211 @@ test('status without completed capture does not tell the customer their payment 
   assert.doesNotMatch(body.error.message, /payment (?:was )?received/u);
   assert.equal(writes, 0);
   assert.equal(network.mock.callCount(), 0);
+});
+
+test('confirmation exposes only verified saved fulfillment milestones after checkout access', async (t) => {
+  const { proof } = setup(t);
+  const row = {
+    ...savedReviewedCheckout(proof),
+    userId: null as string | null,
+    status: 'completed',
+    djangoPaymentSaveCustomId: 'PRIVATE_PAYMENT_SAVE',
+    merchizeFulfillmentResponsePayload: {
+      status: 201,
+      success: true,
+      data: {
+        processing_status: 'completed',
+        error_message: 'Order created but details not available',
+      },
+    },
+    authorizePayload: { amount: { value: '25.00', currencyCode: 'USD' } },
+    capturePayload: {
+      id: 'PRIVATE_CAPTURE',
+      status: 'COMPLETED',
+      amount: { value: '25.00', currencyCode: 'USD' },
+    },
+    updatedAt: new Date(),
+    processingCompletedAt: new Date() as Date | null,
+    fulfillmentAddressOverriddenAt: null as Date | null,
+    lastErrorCode: null as string | null,
+  };
+  const effects = forbidCheckoutEffects(t, row);
+  for (const [key, value] of Object.entries({
+    SHOP_OPS_DATA_TARGET: 'dev',
+    MERCHIZE_FULFILLMENT_OPS_NEON_POOLED_DB_DEV_STRING: 'postgres://local.invalid/fulfillment',
+    PAYPAL_TX_LEDGER_NEON_POOLED_DB_DEV_STRING: 'postgres://local.invalid/payments',
+  })) {
+    const old = process.env[key];
+    process.env[key] = value;
+    t.after(() => {
+      if (old === undefined) delete process.env[key];
+      else process.env[key] = old;
+    });
+  }
+  const progress = {
+    code: 'PRIVATE_ORDER_CODE',
+    external_number: 'PRIVATE_EXTERNAL_NUMBER',
+    identifier: 'PRIVATE_IDENTIFIER',
+    order_progress: [
+      { event: 'order_imported', status: 'done' },
+      { event: 'fulfillment_cost_paid', status: 'done' },
+      { event: 'in_production', status: 'done' },
+      { event: 'shipment_started', status: 'pending' },
+    ],
+    package_progresses: [{ tracking_number: 'PRIVATE_TRACKING' }],
+  };
+  const fulfillment = {
+    orderToken: row.orderToken,
+    djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
+    merchizeExternalOrderNumber: progress.external_number,
+    merchizeIdentifier: progress.identifier,
+    merchizeOrderCode: progress.code,
+    pushVerifiedAt: new Date() as Date | null,
+    duplicateDetectedAt: null,
+    productionGateStatus: 'push_verified',
+    addressReviewStatus: 'ready',
+    lastReadinessCheckAt: null as Date | null,
+    lastProgressSyncAt: new Date('2026-11-22T12:05:00.000Z'),
+    heldAt: null as Date | null,
+    lastLookupAt: null as Date | null,
+    merchizeProductionReadinessPayload: { status: 'ready', addressReadbackStatus: 'matched' },
+    merchizeProgressPayload: { success: true, data: [progress] },
+    merchizeTrackingPayload: {
+      success: true,
+      data: [
+        { _id: 'PRIVATE_PACKAGE_1', external_number: progress.external_number, shipment_status: 'delivered' },
+        { _id: 'PRIVATE_PACKAGE_2', external_number: progress.external_number, shipment_status: 'in_transit' },
+      ],
+    },
+    deliveryStatus: null as string | null,
+  };
+  const findMany = t.mock.fn<(query: unknown) => Promise<(typeof fulfillment)[]>>(async () => [
+    fulfillment,
+  ]);
+  const previous = global.__merchizeFulfillmentOpsPrisma__;
+  global.__merchizeFulfillmentOpsPrisma__ = {
+    merchizeFulfillmentOrder: { findMany },
+  } as unknown as FulfillmentPrismaClient;
+  t.after(() => {
+    global.__merchizeFulfillmentOpsPrisma__ = previous;
+  });
+
+  const grant = `${checkoutGrantCookieName(row.orderToken)}=${createCheckoutGrant(row, 'status')}`;
+  const read = async (cookie = grant) => {
+    const req = new NextRequest(
+      `http://localhost:3001/next-api/paypal/tx-ledger/payments/${row.orderToken}/status`,
+      { headers: { cookie } },
+    );
+    return inRequest(req, () =>
+      status(req, { params: Promise.resolve({ orderToken: row.orderToken }) }),
+    );
+  };
+  assert.equal((await read('')).status, 403);
+  assert.equal(findMany.mock.callCount(), 0);
+
+  const response = await read();
+  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  const payload = await response.json();
+  assert.equal(payload.postPurchaseStage, 'production_started');
+  assert.equal(payload.fulfillmentCheckedAt, '2026-11-22T12:05:00.000Z');
+  assert.doesNotMatch(JSON.stringify(payload), /PRIVATE_|package_progresses|order_progress|tracking/i);
+  assert.deepEqual(findMany.mock.calls[0]?.arguments[0], {
+    where: {
+      OR: [{ orderToken: row.orderToken, djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId }],
+    },
+    select: {
+      orderToken: true,
+      djangoPaymentSaveCustomId: true,
+      merchizeExternalOrderNumber: true,
+      merchizeIdentifier: true,
+      merchizeOrderCode: true,
+      merchizeProgressPayload: true,
+      merchizeTrackingPayload: true,
+      deliveryStatus: true,
+      lastProgressSyncAt: true,
+      pushVerifiedAt: true,
+      duplicateDetectedAt: true,
+      productionGateStatus: true,
+      addressReviewStatus: true,
+      lastReadinessCheckAt: true,
+      merchizeProductionReadinessPayload: true,
+      heldAt: true,
+      lastLookupAt: true,
+    },
+    take: 3,
+  });
+
+  findMany.mock.mockImplementationOnce(async () => [
+    { ...fulfillment, djangoPaymentSaveCustomId: 'OTHER_PAYMENT' },
+  ]);
+  assert.equal((await (await read()).json()).postPurchaseStage, null);
+
+  progress.order_progress[3]!.status = 'done';
+  assert.equal((await (await read()).json()).postPurchaseStage, 'shipped');
+  fulfillment.heldAt = new Date('2026-11-22T12:06:00.000Z');
+  fulfillment.lastLookupAt = new Date('2026-11-22T12:07:00.000Z');
+  const held = await (await read()).json();
+  assert.equal(held.fulfillmentOnHold, true);
+  assert.equal(held.postPurchaseStage, 'shipped');
+  assert.equal(held.fulfillmentCheckedAt, '2026-11-22T12:07:00.000Z');
+  assert.equal((await read('')).status, 403);
+  fulfillment.heldAt = null;
+  const resumed = await (await read()).json();
+  assert.equal(resumed.fulfillmentOnHold, false);
+  assert.equal(resumed.postPurchaseStage, 'shipped');
+  progress.order_progress.push({ event: 'delivered', status: 'done' });
+  fulfillment.deliveryStatus = 'delivered_verified';
+  assert.equal((await (await read()).json()).postPurchaseStage, 'shipped');
+  fulfillment.merchizeTrackingPayload.data[1]!.shipment_status = 'delivered';
+  const delivered = await (await read()).json();
+  assert.equal(delivered.postPurchaseStage, 'delivered');
+  assert.doesNotMatch(JSON.stringify(delivered), /PRIVATE_|tracking/i);
+  progress.order_progress.pop();
+  progress.order_progress[3]!.status = 'pending';
+
+  const production = progress.order_progress[2]!;
+  production.status = 'pending';
+  assert.equal((await (await read()).json()).postPurchaseStage, 'sent_for_preparation');
+  production.status = 'done';
+  fulfillment.merchizeProgressPayload.data = [{ ...progress, identifier: 'OTHER_STORE' }];
+  assert.equal((await (await read()).json()).postPurchaseStage, 'sent_for_preparation');
+  fulfillment.merchizeProgressPayload.data = [progress, progress];
+  assert.equal((await (await read()).json()).postPurchaseStage, 'sent_for_preparation');
+  fulfillment.merchizeProgressPayload.data = [progress];
+  findMany.mock.mockImplementationOnce(async () => [fulfillment, fulfillment]);
+  assert.equal((await (await read()).json()).postPurchaseStage, null);
+  findMany.mock.mockImplementationOnce(async () => [
+    { ...fulfillment, pushVerifiedAt: null },
+  ]);
+  assert.equal((await (await read()).json()).postPurchaseStage, null);
+  findMany.mock.mockImplementationOnce(async () => []);
+  assert.equal((await (await read()).json()).postPurchaseStage, null);
+  findMany.mock.mockImplementationOnce(async () => {
+    throw new Error('PRIVATE_DATABASE_FAILURE');
+  });
+  assert.equal((await (await read()).json()).postPurchaseStage, null);
+
+  row.status = 'payment_saved';
+  row.processingCompletedAt = null;
+  row.lastErrorCode = 'MERCHIZE_ADDRESS_VALIDATION_PENDING';
+  fulfillment.pushVerifiedAt = null;
+  fulfillment.productionGateStatus = 'ready';
+  fulfillment.lastReadinessCheckAt = new Date('2026-11-22T12:00:00.000Z');
+  const refreshed = await (await read()).json();
+  assert.equal(refreshed.postPurchaseStage, 'awaiting_preparation');
+  assert.equal(refreshed.fulfillmentCheckedAt, '2026-11-22T12:00:00.000Z');
+  assert.doesNotMatch(refreshed.recoveryReason, /checking your delivery address/i);
+  row.fulfillmentAddressOverriddenAt = new Date('2026-11-22T12:01:00.000Z');
+  const changed = await (await read()).json();
+  assert.equal(changed.postPurchaseStage, 'checking_delivery_details');
+  assert.equal(changed.fulfillmentCheckedAt, null);
+  row.userId = 'alice';
+  assert.equal((await read(await accountCookie('bob'))).status, 403);
+
+  row.status = 'refunded';
+  const calls = findMany.mock.callCount();
+  assert.equal((await (await read(await accountCookie('alice'))).json()).postPurchaseStage, null);
+  assert.equal(findMany.mock.callCount(), calls);
+  assert.equal(effects.network.mock.callCount(), 0);
+  assert.equal(effects.writes(), 0);
 });

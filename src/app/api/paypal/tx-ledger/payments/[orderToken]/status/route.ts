@@ -9,8 +9,13 @@ import { getCapturedCartPurchase } from '@/lib/cart/purchase';
 import { receiptObjectKey, receiptDownloadPath } from '@/lib/shop/orderHistory/receiptReference';
 import { toCustomerOrderStatus } from '@/lib/shop/checkout/customerOrderStatus';
 import { getBuyerAddressCorrectionSetup } from '@/lib/shop/checkout/customerAddressCorrectionServer';
-import { readCustomerFulfillmentHold } from '@/lib/shop/checkout/readCustomerFulfillmentHold';
-import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
+import { readCustomerFulfillmentMilestone } from '@/lib/shop/checkout/readCustomerFulfillmentMilestone';
+import { customerPostPurchaseDescriptions } from '@/lib/shop/checkout/customerPostPurchaseStage';
+import {
+  getCustomerFulfillmentLookup,
+  getCustomerPostPurchaseStage,
+  getCustomerRecoveryReason,
+} from '@/lib/shop/checkout/customerRecoveryCopy';
 
 type PageProps = {
   params: Promise<{ orderToken: string }>;
@@ -50,30 +55,6 @@ function getPaidAmountLabel(capturePayload: unknown) {
   }
 }
 
-function getCustomerRecoveryReason(status: string) {
-  if (status === PAYPAL_LEDGER_STATUS.CAPTURED) {
-    return 'Your payment was received. Your receipt is taking longer than expected.';
-  }
-
-  if (status === PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED) {
-    return 'Your payment is recorded. Your order needs a check before preparation can continue.';
-  }
-
-  if (status === PAYPAL_LEDGER_STATUS.PAYMENT_SAVED) {
-    return 'Your payment is recorded. Your order needs a check before preparation can continue.';
-  }
-
-  if (
-    status === PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED ||
-    status === PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED ||
-    status === PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED
-  ) {
-    return 'Your order needs a check before preparation can continue.';
-  }
-
-  return 'Your order is taking longer than expected. Keep your order reference for support.';
-}
-
 export async function GET(_req: Request, { params }: PageProps) {
   const { orderToken } = await params;
 
@@ -103,24 +84,28 @@ export async function GET(_req: Request, { params }: PageProps) {
       (CUSTOMER_RECOVERY_LEDGER_STATUSES.has(row.status) &&
         unresolvedAgeMs >= CUSTOMER_RECOVERY_GRACE_MS));
   const effectiveStatus = paymentFailure ? PAYPAL_LEDGER_STATUS.ERROR : row.status;
+  const receiptLink = receiptObjectKey(row) ? receiptDownloadPath(row.orderToken) : null;
   const recoveryReason = paymentFailure
     ? !captureCompletion.ok
       ? 'Your payment details need review before you can continue. Keep your order reference for support.'
       : paymentFailure.errorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED'
         ? 'Your payment was received, but the delivery address needs review before we can prepare the order.'
         : 'Your payment was received, but the amount needs review before we can prepare the order.'
-    : getCustomerRecoveryReason(effectiveStatus);
-  const receiptLink = receiptObjectKey(row) ? receiptDownloadPath(row.orderToken) : null;
-  const holdCheckedAt =
-    captureCompletion.ok &&
-    paymentState.paymentSafeForPostProcessing &&
-    row.status !== PAYPAL_LEDGER_STATUS.REFUNDED &&
-    row.djangoPaymentSaveCustomId &&
-    isAcceptedDjangoFulfillmentProcessResponse(row.merchizeFulfillmentResponsePayload)
-      ? await readCustomerFulfillmentHold(row.orderToken, row.djangoPaymentSaveCustomId)
-      : null;
+    : getCustomerRecoveryReason(effectiveStatus, row.lastErrorCode, Boolean(receiptLink));
+  const paymentConfirmed = captureCompletion.ok && paymentState.paymentSafeForPostProcessing;
+  const lookup = getCustomerFulfillmentLookup(row, paymentConfirmed);
+  const fulfillment = lookup ? await readCustomerFulfillmentMilestone(lookup) : null;
+  const postPurchaseStage = fulfillment?.stage ?? getCustomerPostPurchaseStage({
+    status: row.status,
+    lastErrorCode: row.lastErrorCode,
+    fulfillmentResponse: row.merchizeFulfillmentResponsePayload,
+    paymentConfirmed,
+    postPaymentComplete: Boolean(row.processingCompletedAt),
+  });
 
-  const addressCorrection = holdCheckedAt ? null : getBuyerAddressCorrectionSetup(row, paymentState)?.state;
+  const addressCorrection = fulfillment?.onHold
+    ? null
+    : getBuyerAddressCorrectionSetup(row, paymentState)?.state;
   const waitingForAddress = captureCompletion.ok && !isResolved && !paymentFailure &&
     row.lastErrorCode === 'MERCHIZE_ADDRESS_VALIDATION_PENDING';
   const customerStatus = toCustomerOrderStatus(row, {
@@ -131,11 +116,12 @@ export async function GET(_req: Request, { params }: PageProps) {
     paidAmountLabel: getPaidAmountLabel(row.capturePayload),
     cartPurchase: getCapturedCartPurchase(row, paymentState),
     customerRecoveryStatus: isCustomerProtectionVisible ? 'paid_unresolved' : null,
-    recoveryReason: waitingForAddress
-      ? "We're checking your delivery address. No action is needed right now."
-      : isCustomerProtectionVisible ? recoveryReason : null,
-    fulfillmentOnHold: Boolean(holdCheckedAt),
-    fulfillmentCheckedAt: holdCheckedAt,
+    recoveryReason: isCustomerProtectionVisible || waitingForAddress
+      ? fulfillment?.stage ? customerPostPurchaseDescriptions[fulfillment.stage] : recoveryReason
+      : null,
+    postPurchaseStage,
+    fulfillmentOnHold: fulfillment?.onHold,
+    fulfillmentCheckedAt: fulfillment?.checkedAt,
     error: paymentFailure
       ? { message: recoveryReason }
       : row.lastErrorMessage

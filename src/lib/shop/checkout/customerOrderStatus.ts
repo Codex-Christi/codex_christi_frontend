@@ -1,4 +1,5 @@
 import type { CartPurchase } from '@/lib/cart/types';
+import type { CustomerPostPurchaseStage } from './customerPostPurchaseStage';
 import type { CustomerAddressCorrectionState } from './customerAddressCorrection';
 
 const paymentProgressFields = [
@@ -49,6 +50,7 @@ export type CustomerOrderStatusFields = {
   cartPurchase?: CartPurchase | null;
   customerRecoveryStatus?: 'paid_unresolved' | null;
   recoveryReason?: string | null;
+  postPurchaseStage?: CustomerPostPurchaseStage | null;
   fulfillmentOnHold?: boolean;
   fulfillmentCheckedAt?: Date | null;
   error?: { message?: string | null } | null;
@@ -68,6 +70,7 @@ export type CustomerOrderStatus = {
   cartPurchase: CartPurchase | null;
   customerRecoveryStatus: 'paid_unresolved' | null;
   recoveryReason: string | null;
+  postPurchaseStage: CustomerPostPurchaseStage | null;
   fulfillmentOnHold: boolean;
   fulfillmentCheckedAt: string | null;
   updatedAt: string | null;
@@ -121,6 +124,7 @@ export function toCustomerOrderStatus(
       : null,
     customerRecoveryStatus: fields.customerRecoveryStatus ?? null,
     recoveryReason: fields.recoveryReason ?? null,
+    postPurchaseStage: fields.postPurchaseStage ?? null,
     ...(fields.addressCorrection ? { addressCorrection: fields.addressCorrection } : {}),
     fulfillmentOnHold: fields.fulfillmentOnHold === true,
     fulfillmentCheckedAt: isoDate(fields.fulfillmentCheckedAt),

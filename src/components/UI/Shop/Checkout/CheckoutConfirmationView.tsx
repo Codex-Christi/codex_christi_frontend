@@ -8,6 +8,10 @@ import CustomShopLink from '../HelperComponents/CustomShopLink';
 import type { MappedProcessingState } from '@/lib/paypal/txLedger/mapLedgerToProcessingState';
 import type { CustomerAddressCorrectionState } from '@/lib/shop/checkout/customerAddressCorrection';
 import { customerFulfillmentHold } from '@/lib/shop/checkout/customerFulfillmentHold';
+import {
+  customerPostPurchaseDescriptions,
+  customerPostPurchaseTitles,
+} from '@/lib/shop/checkout/customerPostPurchaseStage';
 
 type CheckoutConfirmationViewProps = {
   orderToken: string;
@@ -88,6 +92,13 @@ export default function CheckoutConfirmationView({
   const manualReview = state?.needsManualReview;
   const delayed = paid && state?.flowStatus === 'error';
   const onHold = paid && hasData && !accessRequired && !refunded && state?.fulfillmentOnHold;
+  const postPurchaseStage = paid && hasData && !accessRequired && !refunded
+    ? state?.postPurchaseStage
+    : null;
+  const stageTitle = postPurchaseStage ? customerPostPurchaseTitles[postPurchaseStage] : null;
+  const stageDescription = postPurchaseStage
+    ? customerPostPurchaseDescriptions[postPurchaseStage]
+    : null;
   const correction = paid && hasData && !accessRequired && !refunded && !onHold
     ? addressCorrectionState
     : null;
@@ -97,8 +108,9 @@ export default function CheckoutConfirmationView({
     ? 'Your payment was received. Please correct your address so we can prepare your order.'
     : correction === 'checking' ? 'We received your correction. No action is needed right now.' : null;
   const shortReference = state?.shortSupportReference || orderToken.slice(0, 8);
+  const fulfillmentCheckedAt = onHold || postPurchaseStage ? state?.fulfillmentCheckedAt : null;
   const lastUpdated = !accessRequired && hasData
-    ? readLastUpdated(onHold ? state?.fulfillmentCheckedAt : state?.updatedAt)
+    ? readLastUpdated(fulfillmentCheckedAt ?? state?.updatedAt)
     : null;
   const title = accessRequired
     ? 'View your order'
@@ -150,14 +162,14 @@ export default function CheckoutConfirmationView({
           )}
         </div>
         <h1 id='checkout-confirmation-title' className='mt-5 text-xl font-semibold sm:text-2xl'>
-          {onHold ? customerFulfillmentHold.title : correctionTitle ?? title}
+          {onHold ? customerFulfillmentHold.title : correctionTitle ?? stageTitle ?? title}
         </h1>
         <p className='mx-auto mt-3 max-w-lg text-sm leading-6 text-white/75' aria-live='polite'>
-          {onHold ? customerFulfillmentHold.description : correctionDescription ?? description}
+          {onHold ? customerFulfillmentHold.description : correctionDescription ?? stageDescription ?? description}
         </p>
         {lastUpdated && (
           <p className='mt-3 text-xs leading-5 text-white/55'>
-            {onHold ? 'Fulfillment last checked: ' : 'Last updated: '}
+            {fulfillmentCheckedAt ? 'Fulfillment last checked: ' : 'Last updated: '}
             <time dateTime={lastUpdated.dateTime}>{lastUpdated.label}</time>
           </p>
         )}
