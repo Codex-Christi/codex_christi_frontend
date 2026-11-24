@@ -488,6 +488,13 @@ function getCostDialogCopy(
 ): Pick<EvidenceItem, 'meaning' | 'nextStep'> {
   const status = summary.costReviewStatus?.toLowerCase();
 
+  if (status === 'unpaid') {
+    return {
+      meaning: 'The supplier invoice is unpaid. This is separate from the buyer payment and does not prove the store balance is low.',
+      nextStep: 'Check billing in Merchize. Do not charge the buyer or send another push to clear the invoice.',
+    };
+  }
+
   if (status === 'awaiting_fulfillment') {
     return {
       meaning:

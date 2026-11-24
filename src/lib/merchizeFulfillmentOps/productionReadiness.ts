@@ -1,4 +1,6 @@
 import { MERCHIZE_ORDER_ON_HOLD } from './status';
+import { readSupplierInvoice } from './supplierInvoice';
+import type { ExternalOrderProgressReference } from './externalOrderProgress';
 
 export type MerchizeReadinessCategory =
   'address' | 'items' | 'artwork' | 'cost' | 'attention' | 'order' | 'provider' | 'age';
@@ -42,6 +44,7 @@ type ReadinessPayloads = {
   addressSuggestion: unknown;
   unfulfilledItems: unknown;
   fulfillmentInvoice: unknown;
+  invoiceReference?: ExternalOrderProgressReference;
   requireAttention: unknown;
   sendToFulfillment: unknown;
   buyerAddressMismatchFields?: string[] | null;
@@ -89,8 +92,6 @@ const FAILED_ITEM_STATUSES = new Set([
   'rejected',
 ]);
 const STALE_ORDER_DAYS = 7;
-type ExternalInvoiceState = 'available' | 'paid' | 'placeholder' | 'provider_error';
-
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -200,22 +201,6 @@ function isDirectItemUnmapped(item: Record<string, unknown>) {
   return Boolean(product && !hasResolvedCatalogVariant(item) && hasFailedMappingStatus(product));
 }
 
-function classifyExternalInvoice(payload: unknown): ExternalInvoiceState {
-  const root = asRecord(payload);
-  if (root?.success !== true || !Array.isArray(root.data)) return 'provider_error';
-
-  const row = asRecord(getDataArray(payload)[0]);
-  const fulfillmentCost = row?.fulfillment_cost;
-  if (typeof fulfillmentCost === 'number') {
-    return fulfillmentCost > 0 ? 'available' : 'placeholder';
-  }
-
-  const costRecord = asRecord(fulfillmentCost);
-  if (!costRecord || Object.keys(costRecord).length === 0) return 'placeholder';
-
-  return asString(costRecord.status)?.toLowerCase() === 'paid' ? 'paid' : 'available';
-}
-
 function classifyProviderPushState(detail: unknown, sendToFulfillment: unknown) {
   const detailData = getDataRecord(detail);
   const sendData = getDataRecord(sendToFulfillment);
@@ -242,6 +227,7 @@ export function classifyMerchizeProductionReadiness({
   addressSuggestion,
   unfulfilledItems,
   fulfillmentInvoice,
+  invoiceReference,
   requireAttention,
   sendToFulfillment,
   buyerAddressMismatchFields,
@@ -404,7 +390,7 @@ export function classifyMerchizeProductionReadiness({
     artworkReviewStatus = 'unknown';
   }
 
-  const invoiceState = classifyExternalInvoice(fulfillmentInvoice);
+  const invoiceState = readSupplierInvoice(fulfillmentInvoice, invoiceReference).state;
   const costReviewStatus =
     invoiceState === 'placeholder'
       ? push.state === 'pushed'

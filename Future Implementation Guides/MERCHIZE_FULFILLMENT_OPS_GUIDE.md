@@ -1405,6 +1405,13 @@ describes paying the supplier invoice before production and configuring a store 
 The order payment label and the supplier invoice are separate. A top-up may let existing queued
 orders advance without a new push. Check which orders are waiting before any real funding test.
 
+**Retailer responsibility:** Supplier funding is internal. An unpaid invoice or a confirmed
+low-balance hold must never send a buyer email, show a buyer action, or suggest a second payment.
+Keep the buyer-facing order status at its last verified milestone with no action required.
+Authorized staff review the Merchize bill and top up manually if needed. Afterward, refresh the
+invoice and progress before considering another push: Merchize can accept a push before funding
+clears, and an order that is already queued may continue without another request.
+
 - **Admin:** Show buyer payment, release, supplier invoice, and shipment as separate states.
   Sync `GET /order/external/orders/order-invoice` for the supplier cost status and `paid_at`.
   Only name insufficient balance when Merchize explicitly reports that reason or verified store
@@ -1423,6 +1430,40 @@ orders advance without a new push. Check which orders are waiting before any rea
   label creation, and shipment as separate transitions. Verify the branded production and
   shipment notices against those transitions and confirm that replay does not send duplicates.
   The earlier release-confirmation email is not a shipment email.
+
+##### Pass 2 API and mock verification
+
+Server-key, read-only calls matched both provider orders by their Merchize order codes. On
+November 23, the November 14 reference returned a single paid supplier invoice with `paid_at`.
+External progress agreed with that timestamp and showed production starting about 24 minutes
+later. Tracking returned one USPS package with a number and `shipment_status: pre_transit`,
+even though the package's generic status was `fulfilled`. The order and package timelines left
+shipment and delivery pending. The latest sandbox-paid checkout returned `fulfillment_cost: 0`,
+completed import, a pending push with an `actual` timestamp, no packages, and no successful
+tracking result. The timestamp and the seller UI's unpaid label do not turn the zero invoice
+into an explicit funding hold. No state-changing endpoint was called.
+
+**Local implementation:** The scheduled lifecycle check distinguishes a matched unpaid invoice
+from a zero or missing record. An unpaid invoice on a verified released order alerts admin;
+it does not charge the buyer, top up the store, or push the order. Rejected or mismatched
+invoices leave the last good invoice snapshot and check time intact. The saved internal order
+code takes precedence over an external-number alias when reading progress and packages.
+
+The customer outbox sends the most advanced, freshly confirmed production, shipment, or
+delivery notice once per order and milestone. It requires matching paid ledger evidence and a
+verified release. The milestone must have a completed actual time on or after our release
+verification and within the last 24 hours; this path does not backfill older emails. Full
+delivery requires matching package evidence. Pending milestones, estimates, and a label alone
+do not qualify. The email links to verified order access instead of embedding a tracking number
+or supplier details. Failed sends remain available for admin resend; a send with an unknown
+outcome must be reviewed before another attempt.
+
+The mocked scheduled job and test inbox covered a placeholder invoice, an unpaid invoice and
+admin alert, funding clearing without a push, a mismatched read, production, a USPS label before
+shipment, a failed shipment email and concurrent resend, and partial versus complete delivery.
+The test also checked the saved progress and package evidence that drives customer status.
+This does not prove production scheduler health, live mail delivery, or a real release for
+the latest checkout. Those are still required before live PayPal.
 
 #### 3. Evaluate Merchize webhooks after scheduled reads work
 

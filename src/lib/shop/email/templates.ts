@@ -83,19 +83,19 @@ export function buildShopFulfillmentEmail({
     throw new Error('An order reference is required.');
   const subjectReference = supportReference.replace(/[\u0000-\u001f\u007f]/gu, ' ').slice(0, 8);
   return {
-    subject: `We’re preparing your order · ${subjectReference} · ${senderName}`,
+    subject: `Your order was sent for preparation · ${subjectReference} · ${senderName}`,
     senderName,
     ...buildShopEmailLayout({
-      previewText: 'Your payment has been received and your order is moving into preparation.',
+      previewText: 'Your payment was received and your order was sent for preparation.',
       eyebrow: 'Order update',
-      heading: 'We’re preparing your order',
+      heading: 'Order sent for preparation',
       greeting: customerName?.trim() ? `Hi ${customerName.trim()},` : 'Hello,',
       paragraphs: [
-        'Your payment has been received, and we’re getting your order ready.',
+        'Your payment was received and your order was sent for preparation. We’ll update your order page when production starts.',
         'Keep the reference below if you need to contact us about your order.',
       ],
       details: [
-        { label: 'Order status', value: 'Preparing your order' },
+        { label: 'Order status', value: 'Sent for preparation' },
         { label: 'Support reference', value: supportReference },
       ],
       action: {
@@ -103,6 +103,42 @@ export function buildShopFulfillmentEmail({
         href: getShopSiteUrl(
           `/shop/checkout/confirmation/${encodeURIComponent(orderToken)}?view=details`,
         ),
+      },
+      footerText: 'For your privacy, you may need to verify access before viewing your order.',
+    }),
+  };
+}
+
+const lifecycleCopy = {
+  production: {
+    heading: 'Your order is in production',
+    message: 'Production has started. You can check your order page for shipment updates.',
+  },
+  shipment: {
+    heading: 'Shipment has started',
+    message: 'At least part of your order has shipped. Open your order for the latest package and tracking details.',
+  },
+  delivery: {
+    heading: 'Your order was delivered',
+    message: 'Delivery has been confirmed for your order. Open your order for details.',
+  },
+} as const;
+
+export type ShopFulfillmentNotice = keyof typeof lifecycleCopy;
+
+export function buildShopFulfillmentMilestoneEmail(notice: ShopFulfillmentNotice, orderToken: string) {
+  const { heading, message } = lifecycleCopy[notice];
+  return {
+    senderName,
+    subject: `${heading} · ${senderName}`,
+    ...buildShopEmailLayout({
+      previewText: message,
+      eyebrow: 'Order update',
+      heading,
+      paragraphs: [message],
+      action: {
+        label: 'View your order',
+        href: getShopSiteUrl(`/shop/checkout/confirmation/${encodeURIComponent(orderToken)}?view=details`),
       },
       footerText: 'For your privacy, you may need to verify access before viewing your order.',
     }),

@@ -60,7 +60,7 @@ const fulfillmentInput = {
 };
 
 for (const receiptAvailable of [true, false]) {
-  test(`preparing email links to the protected order page with receipt ${receiptAvailable ? 'ready' : 'pending'}`, () => {
+  test(`release email links to the protected order page with receipt ${receiptAvailable ? 'ready' : 'pending'}`, () => {
     const message = buildShopFulfillmentEmail({ ...fulfillmentInput, receiptAvailable });
     const label = receiptAvailable ? 'View order & receipt' : 'View order';
     const action = message.textbody.split('\n\n').find((line) => line.startsWith(`${label}: `));
@@ -76,7 +76,9 @@ for (const receiptAvailable of [true, false]) {
     assert.ok(!href.includes(fulfillmentInput.supportReference));
     assert.ok(!message.htmlbody.includes('/admin/'));
     for (const body of [message.textbody, message.htmlbody]) {
-      assert.ok(body.includes('Your payment has been received'));
+      assert.ok(body.includes('Your payment was received'));
+      assert.ok(body.includes('sent for preparation'));
+      assert.ok(!body.includes('Production has started'));
       assert.ok(body.includes(fulfillmentInput.supportReference));
       assert.ok(body.includes('you may need to verify access before viewing your order'));
       if (!receiptAvailable) assert.ok(!body.includes('receipt'));

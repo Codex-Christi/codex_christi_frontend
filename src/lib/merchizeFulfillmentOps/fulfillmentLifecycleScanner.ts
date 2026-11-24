@@ -11,6 +11,8 @@ import { listMerchizeExternalOrdersDetail } from './merchizeClient';
 import { holdLookupSelect, holdLookupVersion, reconcileMerchizeOrderHolds } from './merchizeOrderHold';
 import { MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS } from './status';
 import { safeLogErrorMessage } from './redaction';
+import { VERIFIED_MERCHIZE_DELIVERY_STATUS } from './customerTracking';
+import { notifyMerchizeLifecycle } from './notifyMerchizeLifecycle';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import {
   ADMIN_NOTIFICATION_SEVERITY,
@@ -24,7 +26,8 @@ import {
 
 const MAX_BATCH_SIZE = 25;
 const REPEATED_FAILURE_THRESHOLD = 3;
-const TERMINAL_DELIVERY_STATUSES = ['delivered', 'cancelled', 'canceled'] as const;
+// Legacy "delivered" values may describe only the first package. Recheck those rows.
+const TERMINAL_DELIVERY_STATUSES = [VERIFIED_MERCHIZE_DELIVERY_STATUS, 'cancelled', 'canceled'] as const;
 
 async function notifyRepeatedLifecycleFailure(args: {
   orderToken: string;
@@ -241,6 +244,9 @@ export async function runMerchizeFulfillmentLifecycleScanner(
               blockers: readiness.readiness.blockers,
             })
           : false;
+        if (detailSync.ok && readiness.ok) {
+          await notifyMerchizeLifecycle(candidate.orderToken, scannedAt);
+        }
         results.push({
           orderToken: candidate.orderToken,
           ok: detailSync.ok && readiness.ok && snapshots.ok,

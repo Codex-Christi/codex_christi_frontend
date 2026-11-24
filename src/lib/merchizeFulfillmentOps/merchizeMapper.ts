@@ -301,11 +301,11 @@ export function extractNormalizedOrderSnapshot(args: {
 
   return {
     merchizeOrderCode: firstString(root, [
-      ['order_id'],
+      ['code'],
       ['order_code'],
       ['order_number'],
+      ['order_id'],
       ['external_number'],
-      ['code'],
     ]),
     merchizeIdentifier: firstString(root, [['identifier']]),
     merchizeStatus: firstString(root, [

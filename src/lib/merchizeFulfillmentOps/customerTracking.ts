@@ -7,6 +7,9 @@ export type ShipmentPackage = {
   delivered: boolean;
 };
 
+export const VERIFIED_MERCHIZE_DELIVERY_STATUS = 'delivered_verified';
+const MAX_PACKAGES = 50;
+
 export function object(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -74,6 +77,7 @@ export function matchingShipmentRecords(payload: unknown, reference: string) {
 export function shipmentLabel(value: unknown) {
   switch (normalized(value)) {
     case 'delivered':
+    case VERIFIED_MERCHIZE_DELIVERY_STATUS:
       return 'Delivered';
     case 'in_transit':
     case 'shipped':
@@ -102,78 +106,148 @@ export function shipmentLabel(value: unknown) {
   }
 }
 
-/** Delivery is explicit carrier evidence, never "fulfilled" or a completed payment workflow. */
-export function shipmentPackages(payload: unknown, reference: string): ShipmentPackage[] {
-  return matchingShipmentRecords(payload, reference)
-    .flatMap((row) => {
-      const values = Array.isArray(row.packages)
-        ? row.packages
-        : Array.isArray(row.package_progresses)
-          ? row.package_progresses
-          : [row];
-      return values.slice(0, 50).flatMap((value, index) => {
-        const item = object(value);
-        if (!item) return [];
-        const tracking = object(item.tracking);
-        const carrier = object(item.carrier);
-        const events = Array.isArray(item.progress) ? item.progress : [];
-        const delivered =
-          normalized(item.status) === 'delivered' ||
-          events.some((event) => {
-            const entry = object(event);
-            return normalized(entry?.event) === 'delivered' && normalized(entry?.status) === 'done';
-          });
-        const number = text(
-          item.tracking_number ?? item.tracking_code ?? tracking?.tracking_number,
-        );
-        if (!number && !events.length && !item.package_id && values[0] === row) return [];
-        return [
-          {
-            id: text(item.package_id ?? item.id) ?? `${reference}-${index}`,
-            carrier: text(carrier?.name ?? item.carrier_name ?? item.carrier, 80),
-            trackingNumber: number,
-            trackingUrl: trackingLink(item.tracking_url ?? tracking?.tracking_url),
-            status: delivered ? 'Delivered' : shipmentLabel(item.status),
-            delivered,
-          },
-        ];
-      });
-    })
-    .slice(0, 50);
+function packageRows(row: Record<string, unknown>): unknown[] {
+  if (Array.isArray(row.packages)) return row.packages;
+  if (Array.isArray(row.package_progresses)) return row.package_progresses;
+  return [row];
 }
 
-export function shipmentSummary(payload: unknown, reference: string) {
+function packageId(item: Record<string, unknown>) {
+  return text(item._id) ?? text(item.package_id) ?? text(item.id);
+}
+
+function parsePackage(value: unknown, fallbackId: string): ShipmentPackage | null {
+  const item = object(value);
+  if (!item) return null;
+  const id = packageId(item);
+  const tracking = object(item.tracking);
+  const carrier = object(item.carrier);
+  const events = Array.isArray(item.progress) ? item.progress : [];
+  // The seller's fulfillment state is not a carrier event. Prefer the explicit shipment state.
+  const shipmentStatus = normalized(item.shipment_status);
+  const legacyStatus = normalized(item.status);
+  const delivered =
+    item.shipment_status != null
+      ? shipmentStatus === 'delivered'
+      : legacyStatus === 'delivered' ||
+        events.some((event) => {
+          const entry = object(event);
+          return normalized(entry?.event) === 'delivered' && normalized(entry?.status) === 'done';
+        });
+  const number = text(item.tracking_number ?? item.tracking_code ?? tracking?.tracking_number);
+  const url = trackingLink(item.tracking_url ?? tracking?.tracking_url);
+  if (!number && !url && !events.length && !id) return null;
+  return {
+    id: id ?? fallbackId,
+    carrier:
+      text(item.tracking_company, 80) ??
+      text(carrier?.name ?? item.carrier_name ?? item.carrier, 80),
+    trackingNumber: number,
+    trackingUrl: url,
+    status: delivered ? 'Delivered' : shipmentLabel(shipmentStatus || legacyStatus),
+    delivered,
+  };
+}
+
+/** Only bind evidence from the single-order tracking endpoint, never from a batch tracking reply. */
+export function scopeSingleOrderTracking(
+  payload: unknown,
+  order: {
+    merchizeExternalOrderNumber: string;
+    merchizeIdentifier: string | null;
+    merchizeOrderCode?: string | null;
+  },
+) {
+  const envelope = object(payload);
+  if (envelope?.success !== true) return null;
+  const values = Array.isArray(envelope.data) ? envelope.data : [envelope.data];
+  const reference = order.merchizeExternalOrderNumber;
+  const rows = values.map(object);
+  const matchesScope = (row: Record<string, unknown>) => {
+    const refs = [row.external_number, row.external_order_number].filter((value) => value != null);
+    return (
+      refs.every((value) => value === reference) &&
+      (!row.identifier ||
+        !order.merchizeIdentifier ||
+        row.identifier === order.merchizeIdentifier) &&
+      (!row.code || !order.merchizeOrderCode || row.code === order.merchizeOrderCode)
+    );
+  };
+  if (
+    !reference ||
+    !rows.length ||
+    rows.some(
+      (row) =>
+        !row ||
+        !matchesScope(row) ||
+        (!row.external_number &&
+          !row.external_order_number &&
+          !order.merchizeIdentifier &&
+          !order.merchizeOrderCode),
+    )
+  )
+    return null;
+
+  const accepted = rows.filter((row): row is Record<string, unknown> => row !== null);
+  const raw = accepted.flatMap(packageRows);
+  const ids = new Set<string>();
+  if (
+    !raw.length ||
+    raw.length > MAX_PACKAGES ||
+    raw.some((value, index) => {
+      const item = object(value);
+      if (!item || !matchesScope(item) || !parsePackage(item, `${reference}-${index}`)) return true;
+      const id = packageId(item);
+      if (id && ids.has(id)) return true;
+      if (id) ids.add(id);
+      return false;
+    })
+  )
+    return null;
+
+  const scoped = accepted.map((row) => ({ ...row, external_number: reference }));
+  return { success: true, data: Array.isArray(envelope.data) ? scoped : scoped[0] };
+}
+
+export function shipmentSummary(
+  payload: unknown,
+  reference: string,
+  { orderDeliveryConfirmed = false }: { orderDeliveryConfirmed?: boolean } = {},
+) {
+  const data = object(payload)?.data;
   const rows = matchingShipmentRecords(payload, reference);
-  const packages = shipmentPackages(payload, reference);
+  const raw = rows.flatMap(packageRows);
+  const packages = raw.slice(0, MAX_PACKAGES).flatMap((value, index) => {
+    const pack = parsePackage(value, `${reference}-${index}`);
+    return pack ? [pack] : [];
+  });
+  const counts = rows.flatMap((row) =>
+    [row.package_count, row.total_packages].filter((count) => count != null),
+  );
+  const ids = raw.slice(0, MAX_PACKAGES).map((value) => packageId(object(value) ?? {}));
   const complete =
-    rows.length > 0 &&
-    rows.every((row) => {
-      const count = row.package_count ?? row.total_packages;
-      const source = Array.isArray(row.packages)
-        ? row.packages
-        : Array.isArray(row.package_progresses)
-          ? row.package_progresses
-          : [row];
-      return (
-        rows.length === 1 &&
-        source.length === packages.length &&
-        typeof count === 'number' &&
-        Number.isInteger(count) &&
-        count > 0 &&
-        count <= 50 &&
-        count === packages.length
-      );
-    });
+    rows.length === (Array.isArray(data) ? data.length : 1) &&
+    raw.length === packages.length &&
+    ids.every(Boolean) &&
+    new Set(ids).size === packages.length &&
+    (counts.length ? counts.every((count) => count === packages.length) : orderDeliveryConfirmed);
   const delivered = packages.length > 0 && packages.every((item) => item.delivered);
+  const hasTracking = packages.some((pack) => pack.trackingNumber || pack.trackingUrl);
   return {
     packages,
+    deliveryStatus:
+      complete && delivered
+        ? VERIFIED_MERCHIZE_DELIVERY_STATUS
+        : hasTracking
+          ? 'tracking_available'
+          : null,
     label: delivered
       ? complete
         ? 'Delivered'
         : 'Listed packages delivered'
       : packages.some((item) => ['On the way', 'Out for delivery'].includes(item.status))
         ? 'On the way'
-        : packages.some((item) => item.trackingNumber)
+        : hasTracking
           ? 'Tracking available'
           : 'Tracking not available yet',
     delivered: complete && delivered,

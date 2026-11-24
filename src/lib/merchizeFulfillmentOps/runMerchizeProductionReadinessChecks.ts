@@ -165,6 +165,7 @@ export async function runMerchizeProductionReadinessChecks(
       addressSuggestion,
       unfulfilledItems,
       fulfillmentInvoice,
+      invoiceReference: order,
       requireAttention,
       sendToFulfillment,
       buyerAddressMismatchFields,
@@ -173,7 +174,7 @@ export async function runMerchizeProductionReadinessChecks(
     });
     const checkedAt = new Date();
     const productionGateStatus =
-      readiness.status === 'already_pushed'
+      providerReleaseAlreadyVerified || readiness.status === 'already_pushed'
         ? MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFIED
         : readiness.status === 'ready'
           ? MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.READY
@@ -219,13 +220,15 @@ export async function runMerchizeProductionReadinessChecks(
           providerPaidAt: readiness.providerPaidAt,
           lastReadinessCheckAt: checkedAt,
           lastAddressCheckAt: checkedAt,
-          lastCostCheckAt: checkedAt,
+          ...(readiness.costReviewStatus !== 'provider_error' ? {
+            lastCostCheckAt: checkedAt,
+            merchizeFulfillmentCostPayload: toOptionalPrismaJson(fulfillmentInvoice),
+          } : {}),
           merchizeInDepthOrderDetailPayload: toOptionalPrismaJson(detail),
           merchizeAddressSuggestionPayload: toOptionalPrismaJson(addressSuggestion),
           merchizeUnfulfilledItemsPayload: toOptionalPrismaJson(unfulfilledItems),
           merchizeRequireAttentionPayload: toOptionalPrismaJson(requireAttention),
           merchizeSendToFulfillmentPayload: toOptionalPrismaJson(sendToFulfillment),
-          merchizeFulfillmentCostPayload: toOptionalPrismaJson(fulfillmentInvoice),
           merchizeProductionReadinessPayload: toPrismaJson(readinessSummary),
           ...(readiness.status === 'already_pushed'
             ? {
