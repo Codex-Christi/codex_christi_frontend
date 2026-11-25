@@ -57,6 +57,18 @@ test('an explicitly entered guest email survives sign-in and draft saves', (t) =
 test('an unsubmitted custom email survives a reload separately from the saved checkout email', async (t) => {
   const before = useShopCheckoutStore.getState();
   const storage = new MemoryLegacyStorage();
+  t.mock.method(globalThis, 'fetch', async (input: RequestInfo | URL) => {
+    assert.equal(input, '/next-api/runtime-config');
+    return Response.json({
+      siteUrl: 'https://codexchristi.org',
+      shopSiteUrl: 'https://codexchristi.shop',
+      paymentMode: 'sandbox',
+      paymentClientId: 'checkout-test-client',
+      cartKey: 'checkout-test-cart-key',
+      analyticsOrgToken: null,
+      analyticsShopToken: null,
+    });
+  });
   const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
