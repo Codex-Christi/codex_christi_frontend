@@ -7,6 +7,9 @@ export function readCheckoutSetupFailure(payload: unknown): CheckoutSetupFailure
     outer.error && typeof outer.error === 'object' ? (outer.error as Record<string, unknown>) : {};
   const rawCode = outer.code ?? nested.code;
   const code = typeof rawCode === 'string' ? rawCode : undefined;
+  if (code === 'CHECKOUT_PAUSED') {
+    return { code, message: 'New checkouts are paused. You can still check an existing order.' };
+  }
   const message =
     code === 'PAYPAL_REVIEW_ADDRESS_CHANGED'
       ? 'PayPal returned a different delivery address. Check the saved checkout before continuing.'

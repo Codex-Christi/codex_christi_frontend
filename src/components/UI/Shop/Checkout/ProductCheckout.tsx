@@ -11,6 +11,7 @@ import { getCartVerificationIdentity } from '../Cart/cartAvailability';
 import CustomShopLink from '../HelperComponents/CustomShopLink';
 import { useCurrencyCookie } from '@/lib/utils/shop/globalFXProductPrice/currencyCookieStore';
 import CheckoutStorageNotice from './CheckoutStorageNotice';
+import CheckoutPausedNotice from './CheckoutPausedNotice';
 import { useAuthStore } from '@/stores/authStore';
 import { claimCurrentCheckout } from '@/lib/hooks/shopHooks/checkout/claimCurrentCheckout';
 import { usePayPalIntentStore } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
@@ -44,7 +45,7 @@ type QuoteState = {
   error?: string;
 };
 
-export default function CheckoutPage() {
+export default function CheckoutPage({ checkoutPaused = false }: { checkoutPaused?: boolean }) {
   const [step, setStep] = useState<CheckoutStep>('basic-checkout-info');
   const restoredStep = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -106,7 +107,7 @@ export default function CheckoutPage() {
   }, [authenticatedOwner, activeOrderToken]);
 
   useEffect(() => {
-    if (!hydrated || !cartVariants.length || hasCartConflicts) return;
+    if (checkoutPaused || !hydrated || !cartVariants.length || hasCartConflicts) return;
     let active = true;
     getOrderFinalDetails(cartVariants, country, 'merchize')
       .then((result) => {
@@ -124,7 +125,7 @@ export default function CheckoutPage() {
     return () => {
       active = false;
     };
-  }, [hydrated, cartVariants, country, hasCartConflicts, quoteIdentity]);
+  }, [checkoutPaused, hydrated, cartVariants, country, hasCartConflicts, quoteIdentity]);
 
   return (
     <ServerOrderDetailsComponent details={details}>
@@ -152,8 +153,10 @@ export default function CheckoutPage() {
             </CustomShopLink>
             <h1 className='text-2xl font-semibold sm:text-3xl'>Checkout</h1>
           </header>
-          <CheckoutAttemptRecovery>
-            {!hydrated ? (
+          <CheckoutAttemptRecovery checkoutPaused={checkoutPaused}>
+            {checkoutPaused ? (
+              <CheckoutPausedNotice />
+            ) : !hydrated ? (
               <p
                 role='status'
                 className={`${checkoutPanelClassName} flex min-h-48 items-center justify-center gap-3`}

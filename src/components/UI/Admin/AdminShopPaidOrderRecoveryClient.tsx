@@ -7,17 +7,20 @@ import PaidOrderRecoveryQueuePanel from './dashboard/PaidOrderRecoveryQueuePanel
 import type { PaidOrderRecoveryListResult } from './dashboard/adminShopDashboardTypes';
 import type { AdminRecoveryScannerActionResult } from '@/app/admin/(dashboard)/shop/paid-order-recovery/actions';
 import type { ShopOpsDataTargetView } from '@/lib/prisma/shop/shopOpsDataTarget';
+import type { ScheduledRecoveryRunStatus } from '@/lib/paypal/txLedger/scheduledRecoveryRun';
 import ShopOpsDataTargetBadge from './dashboard/ShopOpsDataTargetBadge';
 
 type AdminShopPaidOrderRecoveryClientProps = {
   recoveryList: PaidOrderRecoveryListResult;
   latestScannerRun: AdminRecoveryScannerActionResult['scan'] | null;
+  scheduledRun: ScheduledRecoveryRunStatus;
   shopOpsDataTarget: ShopOpsDataTargetView;
 };
 
 export default function AdminShopPaidOrderRecoveryClient({
   recoveryList,
   latestScannerRun,
+  scheduledRun,
   shopOpsDataTarget,
 }: AdminShopPaidOrderRecoveryClientProps) {
   return (
@@ -33,7 +36,7 @@ export default function AdminShopPaidOrderRecoveryClient({
 
         <ShopOpsDataTargetBadge status={shopOpsDataTarget} />
 
-        <AdminPaidOrderRecoveryScannerPanel initialScan={latestScannerRun} />
+        <AdminPaidOrderRecoveryScannerPanel initialScan={latestScannerRun} scheduledRun={scheduledRun} />
 
         <PaidOrderRecoveryQueuePanel
           mobileMode='full-list'

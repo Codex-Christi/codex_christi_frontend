@@ -70,6 +70,7 @@ function setup(t: TestContext) {
     SESSION_SECRET: 'checkout-server-test-secret-at-least-32-bytes',
     DJANGO_INTERNAL_BASE_URL: 'https://mock.invalid/api/v1',
     SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY: 'mock-key',
+    SHOP_CHECKOUT_PAUSED: 'false',
   })) {
     const old = process.env[key];
     process.env[key] = value;
@@ -255,6 +256,32 @@ test('a new checkout without the trusted item review cannot create a ledger or P
   assert.equal(effects.reads(), 1);
   assert.equal(effects.writes(), 0);
   assert.equal(effects.network.mock.callCount(), 0);
+});
+
+test('paused checkout blocks new PayPal orders without blocking reuse of the exact existing order', async (t) => {
+  const { proof, proofCookies } = setup(t);
+  process.env.SHOP_CHECKOUT_PAUSED = 'true';
+  const row = savedReviewedCheckout(proof);
+  const payload = {
+    ...body,
+    review: { ...body.review, itemsHash: row.djangoOrderIntentVerifyPayload.review.itemsHash },
+  };
+  for (const existing of [null, { ...row, paypalOrderId: null, status: 'error' }, row]) {
+    const effects = forbidCheckoutEffects(t, existing);
+    const req = request(payload, proofCookies);
+    const result = await inRequest(req, () => intent(req));
+    const json = await result.json();
+    if (existing?.paypalOrderId) {
+      assert.equal(result.status, 200);
+      assert.equal(json.data.paypalOrderId, row.paypalOrderId);
+    } else {
+      assert.equal(result.status, 503);
+      assert.equal(json.code, 'CHECKOUT_PAUSED');
+      assert.equal(result.headers.get('cache-control'), 'private, no-store');
+    }
+    assert.equal(effects.writes(), 0);
+    assert.equal(effects.network.mock.callCount(), 0);
+  }
 });
 
 test('rejects an unsupported payment source before touching the ledger or provider', async (t) => {

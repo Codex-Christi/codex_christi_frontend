@@ -39,6 +39,7 @@ type CheckoutConfirmationViewProps = {
   actionsDisabled?: boolean;
   storageNotice?: ReactNode;
   recovery?: ReactNode;
+  recoveryRequest?: ReactNode;
   addressCorrection?: ReactNode;
   addressCorrectionState?: CustomerAddressCorrectionState;
   onRefresh: () => void;
@@ -93,6 +94,7 @@ export default function CheckoutConfirmationView({
   actionsDisabled,
   storageNotice,
   recovery,
+  recoveryRequest,
   addressCorrection,
   addressCorrectionState,
   onRefresh,
@@ -252,6 +254,9 @@ export default function CheckoutConfirmationView({
         )}
         {accessRequired && recovery}
         {correction && <div className='mt-5 text-left'>{addressCorrection}</div>}
+        {paid && !refunded && !onHold && !fulfillmentCanceled && !correction && recoveryRequest && (
+          <div className='mt-5 text-left'>{recoveryRequest}</div>
+        )}
         {hasData && (
           <div className='mt-6 grid gap-3'>
             <button

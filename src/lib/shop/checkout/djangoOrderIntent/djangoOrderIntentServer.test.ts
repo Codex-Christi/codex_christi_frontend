@@ -30,10 +30,14 @@ const browserId = 'browser-one';
 type Dependencies = NonNullable<Parameters<typeof handleDjangoOrderIntent>[2]>;
 function harness(t: TestContext) {
   const secret = process.env.SESSION_SECRET;
+  const paused = process.env.SHOP_CHECKOUT_PAUSED;
   process.env.SESSION_SECRET = 'checkout-handler-test-secret-of-at-least-32-bytes';
+  process.env.SHOP_CHECKOUT_PAUSED = 'false';
   t.after(() => {
     if (secret === undefined) delete process.env.SESSION_SECRET;
     else process.env.SESSION_SECRET = secret;
+    if (paused === undefined) delete process.env.SHOP_CHECKOUT_PAUSED;
+    else process.env.SHOP_CHECKOUT_PAUSED = paused;
   });
   const values = new Map<string, string>();
   let payload: unknown = upstream;
@@ -88,6 +92,26 @@ function harness(t: TestContext) {
     },
   };
 }
+
+test('pause blocks new Django intents and leaves an issued email code usable', async (t) => {
+  const h = harness(t);
+  const issued = await h.run(fields);
+  assert.equal(issued.status, 200);
+  for (const cookie of issued.cookies.getAll()) h.values.set(cookie.name, cookie.value);
+  process.env.SHOP_CHECKOUT_PAUSED = 'true';
+  const blocked = await h.run(fields);
+  assert.equal(blocked.status, 503);
+  assert.equal((await blocked.json()).code, 'CHECKOUT_PAUSED');
+  assert.equal(blocked.cookies.getAll().length, 0);
+  assert.equal(h.forwarded.length, 1);
+  assert.equal(h.sent.length, 1);
+  const verified = await h.run(
+    { email, intentUuid: 'intent-one', order_id: 'order-one', otp: '123456' },
+    '/orders/intent/verify',
+  );
+  assert.equal(verified.status, 200);
+  assert.equal((await verified.json()).data.otp_status, 'verified');
+});
 
 test('a reused verified Django intent requires a fresh browser-bound checkout code', async (t) => {
   const h = harness(t);

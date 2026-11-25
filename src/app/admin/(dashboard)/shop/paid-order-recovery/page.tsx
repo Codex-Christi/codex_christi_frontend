@@ -9,6 +9,7 @@ import {
 } from '@/lib/paypal/txLedger/adminPaidOrderRecovery';
 import { getLatestAdminPaidOrderRecoveryScannerRun } from './actions';
 import { getShopOpsDataTargetView } from '@/lib/prisma/shop/shopOpsDataTarget';
+import { readScheduledRecoveryRun } from '@/lib/paypal/txLedger/scheduledRecoveryRun';
 
 type AdminPaidOrderRecoveryPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -40,20 +41,23 @@ export default async function AdminPaidOrderRecoveryPage({
     returnPath: '/admin/shop/paid-order-recovery',
   });
 
-  const [recoveryList, latestScannerRun] = await Promise.all([
+  const shopOpsDataTarget = getShopOpsDataTargetView();
+  const [recoveryList, latestScannerRun, scheduledRun] = await Promise.all([
     listAdminPaidOrderRecoveryRows({
       filters,
       page,
       pageSize,
     }),
     getLatestAdminPaidOrderRecoveryScannerRun().catch(() => null),
+    readScheduledRecoveryRun(shopOpsDataTarget),
   ]);
 
   return (
     <AdminShopPaidOrderRecoveryClient
       recoveryList={recoveryList}
       latestScannerRun={latestScannerRun}
-      shopOpsDataTarget={getShopOpsDataTargetView()}
+      shopOpsDataTarget={shopOpsDataTarget}
+      scheduledRun={scheduledRun}
     />
   );
 }

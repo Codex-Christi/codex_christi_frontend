@@ -39,18 +39,26 @@ const CONFIRMATION_STATUSES = new Set([
   'error',
 ]);
 
-function getStageCopy(stage: ActivePayPalCheckoutStage, paymentLabel: string) {
+function getStageCopy(
+  stage: ActivePayPalCheckoutStage,
+  paymentLabel: string,
+  checkoutPaused: boolean,
+) {
   if (stage === 'paypal_cancelled') {
     return {
       title: 'PayPal window closed',
-      description: `Check this payment before reopening the ${paymentLabel} or starting a separate order.`,
+      description: checkoutPaused
+        ? `Check this payment before reopening the ${paymentLabel}.`
+        : `Check this payment before reopening the ${paymentLabel} or starting a separate order.`,
     };
   }
 
   if (stage === 'capture_checking' || stage === 'paypal_approved') {
     return {
       title: 'Recent PayPal approval found',
-      description: 'Check this payment before starting another order.',
+      description: checkoutPaused
+        ? 'Check whether your payment was recorded.'
+        : 'Check this payment before starting another order.',
     };
   }
 
@@ -61,6 +69,7 @@ function getStageCopy(stage: ActivePayPalCheckoutStage, paymentLabel: string) {
 }
 
 type ActivePayPalCheckoutRecoveryBannerProps = {
+  checkoutPaused?: boolean;
   onContinueOriginal: () => void;
   reviewing?: boolean;
   originalOpen?: boolean;
@@ -69,6 +78,7 @@ type ActivePayPalCheckoutRecoveryBannerProps = {
 };
 
 export default function ActivePayPalCheckoutRecoveryBanner({
+  checkoutPaused = false,
   onContinueOriginal,
   reviewing = false,
   originalOpen = false,
@@ -97,7 +107,7 @@ export default function ActivePayPalCheckoutRecoveryBanner({
   const [confirmSeparate, setConfirmSeparate] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const paymentLabel = activeCheckout?.paymentSurface === 'card' ? 'card form' : 'PayPal checkout';
-  const copy = getStageCopy(activeCheckout?.stage ?? 'paypal_order_created', paymentLabel);
+  const copy = getStageCopy(activeCheckout?.stage ?? 'paypal_order_created', paymentLabel, checkoutPaused);
   const reviewLabel = reviewing
     ? 'Opening original purchase…'
     : originalOpen
@@ -124,7 +134,8 @@ export default function ActivePayPalCheckoutRecoveryBanner({
     try {
       const status = await loadStatus(attempt);
       if (!status) return;
-      setUnpaid(canStartSeparateCheckout(attempt, status) ? status : null);
+      const awaitingApproval = canStartSeparateCheckout(attempt, status);
+      setUnpaid(!checkoutPaused && awaitingApproval ? status : null);
       setConfirmSeparate(null);
       const shouldOpenConfirmation =
         status.customerRecoveryStatus === 'paid_unresolved' ||
@@ -137,9 +148,11 @@ export default function ActivePayPalCheckoutRecoveryBanner({
       }
 
       setStatusMessage(
-        canStartSeparateCheckout(attempt, status)
-          ? 'The earlier checkout is awaiting payment approval. Continue it, or explicitly start a separate order with your current cart.'
-          : 'The earlier payment still needs review. Open its order status before starting another order.',
+        awaitingApproval
+          ? checkoutPaused
+            ? 'Your earlier checkout is awaiting payment approval. You can still continue it.'
+            : 'The earlier checkout is awaiting payment approval. Continue it, or explicitly start a separate order with your current cart.'
+          : 'The earlier payment still needs review. Open its order status for updates.',
       );
     } catch {
       if (!isCurrentCheckoutAttempt(attempt)) return;
@@ -151,10 +164,10 @@ export default function ActivePayPalCheckoutRecoveryBanner({
     } finally {
       setIsChecking(false);
     }
-  }, [activeCheckout, loadStatus, push]);
+  }, [activeCheckout, checkoutPaused, loadStatus, push]);
 
   const confirmNewOrder = async () => {
-    if (!attempt || confirmSeparate !== attempt.orderToken) return;
+    if (checkoutPaused || !attempt || confirmSeparate !== attempt.orderToken) return;
     const captured = { ...attempt };
     setIsChecking(true);
     try {
@@ -201,7 +214,7 @@ export default function ActivePayPalCheckoutRecoveryBanner({
               {statusMessage}
             </p>
           )}
-          {attempt && unpaid && canStartSeparateCheckout(attempt, unpaid) && (
+          {!checkoutPaused && attempt && unpaid && canStartSeparateCheckout(attempt, unpaid) && (
             <div className='mt-3 rounded-xl border border-white/20 p-3 text-sm leading-6'>
               {confirmSeparate === attempt.orderToken ? (
                 <>

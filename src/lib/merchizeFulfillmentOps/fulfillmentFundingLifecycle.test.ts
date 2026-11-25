@@ -11,7 +11,9 @@ import {
 } from '@/lib/paypal/txLedger/customerNotificationOutbox';
 import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 import { runPayPalRecoveryScanner } from '@/lib/paypal/txLedger/recoveryScanner';
+import { readScheduledRecoveryRun } from '@/lib/paypal/txLedger/scheduledRecoveryRun';
 import { reconcileVerifiedFulfillmentRelease } from '@/lib/paypal/txLedger/reconcileVerifiedFulfillmentRelease';
+import { getShopOpsDataTargetView } from '@/lib/prisma/shop/shopOpsDataTarget';
 import { VERIFIED_MERCHIZE_DELIVERY_STATUS } from './customerTracking';
 import { readExternalOrderProgress } from './externalOrderProgress';
 import { readSupplierInvoice } from './supplierInvoice';
@@ -150,6 +152,8 @@ function isolatedEnvironment(t: TestContext) {
     MERCHIZE_BO_API_BASE_URL: 'https://merchize.example.test/bo-api',
     MERCHIZE_API_KEY: 'fixture-key',
     CODEX_PRIMARY_MAIL_AGENT_TOKEN: 'fixture-only',
+    SHOP_DEV_ORDER_EMAIL_INBOX: 'checkout-inbox@example.test',
+    SHOP_DEV_ORDER_CONFIRMATION_ORIGIN: 'http://localhost:3001',
     ORDER_RECOVERY_ADMIN_EMAILS: 'ops@example.test',
   })) {
     const saved = process.env[key];
@@ -161,6 +165,76 @@ function isolatedEnvironment(t: TestContext) {
     global.__merchizeFulfillmentOpsPrisma__ = previousOps;
   });
 }
+
+test('the scheduled job records its last success separately from failures and manual scans', async (t) => {
+  isolatedEnvironment(t);
+  const previousAdmin = global.__adminOpsLedgerPrisma__;
+  const oldAdminUrl = process.env.NEON_ADMIN_OPS_LEDGER_POOLED_URL;
+  const oldPause = process.env.SHOP_CHECKOUT_PAUSED;
+  process.env.NEON_ADMIN_OPS_LEDGER_POOLED_URL = 'postgresql://fixture:fixture@localhost:1/unused';
+  process.env.SHOP_CHECKOUT_PAUSED = 'true';
+  t.after(() => {
+    global.__adminOpsLedgerPrisma__ = previousAdmin;
+    if (oldAdminUrl === undefined) delete process.env.NEON_ADMIN_OPS_LEDGER_POOLED_URL;
+    else process.env.NEON_ADMIN_OPS_LEDGER_POOLED_URL = oldAdminUrl;
+    if (oldPause === undefined) delete process.env.SHOP_CHECKOUT_PAUSED;
+    else process.env.SHOP_CHECKOUT_PAUSED = oldPause;
+  });
+  const now = new Date('2026-11-24T10:00:00Z');
+  t.mock.timers.enable({ apis: ['Date'], now });
+  const events: Row[] = [];
+  const ledgerWrite = t.mock.fn(async ({ data }: { data: Row }) => {
+    assert.deepEqual(Object.keys(data).sort(), ['action', 'outcome', 'targetId', 'targetType']);
+    events.unshift({ createdAt: new Date(), ...data });
+  });
+  global.__adminOpsLedgerPrisma__ = {
+    adminAuditLog: {
+      create: ledgerWrite,
+      findFirst: async ({ where }: { where: Row }) => events.find((event) => matches(event, where)),
+    },
+  } as unknown as NonNullable<typeof global.__adminOpsLedgerPrisma__>;
+  global.__paypalTxLedger__ = {
+    paypalIntent: fixtureTable([]),
+    customerNotificationOutbox: fixtureTable([]),
+  } as unknown as NonNullable<typeof global.__paypalTxLedger__>;
+  const fulfillment = fixtureTable([]);
+  global.__merchizeFulfillmentOpsPrisma__ = {
+    merchizeFulfillmentOrder: fulfillment,
+    merchizeFulfillmentSyncAttempt: fixtureTable([]),
+  } as unknown as NonNullable<typeof global.__merchizeFulfillmentOpsPrisma__>;
+  const network = t.mock.method(globalThis, 'fetch', async () => assert.fail('No provider calls'));
+  const run = (secret = 'fixture-job') => POST(new NextRequest('http://localhost/api/jobs/paypal-tx-ledger-recovery-scan', {
+    method: 'POST', headers: { 'x-cron-secret': secret },
+  }));
+  const target = getShopOpsDataTargetView();
+  const read = () => readScheduledRecoveryRun(target);
+  assert.equal((await run('wrong-secret')).status, 401);
+  await runPayPalRecoveryScanner({ dryRun: true });
+  assert.equal(ledgerWrite.mock.callCount(), 0);
+  assert.deepEqual(await read(), {
+    paymentRetries: 'enabled', latest: null, lastSuccessAt: null, unavailable: false,
+  });
+  assert.equal((await run()).status, 200, 'scheduled recovery continues during the checkout pause');
+  assert.deepEqual(await read(), {
+    paymentRetries: 'enabled', latest: { at: now.toISOString(), outcome: 'success' },
+    lastSuccessAt: now.toISOString(), unavailable: false,
+  });
+  t.mock.timers.tick(60_000);
+  t.mock.method(fulfillment, 'findMany', async () => { throw new Error('Fixture read failed'); });
+  assert.equal((await run()).status, 207);
+  assert.deepEqual(await read(), {
+    paymentRetries: 'enabled',
+    latest: { at: new Date().toISOString(), outcome: 'failure' },
+    lastSuccessAt: now.toISOString(), unavailable: false,
+  });
+  assert.equal((await readScheduledRecoveryRun({ ...target, target: 'prod' })).latest, null);
+  process.env.PAYPAL_TX_LEDGER_RECOVERY_SCANNER_ENABLED = 'false';
+  assert.equal((await read()).paymentRetries, 'disabled');
+  process.env.PAYPAL_TX_LEDGER_RECOVERY_SCANNER_SECRET = '';
+  assert.equal((await read()).paymentRetries, 'unconfigured');
+  assert.equal(ledgerWrite.mock.callCount(), 2);
+  assert.equal(network.mock.callCount(), 0);
+});
 
 test('scheduled sync adopts a supplier release, sends mail, and tracks packages without provider writes', async (t) => {
   isolatedEnvironment(t);
@@ -219,7 +293,11 @@ test('scheduled sync adopts a supplier release, sends mail, and tracks packages 
     subject: string; htmlbody?: string; to: Array<{ email_address: { address: string } }>;
   }) => {
     const recipient = mail.to[0].email_address.address;
-    assert.match(recipient, /^(buyer|ops)@example\.test$/u);
+    assert.match(recipient, /^(checkout-inbox|ops)@example\.test$/u);
+    if (recipient === 'checkout-inbox@example.test') {
+      assert.match(mail.htmlbody ?? '', /href="http:\/\/localhost:3001\/shop\/checkout\/confirmation\//u);
+      assert.doesNotMatch(mail.htmlbody ?? '', /href="https:\/\/codexchristi\.shop\/shop\/checkout\/confirmation\//u);
+    }
     if (failShipment && mail.subject.startsWith('Shipment has started'))
       throw new Error('Test inbox not reached', { cause: { code: 'EAI_AGAIN' } });
     if (receivedError?.cause && mail.subject.startsWith('Order received')) throw receivedError;
@@ -291,7 +369,8 @@ test('scheduled sync adopts a supplier release, sends mail, and tracks packages 
     }
     return result;
   };
-  const buyerSubjects = () => emails.filter((mail) => mail.recipient === 'buyer@example.test').map((mail) => mail.subject);
+  const buyerSubjects = () => emails.filter((mail) =>
+    mail.recipient === 'checkout-inbox@example.test').map((mail) => mail.subject);
   const savedProgress = () => readExternalOrderProgress(order.merchizeProgressPayload, reference);
   order.merchizeExternalOrderNumber = 'other-order';
   assert.equal(await reconcileVerifiedFulfillmentRelease(orderToken), false);
@@ -321,6 +400,13 @@ test('scheduled sync adopts a supplier release, sends mail, and tracks packages 
   assert.equal(buyerSubjects().length, 2);
   assert.match(buyerSubjects()[0] ?? '', /^Order received/u);
   assert.match(buyerSubjects()[1] ?? '', /^Your order was sent for preparation/u);
+  for (const email of emails.filter((mail) => mail.recipient === 'checkout-inbox@example.test')) {
+    assert.ok(email.htmlbody?.includes(
+      `http://localhost:3001/shop/checkout/confirmation/${orderToken}?view=details`,
+    ));
+    assert.doesNotMatch(email.htmlbody ?? '', /https:\/\/(?:www\.)?codexchristi\.(?:shop|org)\/shop\/checkout\/confirmation/u);
+  }
+  assert.ok(emails.every((email) => email.recipient !== row.customerEmail));
   assert.equal(customerNotices.find((note) => note.type === 'paid_order_received')?.status, 'sent');
   assert.equal(customerNotices.find((note) => note.type === 'paid_order_fulfillment_push_verified')?.status, 'sent');
   assert.equal(await reconcileVerifiedFulfillmentRelease(orderToken), false);
@@ -442,6 +528,7 @@ test('scheduled sync adopts a supplier release, sends mail, and tracks packages 
     assert.equal(notes.find((entry) => entry.type === 'paid_order_tracking_ready')?.status,
       scenario === 'late_tracking' ? 'sent' : 'suppressed');
     assert.deepEqual(await sendPendingCustomerNotifications({ orderToken: fixtureToken }), []);
+    fulfillmentRows.pop();
   }
 
   for (const scenario of ['race', 'retry', 'unknown'] as const) {
@@ -474,6 +561,18 @@ test('scheduled sync adopts a supplier release, sends mail, and tracks packages 
     assert.deepEqual(await sendPendingCustomerNotifications({ orderToken: fixtureToken }), []);
     assert.equal((await resendCustomerNotification(String(notice?.id))).ok, false);
   }
+
+  const suppressedToken = 'fixture-no-test-inbox';
+  paidRows.push({ ...row, orderToken: suppressedToken });
+  const suppressed = await enqueueCustomerFulfillmentMilestoneNotification('received', {
+    ...contact, orderToken: suppressedToken,
+  });
+  const sendsBeforeSuppression = emails.length;
+  process.env.SHOP_DEV_ORDER_EMAIL_INBOX = '';
+  const result = await scan(0);
+  assert.equal(result.customerNotifications.suppressed, 1);
+  assert.equal(emails.length, sendsBeforeSuppression);
+  assert.equal(customerNotices.find((notice) => notice.dedupeKey === suppressed.queuedKey)?.status, 'suppressed');
 });
 
 for (const reply of [
@@ -561,7 +660,7 @@ for (const reply of [
     t.mock.method(SendMailClient.prototype, 'sendMail', async (mail: {
       subject: string; to: Array<{ email_address: { address: string } }>;
     }) => {
-      if (mail.to[0]?.email_address.address === purchase.customerEmail) buyerMessages.push(mail.subject);
+      if (mail.to[0]?.email_address.address === 'checkout-inbox@example.test') buyerMessages.push(mail.subject);
       return {};
     });
     let pushCount = 0;

@@ -6,10 +6,10 @@ import {
   isRecoveryScannerEnabled,
 } from '@/lib/paypal/txLedger/processingPolicy';
 import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
+import { AUTOMATIC_RECOVERY_STATUSES, hasAutomaticRecoveryEvidence } from './automaticRecoveryPolicy';
 import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import { reconcileCanonicalPayPalPaymentChain } from '@/lib/paypal/txLedger/canonicalPaymentReconciliation';
 import type { CanonicalOrderSnapshotLedgerEnvelope } from '@/lib/paypal/orderSnapshot/canonicalize';
-import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import {
   ADMIN_NOTIFICATION_SEVERITY,
@@ -22,12 +22,6 @@ import {
   assertAlignedShopOpsDataTarget,
   assertShopOpsMutationAllowed,
 } from '@/lib/prisma/shop/shopOpsDataTarget';
-
-const AUTOMATIC_RECOVERY_STATUSES = [
-  PAYPAL_LEDGER_STATUS.CAPTURED,
-  PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED,
-  PAYPAL_LEDGER_STATUS.PAYMENT_SAVED,
-] as const;
 
 const MAX_BATCH_SIZE = 25;
 
@@ -43,6 +37,7 @@ export type PayPalRecoveryScanCandidate = {
   reason: string;
   lastErrorCode: string | null;
   lastErrorMessage: string | null;
+  customerRecoveryRequested?: boolean;
 };
 
 export type PayPalRecoveryScanResult = {
@@ -87,6 +82,7 @@ function toCandidate(
     updatedAt: Date;
     lastErrorCode: string | null;
     lastErrorMessage: string | null;
+    customerRecoveryRequestedAt?: Date | null;
   },
 ) {
   const captureCompletion = getPayPalCaptureCompletion(row.capturePayload);
@@ -108,6 +104,7 @@ function toCandidate(
     reason: `${paymentChain.ok ? captureCompletion.reason : paymentChain.reconciliation.reason} Post-capture ledger row is still ${row.status}.`,
     lastErrorCode: row.lastErrorCode,
     lastErrorMessage: row.lastErrorMessage,
+    customerRecoveryRequested: Boolean(row.customerRecoveryRequestedAt),
   };
 }
 
@@ -122,6 +119,7 @@ export async function findPayPalRecoveryCandidates(args?: {
   const batchSize = clampBatchSize(args?.batchSize ?? getRecoveryScannerBatchSize());
   const cutoff = new Date(now.getTime() - minAgeMinutes * 60_000);
   const orderTokens = args?.orderTokens?.map((orderToken) => orderToken.trim()).filter(Boolean);
+  if (orderTokens?.length === 0) return [];
 
   const rows = await paypalTxLedger.paypalIntent.findMany({
     where: {
@@ -142,6 +140,10 @@ export async function findPayPalRecoveryCandidates(args?: {
       receiptLink: true,
       authorizePayload: true,
       capturePayload: true,
+      djangoPaymentSaveCustomId: true,
+      djangoPaymentSaveResponsePayload: true,
+      djangoOrderIntentOrderId: true,
+      merchizeFulfillmentResponsePayload: true,
       canonicalOrderSnapshot: true,
       canonicalOrderSnapshotVersion: true,
       canonicalOrderSnapshotHash: true,
@@ -150,15 +152,12 @@ export async function findPayPalRecoveryCandidates(args?: {
       updatedAt: true,
       lastErrorCode: true,
       lastErrorMessage: true,
+      customerRecoveryRequestedAt: true,
     },
   });
 
   return rows
-    .filter(
-      (row) =>
-        getPayPalCaptureCompletion(row.capturePayload).ok &&
-        reconcileCanonicalPayPalPaymentChain(row, row.authorizePayload, row.capturePayload).ok,
-    )
+    .filter((row) => hasAutomaticRecoveryEvidence(row))
     .slice(0, batchSize)
     .map((row) => toCandidate(row));
 }
@@ -237,7 +236,9 @@ export async function runPayPalRecoveryScanner(args?: {
   for (const candidate of candidates) {
     try {
       await runPaidFulfillmentProcessing(candidate.orderToken, {
-        triggerDetail: 'scheduled_recovery_scan',
+        triggerDetail: candidate.customerRecoveryRequested
+          ? 'customer_requested_recovery_scan'
+          : 'scheduled_recovery_scan',
         triggerSource: 'recovery_scanner',
       });
 

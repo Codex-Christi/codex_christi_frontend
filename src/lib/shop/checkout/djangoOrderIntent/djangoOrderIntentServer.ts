@@ -36,6 +36,7 @@ import {
   matchesCheckoutEmailIdentity,
 } from './checkoutEmailVerification';
 import { buildShopVerificationEmail } from '@/lib/shop/email/templates';
+import { requireNewCheckoutOpen } from '../checkoutIntakePolicy';
 
 type DjangoOrderIntentEndpoint =
   '/orders/intent' | '/orders/intent/verify' | '/orders/intent/resend-otp';
@@ -127,6 +128,7 @@ export async function handleDjangoOrderIntent(
 ) {
   try {
     const input = await readCheckoutBody(request, 8 * 1024);
+    if (endpoint === '/orders/intent') requireNewCheckoutOpen();
     const email = checkoutEmail(input.email);
     const cookieStore = await dependencies.getCookies();
     const userId = await dependencies.getUserId();

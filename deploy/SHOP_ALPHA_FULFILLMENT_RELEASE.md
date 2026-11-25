@@ -39,3 +39,40 @@ supplier test order.
 The checkout access wording and any owner-specific changes still under review
 are separate from the deployment infrastructure. Do not publish unrelated
 local drafts, test-only release overrides, or profile and design work.
+
+## Buyer recovery and development email
+
+- For an eligible paid order still waiting for the Django handoff, the
+  verified buyer can request recovery on confirmation. This saves one
+  request for the existing recovery job. The button does not take payment
+  or call providers. It does not move the order ahead of other retries.
+  The job respects the existing retry timing and stops when the saved
+  payment or handoff evidence needs review. This change adds no scheduled
+  job or migration.
+- On the `dev` Shop Ops target, set `SHOP_DEV_ORDER_EMAIL_INBOX` to a
+  controlled test inbox and `SHOP_DEV_ORDER_CONFIRMATION_ORIGIN` to the
+  app origin that reads the same development ledger, for example
+  `http://localhost:3001`. Customer order-update emails go only to that
+  inbox and link back to that app. If either setting is missing or invalid,
+  the sender records the email as suppressed. Configure both before
+  running an email test. These settings do not change production mail,
+  admin alerts, or verification codes.
+
+## Pause new orders and check scheduled recovery
+
+- Set the optional server setting `SHOP_CHECKOUT_PAUSED=true` in the
+  active app's runtime environment and restart it to pause new orders.
+  Set it to `false` or remove it to reopen. A nonblank value other than
+  `false` pauses checkout. This does not change PayPal mode or cancel orders.
+- While paused, the app does not create a Django checkout intent or a
+  new PayPal order. A customer can still continue an existing PayPal order
+  or view their order status. Capture and recovery for existing orders,
+  webhooks, and the scheduled job are not paused.
+- In **Paid Order Recovery**, check **Scheduled recovery** for the selected
+  data target. **Latest run** shows the last recorded job result. **Last
+  successful run** advances only when all enabled steps report success.
+  Dry runs and manual retries do not change these times. Check the scheduler
+  logs if the latest timestamp stops moving or shows **Needs attention**.
+- The existing scheduled endpoint adds one small result to the admin audit
+  log per completed call. No new job, database table, or migration is needed.
+  Audit-log retention and manual clears can remove run history.
