@@ -64,7 +64,7 @@ async function checkConfirmation(contents: string, timezone = 'UTC') {
           builder.onLoad({ filter: /.*/, namespace: 'confirmation-routing' }, () => ({
             loader: 'jsx',
             contents:
-              "import React from 'react'; export default function ShopLink({href,children,...props}) { return <a href={href} {...props}>{children}</a>; }",
+              "import React from 'react'; export default function ShopLink({href,children,prefetch,...props}) { return <a href={href} {...props}>{children}</a>; }",
           }));
         },
       },
@@ -151,7 +151,7 @@ test('fulfillment cancellation preserves paid evidence but hides recovery action
     assert.equal(button(doc,'Submit corrected address'),undefined);
     assert.doesNotMatch(doc.body.textContent,/refund/iu);
     assert.equal(render({...props,refunded:true}).querySelector('h1').textContent,'Payment refunded');
-    assert.equal(render({...props,accessRequired:true}).querySelector('h1').textContent,'View your order');
+    assert.equal(render({...props,accessRequired:true}).querySelector('h1').textContent,'Verify access to this order');
   `);
 });
 
@@ -179,8 +179,8 @@ test('confirmation separates paid, delayed, under-review, refunded, and access-r
     assert.equal(doc.querySelector('h1').textContent,'Payment not confirmed yet');
     assert.match(doc.body.textContent,/check its status before paying again/u);
     doc = render({accessRequired:true,recovery:<div>Verify order access</div>});
-    assert.equal(doc.querySelector('h1').textContent,'View your order');
-    assert.match(doc.body.textContent,/Verify the checkout email/u);
+    assert.equal(doc.querySelector('h1').textContent,'Verify access to this order');
+    assert.match(doc.body.textContent,/Use the email address from checkout to get a code and view this order/u);
     assert.match(doc.body.textContent,/Verify order access/u);
     assert.equal(button(doc,'Check order status'),undefined);
     assert.equal(button(doc,'Download receipt'),undefined);
@@ -216,5 +216,55 @@ test('a verified hold remains paid, is private, and clears on resume', async () 
     assert.match(doc.body.textContent,/Fulfillment last checked: 22 Nov 2026, 12:05 UTC/u);
     assert.doesNotMatch(render({state:held,accessRequired:true}).body.textContent,/Order on hold/u);
     assert.doesNotMatch(render({state:{...held,fulfillmentOnHold:false}}).body.textContent,/Order on hold/u);
+  `);
+});
+
+test('an unavailable order link offers order history without verification or payment controls', async () => {
+  await checkConfirmation(`
+    const doc=render({orderNotFound:true,accessRequired:true,recovery:<form><label>Order access code<input /></label></form>,addressCorrection:<button>Submit corrected address</button>,addressCorrectionState:'required'});
+    assert.equal(doc.querySelector('h1').textContent,'Order link unavailable');
+    assert.match(doc.body.textContent,/This order link isn’t available on this site. Check the link or look in Order History/u);
+    const history=[...doc.querySelectorAll('a')].find(link=>link.textContent.includes('View order history'));
+    assert.ok(history);
+    assert.equal(history.getAttribute('href'),'/shop/account-overview/order-history');
+    assert.equal(doc.querySelector('form'),null);
+    assert.equal(doc.querySelector('input'),null);
+    assert.equal(doc.querySelector('time'),null);
+    assert.equal(doc.querySelector('details'),null);
+    assert.equal(doc.querySelector('[role="alert"]'),null);
+    assert.equal(button(doc,'Try again'),undefined);
+    assert.equal(button(doc,'Check order status'),undefined);
+    assert.equal(button(doc,'Download receipt'),undefined);
+    assert.equal(button(doc,'Receipt not ready yet'),undefined);
+    assert.equal(button(doc,'Submit corrected address'),undefined);
+    assert.doesNotMatch(doc.body.textContent,/Verify access|Paid|PayPal|payment|couldn’t find|does not exist/iu);
+  `);
+});
+
+test('verification-required copy describes order access and keeps saved details private', async () => {
+  await checkConfirmation(`
+    const doc=render({accessRequired:true,recovery:<form><label>Order access code<input /></label><button>Verify and view order</button></form>});
+    assert.equal(doc.querySelector('h1').textContent,'Verify access to this order');
+    assert.match(doc.body.textContent,/Use the email address from checkout to get a code and view this order/u);
+    assert.ok(doc.querySelector('form'));
+    assert.ok(button(doc,'Verify and view order'));
+    assert.equal(doc.querySelector('time'),null);
+    assert.doesNotMatch(doc.body.textContent,/Paid|PayPal|payment|Order link unavailable/iu);
+    assert.equal(button(doc,'Try again'),undefined);
+    assert.equal(button(doc,'Check order status'),undefined);
+    assert.equal(button(doc,'Download receipt'),undefined);
+  `);
+});
+
+test('an initial status lookup failure stops showing a waiting message and gives one retry', async () => {
+  await checkConfirmation(`
+    const message='We couldn’t read the saved order status. Try again before starting another payment.';
+    const doc=render({state:null,paid:false,hasData:false,lookupError:message});
+    assert.equal(doc.querySelector('h1').textContent,'Order status unavailable');
+    assert.doesNotMatch(doc.body.textContent,/Checking your payment|Please wait/u);
+    assert.equal(doc.querySelector('[role="alert"] p').textContent,message);
+    assert.equal(button(doc,'Try again').disabled,false);
+    assert.equal(button(doc,'Check order status'),undefined);
+    assert.equal(button(doc,'Receipt not ready yet'),undefined);
   `);
 });

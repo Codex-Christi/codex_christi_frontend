@@ -69,22 +69,17 @@ export default function CheckoutAccessRecovery({
     }
   };
   return (
-    <section className='mt-5 min-w-0 border-t border-white/20 pt-5 text-left'>
-      <h2 className='font-semibold'>Verify access to this order</h2>
-      <p className='mt-2 text-sm leading-6 text-white/70'>
-        Use the email from checkout to view this order. This checks an existing payment and won’t
-        create another one.
-      </p>
+    <div className='mt-5 min-w-0 border-t border-white/20 pt-4 text-left'>
       <form
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
           void submit();
         }}
-        className='mt-4 space-y-3'
+        className='space-y-3'
       >
         <label className='block text-sm'>
-          Checkout email
+          Email used at checkout
           <input
             type='email'
             autoComplete='email'
@@ -98,10 +93,10 @@ export default function CheckoutAccessRecovery({
         {sent && (
           <>
             <p className='text-xs leading-5 text-white/65'>
-              Check your email for the six-digit recovery code.
+              Enter the six-digit code from your email to view this order.
             </p>
             <label className='block text-sm'>
-              Email verification code
+              Order access code
               <input
                 value={code}
                 onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -124,7 +119,7 @@ export default function CheckoutAccessRecovery({
           className='inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#0085ff] px-4 font-semibold disabled:opacity-50'
         >
           {busy && <Loader2 size={16} className='animate-spin' aria-hidden='true' />}
-          {sent ? 'Verify & view order' : 'Send email code'}
+          {sent ? 'Verify and view order' : 'Send order access code'}
         </button>
         {sent && (
           <button
@@ -142,9 +137,10 @@ export default function CheckoutAccessRecovery({
       </form>
       <div className='mt-4'>
         <CheckoutAccountPrompt
+          context='order_access'
           returnPath={`/shop/checkout/confirmation/${encodeURIComponent(orderToken)}`}
         />
       </div>
-    </section>
+    </div>
   );
 }

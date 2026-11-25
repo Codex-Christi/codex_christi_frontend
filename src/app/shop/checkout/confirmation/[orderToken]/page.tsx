@@ -27,6 +27,13 @@ type PageProps = {
   searchParams: Promise<{ view?: string }>;
 };
 
+type LookupResult = {
+  orderToken: string;
+  owner: string | null;
+  outcome: 'access_required' | 'not_found' | null;
+  error: string | null;
+};
+
 export default function CheckoutConfirmationPage({ params, searchParams }: PageProps) {
   const { orderToken } = use(params);
   const viewingEarlierOrder = use(searchParams).view === 'details';
@@ -35,8 +42,7 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
   );
   const [payloadOwner, setPayloadOwner] = useState<string | null | undefined>(undefined);
   const [payload, setPayload] = useState<PayPalTxPaymentStatusResponse | null>(null);
-  const [accessRequired, setAccessRequired] = useState(false);
-  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
   const [cartError, setCartError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -45,6 +51,10 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
   const consumePurchase = useCartStore((state) => state.consumePurchase);
   const data =
     payload?.orderToken === orderToken && payloadOwner === authenticatedOwner ? payload : null;
+  const lookup =
+    lookupResult?.orderToken === orderToken && lookupResult.owner === authenticatedOwner
+      ? lookupResult
+      : null;
   const state = data ? mapLedgerToProcessingState(data) : null;
   const paid = Boolean(data?.cartPurchase || data?.paidAmountLabel);
   const refunded = data?.status === 'refunded';
@@ -78,20 +88,19 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
         if (authenticatedOwner && !viewingEarlierOrder && holdChecks === 0)
           await claimCurrentCheckout();
         if (cancelled) return;
-        const response = await readCheckoutStatus(orderToken, { signal: controller.signal });
+        const response = await readCheckoutStatus(orderToken, {
+          signal: controller.signal,
+        });
         if (cancelled) return;
-        if (response.status === 403) {
+        if (response.status === 403 || response.status === 404) {
           setPayload(null);
-          setAccessRequired(true);
-          setLookupError(null);
-          return;
-        }
-        if (response.status === 404) {
-          setLookupError(
-            'We couldn’t find this order. Check the confirmation link or verify access using the checkout email.',
-          );
-          setPayload(null);
-          setAccessRequired(true);
+          setLookupResult({
+            orderToken,
+            owner: authenticatedOwner,
+            outcome: response.status === 403 ? 'access_required' : 'not_found',
+            error: null,
+          });
+          setCartError(null);
           return;
         }
         const next = response.data;
@@ -99,8 +108,7 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
         if (cancelled) return;
         setPayloadOwner(authenticatedOwner);
         setPayload(next);
-        setAccessRequired(false);
-        setLookupError(null);
+        setLookupResult(null);
         if (next.cartPurchase && !viewingEarlierOrder) {
           try {
             await consumeConfirmedPurchase(next.cartPurchase);
@@ -114,7 +122,10 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
           }
         }
         const mapped = mapLedgerToProcessingState(next);
-        if ((next.fulfillmentOnHold || next.addressCorrection === 'checking') && next.status !== 'refunded') {
+        if (
+          (next.fulfillmentOnHold || next.addressCorrection === 'checking') &&
+          next.status !== 'refunded'
+        ) {
           if (holdChecks++ < 20) timer = setTimeout(() => void poll(), 30_000);
           return;
         }
@@ -127,9 +138,12 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
       } catch (error) {
         if (cancelled || controller.signal.aborted) return;
         console.warn('[checkout] Status unavailable', error);
-        setLookupError(
-          'We couldn’t refresh the order status. Please try again before starting another payment.',
-        );
+        setLookupResult({
+          orderToken,
+          owner: authenticatedOwner,
+          outcome: null,
+          error: 'We couldn’t load the order status. Please try again.',
+        });
       } finally {
         if (!cancelled) setRefreshing(false);
       }
@@ -159,23 +173,32 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
       state={state}
       paid={paid}
       hasData={Boolean(data)}
-      accessRequired={accessRequired}
+      accessRequired={lookup?.outcome === 'access_required'}
+      orderNotFound={lookup?.outcome === 'not_found'}
       refunded={refunded}
-      lookupError={lookupError}
-      cartError={viewingEarlierOrder ? null : cartError}
+      lookupError={lookup?.error}
+      cartError={viewingEarlierOrder || !data ? null : cartError}
       refreshing={refreshing}
       copied={copied}
       storageNotice={<CheckoutStorageNotice />}
-      recovery={<CheckoutAccessRecovery orderToken={orderToken} onVerified={refresh} />}
-      addressCorrectionState={data?.addressCorrection}
-      addressCorrection={data?.addressCorrection && (
-        <CustomerAddressCorrection
+      recovery={
+        <CheckoutAccessRecovery
           key={`${orderToken}:${authenticatedOwner ?? 'guest'}`}
           orderToken={orderToken}
-          state={data.addressCorrection}
-          onRefresh={refresh}
+          onVerified={refresh}
         />
-      )}
+      }
+      addressCorrectionState={data?.addressCorrection}
+      addressCorrection={
+        data?.addressCorrection && (
+          <CustomerAddressCorrection
+            key={`${orderToken}:${authenticatedOwner ?? 'guest'}`}
+            orderToken={orderToken}
+            state={data.addressCorrection}
+            onRefresh={refresh}
+          />
+        )
+      }
       onRefresh={refresh}
       onDownload={() => void downloadReceipt()}
       onCopy={() => {

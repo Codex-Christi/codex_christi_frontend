@@ -9,9 +9,11 @@ import { usePublicRuntimeConfig } from '@/lib/runtime-config/hooks';
 export default function CheckoutAccountPrompt({
   onSignIn,
   returnPath = '/shop/checkout',
+  context = 'checkout',
 }: {
   onSignIn?: () => void;
   returnPath?: string;
+  context?: 'checkout' | 'order_access';
 }) {
   const authenticated = useAuthStore((state) => state.isAuthenticated);
   const origins = usePublicRuntimeConfig();
@@ -23,7 +25,9 @@ export default function CheckoutAccountPrompt({
   });
   return (
     <p className='mb-6 text-sm leading-6 text-white/70'>
-      You can check out as a guest. Have an account?{' '}
+      {context === 'order_access'
+        ? 'Placed this order with an account?'
+        : 'You can check out as a guest. Have an account?'}{' '}
       <CustomShopLink
         href={href}
         onClick={onSignIn}
