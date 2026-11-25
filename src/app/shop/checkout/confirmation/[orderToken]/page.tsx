@@ -4,6 +4,8 @@ import { use, useCallback, useEffect, useRef, useState } from 'react';
 import CheckoutConfirmationView from '@/components/UI/Shop/Checkout/CheckoutConfirmationView';
 import CheckoutAccessRecovery from '@/components/UI/Shop/Checkout/CheckoutAccessRecovery';
 import CustomerAddressCorrection from '@/components/UI/Shop/Checkout/CustomerAddressCorrection';
+import CustomerRecoveryRequest from '@/components/UI/Shop/Checkout/CustomerRecoveryRequest';
+import { isCustomerRecoveryPending } from '@/lib/shop/checkout/customerRecoveryRequestState';
 import CheckoutStorageNotice from '@/components/UI/Shop/Checkout/CheckoutStorageNotice';
 import { useAuthStore } from '@/stores/authStore';
 import { claimCurrentCheckout } from '@/lib/hooks/shopHooks/checkout/claimCurrentCheckout';
@@ -123,7 +125,8 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
         }
         const mapped = mapLedgerToProcessingState(next);
         if (
-          (next.fulfillmentOnHold || next.addressCorrection === 'checking') &&
+          (next.fulfillmentOnHold || next.addressCorrection === 'checking' ||
+            isCustomerRecoveryPending(next.recoveryRequest)) &&
           next.status !== 'refunded'
         ) {
           if (holdChecks++ < 20) timer = setTimeout(() => void poll(), 30_000);
@@ -189,6 +192,14 @@ export default function CheckoutConfirmationPage({ params, searchParams }: PageP
         />
       }
       addressCorrectionState={data?.addressCorrection}
+      recoveryRequest={data?.recoveryRequest && (
+        <CustomerRecoveryRequest
+          key={`${orderToken}:${authenticatedOwner ?? 'guest'}`}
+          orderToken={orderToken}
+          state={data.recoveryRequest}
+          onRefresh={refresh}
+        />
+      )}
       addressCorrection={
         data?.addressCorrection && (
           <CustomerAddressCorrection

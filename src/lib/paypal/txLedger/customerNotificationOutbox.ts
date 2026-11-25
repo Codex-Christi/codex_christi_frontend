@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+import { getShopOpsDataTargetStatus } from '@/lib/prisma/shop/shopOpsDataTarget';
+import { resolveOrderNotificationDelivery } from '@/lib/shop/email/orderNotificationDelivery';
 import {
   buildShopAddressCorrectionEmail,
   buildShopFulfillmentEmail,
@@ -205,6 +207,9 @@ async function sendCustomerNotificationRow(
   }
 
   const payload = row.payload as CustomerFulfillmentPushVerifiedPayload;
+  if (getShopOpsDataTargetStatus().isLocalProductionTarget) {
+    return { id: row.id, ok: false as const, error: 'Order mail cannot be sent from a local production-data session.' };
+  }
   const claimed = await outbox.updateMany({
     where: {
       id: row.id,
@@ -240,15 +245,26 @@ async function sendCustomerNotificationRow(
       await outbox.update({ where: { id: row.id }, data: { status: CUSTOMER_NOTIFICATION_STATUS.SUPPRESSED } });
       return { id: row.id, ok: false as const, error: 'The order no longer qualifies for this notice.' };
     }
+    const delivery = resolveOrderNotificationDelivery(row.recipient, row.orderToken);
+    if (!delivery) {
+      const reason = 'Order email skipped because no safe delivery destination is configured.';
+      await outbox.update({
+        where: { id: row.id },
+        data: { status: CUSTOMER_NOTIFICATION_STATUS.SUPPRESSED, lastErrorMessage: reason },
+      });
+      return { id: row.id, ok: false as const, suppressed: true as const, error: reason };
+    }
+    const confirmationUrl = delivery.test ? delivery.confirmationUrl : undefined;
     const email = isAddressNotice
-      ? buildShopAddressCorrectionEmail(row.orderToken)
+      ? buildShopAddressCorrectionEmail(row.orderToken, confirmationUrl)
       : milestone
-        ? buildShopFulfillmentMilestoneEmail(milestone, row.orderToken)
+        ? buildShopFulfillmentMilestoneEmail(milestone, row.orderToken, confirmationUrl)
         : buildShopFulfillmentEmail({
-            customerName: payload.customerName,
+            customerName: delivery.test ? '' : payload.customerName,
             orderToken: payload.orderToken,
             supportReference: payload.supportReference,
             receiptAvailable: Boolean(payload.receiptLink),
+            confirmationUrl,
           });
     const { sendMailFromPrimaryAgent } = await import('@/lib/zeptomail/sendMailFromPrimaryAgent');
     submitted = true;
@@ -256,8 +272,8 @@ async function sendCustomerNotificationRow(
       emailReceipents: [
         {
           email_address: {
-            address: row.recipient,
-            name: payload.customerName || 'Codex Christi Customer',
+            address: delivery.recipient,
+            name: delivery.test ? 'Checkout test inbox' : payload.customerName || 'Codex Christi Customer',
           },
         },
       ],

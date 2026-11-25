@@ -22,6 +22,7 @@ import {
 } from '@/lib/shop/checkout/checkoutProof';
 import { writeCheckoutEmailProof } from '@/lib/shop/checkout/serverEmailProofCookies';
 import { grantCheckoutAccess, requireCheckoutAccess } from '@/lib/shop/checkout/serverAccess';
+import { requireNewCheckoutOpen } from '@/lib/shop/checkout/checkoutIntakePolicy';
 import {
   checkoutEmail,
   checkoutString,
@@ -276,6 +277,7 @@ export async function POST(req: Request) {
       if (authenticatedUserId && (await cookies()).has(checkoutGrantCookieName(orderToken)))
         await requireCheckoutAccess(existing, true, req);
       if (existing.paypalOrderId) return respond(existing.paypalOrderId);
+      requireNewCheckoutOpen();
       if (
         existing.status === PAYPAL_LEDGER_STATUS.INTENT_CREATING &&
         existing.updatedAt.getTime() > Date.now() - 90_000
@@ -312,12 +314,15 @@ export async function POST(req: Request) {
           'CHECKOUT_ATTEMPT_PENDING',
         );
       creationVersion = claimVersion;
-    } else if (!itemsHash)
-      throw new CheckoutRequestError(
-        'Review and confirm your order before paying.',
-        409,
-        'CHECKOUT_REVIEW_REQUIRED',
-      );
+    } else {
+      requireNewCheckoutOpen();
+      if (!itemsHash)
+        throw new CheckoutRequestError(
+          'Review and confirm your order before paying.',
+          409,
+          'CHECKOUT_REVIEW_REQUIRED',
+        );
+    }
 
     const countryIso3 = normalizeCountryToIso3(delivery_address.shipping_country);
     if (!countryIso3) {

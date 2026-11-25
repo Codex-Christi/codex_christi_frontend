@@ -40,6 +40,12 @@ const verificationCopy = {
 
 const senderName = 'Codex Christi Shop';
 
+function orderConfirmationUrl(orderToken: string, confirmationUrl?: string) {
+  return confirmationUrl ?? getShopSiteUrl(
+    `/shop/checkout/confirmation/${encodeURIComponent(orderToken)}?view=details`,
+  );
+}
+
 export function buildShopVerificationEmail({
   purpose,
   otp,
@@ -73,11 +79,13 @@ export function buildShopFulfillmentEmail({
   orderToken,
   supportReference,
   receiptAvailable,
+  confirmationUrl,
 }: {
   customerName: string;
   orderToken: string;
   supportReference: string;
   receiptAvailable: boolean;
+  confirmationUrl?: string;
 }) {
   if (!orderToken?.trim() || !supportReference?.trim())
     throw new Error('An order reference is required.');
@@ -100,9 +108,7 @@ export function buildShopFulfillmentEmail({
       ],
       action: {
         label: receiptAvailable ? 'View order & receipt' : 'View order',
-        href: getShopSiteUrl(
-          `/shop/checkout/confirmation/${encodeURIComponent(orderToken)}?view=details`,
-        ),
+        href: orderConfirmationUrl(orderToken, confirmationUrl),
       },
       footerText: 'For your privacy, you may need to verify access before viewing your order.',
     }),
@@ -134,7 +140,11 @@ const lifecycleCopy = {
 
 export type ShopFulfillmentNotice = keyof typeof lifecycleCopy;
 
-export function buildShopFulfillmentMilestoneEmail(notice: ShopFulfillmentNotice, orderToken: string) {
+export function buildShopFulfillmentMilestoneEmail(
+  notice: ShopFulfillmentNotice,
+  orderToken: string,
+  confirmationUrl?: string,
+) {
   const { heading, message } = lifecycleCopy[notice];
   return {
     senderName,
@@ -146,14 +156,14 @@ export function buildShopFulfillmentMilestoneEmail(notice: ShopFulfillmentNotice
       paragraphs: [message],
       action: {
         label: 'View your order',
-        href: getShopSiteUrl(`/shop/checkout/confirmation/${encodeURIComponent(orderToken)}?view=details`),
+        href: orderConfirmationUrl(orderToken, confirmationUrl),
       },
       footerText: 'For your privacy, you may need to verify access before viewing your order.',
     }),
   };
 }
 
-export function buildShopAddressCorrectionEmail(orderToken: string) {
+export function buildShopAddressCorrectionEmail(orderToken: string, confirmationUrl?: string) {
   return {
     subject: `Check your delivery address · ${senderName}`,
     senderName,
@@ -167,7 +177,7 @@ export function buildShopAddressCorrectionEmail(orderToken: string) {
       ],
       action: {
         label: 'View your order',
-        href: getShopSiteUrl(`/shop/checkout/confirmation/${encodeURIComponent(orderToken)}?view=details`),
+        href: orderConfirmationUrl(orderToken, confirmationUrl),
       },
       footerText: 'For your privacy, do not reply with your delivery address.',
     }),

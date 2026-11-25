@@ -8,6 +8,10 @@ import { getCanonicalPaymentProjectionState } from '@/lib/paypal/txLedger/canoni
 import { getCapturedCartPurchase } from '@/lib/cart/purchase';
 import { receiptObjectKey, receiptDownloadPath } from '@/lib/shop/orderHistory/receiptReference';
 import { toCustomerOrderStatus } from '@/lib/shop/checkout/customerOrderStatus';
+import {
+  CUSTOMER_RECOVERY_GRACE_MS,
+  getCustomerRecoveryRequestState,
+} from '@/lib/shop/checkout/customerRecoveryRequestServer';
 import { getBuyerAddressCorrectionSetup } from '@/lib/shop/checkout/customerAddressCorrectionServer';
 import { readCustomerFulfillmentMilestone } from '@/lib/shop/checkout/readCustomerFulfillmentMilestone';
 import { customerPostPurchaseDescriptions } from '@/lib/shop/checkout/customerPostPurchaseStage';
@@ -21,7 +25,6 @@ type PageProps = {
   params: Promise<{ orderToken: string }>;
 };
 
-const CUSTOMER_RECOVERY_GRACE_MS = 45_000;
 const privateHeaders = { 'Cache-Control': 'private, no-store' };
 
 const CUSTOMER_RECOVERY_LEDGER_STATUSES = new Set<string>([
@@ -104,6 +107,8 @@ export async function GET(_req: Request, { params }: PageProps) {
   });
 
   const fulfillmentCanceled = postPurchaseStage === 'fulfillment_canceled';
+  const released = ['sent_for_preparation', 'production_started', 'shipped', 'delivered']
+    .some((stage) => postPurchaseStage === stage);
   const addressCorrection = fulfillmentCanceled || fulfillment?.onHold
     ? null
     : getBuyerAddressCorrectionSetup(row, paymentState)?.state;
@@ -111,6 +116,9 @@ export async function GET(_req: Request, { params }: PageProps) {
     row.lastErrorCode === 'MERCHIZE_ADDRESS_VALIDATION_PENDING';
   const customerStatus = toCustomerOrderStatus(row, {
     addressCorrection,
+    recoveryRequest: fulfillmentCanceled || fulfillment?.onHold || addressCorrection || released
+      ? null
+      : getCustomerRecoveryRequestState(row, { payment: paymentState }),
     status: effectiveStatus,
     receiptLink,
     receiptFile: receiptLink ? 'Codex-Christi-receipt' : null,

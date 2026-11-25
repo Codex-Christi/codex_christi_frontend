@@ -61,3 +61,9 @@ test('missing saved review asks for fresh confirmation without retrying payment'
   assert.deepEqual(events, ['message', 'clear-acknowledgment']);
   assert.match(failure.message, /Review and confirm this purchase/);
 });
+
+test('a checkout pause leaves the cart and review intact', () => {
+  const { events, failure } = handle({ ok: false, code: 'CHECKOUT_PAUSED' });
+  assert.deepEqual(events, ['message']);
+  assert.match(failure.message, /New checkouts are paused/u);
+});

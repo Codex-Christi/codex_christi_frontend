@@ -14,6 +14,8 @@ import successToast from '@/lib/success-toast';
 import { cn } from '@/lib/utils';
 import AdminGlassPanel from './AdminGlassPanel';
 import type { AdminIcon } from './adminShopDashboardTypes';
+import type { ScheduledRecoveryRunStatus } from '@/lib/paypal/txLedger/scheduledRecoveryRun';
+import ScheduledRecoveryStatus from './ScheduledRecoveryStatus';
 
 type ScannerCandidate = Extract<
   AdminRecoveryScannerActionResult,
@@ -22,10 +24,12 @@ type ScannerCandidate = Extract<
 
 type AdminPaidOrderRecoveryScannerPanelProps = {
   initialScan?: AdminRecoveryScannerActionResult['scan'] | null;
+  scheduledRun: ScheduledRecoveryRunStatus;
 };
 
 export default function AdminPaidOrderRecoveryScannerPanel({
   initialScan = null,
+  scheduledRun,
 }: AdminPaidOrderRecoveryScannerPanelProps) {
   const [scan, setScan] = useState<AdminRecoveryScannerActionResult['scan'] | null>(initialScan);
   const [selectedTokens, setSelectedTokens] = useState<string[]>([]);
@@ -143,12 +147,14 @@ export default function AdminPaidOrderRecoveryScannerPanel({
         </div>
       </div>
 
+      <ScheduledRecoveryStatus run={scheduledRun} />
+
       <div className='grid gap-3 p-4'>
         <div className='grid gap-2 sm:grid-cols-4'>
           <ScannerMetric label='Min age' value={scan ? `${scan.minAgeMinutes}m` : '—'} />
           <ScannerMetric label='Batch' value={scan ? String(scan.batchSize) : '—'} />
           <ScannerMetric label='Selected' value={String(selectedTokens.length)} />
-          <ScannerMetric label='Last scan' value={scan ? formatScanTime(scan.scannedAt) : '—'} />
+          <ScannerMetric label='Last manual scan' value={scan ? formatScanTime(scan.scannedAt) : '—'} />
         </div>
 
         <div className='overflow-x-auto rounded-lg border border-white/10'>

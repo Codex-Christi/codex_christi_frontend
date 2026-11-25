@@ -1,6 +1,7 @@
 import type { CartPurchase } from '@/lib/cart/types';
 import type { CustomerPostPurchaseStage } from './customerPostPurchaseStage';
 import type { CustomerAddressCorrectionState } from './customerAddressCorrection';
+import type { CustomerRecoveryRequestState } from './customerRecoveryRequestState';
 
 const paymentProgressFields = [
   'paypalAuthorizationId',
@@ -43,6 +44,7 @@ export type CustomerOrderStatusRow = {
 /** These values have already been checked by the status route, including the receipt reference. */
 export type CustomerOrderStatusFields = {
   addressCorrection?: CustomerAddressCorrectionState | null;
+  recoveryRequest?: CustomerRecoveryRequestState | null;
   status: string;
   receiptLink?: string | null;
   receiptFile?: string | null;
@@ -58,6 +60,7 @@ export type CustomerOrderStatusFields = {
 
 export type CustomerOrderStatus = {
   addressCorrection?: CustomerAddressCorrectionState;
+  recoveryRequest?: CustomerRecoveryRequestState;
   orderToken: string;
   status: string;
   receiptReady: boolean;
@@ -126,6 +129,7 @@ export function toCustomerOrderStatus(
     recoveryReason: fields.recoveryReason ?? null,
     postPurchaseStage: fields.postPurchaseStage ?? null,
     ...(fields.addressCorrection ? { addressCorrection: fields.addressCorrection } : {}),
+    ...(fields.recoveryRequest ? { recoveryRequest: fields.recoveryRequest } : {}),
     fulfillmentOnHold: fields.fulfillmentOnHold === true,
     fulfillmentCheckedAt: isoDate(fields.fulfillmentCheckedAt),
     updatedAt: isoDate(row.updatedAt),

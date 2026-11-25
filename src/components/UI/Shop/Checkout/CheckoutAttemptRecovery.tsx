@@ -16,7 +16,13 @@ import { checkoutPanelClassName } from './checkoutStyles';
 const PayPalCheckout = dynamic(() => import('./Paypal/PayPalMainCheckoutComponent'));
 
 /** The saved purchase remains reachable even when the merged cart has no usable quote. */
-export default function CheckoutAttemptRecovery({ children }: { children: ReactNode }) {
+export default function CheckoutAttemptRecovery({
+  checkoutPaused = false,
+  children,
+}: {
+  checkoutPaused?: boolean;
+  children: ReactNode;
+}) {
   const attempt = usePayPalIntentStore((state) => state.checkoutAttempt);
   const owner = useAuthStore((state) => state.accountOwnerId);
   const authenticated = useAuthStore((state) => state.isAuthenticated);
@@ -68,6 +74,7 @@ export default function CheckoutAttemptRecovery({ children }: { children: ReactN
       {attempt?.orderToken && (
         <section className={`${checkoutPanelClassName} mb-5 min-w-0 p-4 sm:p-5`}>
           <ActivePayPalCheckoutRecoveryBanner
+            checkoutPaused={checkoutPaused}
             onContinueOriginal={() => void openOriginal()}
             reviewing={pending === scope}
             originalOpen={Boolean(original)}

@@ -3,6 +3,7 @@ import test from 'node:test';
 import { SendMailClient } from 'zeptomail';
 import type { PrismaClient } from '@/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger/client';
 import { runPaidFulfillmentProcessing } from './runPaidFulfillmentProcessing';
+import { runPayPalRecoveryScanner } from './recoveryScanner';
 
 test('all real runner entry points hold lost Django replies/checkpoints without replay or recapture', async (t) => {
   const previous = { ...process.env };
@@ -21,6 +22,9 @@ test('all real runner entry points hold lost Django replies/checkpoints without 
     SHOP_CHECKOUT_SERVER_ACTIONS_POST_PROCESSING_CRYPTO_SECRET: 'handoff-runner-test-secret',
     SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY: 'handoff-runner-signature-secret',
     CODEX_PRIMARY_MAIL_AGENT_TOKEN: 'fixture-only',
+    SHOP_DEV_ORDER_EMAIL_INBOX: 'checkout-inbox@example.test',
+    SHOP_DEV_ORDER_CONFIRMATION_ORIGIN: 'http://localhost:3001',
+    PAYPAL_TX_LEDGER_RECOVERY_SCANNER_ENABLED: 'true',
     ORDER_RECOVERY_ADMIN_EMAILS: '',
   });
   t.after(() => {
@@ -57,6 +61,7 @@ test('all real runner entry points hold lost Django replies/checkpoints without 
       let calls = 0;
       emails.length = 0;
       let failCheckpoint = failureMode === 'lost_checkpoint';
+      const buyerRequestedRecovery = failureMode === 'accepted_missing_details';
       const row: Record<string, unknown> = {
         id: 'row-1',
         orderToken: 'token-1',
@@ -70,7 +75,8 @@ test('all real runner entry points hold lost Django replies/checkpoints without 
         initialCurrency: 'USD',
         status: 'receipt_uploaded',
         createdAt: new Date(),
-        updatedAt: new Date(),
+        updatedAt: new Date(Date.now() - 16 * 60_000),
+        customerRecoveryRequestedAt: buyerRequestedRecovery ? new Date() : null,
         receiptLink: 'https://payment-receipts.codexchristi.shop/paypal/fixture.pdf',
         receiptFile: 'fixture',
         canonicalOrderSnapshot: null,
@@ -134,6 +140,8 @@ test('all real runner entry points hold lost Django replies/checkpoints without 
       const client = {
         paypalIntent: {
           findUnique: async () => structuredClone(row),
+          findMany: async ({ where }: { where: { updatedAt: { lte: Date } } }) =>
+            (row.updatedAt as Date) <= where.updatedAt.lte ? [structuredClone(row)] : [],
           updateMany: async ({
             where,
             data,
@@ -249,9 +257,22 @@ test('all real runner entry points hold lost Django replies/checkpoints without 
           { status: 201 },
         );
       });
-      await runPaidFulfillmentProcessing('token-1', { triggerSource: 'capture_route' }).catch(
-        () => {},
-      );
+      if (buyerRequestedRecovery) {
+        const recovery = await runPayPalRecoveryScanner({ batchSize: 1, minAgeMinutes: 15 });
+        assert.equal(recovery.candidates[0]?.customerRecoveryRequested, true);
+        assert.equal(recovery.results[0]?.orderToken, 'token-1');
+        assert.equal(row.processingTriggerDetail, 'customer_requested_recovery_scan');
+        assert.equal(row.processingTriggerSource, 'recovery_scanner');
+        assert.deepEqual(
+          (await runPayPalRecoveryScanner({ batchSize: 1, minAgeMinutes: 15 })).candidates,
+          [],
+          'the next immediate run still respects the retry window',
+        );
+      } else {
+        await runPaidFulfillmentProcessing('token-1', { triggerSource: 'capture_route' }).catch(
+          () => {},
+        );
+      }
       assert.equal(calls, 1, 'Only the intended Django operation was dispatched');
       const evidence = row[
         operation === 'payment_save'

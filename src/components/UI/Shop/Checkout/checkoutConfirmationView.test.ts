@@ -155,6 +155,24 @@ test('fulfillment cancellation preserves paid evidence but hides recovery action
   `);
 });
 
+test('only a verified paid order shows the recovery request offered by its saved status', async () => {
+  await checkConfirmation(`
+    const { default: CustomerRecoveryRequest } = require('./src/components/UI/Shop/Checkout/CustomerRecoveryRequest');
+    const recoveryRequest = <CustomerRecoveryRequest orderToken='local-order-1234' state='available' onRefresh={()=>actions++} />;
+    const props = {state:{...state,flowStatus:'error'},recoveryRequest};
+    assert.ok(button(render(props),'Request recovery'));
+    for (const blocked of [
+      {accessRequired:true}, {hasData:false}, {paid:false}, {refunded:true},
+      {addressCorrectionState:'required'}, {state:{...props.state, fulfillmentOnHold:true}},
+    ]) {
+      assert.equal(button(render({...props,...blocked}),'Request recovery'),undefined);
+    }
+    const queued = render({...props,recoveryRequest:<CustomerRecoveryRequest orderToken='local-order-1234' state='queued' onRefresh={()=>actions++} />});
+    assert.equal(button(queued,'Request recovery'),undefined);
+    assert.match(queued.body.textContent,/Your request is saved/u);
+  `);
+});
+
 test('confirmation separates paid, delayed, under-review, refunded, and access-required views', async () => {
   await checkConfirmation(`
     let doc = render();
