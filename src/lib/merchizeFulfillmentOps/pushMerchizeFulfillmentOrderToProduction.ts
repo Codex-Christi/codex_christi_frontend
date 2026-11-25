@@ -14,6 +14,8 @@ import {
 import { asRecord, summarizeProviderRequest, summarizeProviderResponse } from './merchizeMapper';
 import { safeLogErrorMessage } from './redaction';
 import {
+  isMerchizeFulfillmentCanceled,
+  MERCHIZE_FULFILLMENT_CANCELED_CODE,
   MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_STATUS,
@@ -223,6 +225,11 @@ export async function pushMerchizeFulfillmentOrderToProduction(
       code: 'MERCHIZE_PUSH_REFERENCE_UNVERIFIED',
     });
   }
+  if (isMerchizeFulfillmentCanceled(order.deliveryStatus)) {
+    throw new MerchizeFulfillmentPushError('Fulfillment was canceled in Merchize.', {
+      code: MERCHIZE_FULFILLMENT_CANCELED_CODE,
+    });
+  }
   if (order.pushVerifiedAt || order.pushAcknowledgedAt || order.heldAt) {
     throw new MerchizeFulfillmentPushError('The order is held or an earlier release needs verification.', {
       code: order.heldAt ? MERCHIZE_ORDER_ON_HOLD : 'MERCHIZE_PUSH_EVIDENCE_EXISTS',
@@ -262,7 +269,9 @@ export async function pushMerchizeFulfillmentOrderToProduction(
   });
   if (write.count !== 1 || state !== 'unfulfilled') {
     throw new MerchizeFulfillmentPushError('Merchize did not confirm this order was available for release.', {
-      code: state === 'on_hold' ? MERCHIZE_ORDER_ON_HOLD : 'MERCHIZE_PUSH_STATE_UNVERIFIED',
+      code: isMerchizeFulfillmentCanceled(state)
+        ? MERCHIZE_FULFILLMENT_CANCELED_CODE
+        : state === 'on_hold' ? MERCHIZE_ORDER_ON_HOLD : 'MERCHIZE_PUSH_STATE_UNVERIFIED',
     });
   }
 

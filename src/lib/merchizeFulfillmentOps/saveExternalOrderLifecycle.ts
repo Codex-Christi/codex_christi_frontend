@@ -14,6 +14,7 @@ import {
 } from './externalOrderProgress';
 import { MerchizeApiError, type MerchizeExternalOrderReference } from './merchizeClient';
 import { toOptionalPrismaJson } from './merchizeMapper';
+import { MERCHIZE_CANCELLATION_STATUSES } from './status';
 
 type LifecycleOrder = ExternalOrderProgressReference & {
   id: string;
@@ -44,6 +45,7 @@ export function externalOrderLifecycleWriter(
     merchizeIdentifier: order.merchizeIdentifier,
     merchizeOrderCode: order.merchizeOrderCode,
     duplicateDetectedAt: null,
+    AND: [{ OR: [{ deliveryStatus: null }, { deliveryStatus: { notIn: [...MERCHIZE_CANCELLATION_STATUSES] } }] }],
   };
 
   return {

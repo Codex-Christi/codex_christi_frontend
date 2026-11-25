@@ -1,5 +1,6 @@
 import { ChevronDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isMerchizeFulfillmentCanceled } from '@/lib/merchizeFulfillmentOps/status';
 import { getAdminGlassPanelClassName, default as AdminGlassPanel } from './AdminGlassPanel';
 import AdminNotificationHistoryPanel from './AdminNotificationHistoryPanel';
 import AdminPaidOrderRecoveryActionsPanel from './AdminPaidOrderRecoveryActionsPanel';
@@ -167,6 +168,8 @@ function RecoveryActionsPanel({
   manualReleaseReadinessWarning: string | null;
   shopOpsDataTarget: ShopOpsDataTargetView;
 }) {
+  if (isMerchizeFulfillmentCanceled(detail.merchizeFulfillmentOps?.deliveryStatus)) return null;
+
   const addressReviewStatus = detail.merchizeFulfillmentOps?.addressReviewStatus;
   const releaseVerificationPending =
     recovery.status !== 'completed' &&

@@ -1773,6 +1773,24 @@ export async function syncAdminMerchizeProviderDetailsAction({
       };
     }
 
+    if (sync.fulfillmentCanceled) {
+      await writeAdminAuditLog({
+        actor: admin,
+        action: 'shop.paid_order_recovery.sync_merchize_provider_details',
+        targetType: 'orderToken',
+        targetId: orderToken,
+        outcome: 'success',
+        metadata: { fulfillmentCanceled: true },
+      });
+      revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+      revalidatePath('/admin/shop/paid-order-recovery');
+      return {
+        ok: true,
+        tone: 'warning',
+        message: 'Fulfillment was canceled in Merchize. Payment was not changed.',
+      };
+    }
+
     const [readiness, snapshots] = await Promise.all([
       runMerchizeProductionReadinessChecks(existing.orderToken, {
         expectedBuyerAddress: getMerchizeBuyerAddressExpectationFromLedger(

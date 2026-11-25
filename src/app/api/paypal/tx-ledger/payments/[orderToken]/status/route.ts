@@ -103,7 +103,8 @@ export async function GET(_req: Request, { params }: PageProps) {
     postPaymentComplete: Boolean(row.processingCompletedAt),
   });
 
-  const addressCorrection = fulfillment?.onHold
+  const fulfillmentCanceled = postPurchaseStage === 'fulfillment_canceled';
+  const addressCorrection = fulfillmentCanceled || fulfillment?.onHold
     ? null
     : getBuyerAddressCorrectionSetup(row, paymentState)?.state;
   const waitingForAddress = captureCompletion.ok && !isResolved && !paymentFailure &&
@@ -115,7 +116,7 @@ export async function GET(_req: Request, { params }: PageProps) {
     receiptFile: receiptLink ? 'Codex-Christi-receipt' : null,
     paidAmountLabel: getPaidAmountLabel(row.capturePayload),
     cartPurchase: getCapturedCartPurchase(row, paymentState),
-    customerRecoveryStatus: isCustomerProtectionVisible ? 'paid_unresolved' : null,
+    customerRecoveryStatus: isCustomerProtectionVisible && !fulfillmentCanceled ? 'paid_unresolved' : null,
     recoveryReason: isCustomerProtectionVisible || waitingForAddress
       ? fulfillment?.stage ? customerPostPurchaseDescriptions[fulfillment.stage] : recoveryReason
       : null,
@@ -124,7 +125,7 @@ export async function GET(_req: Request, { params }: PageProps) {
     fulfillmentCheckedAt: fulfillment?.checkedAt,
     error: paymentFailure
       ? { message: recoveryReason }
-      : row.lastErrorMessage
+      : row.lastErrorMessage && !fulfillmentCanceled
         ? {
             message:
               'Your payment or order needs review. Please keep your order reference and contact support.',

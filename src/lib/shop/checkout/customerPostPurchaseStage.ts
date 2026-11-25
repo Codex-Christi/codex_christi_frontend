@@ -8,6 +8,7 @@ export const customerPostPurchaseDescriptions = {
   production_started: 'We’ll update this page when shipping starts.',
   shipped: 'Shipping has started for your order.',
   delivered: 'Delivery has been confirmed.',
+  fulfillment_canceled: 'Fulfillment for this order was canceled. Use your order reference to contact support about the next step.',
 } as const;
 
 export type CustomerPostPurchaseStage = keyof typeof customerPostPurchaseDescriptions;
@@ -21,4 +22,5 @@ export const customerPostPurchaseTitles: Record<CustomerPostPurchaseStage, strin
   production_started: 'Production started',
   shipped: 'Shipment started',
   delivered: 'Order delivered',
+  fulfillment_canceled: 'Fulfillment canceled',
 };

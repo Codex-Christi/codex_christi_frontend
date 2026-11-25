@@ -4,7 +4,8 @@ import {
   readCustomerFulfillmentHold,
   savedFulfillmentHoldCheck,
 } from '@/lib/shop/checkout/readCustomerFulfillmentHold';
-import { MERCHIZE_ORDER_ON_HOLD } from './status';
+import { projectCustomerFulfillmentMilestone } from '@/lib/shop/checkout/readCustomerFulfillmentMilestone';
+import { MERCHIZE_FULFILLMENT_CANCELED_CODE, MERCHIZE_ORDER_ON_HOLD } from './status';
 import {
   reconcileMerchizeOrderHolds,
   type HoldLookupOrder,
@@ -28,6 +29,7 @@ function order() {
     merchizeOrderCode: 'RX-TEST',
     lastProgressSyncAt: null as Date | null,
     pushVerifiedAt: null as Date | null,
+    deliveryStatus: null as string | null,
     duplicateDetectedAt: null,
     productionGateStatus: 'ready',
     addressReviewStatus: 'ready',
@@ -117,6 +119,29 @@ test('missing, duplicate, wrong-identity, or stale results cannot clear a hold',
   assert.equal(current.heldAt, heldAt);
 });
 
+test('a verified fulfillment cancellation replaces stale preparation and hold evidence', async () => {
+  const current = {
+    ...order(),
+    heldAt,
+    deliveryStatus: null as string | null,
+    merchizeTrackingPayload: null,
+  };
+  const [canceled] = await reconcileMerchizeOrderHolds(
+    [{ ...current }],
+    reader(current, [{ ...detail, status: 'paid', order_status: 'cancelled_fulfillment' }]),
+    resumedAt,
+  );
+
+  assert.deepEqual(canceled, { id: current.id, state: 'cancelled', saved: true });
+  assert.equal(current.deliveryStatus, 'cancelled');
+  assert.equal(current.heldAt, null);
+  assert.deepEqual(projectCustomerFulfillmentMilestone(current, null), {
+    stage: 'fulfillment_canceled',
+    onHold: false,
+    checkedAt: resumedAt,
+  });
+});
+
 test('scheduled hold and resume only read provider detail; a newly held order cannot be pushed', async (t) => {
   const current = {
     ...order(),
@@ -148,11 +173,16 @@ test('scheduled hold and resume only read provider detail; a newly held order ca
       data,
     }: {
       where: { id: string; lastLookupAt: Date | null };
-      data: Partial<HoldLookupOrder>;
+      data: Partial<HoldLookupOrder> & { deliveryStatus?: string };
     }) => {
       assert.equal(where.id, current.id);
       assert.equal(where.lastLookupAt, current.lastLookupAt);
-      assert.deepEqual(Object.keys(data).sort(), ['heldAt', 'lastLookupAt']);
+      assert.deepEqual(
+        Object.keys(data).sort(),
+        state === 'cancelled_fulfillment'
+          ? ['deliveryStatus', 'heldAt', 'lastLookupAt']
+          : ['heldAt', 'lastLookupAt'],
+      );
       Object.assign(current, data);
       return { count: 1 };
     },
@@ -218,4 +248,12 @@ test('scheduled hold and resume only read provider detail; a newly held order ca
   assert.ok(current.heldAt, 'A hold that arrived after readiness was still recorded');
   assert.equal(network.mock.callCount(), 3);
   assert.equal(writes.mock.callCount(), 3);
+
+  state = 'cancelled_fulfillment';
+  current.heldAt = null;
+  current.lastLookupAt = heldAt;
+  await assert.rejects(release, { code: MERCHIZE_FULFILLMENT_CANCELED_CODE });
+  assert.equal(current.deliveryStatus, 'cancelled');
+  await assert.rejects(release, { code: MERCHIZE_FULFILLMENT_CANCELED_CODE });
+  assert.equal(network.mock.callCount(), 4, 'A saved cancellation requires no further provider read');
 });

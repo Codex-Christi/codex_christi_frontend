@@ -9,7 +9,10 @@ import { syncMerchizeFulfillmentOrder } from './syncMerchizeFulfillmentOrder';
 import { runMerchizeProductionReadinessChecks } from './runMerchizeProductionReadinessChecks';
 import { listMerchizeExternalOrdersDetail } from './merchizeClient';
 import { holdLookupSelect, holdLookupVersion, reconcileMerchizeOrderHolds } from './merchizeOrderHold';
-import { MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS } from './status';
+import {
+  MERCHIZE_CANCELLATION_STATUSES,
+  MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS,
+} from './status';
 import { safeLogErrorMessage } from './redaction';
 import { VERIFIED_MERCHIZE_DELIVERY_STATUS } from './customerTracking';
 import { notifyMerchizeLifecycle } from './notifyMerchizeLifecycle';
@@ -27,7 +30,10 @@ import {
 const MAX_BATCH_SIZE = 25;
 const REPEATED_FAILURE_THRESHOLD = 3;
 // Legacy "delivered" values may describe only the first package. Recheck those rows.
-const TERMINAL_DELIVERY_STATUSES = [VERIFIED_MERCHIZE_DELIVERY_STATUS, 'cancelled', 'canceled'] as const;
+const TERMINAL_DELIVERY_STATUSES = [
+  VERIFIED_MERCHIZE_DELIVERY_STATUS,
+  ...MERCHIZE_CANCELLATION_STATUSES,
+] as const;
 
 async function notifyRepeatedLifecycleFailure(args: {
   orderToken: string;
@@ -222,6 +228,16 @@ export async function runMerchizeFulfillmentLifecycleScanner(
     for (const candidate of candidates) {
       try {
         const detailSync = await syncMerchizeFulfillmentOrder(candidate.orderToken);
+        if (detailSync.ok && detailSync.fulfillmentCanceled) {
+          results.push({
+            orderToken: candidate.orderToken,
+            ok: true,
+            attempted: ['canonical_order_detail'],
+            failedActions: [],
+            readinessStatus: 'cancelled',
+          });
+          continue;
+        }
         const readiness = await runMerchizeProductionReadinessChecks(candidate.orderToken);
         const snapshots = await syncMerchizeFulfillmentOperationalSnapshots(candidate.orderToken, {
           includeInvoice: false,

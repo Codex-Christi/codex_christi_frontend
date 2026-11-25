@@ -24,6 +24,8 @@ import {
 } from './lookupPending';
 import { safeLogErrorMessage } from './redaction';
 import {
+  isMerchizeFulfillmentCanceled,
+  MERCHIZE_FULFILLMENT_CANCELED,
   MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_STATUS,
 } from './status';
@@ -204,6 +206,17 @@ export async function syncMerchizeFulfillmentOrder(
     };
   }
 
+  if (order.merchizeOrderId && isMerchizeFulfillmentCanceled(order.deliveryStatus)) {
+    return {
+      ok: true,
+      orderToken,
+      merchizeExternalOrderNumber: order.merchizeExternalOrderNumber,
+      merchizeOrderId: order.merchizeOrderId,
+      itemCount: order.itemCount,
+      fulfillmentCanceled: true,
+    };
+  }
+
   let activeAttemptId: string | null = null;
   let activeAction: SyncAction = 'external_lookup';
   let merchizeOrderId = order.merchizeOrderId;
@@ -342,14 +355,16 @@ export async function syncMerchizeFulfillmentOrder(
     const orderState = lookup?.success === true
       ? readExternalOrderState({ ...order, merchizeOrderId }, lookup.data)
       : null;
+    const observedState =
+      orderState && canObserveOrderHold(order, lookupStartedAt) ? orderState : null;
     const lookupWrite = await prisma.merchizeFulfillmentOrder.updateMany({
       where: holdLookupVersion(order),
       data: {
         merchizeOrderId,
         merchizeExternalLookupPayload: toOptionalPrismaJson(lookup),
         syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.LOOKUP_FOUND,
-        ...(orderState && canObserveOrderHold(order, lookupStartedAt)
-          ? observedOrderHold(order, orderState, lookupStartedAt)
+        ...(observedState
+          ? observedOrderHold(order, observedState, lookupStartedAt)
           : {}),
       },
     });
@@ -364,6 +379,17 @@ export async function syncMerchizeFulfillmentOrder(
       status: MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.SUCCEEDED,
       responseSummary: lookup,
     });
+
+    if (observedState === MERCHIZE_FULFILLMENT_CANCELED) {
+      return refreshProjectionAndReturn({
+        ok: true,
+        orderToken,
+        merchizeOrderId,
+        merchizeExternalOrderNumber: order.merchizeExternalOrderNumber,
+        itemCount: order.itemCount,
+        fulfillmentCanceled: true,
+      });
+    }
 
     if (retryCount > 0) {
       console.info('[merchize.fulfillment_ops.lookup_recovered_after_provider_processing]', {

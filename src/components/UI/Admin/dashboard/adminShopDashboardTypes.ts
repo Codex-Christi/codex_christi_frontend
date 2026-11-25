@@ -61,7 +61,7 @@ export type PaidOrderRecoveryListResult = {
 export type TimelineItem = {
   label: string;
   time: string;
-  state: 'done' | 'failed' | 'pending';
+  state: 'done' | 'failed' | 'pending' | 'canceled';
 };
 
 export type PaidOrderRecoveryAddress = {

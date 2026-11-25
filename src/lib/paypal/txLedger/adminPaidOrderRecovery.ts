@@ -26,6 +26,7 @@ import {
   isMerchizeFulfillmentOpsDatabaseConfigured,
 } from '@/lib/prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOpsPrisma';
 import {
+  isMerchizeFulfillmentCanceled,
   MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_STATUS,
 } from '@/lib/merchizeFulfillmentOps/status';
@@ -436,6 +437,8 @@ function buildTimeline(row: {
   merchizeFulfillmentOpsLastDetailSyncAt?: string | null;
   merchizeFulfillmentOpsProductionGateStatus?: string | null;
   merchizeFulfillmentOpsReleasedToProductionAt?: string | null;
+  merchizeFulfillmentOpsDeliveryStatus?: string | null;
+  merchizeFulfillmentOpsLastLookupAt?: string | null;
 }) {
   const created = formatTimelineDate(row.createdAt);
   const updated = formatTimelineDate(row.updatedAt);
@@ -457,7 +460,15 @@ function buildTimeline(row: {
     },
   ];
 
-  if (
+  if (isMerchizeFulfillmentCanceled(row.merchizeFulfillmentOpsDeliveryStatus)) {
+    items.push({
+      label: 'Fulfillment canceled',
+      time: row.merchizeFulfillmentOpsLastLookupAt
+        ? `Observed ${row.merchizeFulfillmentOpsLastLookupAt}`
+        : 'Time not recorded',
+      state: 'canceled',
+    });
+  } else if (
     needsProviderDetailSync(
       row.merchizeFulfillmentResponsePayload,
       row.merchizeFulfillmentOpsSyncStatus,
@@ -1398,6 +1409,8 @@ export async function getAdminPaidOrderRecoveryDetail(orderToken: string) {
       merchizeFulfillmentOpsLastDetailSyncAt: merchizeOpsSummary?.lastDetailSyncAt,
       merchizeFulfillmentOpsProductionGateStatus: merchizeOpsSummary?.productionGateStatus,
       merchizeFulfillmentOpsReleasedToProductionAt: merchizeOpsSummary?.releasedToProductionAt,
+      merchizeFulfillmentOpsDeliveryStatus: merchizeOpsSummary?.deliveryStatus,
+      merchizeFulfillmentOpsLastLookupAt: merchizeOpsSummary?.lastLookupAt,
     }),
     notifications,
     customerNotifications,

@@ -3,7 +3,7 @@ import 'server-only';
 import { asRecord } from '@/lib/merchizeFulfillmentOps/merchizeMapper';
 import { shipmentSummary, VERIFIED_MERCHIZE_DELIVERY_STATUS } from '@/lib/merchizeFulfillmentOps/customerTracking';
 import { readExternalOrderProgress } from '@/lib/merchizeFulfillmentOps/externalOrderProgress';
-import { MERCHIZE_ORDER_ON_HOLD } from '@/lib/merchizeFulfillmentOps/status';
+import { isMerchizeFulfillmentCanceled, MERCHIZE_ORDER_ON_HOLD } from '@/lib/merchizeFulfillmentOps/status';
 import { savedFulfillmentHoldCheck } from './readCustomerFulfillmentHold';
 import {
   getMerchizeFulfillmentOpsPrisma,
@@ -66,6 +66,9 @@ export function projectCustomerFulfillmentMilestone(
   addressChangedAt: Date | null,
 ): SavedFulfillmentMilestone | null {
   if (row.duplicateDetectedAt) return null;
+  if (isMerchizeFulfillmentCanceled(row.deliveryStatus)) {
+    return { stage: 'fulfillment_canceled', checkedAt: row.lastLookupAt, onHold: false };
+  }
   const holdCheckedAt = savedFulfillmentHoldCheck(row);
   const withHold = (stage: CustomerPostPurchaseStage | null, checkedAt: Date | null) => ({
     stage,

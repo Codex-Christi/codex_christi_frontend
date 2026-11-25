@@ -1,6 +1,7 @@
 import { Clock3, MapPin, Package, UserRound } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { isMerchizeFulfillmentCanceled } from '@/lib/merchizeFulfillmentOps/status';
 import AdminCopyValueButton from './AdminCopyValueButton';
 import AdminGlassPanel from './AdminGlassPanel';
 import PaidOrderRecoveryAddressOverrideForm from './PaidOrderRecoveryAddressOverrideForm';
@@ -190,14 +191,14 @@ function DeliveryContextPanel({
 
           {detail.hasAddressOverride ? (
             <AddressBlock label='Original checkout address' address={detail.originalAddress} />
-          ) : (
+          ) : !isMerchizeFulfillmentCanceled(provider?.deliveryStatus) ? (
             <PaidOrderRecoveryAddressOverrideForm
               orderToken={orderToken}
               initialAddress={detail.activeAddress ?? detail.originalAddress}
               hasExistingOverride={detail.hasAddressOverride}
               shopOpsDataTarget={shopOpsDataTarget}
             />
-          )}
+          ) : null}
         </div>
 
         {provider ? (

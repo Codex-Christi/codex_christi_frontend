@@ -2,14 +2,14 @@ import 'server-only';
 
 import { asRecord } from './merchizeMapper';
 import type { MerchizeExternalOrderReference } from './merchizeClient';
+import { isMerchizeFulfillmentCanceled, MERCHIZE_FULFILLMENT_CANCELED } from './status';
 
 const externalStates = [
   'on_hold',
   'unfulfilled',
   'fulfilled',
   'delivered',
-  'canceled',
-  'cancelled',
+  MERCHIZE_FULFILLMENT_CANCELED,
 ] as const;
 
 type ExternalState = (typeof externalStates)[number];
@@ -33,6 +33,9 @@ export function readExternalOrderState(
   if (order.merchizeIdentifier && row.identifier && row.identifier !== order.merchizeIdentifier)
     return null;
   const status = row.order_status;
+  if (typeof status === 'string' && isMerchizeFulfillmentCanceled(status)) {
+    return MERCHIZE_FULFILLMENT_CANCELED;
+  }
   return externalStates.find((known) => known === status) ?? null;
 }
 
@@ -40,6 +43,7 @@ export function observedOrderHold(order: HoldLookupOrder, state: ExternalState, 
   return {
     heldAt: state === 'on_hold' ? (order.heldAt ?? checkedAt) : null,
     lastLookupAt: checkedAt,
+    ...(state === MERCHIZE_FULFILLMENT_CANCELED ? { deliveryStatus: state } : {}),
   };
 }
 

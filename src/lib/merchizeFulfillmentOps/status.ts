@@ -1,4 +1,17 @@
 export const MERCHIZE_ORDER_ON_HOLD = 'MERCHIZE_ORDER_ON_HOLD';
+export const MERCHIZE_FULFILLMENT_CANCELED = 'cancelled';
+export const MERCHIZE_FULFILLMENT_CANCELED_CODE = 'MERCHIZE_FULFILLMENT_CANCELED';
+export const MERCHIZE_CANCELLATION_STATUSES = [
+  MERCHIZE_FULFILLMENT_CANCELED,
+  'canceled',
+  'cancelled_fulfillment',
+  'canceled_fulfillment',
+] as const;
+
+export function isMerchizeFulfillmentCanceled(status: string | null | undefined) {
+  const normalized = status?.trim().toLowerCase();
+  return MERCHIZE_CANCELLATION_STATUSES.some((value) => value === normalized);
+}
 
 export const MERCHIZE_FULFILLMENT_SYNC_STATUS = {
   REGISTERED: 'registered',

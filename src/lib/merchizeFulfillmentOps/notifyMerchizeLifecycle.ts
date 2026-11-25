@@ -18,6 +18,7 @@ import { shipmentSummary, VERIFIED_MERCHIZE_DELIVERY_STATUS } from './customerTr
 import { readExternalOrderProgress, type ExternalOrderProgressReference } from './externalOrderProgress';
 import { extractMerchizeExternalOrderNumberFromDjangoProcessResponse } from './merchizeMapper';
 import { readSupplierInvoice } from './supplierInvoice';
+import { isMerchizeFulfillmentCanceled } from './status';
 
 const NOTICE_LOOKBACK_MS = 24 * 60 * 60_000;
 
@@ -82,6 +83,7 @@ export async function notifyMerchizeLifecycle(orderToken: string, scanStartedAt:
   });
   const order = orders[0];
   if (orders.length !== 1 || !order?.pushVerifiedAt || order.duplicateDetectedAt ||
+    isMerchizeFulfillmentCanceled(order.deliveryStatus) ||
     order.productionGateStatus !== 'push_verified') return;
 
   const invoiceUnpaid = order.lastCostCheckAt && order.lastCostCheckAt >= scanStartedAt &&

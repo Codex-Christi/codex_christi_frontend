@@ -23,6 +23,7 @@ import {
 import { isMerchizeFulfillmentPushEnabled } from '@/lib/merchizeFulfillmentOps/pushPolicy';
 import { CODEX_CHRISTI_FULFILLMENT_IDENTIFIER } from '@/lib/merchizeFulfillmentOps/fulfillmentIdentifier';
 import { syncMerchizeFulfillmentOrder } from '@/lib/merchizeFulfillmentOps/syncMerchizeFulfillmentOrder';
+import { MERCHIZE_FULFILLMENT_CANCELED_CODE } from '@/lib/merchizeFulfillmentOps/status';
 import {
   isMerchizeLookupPendingProviderProcessingError,
   MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_ERROR_CODE,
@@ -928,6 +929,14 @@ export async function runPaidFulfillmentProcessing(
       }
 
       activeStage = 'merchize_readiness';
+      if (sync.fulfillmentCanceled) {
+        await updateLockedRow(orderToken, lockId, {
+          status: PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED,
+          lastErrorCode: MERCHIZE_FULFILLMENT_CANCELED_CODE,
+          lastErrorMessage: 'Fulfillment was canceled in Merchize. Payment was not changed.',
+        });
+        return;
+      }
       await processingLease.assertOwned();
       const readinessCheck = await runMerchizeProductionReadinessChecks(orderToken, {
         allowStaleOrderManualRelease: options.allowStaleMerchizeOrderManualRelease,

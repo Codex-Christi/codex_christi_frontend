@@ -95,11 +95,12 @@ export default function CheckoutConfirmationView({
   const postPurchaseStage = paid && hasData && !accessRequired && !refunded
     ? state?.postPurchaseStage
     : null;
+  const fulfillmentCanceled = postPurchaseStage === 'fulfillment_canceled';
   const stageTitle = postPurchaseStage ? customerPostPurchaseTitles[postPurchaseStage] : null;
   const stageDescription = postPurchaseStage
     ? customerPostPurchaseDescriptions[postPurchaseStage]
     : null;
-  const correction = paid && hasData && !accessRequired && !refunded && !onHold
+  const correction = paid && hasData && !accessRequired && !refunded && !onHold && !fulfillmentCanceled
     ? addressCorrectionState
     : null;
   const correctionTitle = correction === 'required' ? 'Check your delivery address'
@@ -151,21 +152,21 @@ export default function CheckoutConfirmationView({
       >
         {storageNotice}
         <div
-          className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${completed && !onHold ? 'bg-[#0085ff]' : manualReview || refunded || onHold ? 'bg-amber-100/10 text-amber-100' : 'bg-white/5 text-sky-200'}`}
+          className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${completed && !onHold && !fulfillmentCanceled ? 'bg-[#0085ff]' : manualReview || refunded || onHold || fulfillmentCanceled ? 'bg-amber-100/10 text-amber-100' : 'bg-white/5 text-sky-200'}`}
         >
-          {completed && !onHold ? (
+          {completed && !onHold && !fulfillmentCanceled ? (
             <Check size={32} aria-hidden='true' />
-          ) : manualReview || refunded || accessRequired || onHold ? (
+          ) : manualReview || refunded || accessRequired || onHold || fulfillmentCanceled ? (
             <TriangleAlert size={28} aria-hidden='true' />
           ) : (
             <Loader2 size={28} className={refreshing ? 'animate-spin' : ''} aria-hidden='true' />
           )}
         </div>
         <h1 id='checkout-confirmation-title' className='mt-5 text-xl font-semibold sm:text-2xl'>
-          {onHold ? customerFulfillmentHold.title : correctionTitle ?? stageTitle ?? title}
+          {fulfillmentCanceled ? stageTitle : onHold ? customerFulfillmentHold.title : correctionTitle ?? stageTitle ?? title}
         </h1>
         <p className='mx-auto mt-3 max-w-lg text-sm leading-6 text-white/75' aria-live='polite'>
-          {onHold ? customerFulfillmentHold.description : correctionDescription ?? stageDescription ?? description}
+          {fulfillmentCanceled ? stageDescription : onHold ? customerFulfillmentHold.description : correctionDescription ?? stageDescription ?? description}
         </p>
         {lastUpdated && (
           <p className='mt-3 text-xs leading-5 text-white/55'>
@@ -241,7 +242,7 @@ export default function CheckoutConfirmationView({
             )}
           </div>
         )}
-        {state && (
+        {state && !fulfillmentCanceled && (
           <details className='mt-5 border-t border-white/15 pt-4 text-left'>
             <summary className='cursor-pointer py-2 text-sm font-medium text-white/75'>
               Order progress

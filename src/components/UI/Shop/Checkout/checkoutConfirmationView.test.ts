@@ -137,6 +137,24 @@ test('confirmation omits missing, invalid, or unauthorized update timestamps', a
   `);
 });
 
+test('fulfillment cancellation preserves paid evidence but hides recovery actions', async () => {
+  await checkConfirmation(`
+    const canceled = { ...state, postPurchaseStage:'fulfillment_canceled', fulfillmentOnHold:true };
+    const props = { state:canceled, addressCorrectionState:'required',
+      addressCorrection:<button>Submit corrected address</button>,
+      recoveryRequest:<button>Request recovery</button> };
+    const doc = render(props);
+    assert.equal(doc.querySelector('h1').textContent,'Fulfillment canceled');
+    assert.match(doc.body.textContent,/Paid \\\$25\\.00/u);
+    assert.ok(button(doc,'Download receipt'));
+    assert.equal(button(doc,'Request recovery'),undefined);
+    assert.equal(button(doc,'Submit corrected address'),undefined);
+    assert.doesNotMatch(doc.body.textContent,/refund/iu);
+    assert.equal(render({...props,refunded:true}).querySelector('h1').textContent,'Payment refunded');
+    assert.equal(render({...props,accessRequired:true}).querySelector('h1').textContent,'View your order');
+  `);
+});
+
 test('confirmation separates paid, delayed, under-review, refunded, and access-required views', async () => {
   await checkConfirmation(`
     let doc = render();
