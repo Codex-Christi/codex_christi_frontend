@@ -61,7 +61,7 @@ export type PaidOrderRecoveryListResult = {
 export type TimelineItem = {
   label: string;
   time: string;
-  state: 'done' | 'failed' | 'pending';
+  state: 'done' | 'failed' | 'pending' | 'canceled';
 };
 
 export type PaidOrderRecoveryAddress = {
@@ -175,6 +175,7 @@ export type PaidOrderRecoveryScannerState = {
 };
 
 export type PaidOrderRecoveryDetail = {
+  buyerAddressCorrectionState?: import('@/lib/shop/checkout/customerAddressCorrection').CustomerAddressCorrectionState | null;
   customerName: string;
   customerEmail: string;
   createdAt: string;

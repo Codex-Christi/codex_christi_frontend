@@ -1,6 +1,14 @@
 'use server';
 
-import { resolveCartOverview } from '@/lib/merchizeStorefront/cartOverview';
+import { getDollarMultiplier } from '@/actions/shop/general/currencyConvert';
+import { resolveCanonicalOrderSnapshotFromMerchize } from '@/lib/paypal/orderSnapshot/merchizeResolver';
+import { extractCanonicalOrderSelectionsFromCart } from '@/lib/paypal/orderSnapshot/resolver';
+import {
+  canonicalReviewItemsHash,
+  canonicalReviewLines,
+  canonicalReviewPreviewTotals,
+} from '@/lib/shop/checkout/checkoutReviewLines';
+import { normalizeCountryToIso3 } from '@/lib/utils/shop/checkout/normalizeCountryToIso3';
 import {
   dropShippingSupplier,
   getCountrySupport,
@@ -8,7 +16,6 @@ import {
 } from '@/lib/datasetSearchers/shippingSupportMerchize';
 import { CartVariant } from '@/stores/shop_stores/cartStore';
 import { cache } from 'react';
-import { hasCheckoutBlockingCartItems } from '@/components/UI/Shop/Cart/cartAvailability';
 
 export const getOrderFinalDetails = cache(
   async (
@@ -16,15 +23,24 @@ export const getOrderFinalDetails = cache(
     country_iso3: ShippingCountryObj['country_iso3'],
     supplier: dropShippingSupplier,
   ) => {
-    const verifiedCart = await resolveCartOverview(cart, country_iso3.toUpperCase());
-    if (hasCheckoutBlockingCartItems(cart, verifiedCart.availabilityByVariantId)) {
-      throw new Error('One or more cart variants are unavailable or could not be verified.');
-    }
-    if (!verifiedCart.totals)
-      throw new Error(verifiedCart.quoteError ?? 'Pricing could not be verified.');
-    const countrySupport = await getCountrySupport(country_iso3, supplier);
-    const finalPricesWithShippingFee = verifiedCart.totals;
-
-    return { countrySupport, finalPricesWithShippingFee };
+    const countryIso3 = normalizeCountryToIso3(country_iso3);
+    if (!countryIso3) throw new Error('A valid destination is required.');
+    const snapshot = await resolveCanonicalOrderSnapshotFromMerchize({
+      selections: extractCanonicalOrderSelectionsFromCart(cart),
+      destination: { countryIso3 },
+    });
+    const [countrySupport, conversion] = await Promise.all([
+      getCountrySupport(countryIso3, supplier),
+      getDollarMultiplier(countryIso3),
+    ]);
+    return {
+      countrySupport,
+      finalPricesWithShippingFee: canonicalReviewPreviewTotals(
+        snapshot,
+        conversion.currency === snapshot.currency ? conversion.multiplier : 1,
+      ),
+      reviewLines: canonicalReviewLines(snapshot),
+      reviewItemsHash: canonicalReviewItemsHash(snapshot),
+    };
   },
 );

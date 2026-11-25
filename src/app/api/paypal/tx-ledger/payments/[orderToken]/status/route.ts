@@ -7,6 +7,15 @@ import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { getCanonicalPaymentProjectionState } from '@/lib/paypal/txLedger/canonicalPaymentProjectionState';
 import { getCapturedCartPurchase } from '@/lib/cart/purchase';
 import { receiptObjectKey, receiptDownloadPath } from '@/lib/shop/orderHistory/receiptReference';
+import { toCustomerOrderStatus } from '@/lib/shop/checkout/customerOrderStatus';
+import { getBuyerAddressCorrectionSetup } from '@/lib/shop/checkout/customerAddressCorrectionServer';
+import { readCustomerFulfillmentMilestone } from '@/lib/shop/checkout/readCustomerFulfillmentMilestone';
+import { customerPostPurchaseDescriptions } from '@/lib/shop/checkout/customerPostPurchaseStage';
+import {
+  getCustomerFulfillmentLookup,
+  getCustomerPostPurchaseStage,
+  getCustomerRecoveryReason,
+} from '@/lib/shop/checkout/customerRecoveryCopy';
 
 type PageProps = {
   params: Promise<{ orderToken: string }>;
@@ -46,30 +55,6 @@ function getPaidAmountLabel(capturePayload: unknown) {
   }
 }
 
-function getCustomerRecoveryReason(status: string) {
-  if (status === PAYPAL_LEDGER_STATUS.CAPTURED) {
-    return 'Payment was captured, but receipt preparation did not finish automatically.';
-  }
-
-  if (status === PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED) {
-    return 'Receipt was prepared, but payment-save or fulfillment handoff did not finish.';
-  }
-
-  if (status === PAYPAL_LEDGER_STATUS.PAYMENT_SAVED) {
-    return 'Payment was saved, but fulfillment handoff did not finish.';
-  }
-
-  if (
-    status === PAYPAL_LEDGER_STATUS.FULFILLMENT_BLOCKED ||
-    status === PAYPAL_LEDGER_STATUS.FULFILLMENT_FAILED ||
-    status === PAYPAL_LEDGER_STATUS.FULFILLMENT_ATTENTION_REQUIRED
-  ) {
-    return 'Fulfillment needs review before the order can move forward.';
-  }
-
-  return 'Post-payment processing needs review before the order can move forward.';
-}
-
 export async function GET(_req: Request, { params }: PageProps) {
   const { orderToken } = await params;
 
@@ -99,35 +84,53 @@ export async function GET(_req: Request, { params }: PageProps) {
       (CUSTOMER_RECOVERY_LEDGER_STATUSES.has(row.status) &&
         unresolvedAgeMs >= CUSTOMER_RECOVERY_GRACE_MS));
   const effectiveStatus = paymentFailure ? PAYPAL_LEDGER_STATUS.ERROR : row.status;
-  const recoveryReason = paymentFailure
-    ? 'Your payment was received, but its amount requires review before fulfillment.'
-    : getCustomerRecoveryReason(effectiveStatus);
   const receiptLink = receiptObjectKey(row) ? receiptDownloadPath(row.orderToken) : null;
+  const recoveryReason = paymentFailure
+    ? !captureCompletion.ok
+      ? 'Your payment details need review before you can continue. Keep your order reference for support.'
+      : paymentFailure.errorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED'
+        ? 'Your payment was received, but the delivery address needs review before we can prepare the order.'
+        : 'Your payment was received, but the amount needs review before we can prepare the order.'
+    : getCustomerRecoveryReason(effectiveStatus, row.lastErrorCode, Boolean(receiptLink));
+  const paymentConfirmed = captureCompletion.ok && paymentState.paymentSafeForPostProcessing;
+  const lookup = getCustomerFulfillmentLookup(row, paymentConfirmed);
+  const fulfillment = lookup ? await readCustomerFulfillmentMilestone(lookup) : null;
+  const postPurchaseStage = fulfillment?.stage ?? getCustomerPostPurchaseStage({
+    status: row.status,
+    lastErrorCode: row.lastErrorCode,
+    fulfillmentResponse: row.merchizeFulfillmentResponsePayload,
+    paymentConfirmed,
+    postPaymentComplete: Boolean(row.processingCompletedAt),
+  });
 
-  return NextResponse.json(
-    {
-      orderToken: row.orderToken,
-      status: effectiveStatus,
-      lastEventType: row.lastEventType,
-      receiptLink,
-      receiptFile: receiptLink ? 'Codex-Christi-receipt' : null,
-      djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
-      processingCompletedAt: row.processingCompletedAt,
-      paidAmountLabel: getPaidAmountLabel(row.capturePayload),
-      cartPurchase: getCapturedCartPurchase(row, paymentState),
-      customerRecoveryStatus: isCustomerProtectionVisible ? 'paid_unresolved' : null,
-      recoveryReason: isCustomerProtectionVisible ? recoveryReason : null,
-      updatedAt: row.updatedAt,
-      error: paymentFailure
-        ? { code: paymentFailure.errorCode, message: recoveryReason }
-        : row.lastErrorMessage
-          ? {
-              code: row.lastErrorCode,
-              message:
-                'Your payment or order needs review. Please keep your order reference and contact support.',
-            }
-          : null,
-    },
-    { headers: privateHeaders },
-  );
+  const fulfillmentCanceled = postPurchaseStage === 'fulfillment_canceled';
+  const addressCorrection = fulfillmentCanceled || fulfillment?.onHold
+    ? null
+    : getBuyerAddressCorrectionSetup(row, paymentState)?.state;
+  const waitingForAddress = captureCompletion.ok && !isResolved && !paymentFailure &&
+    row.lastErrorCode === 'MERCHIZE_ADDRESS_VALIDATION_PENDING';
+  const customerStatus = toCustomerOrderStatus(row, {
+    addressCorrection,
+    status: effectiveStatus,
+    receiptLink,
+    receiptFile: receiptLink ? 'Codex-Christi-receipt' : null,
+    paidAmountLabel: getPaidAmountLabel(row.capturePayload),
+    cartPurchase: getCapturedCartPurchase(row, paymentState),
+    customerRecoveryStatus: isCustomerProtectionVisible && !fulfillmentCanceled ? 'paid_unresolved' : null,
+    recoveryReason: isCustomerProtectionVisible || waitingForAddress
+      ? fulfillment?.stage ? customerPostPurchaseDescriptions[fulfillment.stage] : recoveryReason
+      : null,
+    postPurchaseStage,
+    fulfillmentOnHold: fulfillment?.onHold,
+    fulfillmentCheckedAt: fulfillment?.checkedAt,
+    error: paymentFailure
+      ? { message: recoveryReason }
+      : row.lastErrorMessage && !fulfillmentCanceled
+        ? {
+            message:
+              'Your payment or order needs review. Please keep your order reference and contact support.',
+          }
+        : null,
+  });
+  return NextResponse.json(customerStatus, { headers: privateHeaders });
 }

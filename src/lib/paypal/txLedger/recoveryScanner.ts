@@ -73,20 +73,22 @@ function clampBatchSize(batchSize: number) {
   return Math.min(batchSize, MAX_BATCH_SIZE);
 }
 
-function toCandidate(row: CanonicalOrderSnapshotLedgerEnvelope & {
-  orderToken: string;
-  status: string;
-  customerEmail: string;
-  customerName: string;
-  paypalOrderId: string | null;
-  receiptLink: string | null;
-  authorizePayload: unknown;
-  capturePayload: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-  lastErrorCode: string | null;
-  lastErrorMessage: string | null;
-}) {
+function toCandidate(
+  row: CanonicalOrderSnapshotLedgerEnvelope & {
+    orderToken: string;
+    status: string;
+    customerEmail: string;
+    customerName: string;
+    paypalOrderId: string | null;
+    receiptLink: string | null;
+    authorizePayload: unknown;
+    capturePayload: unknown;
+    createdAt: Date;
+    updatedAt: Date;
+    lastErrorCode: string | null;
+    lastErrorMessage: string | null;
+  },
+) {
   const captureCompletion = getPayPalCaptureCompletion(row.capturePayload);
   const paymentChain = reconcileCanonicalPayPalPaymentChain(
     row,
@@ -143,6 +145,7 @@ export async function findPayPalRecoveryCandidates(args?: {
       canonicalOrderSnapshot: true,
       canonicalOrderSnapshotVersion: true,
       canonicalOrderSnapshotHash: true,
+      shippingSnapshot: true,
       createdAt: true,
       updatedAt: true,
       lastErrorCode: true,
@@ -154,11 +157,7 @@ export async function findPayPalRecoveryCandidates(args?: {
     .filter(
       (row) =>
         getPayPalCaptureCompletion(row.capturePayload).ok &&
-        reconcileCanonicalPayPalPaymentChain(
-          row,
-          row.authorizePayload,
-          row.capturePayload,
-        ).ok,
+        reconcileCanonicalPayPalPaymentChain(row, row.authorizePayload, row.capturePayload).ok,
     )
     .slice(0, batchSize)
     .map((row) => toCandidate(row));

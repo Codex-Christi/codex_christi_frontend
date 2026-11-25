@@ -47,6 +47,8 @@ function readyPayloads(overrides: Record<string, unknown> = {}) {
     },
     requireAttention: { success: true, data: [] },
     sendToFulfillment: { success: true, data: { pushed: false, is_failed: false } },
+    buyerAddressMismatchFields: [],
+    buyerAddressCountryCode: 'US',
     now: new Date('2026-07-21T12:00:00.000Z'),
     ...overrides,
   };
@@ -58,7 +60,7 @@ test('allows a current order only when explicit provider readiness evidence pass
   assert.equal(readiness.status, 'ready');
   assert.equal(readiness.ready, true);
   assert.equal(readiness.addressValidationStatus, 'valid');
-  assert.equal(readiness.addressReadbackStatus, 'not_checked');
+  assert.equal(readiness.addressReadbackStatus, 'matched');
   assert.deepEqual(readiness.blockers, []);
 });
 
@@ -83,6 +85,110 @@ test('does not treat an empty suggestion list as proof that an invalid address i
   assert.equal(readiness.primaryBlocker?.code, 'MERCHIZE_ADDRESS_INVALID');
 });
 
+test('rejects non-US validation evidence for a US fulfillment address', () => {
+  const readiness = classifyMerchizeProductionReadiness(
+    readyPayloads({
+      detail: {
+        success: true,
+        data: {
+          validate_shipping_address: 'others',
+          mark_valid_address: false,
+          artwork_status: 'ready',
+          order_status: 'open',
+          paid_at: '2026-07-20T12:00:00.000Z',
+        },
+      },
+    }),
+  );
+
+  assert.equal(readiness.ready, false);
+  assert.equal(readiness.primaryBlocker?.code, 'MERCHIZE_ADDRESS_VALIDATION_COUNTRY_CONFLICT');
+});
+
+test('rejects a US-valid status for a non-US fulfillment address', () => {
+  const readiness = classifyMerchizeProductionReadiness(
+    readyPayloads({ buyerAddressCountryCode: 'CA' }),
+  );
+
+  assert.equal(readiness.ready, false);
+  assert.equal(readiness.primaryBlocker?.code, 'MERCHIZE_ADDRESS_VALIDATION_COUNTRY_CONFLICT');
+});
+
+test('does not release an undocumented ignored status without an explicit admin marker', () => {
+  const readiness = classifyMerchizeProductionReadiness(
+    readyPayloads({
+      detail: {
+        success: true,
+        data: {
+          validate_shipping_address: 'ignored',
+          mark_valid_address: false,
+          artwork_status: 'ready',
+          order_status: 'open',
+          paid_at: '2026-07-20T12:00:00.000Z',
+        },
+      },
+    }),
+  );
+
+  assert.equal(readiness.ready, false);
+  assert.equal(readiness.primaryBlocker?.code, 'MERCHIZE_ADDRESS_VALIDATION_UNSUPPORTED');
+});
+
+test('preserves an explicit authorised address confirmation', () => {
+  const readiness = classifyMerchizeProductionReadiness(
+    readyPayloads({
+      detail: {
+        success: true,
+        data: {
+          validate_shipping_address: 'street_undefined',
+          mark_valid_address: true,
+          artwork_status: 'ready',
+          order_status: 'open',
+          paid_at: '2026-07-20T12:00:00.000Z',
+        },
+      },
+    }),
+  );
+
+  assert.equal(readiness.ready, true);
+  assert.equal(readiness.addressReviewStatus, 'buyer_confirmed');
+});
+
+test('uses the explicit admin marker rather than an ignored status string', () => {
+  const readiness = classifyMerchizeProductionReadiness(
+    readyPayloads({
+      detail: {
+        success: true,
+        data: {
+          validate_shipping_address: 'ignored',
+          mark_valid_address: true,
+          artwork_status: 'ready',
+          order_status: 'open',
+          paid_at: '2026-07-20T12:00:00.000Z',
+        },
+      },
+    }),
+  );
+
+  assert.equal(readiness.ready, true);
+  assert.equal(readiness.addressReviewStatus, 'buyer_confirmed');
+});
+
+test('blocks automatic release when the saved effective address cannot be compared', () => {
+  const readiness = classifyMerchizeProductionReadiness(
+    readyPayloads({
+      buyerAddressMismatchFields: null,
+      buyerAddressCountryCode: null,
+    }),
+  );
+
+  assert.equal(readiness.ready, false);
+  assert.equal(readiness.addressReadbackStatus, 'not_checked');
+  assert.ok(
+    readiness.blockers.some((blocker) => blocker.code === 'MERCHIZE_PROVIDER_ADDRESS_NOT_CHECKED'),
+  );
+});
+
 test('accepts the provider non-US address status without pretending it was US-validated', () => {
   const readiness = classifyMerchizeProductionReadiness(
     readyPayloads({
@@ -96,6 +202,7 @@ test('accepts the provider non-US address status without pretending it was US-va
           paid_at: '2026-07-20T12:00:00.000Z',
         },
       },
+      buyerAddressCountryCode: 'CA',
     }),
   );
 
@@ -367,9 +474,8 @@ test('does not require artwork when every direct product explicitly opts out', (
   assert.ok(!readiness.blockers.some((blocker) => blocker.category === 'artwork'));
 });
 
-test('does not infer missing production artwork for a resolved catalog-backed item', () => {
-  const readiness = classifyMerchizeProductionReadiness(
-    readyPayloads({
+test('explicit missing artwork blocks a mapped catalog item, but empty upload slots alone do not', () => {
+  const payload = readyPayloads({
       detail: {
         success: true,
         data: {
@@ -392,15 +498,24 @@ test('does not infer missing production artwork for a resolved catalog-backed it
               no_need_artworks: false,
             },
             variant: { is_active: true, is_deleted: false, sku: 'TEST-CATALOG-SKU' },
+            artworks: [],
           },
         ],
       },
-    }),
-  );
+    });
+  const readiness = classifyMerchizeProductionReadiness(payload);
 
-  assert.equal(readiness.ready, true);
-  assert.equal(readiness.artworkReviewStatus, 'catalog_managed');
-  assert.ok(!readiness.blockers.some((blocker) => blocker.category === 'artwork'));
+  assert.equal(readiness.ready, false);
+  assert.equal(readiness.itemReviewStatus, 'ready');
+  assert.equal(readiness.artworkReviewStatus, 'blocked');
+  assert.ok(readiness.blockers.some((blocker) => blocker.code === 'MERCHIZE_ARTWORK_MISSING'));
+
+  const completed = classifyMerchizeProductionReadiness({
+    ...payload,
+    detail: { success: true, data: { ...payload.detail.data, artwork_status: 'completed' } },
+  });
+  assert.equal(completed.ready, true);
+  assert.equal(completed.artworkReviewStatus, 'ready');
 });
 
 test('treats the observed numeric zero invoice as a non-blocking pre-push placeholder', () => {
@@ -461,11 +576,16 @@ test('recognizes provider push evidence instead of requiring another push comman
           push_to_fulfillment_progress: 'pushed',
         },
       },
+      buyerAddressMismatchFields: null,
+      buyerAddressCountryCode: null,
     }),
   );
 
   assert.equal(readiness.status, 'already_pushed');
   assert.equal(readiness.providerPushState, 'pushed');
+  assert.ok(
+    !readiness.blockers.some((blocker) => blocker.code === 'MERCHIZE_PROVIDER_ADDRESS_NOT_CHECKED'),
+  );
 });
 
 test('recognizes the delivered-order is_pushed send-state shape', () => {

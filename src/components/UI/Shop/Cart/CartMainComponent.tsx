@@ -131,7 +131,7 @@ const CartMainComponent = () => {
         {hydrated && isCartEmpty && <CartEmptyComponent />}
 
         {hydrated && !isCartEmpty && (
-          <div className='scrollbar flex min-w-0 max-w-full max-h-[90vh] flex-col gap-4 overflow-y-auto px-4 sm:gap-6 sm:px-5'>
+          <div className='scrollbar flex min-w-0 max-w-full max-h-[90vh] flex-col gap-4 overflow-y-auto px-4 [container-type:inline-size] sm:gap-6 sm:px-5'>
             <CartItems
               cartItems={cartItemsForDisplay}
               availabilityByVariantId={availabilityByVariantId}

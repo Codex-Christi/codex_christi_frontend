@@ -8,6 +8,8 @@ import {
 } from '@/lib/paypal/orderSnapshot/canonicalize';
 import type { CanonicalMoney } from '@/lib/paypal/orderSnapshot/types';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
+import { getCheckoutSurfaceProvenance } from '@/lib/paypal/txLedger/checkoutSurfaceProvenance';
+import { getServerSessionState } from '@/lib/session/server-session';
 import {
   normalizeCountryToIso2,
   normalizeCountryToIso3,
@@ -17,6 +19,8 @@ import { currencyExponent } from './orderMoney';
 import type { OriginalCheckout } from './originalCheckout';
 import { requireCheckoutAccess } from './serverAccess';
 import { checkoutEmail, checkoutString, CheckoutRequestError, record } from './serverRequest';
+import { CHECKOUT_REVIEW_VERSION, canonicalReviewItemsHash } from './checkoutReviewLines';
+import { checkoutInputFingerprint } from './checkoutReview';
 
 const originalCheckoutSelect = {
   orderToken: true,
@@ -26,6 +30,8 @@ const originalCheckoutSelect = {
   djangoOrderIntentUuid: true,
   djangoOrderIntentOrderId: true,
   djangoOrderIntentPayload: true,
+  djangoOrderIntentVerifyPayload: true,
+  updatedAt: true,
   customerName: true,
   customerEmail: true,
   countryIso2: true,
@@ -224,6 +230,11 @@ export function toOriginalCheckout(row: OriginalCheckoutRow): OriginalCheckout {
 }
 
 export async function getOriginalCheckout(orderToken: string) {
+  const row = await readOriginalCheckoutRow(orderToken);
+  return toOriginalCheckout(row);
+}
+
+async function readOriginalCheckoutRow(orderToken: string) {
   const token = checkoutString(orderToken, 128);
   const row = await paypalTxLedger.paypalIntent.findUnique({
     where: { orderToken: token },
@@ -233,5 +244,78 @@ export async function getOriginalCheckout(orderToken: string) {
     throw new CheckoutRequestError('This checkout could not be found.', 404, 'CHECKOUT_NOT_FOUND');
   // A GET must never claim ownership or issue a new payment grant.
   await requireCheckoutAccess(row, true);
-  return toOriginalCheckout(row);
+  return row;
+}
+
+/** Save a fresh review of an existing unpaid purchase, without creating or paying for an order. */
+export async function acknowledgeOriginalCheckout(
+  orderToken: string,
+  input: Record<string, unknown>,
+  request: Request,
+) {
+  if (input.acknowledged !== true || typeof input.reviewKey !== 'string')
+    throw new CheckoutRequestError(
+      'Review and confirm the original purchase before paying.',
+      409,
+      'CHECKOUT_REVIEW_REQUIRED',
+    );
+  const row = await readOriginalCheckoutRow(orderToken);
+  const checkout = toOriginalCheckout(row);
+  if (input.reviewKey !== checkout.reviewKey)
+    throw new CheckoutRequestError(
+      'The saved purchase changed. Reopen it and review the details again.',
+      409,
+      'CHECKOUT_REVIEW_CHANGED',
+    );
+  const snapshot = parseCanonicalOrderSnapshotFromLedger(row).snapshot!;
+  const session = await getServerSessionState();
+  const saved = record(row.djangoOrderIntentVerifyPayload) ?? {};
+  const review = {
+    version: CHECKOUT_REVIEW_VERSION,
+    acknowledgedAt: new Date().toISOString(),
+    originalReviewKey: checkout.reviewKey,
+    canonicalSnapshotHash: snapshot.hash,
+    itemsHash: canonicalReviewItemsHash(snapshot),
+    quote: checkout.quote,
+    requestFingerprint: checkoutInputFingerprint({
+      selections: snapshot.lines.map(({ productId, variantId, quantity }) => ({
+        productId,
+        variantId,
+        quantity,
+      })),
+      email: checkout.customer.email,
+      name: checkout.customer.name,
+      address: checkout.deliveryAddress,
+      quote: checkout.quote,
+    }),
+    userId: session.isAuthenticated ? (session.userID ?? null) : null,
+    surface: getCheckoutSurfaceProvenance(request),
+  };
+  const savedReview = await paypalTxLedger.paypalIntent.updateMany({
+    where: {
+      orderToken: row.orderToken,
+      userId: row.userId,
+      status: PAYPAL_LEDGER_STATUS.INTENT_CREATED,
+      updatedAt: row.updatedAt,
+      canonicalOrderSnapshotHash: snapshot.hash,
+    },
+    data: {
+      djangoOrderIntentVerifyPayload: JSON.parse(
+        JSON.stringify({
+          ...saved,
+          verified: true,
+          intentUuid: row.djangoOrderIntentUuid,
+          email: checkout.customer.email,
+          review,
+        }),
+      ),
+    },
+  });
+  if (savedReview.count !== 1)
+    throw new CheckoutRequestError(
+      'This checkout changed while you reviewed it. Reopen its status before paying.',
+      409,
+      'CHECKOUT_REVIEW_CHANGED',
+    );
+  return { ok: true, reviewKey: checkout.reviewKey, paypalOrderId: checkout.paypalOrderId };
 }

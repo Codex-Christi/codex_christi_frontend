@@ -5,6 +5,7 @@ import { finalizeCanonicalOrderSnapshot } from '@/lib/paypal/orderSnapshot/canon
 import type { Prisma } from '@/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger/client';
 import type { AuthSessionState } from '@/lib/auth/session-snapshot';
 import { accountViewState } from '@/lib/auth/account-view-state';
+import { readCustomerFulfillmentMilestones } from '@/lib/shop/checkout/readCustomerFulfillmentMilestone';
 import {
   createAccountOrderReader,
   AccountHistoryAccessError,
@@ -15,11 +16,11 @@ import {
   historyImageUrl,
   historyMoney,
   HISTORY_PAGE_SIZE,
-  type HistoryLedgerRow,
+  type HistoryListLedgerRow,
 } from './model';
 import { receiptObjectKey } from './receiptReference';
 
-function row(index = 1, owner = 'owner-a'): HistoryLedgerRow {
+function row(index = 1, owner = 'owner-a'): HistoryListLedgerRow {
   const snapshot = finalizeCanonicalOrderSnapshot({
     version: 'shop-alpha-order-v1',
     hashAlgorithm: 'sha256',
@@ -53,6 +54,11 @@ function row(index = 1, owner = 'owner-a'): HistoryLedgerRow {
     orderToken: `token-${index}`,
     userId: owner,
     djangoOrderIntentOrderId: `ORD-${index}`,
+    djangoPaymentSaveCustomId: null,
+    merchizeFulfillmentResponsePayload: null,
+    fulfillmentAddressOverriddenAt: null,
+    lastErrorCode: null,
+    processingCompletedAt: null,
     status: 'completed',
     createdAt: new Date('2026-10-01T00:00:00.000Z'),
     receiptLink: 'https://payment-receipts.codexchristi.shop/paypal/invoice.pdf',
@@ -60,6 +66,7 @@ function row(index = 1, owner = 'owner-a'): HistoryLedgerRow {
     canonicalOrderSnapshot: snapshot as unknown as Prisma.JsonValue,
     canonicalOrderSnapshotHash: snapshot.hash,
     canonicalOrderSnapshotVersion: snapshot.version,
+    shippingSnapshot: null,
     authorizePayload: { amount: { value: '35.00', currencyCode: 'USD' } },
     capturePayload: {
       id: 'capture-1',
@@ -142,6 +149,7 @@ test('list, detail and receipt reject anonymous or expired sessions before touch
       session: async () => auth,
       list: async () => assert.fail('No unauthenticated database access'),
       detail: async () => assert.fail('No unauthenticated database access'),
+      milestones: async () => assert.fail('No unauthenticated fulfillment access'),
       fulfillment: async () => assert.fail('No unauthenticated shipment access'),
     });
     await assert.rejects(reader.list(), AccountHistoryAccessError);
@@ -160,6 +168,7 @@ test('pagination stays owner-scoped and bounded, including equal timestamps and 
       return values;
     },
     detail: async () => null,
+    milestones: async () => assert.fail('No fulfillment lookup without a matched handoff'),
     fulfillment: async () => assert.fail('Listing must not create per-order queries'),
   });
   const first = await reader.list();
@@ -193,7 +202,7 @@ test('pagination stays owner-scoped and bounded, including equal timestamps and 
 test('foreign or unowned rows never grant account history or receipt access', async () => {
   let auth = session();
   let shipmentReads = 0;
-  let foreign: HistoryLedgerRow = { ...row(), userId: null };
+  let foreign: HistoryListLedgerRow = { ...row(), userId: null };
   const reader = createAccountOrderReader({
     session: async () => auth,
     list: async () => [foreign],
@@ -202,6 +211,7 @@ test('foreign or unowned rows never grant account history or receipt access', as
       assert.equal(query.where.orderToken, 'token-1');
       return foreign;
     },
+    milestones: async () => assert.fail('No fulfillment lookup for a foreign buyer'),
     fulfillment: async () => {
       shipmentReads++;
       return [];
@@ -224,6 +234,7 @@ test('missing or failed shipment enrichment does not hide a paid purchase', asyn
     session: async () => session(),
     list: async () => [],
     detail: async () => row(),
+    milestones: async () => new Map(),
     fulfillment: async (tokens) => {
       assert.deepEqual(tokens, ['token-1']);
       if (fail) throw Error('offline');
@@ -254,6 +265,7 @@ test('shipment enrichment cannot leak another order or imply shared tracking fre
     session: async () => session(),
     list: async () => [],
     detail: async () => row(),
+    milestones: async () => new Map(),
     fulfillment: async () =>
       ['token-1', 'someone-else'].map((orderToken) => ({
         orderToken,
@@ -279,6 +291,130 @@ test('history runtime has no checkout mutations, supplier calls, polling, cron o
       /\.\s*(create|update|upsert|delete|updateMany)\s*\(|\bfetch\s*\(|\bafter\s*\(|setInterval|claimCurrentCheckout|consumePurchase|runPaidFulfillmentProcessing/,
     );
   }
+});
+
+test('order rows show the same saved milestones as confirmation with one matched lookup per page', async (t) => {
+  const previousOps = global.__merchizeFulfillmentOpsPrisma__;
+  const previousEnv = { ...process.env };
+  Object.assign(process.env, {
+    SHOP_OPS_DATA_TARGET: 'dev',
+    PAYPAL_TX_LEDGER_NEON_POOLED_DB_DEV_STRING: 'postgresql://fixture:fixture@localhost:1/unused',
+    MERCHIZE_FULFILLMENT_OPS_NEON_POOLED_DB_DEV_STRING:
+      'postgresql://fixture:fixture@localhost:1/unused',
+  });
+  t.after(() => {
+    global.__merchizeFulfillmentOpsPrisma__ = previousOps;
+    for (const key of Object.keys(process.env)) if (!(key in previousEnv)) delete process.env[key];
+    Object.assign(process.env, previousEnv);
+  });
+  let providerCalls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    providerCalls++;
+    return new Response(null, { status: 503 });
+  });
+  const checkedAt = new Date('2026-10-02T00:00:00Z');
+  const ledger = (index: number): HistoryListLedgerRow => ({
+    ...row(index),
+    djangoPaymentSaveCustomId: `save-${index}`,
+    merchizeFulfillmentResponsePayload: {
+      status: 201, success: true, data: { processing_status: 'completed' },
+    },
+  });
+  const saved = (index: number, events: string[] = [], packageStates: string[] = []) => ({
+    orderToken: `token-${index}`,
+    djangoPaymentSaveCustomId: `save-${index}`,
+    merchizeExternalOrderNumber: `ORD-${index}`,
+    merchizeIdentifier: null,
+    merchizeOrderCode: null,
+    merchizeProgressPayload: {
+      success: true,
+      data: [{
+        external_number: `ORD-${index}`,
+        order_progress: events.map((event) => ({ event, status: 'done' })),
+      }],
+    },
+    merchizeTrackingPayload: {
+      success: true,
+      data: [{
+        external_number: `ORD-${index}`,
+        packages: packageStates.map((shipment_status, n) => ({
+          _id: `pack-${n}`, shipment_status, tracking_number: 'PRIVATE-TRACKING',
+        })),
+      }],
+    },
+    deliveryStatus: packageStates.length === 2 ? 'delivered_verified' : null,
+    lastProgressSyncAt: checkedAt,
+    pushVerifiedAt: checkedAt,
+    duplicateDetectedAt: null,
+    productionGateStatus: 'push_verified',
+    addressReviewStatus: 'ready',
+    lastReadinessCheckAt: checkedAt,
+    merchizeProductionReadinessPayload: {
+      addressReadbackStatus: 'matched', providerPushState: 'pending',
+    },
+    heldAt: null as Date | null,
+    lastLookupAt: checkedAt,
+  });
+  const releasePending = {
+    ...saved(1), pushVerifiedAt: null, productionGateStatus: 'ready',
+  };
+  const savedRows = [
+    saved(5, ['delivered', 'shipment_started'], ['delivered', 'delivered']),
+    releasePending,
+    { ...saved(2), heldAt: checkedAt },
+    saved(3, ['in_production'], ['pre_transit']),
+    saved(4, ['delivered', 'shipment_started'], ['delivered', 'in_transit']),
+    { ...saved(6, ['shipment_started']), djangoPaymentSaveCustomId: 'mismatched' },
+    saved(7, ['shipment_started']), saved(7, ['shipment_started']),
+    saved(50, ['shipment_started']),
+  ];
+  let dbReads = 0;
+  let offline = false;
+  global.__merchizeFulfillmentOpsPrisma__ = {
+    merchizeFulfillmentOrder: {
+      findMany: async (query: { where: unknown; take: number }) => {
+        dbReads++;
+        assert.deepEqual(query.where, {
+          OR: Array.from({ length: 7 }, (_, i) => ({
+            orderToken: `token-${i + 1}`, djangoPaymentSaveCustomId: `save-${i + 1}`,
+          })),
+        });
+        assert.equal(query.take, 15);
+        if (offline) throw Error('Unavailable');
+        return savedRows;
+      },
+    },
+  } as unknown as NonNullable<typeof global.__merchizeFulfillmentOpsPrisma__>;
+  const reader = createAccountOrderReader({
+    session: async () => session(),
+    list: async () => [
+      { ...ledger(1), status: 'payment_saved', lastErrorCode: 'MERCHIZE_PUSH_VERIFICATION_PENDING' },
+      ...[2, 3, 4, 5, 6, 7].map(ledger),
+      { ...ledger(8), status: 'refunded' },
+      { ...ledger(9), capturePayload: null },
+      { ...ledger(10), merchizeFulfillmentResponsePayload: { success: false } },
+      ...Array.from({ length: HISTORY_PAGE_SIZE - 10 }, (_, i) => row(11 + i)),
+      ledger(70),
+    ],
+    detail: async () => null,
+    milestones: readCustomerFulfillmentMilestones,
+    fulfillment: async () => assert.fail('The list must not read individual package details'),
+  });
+  const { orders, nextCursor } = await reader.list();
+  assert.equal(dbReads, 1);
+  assert.equal(orders.length, HISTORY_PAGE_SIZE);
+  assert.ok(nextCursor);
+  assert.deepEqual(orders.slice(0, 10).map((order) => order.status), [
+    'Order received', 'Order on hold', 'Production started', 'Shipment started', 'Order delivered',
+    'Order confirmed', 'Order confirmed', 'Refund recorded', 'Needs review', 'Order confirmed',
+  ]);
+  assert.doesNotMatch(JSON.stringify(orders), /save-\d|PRIVATE-TRACKING|providerPushState/u);
+  offline = true;
+  const fallback = await reader.list();
+  assert.equal(fallback.orders[0].status, 'Order received');
+  assert.equal(fallback.orders[4].status, 'Order confirmed');
+  assert.equal(dbReads, 2);
+  assert.equal(providerCalls, 0);
 });
 
 test('paid dates and legacy item names come only from historical payment evidence', () => {

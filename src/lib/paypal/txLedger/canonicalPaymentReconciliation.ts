@@ -9,6 +9,7 @@ import {
   type PayPalMoney,
   type PayPalMoneyReconciliation,
 } from '@/lib/paypal/txLedger/payPalMoneyReconciliation';
+import { hasChangedPayPalReviewAddress } from './payPalReviewAddress';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -17,7 +18,12 @@ export type CanonicalPaymentEvidenceKind = 'authorization' | 'capture';
 export type CanonicalPaymentReconciliationErrorCode =
   | 'CANONICAL_ORDER_SNAPSHOT_INVALID'
   | 'PAYPAL_AUTHORIZATION_AMOUNT_MISMATCH'
-  | 'PAYPAL_CAPTURE_AMOUNT_MISMATCH';
+  | 'PAYPAL_CAPTURE_AMOUNT_MISMATCH'
+  | 'PAYPAL_REVIEW_ADDRESS_CHANGED';
+
+export type CanonicalPaymentLedgerEnvelope = CanonicalOrderSnapshotLedgerEnvelope & {
+  shippingSnapshot?: unknown;
+};
 
 export type CanonicalPaymentReconciliationResult =
   | {
@@ -49,9 +55,7 @@ export type CanonicalPaymentReconciliationResult =
     };
 
 function asRecord(value: unknown): JsonRecord | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as JsonRecord)
-    : null;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : null;
 }
 
 function getPath(root: unknown, path: Array<string | number>) {
@@ -103,9 +107,10 @@ function mismatchErrorCode(
 }
 
 function reconcileCanonicalPaymentEvidence(args: {
-  envelope: CanonicalOrderSnapshotLedgerEnvelope;
+  envelope: CanonicalPaymentLedgerEnvelope;
   evidenceKind: CanonicalPaymentEvidenceKind;
   actual: PayPalMoney | null;
+  payload: unknown;
 }): CanonicalPaymentReconciliationResult {
   let parsedEnvelope;
   try {
@@ -150,6 +155,19 @@ function reconcileCanonicalPaymentEvidence(args: {
     };
   }
 
+  if (hasChangedPayPalReviewAddress(args.envelope.shippingSnapshot, args.payload)) {
+    return {
+      ok: false,
+      mode: 'canonical',
+      evidenceKind: args.evidenceKind,
+      snapshot: parsedEnvelope.snapshot,
+      money,
+      errorCode: 'PAYPAL_REVIEW_ADDRESS_CHANGED',
+      reason:
+        'PayPal returned a different delivery address. Review this checkout before continuing.',
+    };
+  }
+
   return {
     ok: true,
     mode: 'canonical',
@@ -162,35 +180,40 @@ function reconcileCanonicalPaymentEvidence(args: {
 }
 
 export function reconcileCanonicalPayPalAuthorization(
-  envelope: CanonicalOrderSnapshotLedgerEnvelope,
+  envelope: CanonicalPaymentLedgerEnvelope,
   payload: unknown,
+  orderPayload: unknown = payload,
 ) {
   return reconcileCanonicalPaymentEvidence({
     envelope,
     evidenceKind: 'authorization',
     actual: getPayPalAuthorizationMoney(payload),
+    payload: orderPayload,
   });
 }
 
 export function reconcileCanonicalPayPalCapture(
-  envelope: CanonicalOrderSnapshotLedgerEnvelope,
+  envelope: CanonicalPaymentLedgerEnvelope,
   payload: unknown,
 ) {
   return reconcileCanonicalPaymentEvidence({
     envelope,
     evidenceKind: 'capture',
     actual: getPayPalCaptureMoney(payload),
+    payload,
   });
 }
 
 export function getDurableCanonicalPayPalCaptureMismatch(
-  envelope: CanonicalOrderSnapshotLedgerEnvelope & { capturePayload: unknown },
+  envelope: CanonicalPaymentLedgerEnvelope & { capturePayload: unknown },
 ) {
   if (envelope.capturePayload === null || envelope.capturePayload === undefined) return null;
   if (getPayPalCaptureCompletion(envelope.capturePayload).status !== 'COMPLETED') return null;
 
   const reconciliation = reconcileCanonicalPayPalCapture(envelope, envelope.capturePayload);
-  return !reconciliation.ok && reconciliation.errorCode === 'PAYPAL_CAPTURE_AMOUNT_MISMATCH'
+  return !reconciliation.ok &&
+    (reconciliation.errorCode === 'PAYPAL_CAPTURE_AMOUNT_MISMATCH' ||
+      reconciliation.errorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED')
     ? reconciliation
     : null;
 }
@@ -200,7 +223,7 @@ export function getDurableCanonicalPayPalCaptureMismatch(
  * corrupt, or mismatched authorization for a canonical order.
  */
 export function reconcileCanonicalPayPalPaymentChain(
-  envelope: CanonicalOrderSnapshotLedgerEnvelope,
+  envelope: CanonicalPaymentLedgerEnvelope,
   authorizationPayload: unknown,
   capturePayload: unknown,
 ) {

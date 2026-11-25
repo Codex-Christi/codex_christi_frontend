@@ -1226,6 +1226,372 @@ order by "createdAt" asc;
 
 Do not select raw payload columns during normal verification. Use the admin detail UI or a redacted debug path when payload inspection is required.
 
+### November 23, 2026: $40 sandbox payment against real fulfillment services
+
+This was a localhost run on port 3001 against the development ledgers, with PayPal sandbox and real Django and Merchize services. The app's automatic push was disabled. The Merchize store separately advertised automatic fulfillment for eligible orders after five minutes. Neither the local ledger target nor the app switch makes a real store safe for an isolated test.
+
+| Step | What we verified | What the UI should make clear |
+| --- | --- | --- |
+| PayPal window closed before approval | The existing approval was reopened. The buyer approved the original checkout and the ledger recorded one completed $40 USD sandbox capture. | Let the buyer resume the same payment; do not offer a replacement when the result is uncertain. |
+| Payment captured, downstream work pending | Before operator resume, there was no recorded receipt, Django payment save, Merchize record, or webhook. Confirmation showed payment received and order under review; Order History correctly had no tracking. | Say that payment succeeded and the order is still being prepared. Show what the buyer can do without suggesting another payment. This run did not prove that scheduled recovery works. |
+| **Resume post-payment processing** | Saved the receipt and Django payment. Django returned `201`, `success=true`, and `processing_status=completed` with the informational details-unavailable message. Merchize registration, lookup, and detail read succeeded. The provider address matched the saved address, but validation was pending. | Acknowledge the accepted handoff. Show that Merchize is still checking the address, not that payment failed or that the customer must correct it. |
+| **Refresh Merchize state** | The address later became `valid` and readiness passed. External progress showed import complete; push, fulfillment cost payment, production, shipment, and delivery were pending. No package was saved. Pre-release tracking and supplemental transaction-fee reads were rejected. | Differentiate ready to release from released. Show no packages yet, not a tracking failure or a reason to block release. |
+| **Retry Merchize fulfillment** | The push step was skipped with `MERCHIZE_PUSH_DISABLED_BY_CONFIG`. No payment step had to be repeated. | Show that automatic release is off and surface the one-order master-admin action only when eligible. |
+| **Review manual release** | The authorized attempt returned **Production release did not complete / Release ended in payment_saved**. The runner saw `validating` and took the verification path. The attempt history contains no push request; there is no push acknowledgement or verification timestamp. The ledger saved `MERCHIZE_PUSH_VERIFICATION_PENDING`. | Say **Release not confirmed** and **No new push request was sent** for this case. Keep **Refresh Merchize state** available; do not imply retry is safe based on the ledger stage alone. |
+
+Independent API-key reads of seller order detail and send-to-fulfillment state agreed on the
+matched order: valid address, `validating`, unfulfilled, not reported pushed, and not reported
+failed. That does not establish whether Merchize was checking a queued release or validating
+before any release request. Reconcile with fresh send-state, external progress, provider history,
+and local attempt records before allowing another push. Do not clear the safeguard based only on
+the absence of a local acknowledgement. A done import milestone or a timestamp on a pending
+push milestone does not prove release. Production release and shipment are unverified for this run.
+
+#### Next before live PayPal: clarify recovery and prove release
+
+1. Use one compact recovery panel to show **Payment**, **Order received by Merchize**, **Release**,
+   and **Shipment**. Put the next safe action beside its status and the last successful check.
+   Show the evidence and operator history on demand rather than repeating controls across panels.
+2. Give each action one scope. **Resume post-payment processing** continues from incomplete payment
+   handoff checkpoints without recapturing. **Retry Merchize fulfillment** starts from an accepted
+   handoff. **Refresh Merchize state** only reads the provider and saves evidence. **Release to
+   production** is a separate, confirmed one-order action that may incur a cost. Show who can use
+   it and why it is unavailable. Never override a hold or an inconclusive release automatically.
+3. Replace the generic `payment_saved` release toast with explicit outcomes: blocked before a
+   request, no push sent and verification pending, acknowledged but not verified, verified,
+   or confirmed failure. Save the action scope and matching outcome in the audit history; a
+   plain `validating` response is not a push acknowledgement. Escalate a persistent uncertain
+   state after a bounded verification window without submitting another push.
+4. Prove that one eligible release can be requested and independently verified, then observe the
+   same order reach production and shipment through scheduled sync. Check that reopening a page,
+   pressing refresh, a timeout after acknowledgement, or concurrent recovery requests cannot
+   create a second charge, import, or push. Also test verified hold/resume, read failures, split
+   shipments, and the distinction between no tracking yet and a failed tracking refresh.
+
+#### Endpoint and customer-view follow-up
+
+- **Identity and readiness:** Use `GET /order/external/orders/order-detail` with the external
+  number and identifier, and use its `data._id` for the in-depth detail and address reads. Never
+  use the Django response's wrapped `_id` for Merchize actions. Use buyer-detail read-back when
+  a correction must be verified; a matching address and an address marked valid are separate facts.
+- **Release versus verification:** `POST /order/external/orders/push` requests release. Use
+  `GET /order/orders/{merchizeOrderId}/send-to-fulfillment-date`, matched detail, and external
+  progress to verify it. Use seller history for admin investigation where server auth works.
+- **Progress and packages:** Continue using documented `GET /order/external/orders/order-progress`
+  and `GET /order/external/orders/tracking`. Save correlated, normalized snapshots through the
+  scheduled sync, with targeted admin refresh for troubleshooting. Do not fetch Merchize on
+  customer page loads. Verify this with an app-linked shipment, including whether a previously
+  saved package stays visible after a temporary read failure and whether partial delivery stays
+  distinct from delivery of the whole order.
+- **Admin-only expansion:** Keep invoice, fees, tickets, seller history, and deeper package
+  endpoints in their own evidence groups. Before adding a call, identify the question it answers,
+  confirm stable server authentication, and compare its normalized fields against one imported
+  and one delivered order. Do not turn unavailable supplemental reads into release blockers or
+  introduce dashboard-session credentials into workers.
+- **Customer pages:** Use the same saved milestones on confirmation and authorized Order History;
+  link history to the order's detail view. Show the order reference, items, paid total, confirmed
+  stage, last checked time, and any action required. Show carrier links and per-package status
+  only in protected order details. Keep raw payloads, provider IDs, supplier costs, internal
+  notes, contact details, and addresses out of the customer status response.
+
+#### Later: webhook and email verification
+
+Keep scheduled reads as the working path for alpha. When webhook work starts, confirm the event
+types, authentication, retry behavior, and registration/simulator steps in the Merchize docs.
+Test valid, duplicate, delayed, out-of-order, unauthenticated, and unmatched events, plus missed
+delivery recovered by the scheduled sync. A webhook should prompt a scoped read-back through the
+same reconciliation code rather than directly claiming shipment or delivery. Queue branded customer
+emails for verified customer milestones or a confirmed action they need to take. Route release
+blockers and persistent sync exceptions to admin. Verify that one saved transition produces one
+notification, failed sends are visible and retryable, and admin resend does not replay fulfillment.
+No webhook or notification delivery was verified during the release investigation.
+
+### Three passes to finish the alpha fulfillment flow
+
+#### 1. Address review and recovery actions
+
+Use a short checkout note near the address: **Double-check your delivery address, including any
+apartment or unit number.** Keep confirmation inline, not in another modal. Before payment,
+validate required fields and let buyers edit them. Do not make checkout wait for Merchize's
+post-import check or promise that a well-formed address is deliverable.
+
+[Merchize's U.S. address guide](https://merchize.com/helpdesk/verify-us-shipping-address/)
+describes a SmartyStreets check after import that typically takes up to five minutes under
+default settings. Use that as context, not a deadline or permission to bypass a pending check.
+Track the validation result separately from whether Merchize saved the correct address and whether
+production release was acknowledged. In the sandbox walkthrough, `validate_shipping_address`
+was `valid` on read-back while `push_to_fulfillment_progress` remained `validating`.
+
+| Address evidence | Buyer experience | Ops action |
+| --- | --- | --- |
+| U.S. check pending | **We're checking your delivery address. No action is needed right now.** | Wait and recheck server-side. Escalate persistent uncertainty to admin, not to the buyer. |
+| U.S. check valid and saved address matches | **Preparing your order.** | Continue only if the separate hold, readiness, and release guards pass. |
+| Confirmed invalid address or missing unit | **Check your delivery address.** Send one email with a link to the verified order page. | Pause release. Review the correction submitted through the verified flow. Save, read it back from Merchize, and recheck validation before release. Never silently apply a provider suggestion. |
+| Buyer confirms an address still flagged by Merchize | Acknowledge the confirmation; do not promise release yet. | **Mark address as valid** is an audited master-admin exception for the exact, matched address. Require evidence of buyer confirmation and a reason. This action does not push the order. |
+| Non-U.S. address with expected unsupported validation result | **Preparing your order.** Do not claim a postal validation passed. | Do not require a U.S. result or a blanket override. Continue only with a complete, matching address and no explicit provider problem, under the saved country rules. |
+| Address read missing, mismatched, or inconclusive | **We're reviewing your order.** No correction request unless there is a confirmed issue. | Block automatic release and show the evidence needing review. A provider read failure is not proof that the address is wrong. |
+
+**Implemented locally:** Manual release distinguishes a check that sent no new push from a newly
+acknowledged push that still needs verification. For a confirmed invalid U.S. address, the
+verified order page now offers one correction, and the payment runner queues one branded
+address-action notice. Pending address validation does not send that notice. The correction API
+saves a request without a provider call, payment grant, or new shipment. The existing recovery
+scanner applies the address under its order lock, only to the single matched, unreleased order.
+It checks the original provider address before writing, reads back all address fields, and waits
+for separate postal validation. A repeat check that finds the correction already saved does not
+write it again. If Merchize still flags the matched correction after five minutes, or read-back
+cannot be verified, the order requires master-admin review. The buyer can see that review but
+cannot submit a second correction. No financial records, receipts, account details, or Django
+records are rewritten by the buyer flow. All existing release checks still apply, including the
+hold, age, and automatic-push settings. No migration is required for this implementation.
+
+The correction depends on a working `PAYPAL_TX_LEDGER_RECOVERY_SCANNER_ENABLED` job on the
+same data target. Existing orders that reached an invalid-address state before this change can
+show the correction form; they are not automatically emailed by deploying this change. Live
+delivery of the notice, deployed scanner health, and release verification are not yet proven.
+
+**Email ownership:** The correction notice uses the same branded shop layout as Next.js checkout
+codes, order-access codes, guest-order linking, and fulfillment confirmation. A first-time
+checkout can still receive its code directly from Django when Django creates an intent with OTP
+pending. The Next.js template does not style that message. Check fresh-checkout and recovery
+inboxes separately before marking OTP styling complete. The checkout email work is tracked in
+**Shop Checkout, Recovery, Sandbox Payments & UX**.
+
+**Exit test:** Pending, valid, invalid, corrected, confirmed override, mismatched, and non-U.S.
+fixtures render the right next action for customer and admin on mobile and desktop. Only a
+confirmed address problem asks the customer to act. No correction or retry repeats payment or
+imports another order.
+
+#### 2. Prove release, scheduled sync, and customer updates
+
+- Reconcile the existing sandbox-paid order using matched detail, send-to-fulfillment state,
+  external progress, and attempt history. Do not treat `validating` on its own as an acknowledgement
+  or permission to resend. If those sources stay inconclusive, ask Merchize to clarify before
+  changing the release guard. If already released, record the evidence without another push.
+- With explicit approval for the one order and its real Merchize cost, verify one release and
+  observe production, tracking creation, shipment, delivery, holds, and stale reads. Use mocks
+  and the delivered reference for states that cannot be reproduced immediately. Test scheduled
+  recovery and sync on the deployed target, with no browser tab left open.
+- Prefer the documented external detail, progress, and tracking endpoints. Save normalized
+  milestones and per-package history; retain last confirmed results when a read fails. Only add
+  seller-only endpoints for a specific missing field after checking safe server authentication.
+  Tracking created is not the same as shipped. Do not show seller-only estimates or notes unless
+  a verified, customer-safe source exists. Confirmation and Order History read saved data only.
+- Send Codex Christi's branded updates from verified saved transitions, not directly from a
+  provider response. [Merchize's fulfillment FAQ](https://merchize.com/helpdesk/f-a-q-about-fulfillment-procedure-on-merchize/)
+  says it does not send tracking emails to customers of imported orders. Check the test inbox
+  for duplicates on this integration. Use the existing notification outboxes where applicable;
+  verify buyer action emails, release/shipping/delivery notices, admin alerts, and resend without
+  any new payment or fulfillment action.
+
+**Exit test:** One sandbox payment, one Django handoff, one verified release, and matched saved
+package data visible only to the authorized buyer. Confirm a label alone never sends a shipped
+notice, one package never marks a split order delivered, and provider retries do not send repeat
+emails. Record deployed results before enabling live PayPal.
+
+##### November 23 comparison: buyer payment, supplier payment, and USPS label
+
+Read-only comparison in the Merchize seller dashboard. Neither order was changed.
+
+| Evidence | November 14 reference | Latest sandbox-paid checkout |
+| --- | --- | --- |
+| Buyer payment | **Paid** on November 14 at 4:02 PM, as displayed by Merchize | **Paid**; this does not mean that the supplier invoice was paid |
+| Production release | **Pushed** on November 14. History records `push_merchize_fulfill` from the auto fulfillment service, then `fulfillment_created` for one package. | **Unfulfilled / Validating**. The visible history records API import and SKU mapping, not a confirmed push. The date beside the pending push step is not proof of release. |
+| Supplier billing and production | Fulfillment cost **Paid** and **In production** on November 23, after the operator reported topping up. This is consistent with a funding delay; the order view does not prove the top-up was the only cause. | Fulfillment cost **Unpaid**. The displayed store balance was below the displayed order cost. The address itself was valid, and production had not started. Do not infer that balance alone explains `Validating`. |
+| Package and carrier | `fulfillment_tracking_updated` records `ORDER_TRACKING_UPDATED` and USPS. The seller view shows a tracking number and shipping-partner history, but the shipment-start and in-transit steps are still incomplete. | No package or shipment evidence on the order view. |
+
+[Merchize's setup and billing guide](https://merchize.com/helpdesk/complete-guide-how-to-get-started-set-up-fulfillment-on-merchize/)
+describes paying the supplier invoice before production and configuring a store balance alert.
+The order payment label and the supplier invoice are separate. A top-up may let existing queued
+orders advance without a new push. Check which orders are waiting before any real funding test.
+
+**Retailer responsibility:** Supplier funding is internal. An unpaid invoice or a confirmed
+low-balance hold must never send a buyer email, show a buyer action, or suggest a second payment.
+Keep the buyer-facing order status at its last verified milestone with no action required.
+Authorized staff review the Merchize bill and top up manually if needed. Afterward, refresh the
+invoice and progress before considering another push: Merchize can accept a push before funding
+clears, and an order that is already queued may continue without another request.
+
+- **Admin:** Show buyer payment, release, supplier invoice, and shipment as separate states.
+  Sync `GET /order/external/orders/order-invoice` for the supplier cost status and `paid_at`.
+  Only name insufficient balance when Merchize explicitly reports that reason or verified store
+  billing evidence supports it. An unpaid invoice alone is not a low-balance diagnosis; a `0`
+  or `null` pre-release invoice is not a failure. Flag genuine funding holds to admin, never ask
+  the buyer to pay again, and never top up automatically. Use the seller balance alert if there
+  is no supported server endpoint for the balance.
+- **Customer:** Read order-level milestones from `GET /order/external/orders/order-progress`
+  and match package and carrier data from `GET /order/external/orders/tracking`. Suppress seller
+  balance and supplier charges. Use **Preparing your order** after verified production start.
+  A label can be saved and shown on the protected details page before shipment; it must not
+  turn into **Shipped** or a shipped email without confirmed shipment evidence. Do not import
+  an unrelated seller order into a buyer's history to demonstrate this.
+- **Pass 2 acceptance:** Test a paid buyer order waiting on supplier payment, then simulate the
+  invoice becoming paid without a new push. Confirm the scheduled job records production,
+  label creation, and shipment as separate transitions. Verify the branded production and
+  shipment notices against those transitions and confirm that replay does not send duplicates.
+  The earlier release-confirmation email is not a shipment email.
+
+##### Pass 2 API and mock verification
+
+Server-key, read-only calls matched both provider orders by their Merchize order codes. On
+November 23, the November 14 reference returned a single paid supplier invoice with `paid_at`.
+External progress agreed with that timestamp and showed production starting about 24 minutes
+later. Tracking returned one USPS package with a number and `shipment_status: pre_transit`,
+even though the package's generic status was `fulfilled`. The order and package timelines left
+shipment and delivery pending. The latest sandbox-paid checkout returned `fulfillment_cost: 0`,
+completed import, a pending push with an `actual` timestamp, no packages, and no successful
+tracking result. The timestamp and the seller UI's unpaid label do not turn the zero invoice
+into an explicit funding hold. No state-changing endpoint was called.
+
+**Local implementation:** The scheduled lifecycle check distinguishes a matched unpaid invoice
+from a zero or missing record. An unpaid invoice on a verified released order alerts admin;
+it does not charge the buyer, top up the store, or push the order. Rejected or mismatched
+invoices leave the last good invoice snapshot and check time intact. The saved internal order
+code takes precedence over an external-number alias when reading progress and packages.
+
+The app queues **Order received** when the verified capture and Django payment record are
+followed by an accepted Django fulfillment handoff. The accepted 201 with missing details
+qualifies; release, supplier payment, and tracking are not prerequisites. The app saves the
+handoff and queues the email together, then attempts delivery as soon as the transaction
+commits. It does not resend for an existing accepted handoff or backfill older orders.
+The same immediate send applies when the app saves an actionable address issue and queues
+**Check your delivery address**. Pending validation alone does not trigger that email.
+
+The customer outbox queues the most advanced, freshly confirmed production, shipment, or
+delivery notice once per order and milestone. It requires matching paid ledger evidence and a
+verified release. The milestone must have a completed actual time on or after our release
+verification and within the last 24 hours; this path does not backfill older emails. Full
+delivery requires matching package evidence. Pending milestones, estimates, and a label alone
+do not qualify. The email links to verified order access instead of embedding a tracking number
+or supplier details.
+
+With `PAYPAL_TX_LEDGER_RECOVERY_SCANNER_ENABLED=true`, the existing authenticated recovery
+job sends other customer updates in batches and picks up urgent notices still waiting
+or eligible for retry. Both paths claim the same queue row so only one can send it.
+There is no new schedule. An open checkout or Order History page is not needed.
+The worker can retry a confirmed connection failure after 15 minutes, up to three automatic
+attempts. Admins can retry a failed notice. If submission is uncertain, check ZeptoMail;
+the app blocks resending that notice to avoid a duplicate.
+
+The mocked scheduled job and test inbox covered a placeholder invoice, an unpaid invoice and
+admin alert, funding clearing without a push, a mismatched read, production, a USPS label before
+shipment, a failed shipment email and concurrent resend, and partial versus complete delivery.
+The test also checked the saved progress and package evidence that drives customer status.
+This does not prove production scheduler health, live mail delivery, or a real release for
+the latest checkout. Those are still required before live PayPal.
+
+The urgent email tests use mock mail, database clients, and provider responses. They cover an
+accepted handoff, a confirmed address issue, a race with the scheduled sender, a deferred retry,
+and an unknown response that must not be resent.
+
+##### Read-only follow-up: release not confirmed
+
+The development ledgers matched the $40 sandbox capture, accepted Django handoff, and one
+Merchize order. Our recorded push was skipped because the switch was off. The later
+verification did not acknowledge a new push. Merchize reported a valid address and
+`validating`, but its send-state read returned `pushed: false` and `is_failed: false`.
+External progress showed import complete and push pending. Seller history showed import
+and item mapping only; there were no packages. This does not confirm a queue entry or
+prove that another push would be safe.
+
+The seller detail returned `estimated_ffm_cost.total: 21.30`. The estimate has no currency
+of its own; the order invoice currency is USD. The external supplier invoice still returned
+`fulfillment_cost: 0`, so the estimate is not a final supplier charge. The operator identified
+store balance as the issue. The order reads did not independently report a balance hold.
+No order, invoice, balance, or notification was changed.
+
+- **Admin:** Show the estimated supplier cost separately from the invoice and buyer payment.
+  Show “Imported; release not confirmed” when that is all the evidence supports. Offer a
+  read-only recheck of release, progress and invoice after staff top up, rather than a push.
+  Pass 2 alerts on an unpaid invoice after verified release; separately handle a future
+  explicit pre-release balance hold and use [Merchize's store balance alert](https://merchize.com/helpdesk/complete-guide-how-to-get-started-set-up-fulfillment-on-merchize/)
+  for low funds before an order is affected.
+- **Buyer:** Until a later milestone is confirmed, show that the order was received and no
+  action is needed. Do not show supplier funding, costs, or a second payment prompt.
+- **Merchize:** Evaluate the unpaid and paid supplier-cost events as prompts to refresh the
+  invoice and progress, not as authorization to push or email the buyer. Confirm each event
+  in the simulator and keep the scheduled check as a fallback.
+
+##### Fulfillment status in Order History
+
+The delivered reference and the linked sandbox order verified that Merchize progress and
+package data can distinguish import, release, production, shipment, and delivery. The local Order
+History list now uses the same saved fulfillment milestones as **View status**. Orders without
+usable fulfillment evidence still show a safe status from the payment ledger.
+
+- **Buyer list:** Show one compact badge per order, using the same status rules as confirmation.
+  Use **Order received**, **In production**, **Shipped**, or **Delivered** when the saved evidence
+  supports it. The imported but unreleased sandbox order should show **Order received**, with no
+  buyer action implied. A tracking label alone is not shipment, and one delivered package is not
+  proof that a split order is fully delivered.
+- **One fulfillment read per page:** Filter and paginate the signed-in buyer's orders first, then
+  load the saved fulfillment evidence for that page in one Prisma query. Match on order token
+  and Django payment-save ID. Do not call Merchize from the page or expose raw provider data.
+  Keep the last verified status when provider evidence is stale; without sufficient evidence,
+  fall back to the safe payment status. Do not guess a later milestone.
+- **Admin list:** Keep buyer payment, address, release, and supplier invoice separate. Do not
+  copy supplier charges, raw states, or provider diagnostics into the buyer list.
+- **Acceptance:** Check that the list and confirmation agree for imported, on-hold, in-production,
+  label-only, split-shipment, and delivered fixtures. Verify that another account cannot read
+  those orders and that **View status** and **Back to orders** preserve the list position on
+  desktop and mobile. Use mocks for later stages; no real release is needed for this UI check.
+
+**Local verification:** The imported sandbox order showed **Order received** in Order History
+and confirmation at desktop and mobile widths. Returning through order details preserved the
+selected sort. Tests use fixtures for later milestones, ownership, and unavailable or duplicate
+snapshots. No provider writes or payment actions were needed.
+
+#### 3. Evaluate Merchize webhooks after scheduled reads work
+
+The [Merchize webhook guide](https://merchize.com/helpdesk/merchize-webhooks-guide/) lists
+tracking, shipment, package progress, and order progress events, and documents a simulator and
+delivery logs. The [seller shipment guide](https://merchize.com/helpdesk/how-to-track-and-manage-packages-in-shipment-status/)
+shows pre-transit, in transit, out for delivery, delivered, and exception states. Those seller
+screens do not establish that every detail is present in the external API or webhook payload.
+
+- Confirm the exact secret verification contract, event correlation, supported payload fields,
+  and retry behavior. Test synthetic deliveries against a private test receiver, not a public
+  request bin. Do not register or enable production events without approval.
+- Start with tracking, shipment, and progress events as prompts for the same read-back path.
+  Keep scheduled sync as the fallback. Verify duplicate, stale, missing, and unauthenticated
+  events, and replay after a delivery outage. Send no customer email from a simulator event or
+  unchecked payload.
+- Evaluate `ORDER.PAYMENT.FULFILLMENT_COST_PAID` as a prompt to refresh the supplier invoice
+  and production status. Do not send a buyer payment or production email from the invoice event
+  alone. An `ORDER.CHANGED.TRACKING` notification may mean only that a label was issued; it does
+  not establish shipment. A seller history entry does not prove that any webhook reached or was
+  stored by Codex Christi. Verify that separately in the delivery logs and our receiver.
+
+##### Seller history and webhook payloads are related, not interchangeable
+
+Compared the expanded USPS history entry on the November 14 reference with the examples under
+**Webhooks** in the [Merchize developer docs](https://seller.merchize.com/a/api-documents).
+No actual webhook delivery was inspected. No receiver or registration was changed.
+
+| Seller evidence | Documented webhook | What to verify before saving a customer milestone |
+| --- | --- | --- |
+| `fulfillment_tracking_updated` contains internal type `ORDER_TRACKING_UPDATED`, a `fulfillmentId`, and nested `tracking.tracking_company` (USPS in the reference). | `ORDER.CHANGED.TRACKING` puts `tracking_company`, `tracking_number`, `tracking_url`, and `has_tracking` directly on `resource`. | Match the order, then confirm the package through the tracking API. Do not assume the webhook's `resource._id` equals the seller history's `fulfillmentId` or the canonical Merchize order ID. A label is not shipment. |
+| Shipping-partner history and package shipment status. The reference did not confirm an in-transit milestone. | `ORDER.CHANGED.SHIPMENT` includes `package_code`, `old_shipment_status`, `new_shipment_status`, and `shipment_histories`. The example shows `pre_transit` to `in_transit`. | Check the matching package's actual shipment status. Neither the generic `resource.status` nor an estimate proves the package shipped. |
+| The order timeline shows push, fulfillment cost paid, production, shipment, and delivery. Seller history also has internal push and package-creation events. | `ORDER.CHANGED.PROGRESS` carries `order_progress` and `package_progresses`; `ORDER.CHANGED.PROGRESS_STATUS` instead carries `old_status` and `new_status`, with a `hold` to `open` example. | Confirm the named timeline step is `done`, not `pending`, before announcing it. A broad status change calls for a new detail read; it is not production or shipment evidence by itself. Don't subscribe using seller-only history names. |
+| The supplier invoice becomes paid after the order was already pushed. | `ORDER.PAYMENT.FULFILLMENT_COST_PAID` includes `transaction_id`, `paid_at`, and `paid_by_method`. Its example still has `status: pending`. | Re-read the external order invoice. Confirm production separately from payment and do not send a buyer payment notice for a supplier event. |
+
+The examples use the `merchize-webhook-key` header and an envelope with `event_type`, `event_id`,
+`event_time`, and `resource`. In the later simulator test, confirm that authentication and the
+envelope match actual deliveries. Deduplicate by event ID within the verified store; match an
+existing order by its external number and identifier, with the known Merchize order code as a
+cross-check. Refresh only the relevant invoice, progress, or tracking snapshot. Keep the header
+value, raw tracking links, and shipment-history locations out of logs. Send email from the saved,
+verified transition, so scheduled reads and webhooks cannot both announce the same milestone.
+
+**Exit test:** A trusted event can bring forward the same verified update without adding a charge,
+release, or duplicate email. If authentication or coverage is unclear, leave webhooks off; they
+are not an alpha prerequisite once scheduled sync and notifications pass.
+
+**Approved for alpha:** Verified buyers may submit a correction. A revalidated correction can
+continue automatically after exact provider read-back and all release checks pass. A correction
+that remains flagged needs master-admin review. The separate approvals are for a real one-order
+release and, later, webhook registration.
+
 ## Address and buyer detail endpoints
 
 These endpoints support address review and correction:
@@ -3017,15 +3383,72 @@ Before starting Merchize Fulfillment Ops DB implementation:
 8. Remaining: dedicated address-review rows and customer correction-request messaging.
 9. Remaining: normalize richer cost-delta evidence when a correction changes fulfillment cost.
 
-## Phase 8 - Production hold/open controls
+## Phase 8 - Detect and display fulfillment holds
 
-1. Add hold/open adapter methods.
-2. Add admin hold action.
-3. Add admin open/release action.
-4. Require admin reason.
-5. Require step-up auth in production phase.
-6. Block open/release when `productionGateStatus = production_gate_blocked`.
-7. Persist admin action history.
+**Verified on November 22, 2026:** the recently paused seller order showed **On hold** and a
+**Resume order** button. An API-key read of `GET /order/external/orders/order-detail` returned
+`data.order_status = on_hold` for the same provider order ID. In contrast, seller in-depth detail
+still showed `order_status = open` and push progress `validating`; external progress still showed
+import complete with push and shipment pending. Send-state showed neither pushed nor failed. Do
+not use the in-depth status, absence of a hold history event, or a pending milestone as evidence
+that the order is not held.
+
+A follow-up read with the server API key used the documented
+`POST /order/external/orders/list-orders-detail` for the paused and delivered references. This
+endpoint reads order details; it does not change them. It returned `on_hold` and `delivered` in
+two rows whose provider order codes and `_id` values both matched the requested orders. This
+supports a bounded batch detail check for holds. Before enabling it in the worker, test reordered,
+missing, duplicate, and conflicting rows. Match by identity, never batch position; a missing row
+does not clear a hold or authorize release. The live check did not run a worker or test resume.
+
+The paused seller order had no matching row on the configured development Fulfillment Ops target.
+The other linked checkout was still in `manual_release_required`, which is not a provider hold.
+This verifies the provider response shape, not a customer-page result or a successful resume.
+Do not create or claim a checkout record from a seller-only order to make it appear in history.
+
+**Local implementation:** the pre-release lifecycle scan reconciles known orders in one bounded
+external detail batch. Routine external lookup also records holds for already-released orders.
+An inconclusive or superseded read cannot clear a saved hold; a final, matched external read must
+confirm an order is unfulfilled before push. Confirmation and authorized tracking show the hold
+without erasing shipment progress. The mock browser check on port 3001 covered hold, an
+inconclusive read, and verified resume. No migration, new admin mutation, or deployed run was
+part of this check. The seller dashboard remains the place to issue hold and resume commands.
+
+| Situation | Customer status | Operational behavior |
+| --- | --- | --- |
+| Verified hold, no action requested from the buyer | **Order on hold.** Your payment was received. We're reviewing your order. No action is needed right now. | Explain the verified hold and last checked time to admin. Do not show internal reasons or infer a payment problem |
+| Verified hold with a separately confirmed buyer action | Name the action, such as **Check your delivery address**, and show the existing secure correction or support path | Alert admin and queue the applicable deduplicated customer action email. A hold alone does not establish a reason or send an email |
+| Hold after verified release or while one package is in transit | Show the order-level notice alongside the last verified milestone and any existing package links | Keep verified release and package history. A production hold is not a carrier hold; continue relevant package checks |
+| Hold read fails or resume is unverified | Keep the last verified hold and show that the latest update is unavailable | Mark evidence stale or conflicting. Do not clear the hold or retry push to repair a read failure |
+| Resume confirmed by a fresh provider read | Return to the appropriate saved stage, not automatically **In production** | Recheck current readiness if pre-release or continue lifecycle sync if already released. Never recapture or reimport |
+
+Implementation order:
+
+1. Normalize the external `order_status` independently of seller/payment `status` and release
+   verification. Reuse `MerchizeFulfillmentOrder` and its existing external snapshot; use `heldAt`
+   for observed hold timing if needed. Keep the hold separate from the last completed milestone.
+   Only a newer, successful, identity-matched read with explicit state may clear it. No new table
+   is required for the first pass.
+2. Add a shared customer-safe hold projection to confirmation, Order History details, and tracking.
+   Keep the order-access checks and separate the order notice from per-package shipping status.
+   Render from Prisma; do not call Merchize each time a customer opens a page.
+3. Check for a hold before every explicit or automatic release decision. Add bounded, read-only
+   reconciliation of eligible registered pre-release and held orders, using the existing scheduled
+   job and admin refresh. The current lifecycle scan starts at verified push, so it cannot detect
+   all holds made in the seller dashboard today. After release, keep the hold as an additional
+   state so it does not accidentally exclude in-transit packages from sync. Skip stale or
+   conflicting release evidence rather than treating it as permission to push.
+4. The adapter already has `POST /order/external/orders/update-order-status` with `hold` and
+   `resume`. Any future admin controls must be separate from **Release to production**, require
+   a reason and production step-up, verify the current state after the command, and write an audit
+   entry. A release override must not bypass a verified hold. A resume is not a push or a payment
+   retry; verify the supplier's store-level auto-fulfillment behavior before exposing it in alpha.
+5. Test the observed `on_hold` versus seller `open` response, a dashboard hold before release, a
+   hold after release with an in-transit package, customer action versus no action, missing or stale
+   evidence, an ambiguous resume, and a verified resume. Assert that an unauthorized viewer cannot
+   see the order, the last package milestone is preserved, repeated sync does not duplicate alerts,
+   and no test issues a second capture, import, or push. Verify resume separately on an approved
+   test order; the observation above did not change either order.
 
 ## Phase 9 - Progress, history, and delivery sync
 

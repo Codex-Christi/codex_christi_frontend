@@ -13,6 +13,7 @@ import HistoryOwnerBoundary from '../_components/history-owner-boundary';
 import styles from '../orderHistory.module.css';
 import { orderHistoryMetadata } from '../metadata';
 import { RefreshTracking } from '../_components/history-actions';
+import FulfillmentHoldNotice from '../_components/fulfillment-hold-notice';
 
 export const metadata = orderHistoryMetadata;
 
@@ -36,6 +37,9 @@ export default async function AccountOrderDetails({
   }
   if (!result) notFound();
   const { order } = result;
+  const holdCheckedAt = !order.refunded && order.paidAmount && result.updates.length === 1
+    ? result.updates[0].holdCheckedAt
+    : null;
   return (
     <HistoryOwnerBoundary session={result.session}>
       <HistoryHeader detail />
@@ -94,6 +98,7 @@ export default async function AccountOrderDetails({
             <h2>Delivery updates</h2>
             <RefreshTracking orderToken={order.orderToken} />
           </div>
+          {holdCheckedAt && <FulfillmentHoldNotice checkedAt={holdCheckedAt} />}
           {result.unavailable ? (
             <p>Shipment updates are temporarily unavailable.</p>
           ) : !result.updates.length ? (

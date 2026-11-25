@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { SendMailClient } from 'zeptomail';
 import type { PrismaClient } from '@/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger/client';
 import { runPaidFulfillmentProcessing } from './runPaidFulfillmentProcessing';
 
@@ -19,6 +20,7 @@ test('all real runner entry points hold lost Django replies/checkpoints without 
     DJANGO_INTERNAL_BASE_URL: 'https://django.example/api/v1',
     SHOP_CHECKOUT_SERVER_ACTIONS_POST_PROCESSING_CRYPTO_SECRET: 'handoff-runner-test-secret',
     SHOP_CHECKOUT_OTP_VERIFICATION_API_KEY: 'handoff-runner-signature-secret',
+    CODEX_PRIMARY_MAIL_AGENT_TOKEN: 'fixture-only',
     ORDER_RECOVERY_ADMIN_EMAILS: '',
   });
   t.after(() => {
@@ -34,6 +36,12 @@ test('all real runner entry points hold lost Django replies/checkpoints without 
   global.__adminOpsLedgerPrisma__ = {
     adminNotificationRecipientGroup: { findUnique: async () => ({ enabled: false }) },
   } as unknown as NonNullable<typeof global.__adminOpsLedgerPrisma__>;
+  let inTransaction = false;
+  const emails: Array<{ subject: string; inTransaction: boolean }> = [];
+  t.mock.method(SendMailClient.prototype, 'sendMail', async ({ subject }: { subject: string }) => {
+    emails.push({ subject, inTransaction });
+    return {};
+  });
 
   for (const operation of ['payment_save', 'fulfillment_handoff'] as const) {
     for (const failureMode of [
@@ -41,8 +49,13 @@ test('all real runner entry points hold lost Django replies/checkpoints without 
       'lost_checkpoint',
       'wrong_identity',
       'duplicate_conflict',
+      'accepted_missing_details',
+      'notice_queue_unavailable',
     ] as const) {
+      if (operation === 'payment_save' &&
+        (failureMode === 'accepted_missing_details' || failureMode === 'notice_queue_unavailable')) continue;
       let calls = 0;
+      emails.length = 0;
       let failCheckpoint = failureMode === 'lost_checkpoint';
       const row: Record<string, unknown> = {
         id: 'row-1',
@@ -117,6 +130,7 @@ test('all real runner entry points hold lost Django replies/checkpoints without 
         lastErrorMessage: null,
       };
       const projections: Array<Record<string, unknown>> = [];
+      const notices: Array<Record<string, unknown>> = [];
       const client = {
         paypalIntent: {
           findUnique: async () => structuredClone(row),
@@ -157,7 +171,48 @@ test('all real runner entry points hold lost Django replies/checkpoints without 
           findMany: async () => [],
           createMany: async () => ({ count: 0 }),
         },
-        $transaction: async (run: (db: unknown) => Promise<unknown>) => run(client),
+        customerNotificationOutbox: {
+          findUnique: async ({ where }: { where: { dedupeKey: string } }) =>
+            notices.find((notice) => notice.dedupeKey === where.dedupeKey),
+          updateMany: async ({ where, data }: { where: { id: string; attemptCount: number }; data: Record<string, unknown> }) => {
+            const notice = notices.find((entry) => entry.id === where.id &&
+              entry.attemptCount === where.attemptCount && entry.status === 'pending');
+            if (!notice) return { count: 0 };
+            Object.assign(notice, data);
+            return { count: 1 };
+          },
+          update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+            const notice = notices.find((entry) => entry.id === where.id);
+            assert.ok(notice);
+            return Object.assign(notice, data);
+          },
+          createMany: async ({ data }: { data: Array<Record<string, unknown>> }) => {
+            assert.equal(
+              (row.merchizeFulfillmentResponsePayload as {
+                _nextDjangoAttempt?: { outcome: string };
+              })?._nextDjangoAttempt?.outcome,
+              'acknowledged',
+            );
+            if (failureMode === 'notice_queue_unavailable')
+              throw new Error('Fixture notification queue unavailable');
+            notices.push(...data.map((entry) => ({ id: 'fixture-notice', attemptCount: 0, ...entry })));
+            return { count: data.length };
+          },
+        },
+        $transaction: async (run: (db: unknown) => Promise<unknown>) => {
+          const previous = structuredClone(row);
+          const noticeCount = notices.length;
+          inTransaction = true;
+          try {
+            return await run(client);
+          } catch (error) {
+            Object.assign(row, previous);
+            notices.length = noticeCount;
+            throw error;
+          } finally {
+            inTransaction = false;
+          }
+        },
       };
       global.__paypalTxLedger__ = client as unknown as PrismaClient;
       const network = t.mock.method(globalThis, 'fetch', async (url: RequestInfo | URL) => {
@@ -186,7 +241,9 @@ test('all real runner entry points hold lost Django replies/checkpoints without 
               captured_order_paypal_id: 'PAYPAL-1',
               order_payment_custom_id: 'payment-1',
               processing_status: 'completed',
-              error_message: null,
+              error_message: failureMode === 'accepted_missing_details'
+                ? 'Order created but details not available'
+                : null,
             },
           },
           { status: 201 },
@@ -201,9 +258,24 @@ test('all real runner entry points hold lost Django replies/checkpoints without 
           ? 'djangoPaymentSaveResponsePayload'
           : 'merchizeFulfillmentResponsePayload'
       ] as { _nextDjangoAttempt: { outcome: string; code?: string; httpStatus?: number } };
+      if (failureMode === 'accepted_missing_details') {
+        assert.equal(evidence._nextDjangoAttempt.outcome, 'acknowledged');
+        assert.equal(row.processingCompletedAt, null, 'release is not verified');
+        assert.deepEqual(notices.map(({ type, status }) => ({ type, status })), [
+          { type: 'paid_order_received', status: 'sent' },
+        ]);
+        assert.equal(emails.length, 1);
+        assert.match(emails[0].subject, /^Order received/u);
+        assert.equal(emails[0].inTransaction, false);
+        network.mock.restore();
+        continue;
+      }
+      assert.equal(notices.length, 0);
+      assert.equal(emails.length, 0);
       assert.equal(
         evidence._nextDjangoAttempt.outcome,
-        failureMode === 'lost_checkpoint' ? 'started' : 'uncertain',
+        failureMode === 'lost_checkpoint' || failureMode === 'notice_queue_unavailable'
+          ? 'started' : 'uncertain',
       );
       if (failureMode === 'wrong_identity')
         assert.match(evidence._nextDjangoAttempt.code ?? '', /^INVALID_DJANGO_/u);

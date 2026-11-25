@@ -305,6 +305,7 @@ function getProjectionLedgerRow(orderToken: string) {
       canonicalOrderSnapshot: true,
       canonicalOrderSnapshotVersion: true,
       canonicalOrderSnapshotHash: true,
+      shippingSnapshot: true,
       initialCurrency: true,
       merchizeFulfillmentResponsePayload: true,
       merchizeProviderOrderId: true,

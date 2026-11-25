@@ -6,7 +6,8 @@ export const ItemQuantityComponent: FC<{
   cartItem: CartVariant;
   className?: string;
   disableIncrement?: boolean;
-}> = ({ cartItem, className, disableIncrement = false }) => {
+  onRequestRemove: (trigger: HTMLButtonElement) => void;
+}> = ({ cartItem, className, disableIncrement = false, onRequestRemove }) => {
   const { quantity, title, variantId } = cartItem;
 
   const addToCart = useCartStore((state) => state.addToCart);
@@ -15,8 +16,13 @@ export const ItemQuantityComponent: FC<{
   const [error, setError] = useState<string | null>(null);
 
   const changeQuantity = useCallback(
-    async (delta: 1 | -1) => {
+    async (delta: 1 | -1, trigger: HTMLButtonElement) => {
       if (isSaving || (delta > 0 && disableIncrement)) return;
+      if (delta < 0 && quantity === 1) {
+        setError(null);
+        onRequestRemove(trigger);
+        return;
+      }
       setIsSaving(true);
       setError(null);
       try {
@@ -31,7 +37,16 @@ export const ItemQuantityComponent: FC<{
         setIsSaving(false);
       }
     },
-    [addToCart, reduceFromCart, cartItem, disableIncrement, variantId, isSaving],
+    [
+      addToCart,
+      reduceFromCart,
+      cartItem,
+      disableIncrement,
+      variantId,
+      isSaving,
+      quantity,
+      onRequestRemove,
+    ],
   );
 
   return (
@@ -40,9 +55,9 @@ export const ItemQuantityComponent: FC<{
         className={`flex w-auto min-w-[6.5rem] max-w-full items-center justify-between rounded-lg border-[.5px] border-gray-300 ${className ?? ''} not-a`}
       >
         <OperationButton
-          name={`Decrease quantity of ${title}`}
+          name={quantity === 1 ? `Remove ${title} from cart` : `Decrease quantity of ${title}`}
           disabled={isSaving}
-          onClick={() => void changeQuantity(-1)}
+          onClick={(event) => void changeQuantity(-1, event.currentTarget)}
         >
           -
         </OperationButton>
@@ -53,7 +68,7 @@ export const ItemQuantityComponent: FC<{
         <OperationButton
           name={`Increase quantity of ${title}`}
           disabled={disableIncrement || isSaving}
-          onClick={() => void changeQuantity(1)}
+          onClick={(event) => void changeQuantity(1, event.currentTarget)}
         >
           +
         </OperationButton>
@@ -70,6 +85,7 @@ export const ItemQuantityComponent: FC<{
 const OperationButton: FC<ButtonProps> = ({ className, name, onClick, children, ...rest }) => {
   return (
     <Button
+      type='button'
       className={`h-11 w-11 shrink-0 rounded-lg bg-slate-950 p-2 text-xl ${className ?? ''}`}
       name={name}
       onClick={onClick}

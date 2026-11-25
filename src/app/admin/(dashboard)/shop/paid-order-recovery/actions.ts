@@ -1,5 +1,6 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import argon2 from 'argon2';
 import { revalidatePath } from 'next/cache';
 import {
@@ -34,7 +35,12 @@ import {
   runPaidFulfillmentProcessing,
 } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
-import { getMerchizeFulfillmentRetryEligibility } from '@/lib/paypal/txLedger/fulfillmentRetryPolicy';
+import {
+  getMerchizeFulfillmentRetryEligibility,
+  getMerchizeReadyRefreshFeedback,
+  getPendingFulfillmentRetryMessage,
+  getPushVerificationPendingMessage,
+} from '@/lib/paypal/txLedger/fulfillmentRetryPolicy';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
@@ -48,6 +54,11 @@ import { CODEX_CHRISTI_FULFILLMENT_IDENTIFIER } from '@/lib/merchizeFulfillmentO
 import { applyMerchizeFulfillmentAddressCorrection } from '@/lib/merchizeFulfillmentOps/applyMerchizeFulfillmentAddressCorrection';
 import { markMerchizeFulfillmentAddressValid } from '@/lib/merchizeFulfillmentOps/markMerchizeFulfillmentAddressValid';
 import { getMerchizeBuyerAddressExpectationFromLedger } from '@/lib/merchizeFulfillmentOps/addressCorrectionVerification';
+import {
+  customerAddressCorrectionState,
+  CUSTOMER_ADDRESS_CORRECTION_REQUESTED,
+  CUSTOMER_ADDRESS_CORRECTION_REVIEW,
+} from '@/lib/shop/checkout/customerAddressCorrection';
 import { resolveMerchizeFulfillmentAddressCorrectionTarget } from '@/lib/merchizeFulfillmentOps/resolveMerchizeFulfillmentAddressCorrectionTarget';
 import { runMerchizeProductionReadinessChecks } from '@/lib/merchizeFulfillmentOps/runMerchizeProductionReadinessChecks';
 import { MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS } from '@/lib/merchizeFulfillmentOps/status';
@@ -76,6 +87,24 @@ type AdminNotificationActionResult =
       errorCode?: string;
       stage?: string;
     };
+
+type MerchizeRefreshActionResult = AdminNotificationActionResult & { heading?: string };
+
+async function releaseAddressActionLock(orderToken: string, lockId: string | null) {
+  if (!lockId) return;
+  await paypalTxLedger.paypalIntent.updateMany({
+    where: { orderToken, postProcessingLockId: lockId },
+    data: { postProcessingLockId: null, postProcessingLockedAt: null, postProcessingLockExpiresAt: null },
+  }).catch(() => undefined);
+}
+
+function addressActionLock(now: Date) {
+  return {
+    postProcessingLockId: randomUUID(),
+    postProcessingLockedAt: now,
+    postProcessingLockExpiresAt: new Date(now.getTime() + 5 * 60_000),
+  };
+}
 
 const SCANNER_AUDIT_ACTIONS = [
   'shop.paid_order_recovery.scan_candidates',
@@ -299,6 +328,7 @@ function getPaidOrderPaymentGate(row: {
   canonicalOrderSnapshot: unknown | null;
   canonicalOrderSnapshotVersion: string | null;
   canonicalOrderSnapshotHash: string | null;
+  shippingSnapshot: unknown;
 }) {
   const captureCompletion = getPayPalCaptureCompletion(row.capturePayload);
   if (!captureCompletion.ok) {
@@ -373,6 +403,7 @@ async function regeneratePaidOrderReceiptFromLedger(row: {
   canonicalOrderSnapshot: unknown | null;
   canonicalOrderSnapshotVersion: string | null;
   canonicalOrderSnapshotHash: string | null;
+  shippingSnapshot: unknown;
   customerName: string;
   customerEmail: string;
   djangoOrderIntentOrderId: string | null;
@@ -838,6 +869,7 @@ export async function retryAdminPaidOrderRecoveryAction({
         canonicalOrderSnapshot: true,
         canonicalOrderSnapshotVersion: true,
         canonicalOrderSnapshotHash: true,
+        shippingSnapshot: true,
         processingCompletedAt: true,
         postProcessingLockExpiresAt: true,
         merchizeFulfillmentResponsePayload: true,
@@ -878,6 +910,7 @@ export async function retryAdminPaidOrderRecoveryAction({
         processingCompletedAt: true,
         lastErrorCode: true,
         lastErrorMessage: true,
+        merchizeFulfillmentResponsePayload: true,
       },
     });
 
@@ -885,7 +918,16 @@ export async function retryAdminPaidOrderRecoveryAction({
       return reject('Recovery row could not be reloaded after retry.');
     }
 
-    if (updated.processingCompletedAt) {
+    const pendingMessage = updated.processingCompletedAt
+      ? null
+      : getPendingFulfillmentRetryMessage({
+          ...updated,
+          hasAcceptedDjangoHandoff: isAcceptedDjangoFulfillmentProcessResponse(
+            updated.merchizeFulfillmentResponsePayload,
+          ),
+        });
+
+    if (updated.processingCompletedAt || pendingMessage) {
       await writeAdminAuditLog({
         actor: admin,
         action,
@@ -896,12 +938,12 @@ export async function retryAdminPaidOrderRecoveryAction({
           ...targetMetadata,
           executionScope: 'full_post_payment',
           resultingStatus: updated.status,
+          ...(pendingMessage ? { pending: true, errorCode: updated.lastErrorCode } : {}),
         },
       });
-      return {
-        ok: true,
-        message: 'Order completed after retry.',
-      };
+      return pendingMessage
+        ? { ok: true, tone: 'warning', message: pendingMessage }
+        : { ok: true, message: 'Order completed after retry.' };
     }
 
     return reject(
@@ -999,6 +1041,7 @@ export async function retryAdminMerchizeFulfillmentAction({
         canonicalOrderSnapshot: true,
         canonicalOrderSnapshotVersion: true,
         canonicalOrderSnapshotHash: true,
+        shippingSnapshot: true,
         djangoPaymentSaveCustomId: true,
         merchizeFulfillmentResponsePayload: true,
         postProcessingLockExpiresAt: true,
@@ -1060,12 +1103,22 @@ export async function retryAdminMerchizeFulfillmentAction({
         lastErrorMessage: true,
         processingCompletedAt: true,
         status: true,
+        merchizeFulfillmentResponsePayload: true,
       },
     });
 
     if (!updated) return reject('Recovery row could not be reloaded after fulfillment retry.');
 
-    if (!updated.processingCompletedAt) {
+    const pendingMessage = updated.processingCompletedAt
+      ? null
+      : getPendingFulfillmentRetryMessage({
+          ...updated,
+          hasAcceptedDjangoHandoff: isAcceptedDjangoFulfillmentProcessResponse(
+            updated.merchizeFulfillmentResponsePayload,
+          ),
+        });
+
+    if (!updated.processingCompletedAt && !pendingMessage) {
       return reject(
         updated.lastErrorMessage ?? `Fulfillment retry ended in ${updated.status}.`,
         updated.lastErrorCode ?? undefined,
@@ -1083,13 +1136,13 @@ export async function retryAdminMerchizeFulfillmentAction({
         ...targetMetadata,
         executionScope: 'merchize_fulfillment_only',
         resultingStatus: updated.status,
+        ...(pendingMessage ? { pending: true, errorCode: updated.lastErrorCode } : {}),
       },
     });
 
-    return {
-      ok: true,
-      message: 'Merchize fulfillment completed after retry.',
-    };
+    return pendingMessage
+      ? { ok: true, tone: 'warning', message: pendingMessage }
+      : { ok: true, message: 'Merchize fulfillment completed after retry.' };
   } catch (error) {
     const failure = getProcessingActionFailure(error, 'Merchize fulfillment retry failed.');
     if (auditContext) {
@@ -1205,6 +1258,7 @@ export async function releaseMerchizeFulfillmentToProductionAction({
         canonicalOrderSnapshot: true,
         canonicalOrderSnapshotVersion: true,
         canonicalOrderSnapshotHash: true,
+        shippingSnapshot: true,
         lastErrorCode: true,
         processingCompletedAt: true,
         postProcessingLockExpiresAt: true,
@@ -1251,7 +1305,7 @@ export async function releaseMerchizeFulfillmentToProductionAction({
       return rejectAfterStepUp(paymentGate.reason);
     }
 
-    await runPaidFulfillmentProcessing(orderToken, {
+    const processing = await runPaidFulfillmentProcessing(orderToken, {
       overrideMerchizeFulfillmentPushDisabled: true,
       allowStaleMerchizeOrderManualRelease: true,
       executionScope: 'merchize_fulfillment_only',
@@ -1268,7 +1322,9 @@ export async function releaseMerchizeFulfillmentToProductionAction({
       select: {
         status: true,
         processingCompletedAt: true,
+        lastErrorCode: true,
         lastErrorMessage: true,
+        merchizeFulfillmentResponsePayload: true,
       },
     });
 
@@ -1296,7 +1352,45 @@ export async function releaseMerchizeFulfillmentToProductionAction({
       };
     }
 
-    const error = updated?.lastErrorMessage ?? `Release ended in ${updated?.status ?? 'unknown'}.`;
+    const pendingMessage =
+      processing?.status === 'push_verification_pending'
+        ? getPushVerificationPendingMessage(processing.pushRequestOutcome)
+        : updated && getPendingFulfillmentRetryMessage({
+            status: updated.status,
+            lastErrorCode: updated.lastErrorCode,
+            hasAcceptedDjangoHandoff: isAcceptedDjangoFulfillmentProcessResponse(
+              updated.merchizeFulfillmentResponsePayload,
+            ),
+          });
+
+    if (pendingMessage) {
+      const metadata = {
+        ...targetMetadata,
+        pending: true,
+        errorCode: updated?.lastErrorCode ?? null,
+        ...(processing ? { pushRequestOutcome: processing.pushRequestOutcome } : {}),
+      };
+      await writeMerchizeFulfillmentAdminAction({
+        orderToken,
+        action: 'manual_production_release',
+        actor: admin.userID,
+        reason: releaseReason,
+        status: 'pending',
+        metadata,
+      });
+      await writeAdminAuditLog({
+        actor: admin,
+        action,
+        targetType: 'orderToken',
+        targetId: orderToken,
+        outcome: 'blocked',
+        metadata,
+      });
+      return { ok: true, tone: 'warning', message: pendingMessage };
+    }
+
+    const error = updated?.lastErrorMessage ??
+      'Release was not confirmed. Refresh Merchize state before trying again.';
     await writeMerchizeFulfillmentAdminAction({
       orderToken,
       action: 'manual_production_release',
@@ -1338,6 +1432,7 @@ export async function markPaidOrderFulfillmentAddressValidAction({
 }): Promise<AdminNotificationActionResult> {
   const action = 'shop.paid_order_recovery.mark_fulfillment_address_valid';
   const confirmationReason = reason.trim();
+  let addressLockId: string | null = null;
 
   if (!confirmationReason) {
     return {
@@ -1364,6 +1459,11 @@ export async function markPaidOrderFulfillmentAddressValidAction({
     const ledgerOrder = await paypalTxLedger.paypalIntent.findUnique({
       where: { orderToken },
       select: {
+        status: true,
+        updatedAt: true,
+        lastErrorCode: true,
+        fulfillmentAddressOverriddenAt: true,
+        fulfillmentAddressOverriddenBy: true,
         authorizePayload: true,
         capturePayload: true,
         canonicalOrderSnapshot: true,
@@ -1377,6 +1477,9 @@ export async function markPaidOrderFulfillmentAddressValidAction({
       throw new Error('Recovery row was not found.');
     }
     assertPaidOrderPaymentGate(ledgerOrder);
+    if (customerAddressCorrectionState(ledgerOrder) === 'checking') {
+      return { ok: false, error: 'The buyer correction is still being checked. Refresh Merchize state before confirming it.' };
+    }
 
     const expectedAddress = getMerchizeBuyerAddressExpectationFromLedger(
       ledgerOrder.fulfillmentAddressOverride ?? ledgerOrder.shippingSnapshot,
@@ -1386,6 +1489,19 @@ export async function markPaidOrderFulfillmentAddressValidAction({
         'The effective ledger address is incomplete and cannot be safely confirmed in Merchize.',
       );
     }
+
+    const now = new Date();
+    const lock = addressActionLock(now);
+    const claimed = await paypalTxLedger.paypalIntent.updateMany({
+      where: {
+        orderToken, updatedAt: ledgerOrder.updatedAt, processingCompletedAt: null,
+        status: { notIn: [PAYPAL_LEDGER_STATUS.COMPLETED, PAYPAL_LEDGER_STATUS.REFUNDED] },
+        OR: [{ postProcessingLockExpiresAt: null }, { postProcessingLockExpiresAt: { lt: now } }],
+      },
+      data: lock,
+    });
+    if (claimed.count !== 1) return { ok: false, error: 'This order changed or is being processed. Refresh before trying again.' };
+    addressLockId = lock.postProcessingLockId;
 
     await Promise.all([
       writeAdminAuditLog({
@@ -1485,6 +1601,14 @@ export async function markPaidOrderFulfillmentAddressValidAction({
     }
 
     const remainingBlocker = readiness.readiness.primaryBlocker;
+    if (ledgerOrder.lastErrorCode === CUSTOMER_ADDRESS_CORRECTION_REVIEW &&
+      readiness.readiness.addressReadbackStatus === 'matched') {
+      await paypalTxLedger.paypalIntent.updateMany({
+        where: { orderToken, postProcessingLockId: addressLockId, lastErrorCode: CUSTOMER_ADDRESS_CORRECTION_REVIEW },
+        data: { status: PAYPAL_LEDGER_STATUS.PAYMENT_SAVED, lastErrorCode: null, lastErrorMessage: null },
+      });
+      await refreshPaidOrderRecoveryProjectionSafely(orderToken);
+    }
     await Promise.all([
       writeAdminAuditLog({
         actor: admin,
@@ -1528,6 +1652,8 @@ export async function markPaidOrderFulfillmentAddressValidAction({
       ok: false,
       error: getAdminActionErrorMessage(error, 'Address confirmation failed.'),
     };
+  } finally {
+    await releaseAddressActionLock(orderToken, addressLockId);
   }
 }
 
@@ -1535,7 +1661,7 @@ export async function syncAdminMerchizeProviderDetailsAction({
   orderToken,
 }: {
   orderToken: string;
-}): Promise<AdminNotificationActionResult> {
+}): Promise<MerchizeRefreshActionResult> {
   try {
     const admin = await requireAdminAction('shop.recovery.run');
     assertShopOpsMutationAllowed();
@@ -1647,6 +1773,24 @@ export async function syncAdminMerchizeProviderDetailsAction({
       };
     }
 
+    if (sync.fulfillmentCanceled) {
+      await writeAdminAuditLog({
+        actor: admin,
+        action: 'shop.paid_order_recovery.sync_merchize_provider_details',
+        targetType: 'orderToken',
+        targetId: orderToken,
+        outcome: 'success',
+        metadata: { fulfillmentCanceled: true },
+      });
+      revalidatePath(`/admin/shop/paid-order-recovery/${encodeURIComponent(orderToken)}`);
+      revalidatePath('/admin/shop/paid-order-recovery');
+      return {
+        ok: true,
+        tone: 'warning',
+        message: 'Fulfillment was canceled in Merchize. Payment was not changed.',
+      };
+    }
+
     const [readiness, snapshots] = await Promise.all([
       runMerchizeProductionReadinessChecks(existing.orderToken, {
         expectedBuyerAddress: getMerchizeBuyerAddressExpectationFromLedger(
@@ -1695,12 +1839,10 @@ export async function syncAdminMerchizeProviderDetailsAction({
 
     return {
       ok: true,
-      tone:
-        readiness.readiness.providerPushState === 'pushed' && snapshots.ok ? 'success' : 'warning',
-      message:
-        readiness.readiness.providerPushState === 'pushed'
-          ? `Merchize provider state is verified for ${sync.merchizeOrderId}.`
-          : `Production readiness passed for ${sync.merchizeOrderId}, but the order is not yet verified as pushed.`,
+      ...getMerchizeReadyRefreshFeedback(
+        readiness.readiness.providerPushState === 'pushed',
+        snapshots.ok,
+      ),
     };
   } catch (error) {
     return {
@@ -1729,6 +1871,7 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
   password?: string;
 }): Promise<AdminNotificationActionResult> {
   const auditAction = 'shop.paid_order_recovery.address_correction_save';
+  let addressLockId: string | null = null;
   try {
     const { admin, targetStatus } = await authorizeShopOpsRecoveryMutation({
       action: auditAction,
@@ -1774,6 +1917,8 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
       where: { orderToken },
       select: {
         orderToken: true,
+        updatedAt: true,
+        lastErrorCode: true,
         paypalOrderId: true,
         authorizePayload: true,
         capturePayload: true,
@@ -1781,6 +1926,7 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
         canonicalOrderSnapshot: true,
         canonicalOrderSnapshotVersion: true,
         canonicalOrderSnapshotHash: true,
+        shippingSnapshot: true,
         customerName: true,
         customerEmail: true,
         djangoOrderIntentUuid: true,
@@ -1795,6 +1941,9 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
       return { ok: false, error: 'Recovery row was not found.' };
     }
     assertPaidOrderPaymentGate(existing);
+    if (existing.lastErrorCode === CUSTOMER_ADDRESS_CORRECTION_REQUESTED) {
+      return { ok: false, error: 'The buyer correction is queued. Wait for the provider check before making another correction.' };
+    }
 
     const normalizedAddress = {
       shipping_address_line_1: address.line1.trim(),
@@ -1804,15 +1953,24 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
       zip_code: address.postalCode.trim(),
       shipping_country: address.country.trim(),
     };
-    await paypalTxLedger.paypalIntent.update({
-      where: { orderToken },
+    const now = new Date();
+    const lock = addressActionLock(now);
+    const claimed = await paypalTxLedger.paypalIntent.updateMany({
+      where: {
+        orderToken, updatedAt: existing.updatedAt, processingCompletedAt: null,
+        status: { notIn: [PAYPAL_LEDGER_STATUS.COMPLETED, PAYPAL_LEDGER_STATUS.REFUNDED] },
+        OR: [{ postProcessingLockExpiresAt: null }, { postProcessingLockExpiresAt: { lt: now } }],
+      },
       data: {
+        ...lock,
         fulfillmentAddressOverride: normalizedAddress,
         fulfillmentAddressOverrideReason: reason.trim(),
         fulfillmentAddressOverriddenBy: admin.userID,
-        fulfillmentAddressOverriddenAt: new Date(),
+        fulfillmentAddressOverriddenAt: now,
       },
     });
+    if (claimed.count !== 1) return { ok: false, error: 'This order changed or is being processed. Refresh before trying again.' };
+    addressLockId = lock.postProcessingLockId;
 
     await writeMerchizeFulfillmentAdminAction({
       orderToken,
@@ -2000,6 +2158,8 @@ export async function savePaidOrderFulfillmentAddressOverrideAction({
       ok: false,
       error: getAdminActionErrorMessage(error, 'Address override could not be saved.'),
     };
+  } finally {
+    await releaseAddressActionLock(orderToken, addressLockId);
   }
 }
 
@@ -2029,6 +2189,7 @@ export async function regeneratePaidOrderReceiptAction({
         canonicalOrderSnapshot: true,
         canonicalOrderSnapshotVersion: true,
         canonicalOrderSnapshotHash: true,
+        shippingSnapshot: true,
         customerName: true,
         customerEmail: true,
         djangoOrderIntentOrderId: true,

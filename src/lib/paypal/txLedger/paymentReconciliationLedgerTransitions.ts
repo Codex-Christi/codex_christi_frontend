@@ -335,9 +335,7 @@ export function buildReconciledAuthorizationLedgerDecision({
     return {
       data: {
         status: PAYPAL_LEDGER_STATUS.ERROR,
-        ...(row.paypalAuthorizationId
-          ? { paypalAuthorizationId: row.paypalAuthorizationId }
-          : {}),
+        ...(row.paypalAuthorizationId ? { paypalAuthorizationId: row.paypalAuthorizationId } : {}),
         authorizePayload: safeJson(row.authorizePayload),
         lastErrorCode: durableMismatch.errorCode,
         lastErrorMessage: row.lastErrorMessage ?? durableMismatch.reason,
@@ -359,7 +357,14 @@ export function buildReconciledAuthorizationLedgerDecision({
     };
   }
 
-  const paymentReconciliation = reconcileCanonicalPayPalAuthorization(row, payload);
+  const durableAuthorizePayload = safeJson(
+    getProcessingAuthorizePayload({ row, orderPayload, authorizationPayload: payload }) ?? payload,
+  );
+  const paymentReconciliation = reconcileCanonicalPayPalAuthorization(
+    row,
+    payload,
+    durableAuthorizePayload,
+  );
   const paypalOrderId =
     row.paypalOrderId ?? getRelatedOrderId(payload) ?? getRelatedOrderId(orderPayload);
   if (!paymentReconciliation.ok) {
@@ -367,7 +372,10 @@ export function buildReconciledAuthorizationLedgerDecision({
       data: {
         ...(paypalOrderId ? { paypalOrderId } : {}),
         paypalAuthorizationId: row.paypalAuthorizationId ?? asString(authorization?.id),
-        authorizePayload: safeJson(payload),
+        authorizePayload:
+          paymentReconciliation.errorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED'
+            ? durableAuthorizePayload
+            : safeJson(payload),
         status: PAYPAL_LEDGER_STATUS.ERROR,
         lastErrorCode: paymentReconciliation.errorCode,
         lastErrorMessage: paymentReconciliation.reason,
@@ -421,10 +429,6 @@ export function buildReconciledAuthorizationLedgerDecision({
   const preservesAdvancedState =
     !AUTHORIZATION_RECONCILIATION_ADVANCE_STATUSES.has(row.status) ||
     Boolean(row.processingCompletedAt);
-  const durableAuthorizePayload = safeJson(
-    getProcessingAuthorizePayload({ row, orderPayload, authorizationPayload: payload }) ?? payload,
-  );
-
   if (preservesAdvancedState) {
     return {
       data: { status: row.status },
@@ -476,11 +480,11 @@ export function buildMissingPaymentReferenceLedgerDecision(
 ): PaymentReconciliationLedgerDecision {
   const hasNewerPaymentEvidence = Boolean(
     row.paypalAuthorizationId ||
-      getRelatedAuthorizationId(row.authorizePayload) ||
-      getPayPalCaptureCompletion(row.capturePayload).captureId ||
-      CAPTURE_RECONCILIATION_ADVANCED_STATUSES.has(row.status) ||
-      row.status === PAYPAL_LEDGER_STATUS.CAPTURED ||
-      row.processingCompletedAt,
+    getRelatedAuthorizationId(row.authorizePayload) ||
+    getPayPalCaptureCompletion(row.capturePayload).captureId ||
+    CAPTURE_RECONCILIATION_ADVANCED_STATUSES.has(row.status) ||
+    row.status === PAYPAL_LEDGER_STATUS.CAPTURED ||
+    row.processingCompletedAt,
   );
 
   if (hasNewerPaymentEvidence) {

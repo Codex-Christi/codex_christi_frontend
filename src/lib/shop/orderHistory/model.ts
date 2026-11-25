@@ -18,11 +18,23 @@ export const historyOrderSelect = {
   canonicalOrderSnapshot: true,
   canonicalOrderSnapshotVersion: true,
   canonicalOrderSnapshotHash: true,
+  shippingSnapshot: true,
   authorizePayload: true,
   capturePayload: true,
 } satisfies Prisma.PaypalIntentSelect;
 
 export type HistoryLedgerRow = Prisma.PaypalIntentGetPayload<{ select: typeof historyOrderSelect }>;
+export const historyListOrderSelect = {
+  ...historyOrderSelect,
+  djangoPaymentSaveCustomId: true,
+  merchizeFulfillmentResponsePayload: true,
+  fulfillmentAddressOverriddenAt: true,
+  lastErrorCode: true,
+  processingCompletedAt: true,
+} satisfies Prisma.PaypalIntentSelect;
+export type HistoryListLedgerRow = Prisma.PaypalIntentGetPayload<{
+  select: typeof historyListOrderSelect;
+}>;
 export const HISTORY_PAGE_SIZE = 20;
 export const HISTORY_POST_CAPTURE_STATUSES = [
   STATUS.CAPTURED,
@@ -42,6 +54,7 @@ export type HistoryFulfillment = {
   tracking: string | null;
   progressCheckedAt: string | null;
   trackingCheckedAt: string | null;
+  holdCheckedAt?: string | null;
   packages?: ShipmentPackage[];
   delivered?: boolean;
 };
@@ -123,14 +136,13 @@ function legacyPaymentLines(row: HistoryLedgerRow, isPaid: boolean) {
   });
 }
 
-export function toHistoryOrder(row: HistoryLedgerRow) {
+export function toHistoryOrder(row: HistoryLedgerRow, payment = getCanonicalPaymentProjectionState(row)) {
   let snapshot = null;
   try {
     snapshot = parseCanonicalOrderSnapshotFromLedger(row).snapshot;
   } catch {
     /* Retain the purchase, but never substitute mutable cart data for corrupt details. */
   }
-  const payment = getCanonicalPaymentProjectionState(row);
   const captured = payment.captureCompletion.ok ? payment.captureCompletion.amount : null;
   const paidAmount = captured ? historyMoney(captured.value, captured.currency) : null;
   const refunded = row.status === STATUS.REFUNDED;

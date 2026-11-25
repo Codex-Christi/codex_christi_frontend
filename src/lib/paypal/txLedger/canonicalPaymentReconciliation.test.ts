@@ -14,6 +14,7 @@ import {
   CANONICAL_ORDER_SNAPSHOT_HASH_ALGORITHM,
   CANONICAL_ORDER_SNAPSHOT_VERSION,
 } from '@/lib/paypal/orderSnapshot/types';
+import { hasChangedPayPalReviewAddress } from './payPalReviewAddress';
 
 function canonicalEnvelope(): CanonicalOrderSnapshotLedgerEnvelope {
   const snapshot = finalizeCanonicalOrderSnapshot({
@@ -51,6 +52,178 @@ function canonicalEnvelope(): CanonicalOrderSnapshotLedgerEnvelope {
     canonicalOrderSnapshotHash: snapshot.hash,
   };
 }
+
+const reviewedAddress = {
+  shipping_address_line_1: '12 Example Street',
+  shipping_address_line_2: 'Unit 4',
+  shipping_city: 'Example City',
+  shipping_state: 'CA',
+  zip_code: '90001-1234',
+  shipping_country: 'USA',
+};
+const returnedAddress = {
+  addressLine1: '12 Example Street',
+  addressLine2: 'Unit 4',
+  adminArea2: 'Example City',
+  adminArea1: 'CA',
+  postalCode: '90001-1234',
+  countryCode: 'US',
+};
+const authorizationWithAddress = (address = returnedAddress) => ({
+  purchaseUnits: [
+    {
+      shipping: { address },
+      payments: { authorizations: [{ amount: { value: '57.00', currencyCode: 'EUR' } }] },
+    },
+  ],
+});
+
+test('returned shipping preserves case, whitespace, postal formatting and country-code equivalence', () => {
+  const envelope = { ...canonicalEnvelope(), shippingSnapshot: reviewedAddress };
+  const camel = reconcileCanonicalPayPalAuthorization(
+    envelope,
+    authorizationWithAddress({
+      ...returnedAddress,
+      addressLine1: ' 12 EXAMPLE  STREET ',
+      postalCode: '90001 1234',
+      countryCode: 'us',
+    }),
+  );
+  const snake = reconcileCanonicalPayPalAuthorization(envelope, {
+    purchase_units: [
+      {
+        shipping: {
+          address: {
+            address_line_1: '12 Example Street',
+            address_line_2: 'Unit 4',
+            admin_area_2: 'Example City',
+            admin_area_1: 'CA',
+            postal_code: '900011234',
+            country_code: 'US',
+          },
+        },
+        payments: { authorizations: [{ amount: { value: '57.00', currency_code: 'EUR' } }] },
+      },
+    ],
+  });
+  assert.equal(camel.ok, true);
+  assert.equal(snake.ok, true);
+});
+
+test('the same U.S. state matches full names and postal codes in either direction', () => {
+  for (const [savedState, returnedState] of [
+    ['California', 'CA'],
+    ['CA', 'California'],
+    ['  california  ', ' ca '],
+    ['cA', 'CALIFORNIA'],
+  ]) {
+    const envelope = {
+      ...canonicalEnvelope(),
+      shippingSnapshot: { ...reviewedAddress, shipping_state: savedState },
+    };
+    const camel = reconcileCanonicalPayPalAuthorization(
+      envelope,
+      authorizationWithAddress({ ...returnedAddress, adminArea1: returnedState }),
+    );
+    const snake = reconcileCanonicalPayPalAuthorization(envelope, {
+      purchase_units: [
+        {
+          shipping: {
+            address: {
+              address_line_1: returnedAddress.addressLine1,
+              address_line_2: returnedAddress.addressLine2,
+              admin_area_2: returnedAddress.adminArea2,
+              admin_area_1: returnedState,
+              postal_code: returnedAddress.postalCode,
+              country_code: 'US',
+            },
+          },
+          payments: { authorizations: [{ amount: { value: '57.00', currency_code: 'EUR' } }] },
+        },
+      ],
+    });
+    assert.equal(camel.ok, true, `${savedState} should match ${returnedState}`);
+    assert.equal(snake.ok, true, `${savedState} should match ${returnedState}`);
+  }
+});
+
+test('U.S. alias matching still blocks different, missing, and unrecognized state differences', () => {
+  for (const [savedState, returnedState] of [
+    ['California', 'NY'],
+    ['CA', 'New York'],
+    ['California', ''],
+    ['', 'CA'],
+    ['Calif', 'CA'],
+    ['CA', 'Calif'],
+    ['Unknown One', 'Unknown Two'],
+  ]) {
+    const result = reconcileCanonicalPayPalAuthorization(
+      {
+        ...canonicalEnvelope(),
+        shippingSnapshot: { ...reviewedAddress, shipping_state: savedState },
+      },
+      authorizationWithAddress({ ...returnedAddress, adminArea1: returnedState }),
+    );
+    assert.equal(result.ok, false, `${savedState} must not match ${returnedState}`);
+    assert.equal(result.errorCode, 'PAYPAL_REVIEW_ADDRESS_CHANGED');
+  }
+});
+
+test('U.S. state aliases do not change how non-U.S. regions are compared', () => {
+  const saved = { ...reviewedAddress, shipping_country: 'CAN', shipping_state: 'CA' };
+  assert.equal(
+    hasChangedPayPalReviewAddress(
+      saved,
+      authorizationWithAddress({ ...returnedAddress, countryCode: 'CA', adminArea1: 'California' }),
+    ),
+    true,
+  );
+  assert.equal(
+    hasChangedPayPalReviewAddress(
+      { ...saved, shipping_state: 'Ontario' },
+      authorizationWithAddress({ ...returnedAddress, countryCode: 'CA', adminArea1: ' ontario ' }),
+    ),
+    false,
+  );
+});
+
+test('a changed returned address blocks capture and fulfillment even when payment amounts match', () => {
+  const envelope = { ...canonicalEnvelope(), shippingSnapshot: reviewedAddress };
+  for (const changed of [
+    { addressLine1: '99 Changed Street' },
+    { addressLine2: '' },
+    { adminArea2: 'Different City' },
+    { adminArea1: 'NY' },
+    { postalCode: '10001' },
+    { countryCode: 'CA' },
+  ]) {
+    const result = reconcileCanonicalPayPalPaymentChain(
+      envelope,
+      authorizationWithAddress({ ...returnedAddress, ...changed }),
+      {
+        id: 'capture-1',
+        status: 'COMPLETED',
+        amount: { value: '57.00', currencyCode: 'EUR' },
+      },
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.failedAt, 'authorization');
+    assert.equal(result.reconciliation?.errorCode, 'PAYPAL_REVIEW_ADDRESS_CHANGED');
+    assert.doesNotMatch(result.reconciliation?.reason ?? '', /99 Changed|Different City|10001/u);
+  }
+});
+
+test('a supplied PayPal address needs a complete original saved address', () => {
+  const result = reconcileCanonicalPayPalAuthorization(
+    {
+      ...canonicalEnvelope(),
+      shippingSnapshot: { ...reviewedAddress, shipping_city: '' },
+    },
+    authorizationWithAddress(),
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, 'PAYPAL_REVIEW_ADDRESS_CHANGED');
+});
 
 test('preserves existing behavior only for an all-null legacy envelope', () => {
   const result = reconcileCanonicalPayPalAuthorization(

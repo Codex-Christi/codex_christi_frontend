@@ -2,6 +2,7 @@ import { normalizeCountryToIso3 } from '@/lib/utils/shop/checkout/normalizeCount
 
 type CheckoutContact = {
   email?: string | null;
+  draftEmail?: string | null;
   delivery_address?: Partial<
     Record<
       | 'shipping_address_line_1'
@@ -82,7 +83,7 @@ export function canResumeVerifiedCheckout(
   const data = record(payload?.data);
   const uuid = text(intent.djangoOrderIntentUuid, 128);
   const orderId = text(intent.djangoOrderIntentOrderId, 128);
-  const currentEmail = email(checkout.email);
+  const currentEmail = email(checkout.draftEmail ?? checkout.email);
   if (
     !uuid ||
     !orderId ||

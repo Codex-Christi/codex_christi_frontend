@@ -35,6 +35,7 @@ import {
   checkoutEmailChallengeScope,
   matchesCheckoutEmailIdentity,
 } from './checkoutEmailVerification';
+import { buildShopVerificationEmail } from '@/lib/shop/email/templates';
 
 type DjangoOrderIntentEndpoint =
   '/orders/intent' | '/orders/intent/verify' | '/orders/intent/resend-otp';
@@ -72,9 +73,11 @@ async function sendCheckoutEmailCode(proof: CheckoutEmailProof) {
     const { sendMailFromPrimaryAgent } = await import('@/lib/zeptomail/sendMailFromPrimaryAgent');
     await sendMailFromPrimaryAgent({
       emailReceipents: [{ email_address: { address: proof.email, name: 'Checkout customer' } }],
-      subject: 'Your Codex Christi checkout verification code',
-      // The only interpolated value is a server-generated six-digit code.
-      htmlbody: `<h1>Verify your checkout email</h1><p>Use this code to continue your Codex Christi checkout:</p><p style="font-size:28px;letter-spacing:6px;font-weight:bold">${challenge.otp}</p><p>This code expires in ${RECOVERY_OTP_EXPIRY_MINUTES} minutes. Do not share it with anyone.</p>`,
+      ...buildShopVerificationEmail({
+        purpose: 'checkout',
+        otp: challenge.otp,
+        expiresInMinutes: RECOVERY_OTP_EXPIRY_MINUTES,
+      }),
     });
   }
   return challenge;

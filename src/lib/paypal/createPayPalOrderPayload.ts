@@ -16,6 +16,7 @@ export type BuildPayPalOrderCreatePayloadInput = Readonly<{
   /** PayPal requires the ISO-2 country code for its provided shipping address. */
   country: string;
   delivery_address: ShopCheckoutStoreInterface['delivery_address'];
+  paymentSource?: 'paypal';
 }>;
 
 export type PayPalOrderCreatePayload = Readonly<{
@@ -29,6 +30,15 @@ const shippingPreferenceForPaymentContext = {
     shippingPreference: 'SET_PROVIDED_ADDRESS' as const,
     brandName: 'Codex Christi',
   },
+};
+
+const legacyPaymentSources = {
+  paypal: shippingPreferenceForPaymentContext,
+  card: {
+    experienceContext: shippingPreferenceForPaymentContext.experienceContext,
+    attributes: { verification: { method: 'SCA_WHEN_REQUIRED' as const } },
+  },
+  venmo: shippingPreferenceForPaymentContext,
 };
 
 function buildPayPalItem(
@@ -59,6 +69,7 @@ export function buildPayPalOrderCreatePayload({
   customer,
   country,
   delivery_address,
+  paymentSource,
 }: BuildPayPalOrderCreatePayloadInput): PayPalOrderCreatePayload {
   const currencyCode = canonicalOrderSnapshot.currency;
   const items = canonicalOrderSnapshot.lines.map((line) => buildPayPalItem(line, currencyCode));
@@ -111,18 +122,10 @@ export function buildPayPalOrderCreatePayload({
         name: { givenName: customer.name },
         emailAddress: customer.email,
       },
-      paymentSource: {
-        paypal: shippingPreferenceForPaymentContext,
-        card: {
-          experienceContext: shippingPreferenceForPaymentContext.experienceContext,
-          attributes: {
-            verification: {
-              method: 'SCA_WHEN_REQUIRED',
-            },
-          },
-        },
-        venmo: shippingPreferenceForPaymentContext,
-      },
+      paymentSource:
+        paymentSource === 'paypal'
+          ? { paypal: shippingPreferenceForPaymentContext }
+          : legacyPaymentSources,
     } as OrderRequest,
     prefer: 'return=representation',
   };

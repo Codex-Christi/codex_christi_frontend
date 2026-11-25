@@ -3,29 +3,34 @@
 import { useContext, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { ServerOrderDetailsContext } from './ServerOrderDetailsComponent';
-import { useCartStore, type CartVariant } from '@/stores/shop_stores/cartStore';
-import { MiniCartList } from '../Cart/MiniCartList';
+import type { CheckoutReviewLine } from '@/lib/shop/checkout/checkoutReviewTypes';
+import CheckoutReviewItems from './CheckoutReviewItems';
 import OrderSummaryTotals from './OrderSummaryTotals';
 import { formatOrderMoney, type OrderPreviewTotals } from '@/lib/shop/checkout/orderMoney';
 import { checkoutPanelClassName } from './checkoutStyles';
 
 export default function CheckoutPageOrderSummary() {
   const details = useContext(ServerOrderDetailsContext);
-  const cartItems = useCartStore((state) => state.variants);
   return (
-    <CheckoutOrderSummaryView cartItems={cartItems} prices={details?.finalPricesWithShippingFee} />
+    <CheckoutOrderSummaryView
+      reviewLines={details?.reviewLines ?? []}
+      prices={details?.finalPricesWithShippingFee}
+    />
   );
 }
 
 export function CheckoutOrderSummaryView({
-  cartItems,
+  reviewLines,
   prices,
 }: {
-  cartItems: CartVariant[];
+  reviewLines: CheckoutReviewLine[];
   prices?: OrderPreviewTotals;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const quantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const quantity = reviewLines.reduce((sum, item) => sum + item.quantity, 0);
+  const quantityLabel = prices
+    ? `${quantity} ${quantity === 1 ? 'item' : 'items'}`
+    : 'Awaiting current order details';
 
   return (
     <aside
@@ -41,9 +46,7 @@ export function CheckoutOrderSummaryView({
       >
         <span className='min-w-0'>
           <span className='block text-xl font-semibold'>Order summary</span>
-          <span className='mt-1 block text-sm text-white/65'>
-            {quantity} {quantity === 1 ? 'item' : 'items'}
-          </span>
+          <span className='mt-1 block text-sm text-white/65'>{quantityLabel}</span>
         </span>
         <span className='flex min-w-0 items-center gap-2 lg:hidden'>
           {prices && (
@@ -60,9 +63,7 @@ export function CheckoutOrderSummaryView({
       </button>
       <h2 className='hidden text-xl font-semibold lg:block'>
         <span>Order summary</span>
-        <span className='mt-1 block text-sm font-normal text-white/65'>
-          {quantity} {quantity === 1 ? 'item' : 'items'}
-        </span>
+        <span className='mt-1 block text-sm font-normal text-white/65'>{quantityLabel}</span>
       </h2>
       <div
         id='checkout-order-summary'
@@ -74,14 +75,13 @@ export function CheckoutOrderSummaryView({
           tabIndex={0}
           className='scrollbar max-h-64 overflow-x-hidden overflow-y-auto overscroll-contain pr-2 focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-white/60 lg:max-h-80'
         >
-          <MiniCartList
-            items={cartItems}
-            showQuantityControls={false}
-            showRemoveButton={false}
-            variant='summary'
-            className='!space-y-2'
-            prices={prices}
-          />
+          {prices ? (
+            <CheckoutReviewItems lines={reviewLines} currency={prices.currency} />
+          ) : (
+            <p role='status' className='text-sm text-white/70'>
+              Updating your order details…
+            </p>
+          )}
         </div>
         <div>
           <label htmlFor='checkout-discount-code' className='sr-only'>

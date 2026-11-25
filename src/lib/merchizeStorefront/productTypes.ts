@@ -5,6 +5,7 @@ export interface BasicProductInterface {
     description: string;
     image: string;
     retail_price: string;
+    no_need_artworks?: boolean;
     slug: string;
     is_active?: boolean;
     is_deleted?: boolean;

@@ -8,7 +8,9 @@ import {
 import { useShopRouter } from '@/lib/hooks/useShopRouter';
 import { finalizePayPalAttempt, PayPalCheckoutError } from './finalizePayPalAttempt';
 
-export const usePayPalTXApproveCallback = (onFailure?: (message: string) => void) => {
+export const usePayPalTXApproveCallback = (
+  onFailure?: (message: string, code?: string) => void,
+) => {
   const { push } = useShopRouter();
   const [isFinalizingPayment, setIsFinalizingPayment] = useState(false);
   const attempt = usePayPalIntentStore((state) => state.checkoutAttempt);
@@ -26,7 +28,8 @@ export const usePayPalTXApproveCallback = (onFailure?: (message: string) => void
             error instanceof PayPalCheckoutError
               ? error.message
               : 'We could not confirm this payment. Check its status before trying again.';
-          if (onFailure) onFailure(message);
+          if (onFailure)
+            onFailure(message, error instanceof PayPalCheckoutError ? error.code : undefined);
           else errorToast({ message });
         }
       } finally {

@@ -11,6 +11,8 @@ import type { OriginalCheckout } from '@/lib/shop/checkout/originalCheckout';
 import { boundedCheckoutRequest } from './boundedCheckoutRequest';
 import { claimCurrentCheckout } from './claimCurrentCheckout';
 
+const REVIEW_LOAD_FAILED = 'We couldn’t load your purchase review. Please try again.';
+
 export const canReopenCheckoutPayment = (stage?: ActivePayPalCheckoutStage) =>
   !stage || ['paypal_order_created', 'paypal_window_opened', 'paypal_cancelled'].includes(stage);
 
@@ -100,12 +102,27 @@ export async function loadOriginalCheckout(
       `/next-api/shop/checkout/${encodeURIComponent(attempt.orderToken!)}/resume`,
       { cache: 'no-store', signal },
     );
-    if (!response.ok)
-      throw new Error('This checkout needs a status check before payment can continue.');
-    return (await response.json()) as { checkout?: unknown };
-  }, timeoutMs);
+    return {
+      ok: response.ok,
+      status: response.status,
+      body: response.ok ? ((await response.json()) as { checkout?: unknown }) : null,
+    };
+  }, timeoutMs).catch(() => {
+    assertCurrent();
+    throw new Error(REVIEW_LOAD_FAILED);
+  });
   assertCurrent();
-  const checkout = result?.checkout;
+  if (!result.ok) {
+    if (result.status === 401 || result.status === 403)
+      throw new Error('Sign in or verify your email to reopen this checkout.');
+    const retryable = result.status === 408 || result.status === 429 || result.status >= 500;
+    throw new Error(
+      retryable
+        ? REVIEW_LOAD_FAILED
+        : 'This checkout needs a status check before payment can continue.',
+    );
+  }
+  const checkout = result.body?.checkout;
   if (
     !isOriginalCheckout(checkout) ||
     checkout.orderToken !== attempt.orderToken ||
@@ -121,8 +138,39 @@ export async function resumeOriginalPayPalOrder(
   attempt: CheckoutAttempt,
   options?: Parameters<typeof loadOriginalCheckout>[1],
 ) {
+  const scope = originalCheckoutScope();
   const current = await loadOriginalCheckout(attempt, options);
   if (current.reviewKey !== reviewed.reviewKey)
     throw new Error('The saved purchase changed. Reopen it and review the details again.');
+  const isCurrent = () =>
+    originalCheckoutScope() === scope &&
+    isCurrentCheckoutAttempt(attempt) &&
+    canReopenCheckoutPayment(usePayPalIntentStore.getState().activeCheckout?.stage);
+  if (!isCurrent()) throw new Error('This checkout changed. Reopen its order status.');
+  const confirmed = await boundedCheckoutRequest(async (signal) => {
+    const response = await (options?.request ?? fetch)(
+      `/next-api/shop/checkout/${encodeURIComponent(current.orderToken)}/resume`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acknowledged: true, reviewKey: reviewed.reviewKey }),
+        signal,
+      },
+    );
+    if (!response.ok)
+      throw new Error('We couldn’t save your review. Reopen the purchase and try again.');
+    return (await response.json()) as {
+      ok?: boolean;
+      reviewKey?: string;
+      paypalOrderId?: string;
+    };
+  }, options?.timeoutMs);
+  if (
+    !isCurrent() ||
+    confirmed.ok !== true ||
+    confirmed.reviewKey !== reviewed.reviewKey ||
+    confirmed.paypalOrderId !== current.paypalOrderId
+  )
+    throw new Error('This checkout changed. Reopen it and review the details again.');
   return current.paypalOrderId;
 }

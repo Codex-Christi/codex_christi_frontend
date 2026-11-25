@@ -18,6 +18,60 @@ import {
 import type { PaymentLedgerRow } from './paymentReconciliationTypes';
 import { PAYPAL_LEDGER_STATUS } from './status';
 
+test('direct authorization reconciliation checks its order address and preserves a mismatch', () => {
+  const current = canonicalRow();
+  current.shippingSnapshot = {
+    shipping_address_line_1: '12 Example Street',
+    shipping_city: 'Example City',
+    shipping_state: 'CA',
+    zip_code: '90001',
+    shipping_country: 'USA',
+  };
+  const payment = {
+    id: 'authorization-id',
+    status: 'CREATED',
+    amount: { value: '25.00', currencyCode: 'USD' },
+  };
+  const order = {
+    purchaseUnits: [
+      {
+        customId: current.orderToken,
+        shipping: {
+          address: {
+            addressLine1: '99 Changed Street',
+            adminArea2: 'Example City',
+            adminArea1: 'CA',
+            postalCode: '90001',
+            countryCode: 'US',
+          },
+        },
+      },
+    ],
+  };
+  const first = buildReconciledAuthorizationLedgerDecision({
+    row: current,
+    payload: payment,
+    orderPayload: order,
+  });
+  assert.equal(first.errorCode, 'PAYPAL_REVIEW_ADDRESS_CHANGED');
+  assert.equal(first.shouldResumeFulfillment, false);
+  const retained = buildReconciledAuthorizationLedgerDecision({
+    row: { ...current, ...first.data } as PaymentLedgerRow,
+    payload: payment,
+  });
+  assert.equal(retained.errorCode, 'PAYPAL_REVIEW_ADDRESS_CHANGED');
+  assert.equal(retained.shouldResumeFulfillment, false);
+});
+
+test('a matching stored order amount cannot replace missing direct authorization evidence', () => {
+  const result = buildReconciledAuthorizationLedgerDecision({
+    row: canonicalRow(),
+    payload: { id: 'authorization-id', status: 'CREATED' },
+  });
+  assert.equal(result.errorCode, 'PAYPAL_AUTHORIZATION_AMOUNT_MISMATCH');
+  assert.equal(result.shouldResumeFulfillment, false);
+});
+
 function canonicalRow(): PaymentLedgerRow {
   const snapshot = finalizeCanonicalOrderSnapshot({
     version: CANONICAL_ORDER_SNAPSHOT_VERSION,

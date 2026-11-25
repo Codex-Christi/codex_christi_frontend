@@ -1,3 +1,18 @@
+export const MERCHIZE_ORDER_ON_HOLD = 'MERCHIZE_ORDER_ON_HOLD';
+export const MERCHIZE_FULFILLMENT_CANCELED = 'cancelled';
+export const MERCHIZE_FULFILLMENT_CANCELED_CODE = 'MERCHIZE_FULFILLMENT_CANCELED';
+export const MERCHIZE_CANCELLATION_STATUSES = [
+  MERCHIZE_FULFILLMENT_CANCELED,
+  'canceled',
+  'cancelled_fulfillment',
+  'canceled_fulfillment',
+] as const;
+
+export function isMerchizeFulfillmentCanceled(status: string | null | undefined) {
+  const normalized = status?.trim().toLowerCase();
+  return MERCHIZE_CANCELLATION_STATUSES.some((value) => value === normalized);
+}
+
 export const MERCHIZE_FULFILLMENT_SYNC_STATUS = {
   REGISTERED: 'registered',
   PROCESS_ACCEPTED: 'process_accepted',
@@ -25,10 +40,22 @@ export type MerchizeFulfillmentSyncStatus =
 
 export const MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS = {
   RUNNING: 'running',
+  UNCONFIRMED: 'unconfirmed',
   SUCCEEDED: 'succeeded',
   FAILED: 'failed',
   SKIPPED: 'skipped',
 } as const;
+
+export const MERCHIZE_PUSH_ACTION = 'push_to_fulfillment';
+export const MERCHIZE_UNCONFIRMED_PUSH_ATTEMPT = {
+  action: MERCHIZE_PUSH_ACTION,
+  status: {
+    in: [
+      MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.RUNNING,
+      MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.UNCONFIRMED,
+    ],
+  },
+};
 
 export const MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS = {
   CHECKING: 'checking',

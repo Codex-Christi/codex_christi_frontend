@@ -4,18 +4,20 @@ import { useContext } from 'react';
 import type { MyPayPalCardFieldInterface } from './MyPaypalCardFields';
 import { CheckoutPaymentReviewContext } from '../PaymentSection';
 
-const MyPaypalButtons: FC<MyPayPalCardFieldInterface & { onCancel?: () => void }> = ({
-  mode,
-  createOrder,
-  onApprove,
-  onCancel,
-}) => {
+type PayPalButtonsProps = Omit<MyPayPalCardFieldInterface, 'createOrder'> & {
+  createOrder: (paymentSource?: 'paypal') => Promise<string>;
+  onCancel?: () => void;
+};
+
+const MyPaypalButtons: FC<PayPalButtonsProps> = ({ mode, createOrder, onApprove, onCancel }) => {
   const { onPaymentError } = useContext(CheckoutPaymentReviewContext);
   if (mode !== 'paypal_buttons') return null;
   return (
     <section aria-label='Pay with PayPal' className='w-full min-w-0'>
       <PayPalButtons
-        createOrder={createOrder}
+        createOrder={({ paymentSource }) =>
+          createOrder(paymentSource === 'paypal' ? 'paypal' : undefined)
+        }
         onApprove={onApprove}
         onCancel={onCancel}
         onError={(error) => {

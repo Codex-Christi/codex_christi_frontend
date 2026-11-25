@@ -7,9 +7,17 @@ import {
 import { syncMerchizeFulfillmentOperationalSnapshots } from './syncMerchizeFulfillmentOperationalSnapshots';
 import { syncMerchizeFulfillmentOrder } from './syncMerchizeFulfillmentOrder';
 import { runMerchizeProductionReadinessChecks } from './runMerchizeProductionReadinessChecks';
-import { MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS } from './status';
+import { listMerchizeExternalOrdersDetail } from './merchizeClient';
+import { holdLookupSelect, holdLookupVersion, reconcileMerchizeOrderHolds } from './merchizeOrderHold';
+import {
+  MERCHIZE_CANCELLATION_STATUSES,
+  MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS,
+} from './status';
 import { safeLogErrorMessage } from './redaction';
+import { VERIFIED_MERCHIZE_DELIVERY_STATUS } from './customerTracking';
+import { notifyMerchizeLifecycle } from './notifyMerchizeLifecycle';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+import { reconcileVerifiedFulfillmentRelease } from '@/lib/paypal/txLedger/reconcileVerifiedFulfillmentRelease';
 import {
   ADMIN_NOTIFICATION_SEVERITY,
   enqueueAdminRecoveryNotification,
@@ -22,7 +30,11 @@ import {
 
 const MAX_BATCH_SIZE = 25;
 const REPEATED_FAILURE_THRESHOLD = 3;
-const TERMINAL_DELIVERY_STATUSES = ['delivered', 'cancelled', 'canceled'] as const;
+// Legacy "delivered" values may describe only the first package. Recheck those rows.
+const TERMINAL_DELIVERY_STATUSES = [
+  VERIFIED_MERCHIZE_DELIVERY_STATUS,
+  ...MERCHIZE_CANCELLATION_STATUSES,
+] as const;
 
 async function notifyRepeatedLifecycleFailure(args: {
   orderToken: string;
@@ -143,12 +155,47 @@ export async function runMerchizeFulfillmentLifecycleScanner(
 
   const cutoff = new Date(scannedAt.getTime() - minAgeMinutes * 60_000);
   const prisma = getMerchizeFulfillmentOpsPrisma();
+  const pendingRelease = await prisma.merchizeFulfillmentOrder.findMany({
+    where: {
+      merchizeOrderId: { not: null },
+      duplicateDetectedAt: null,
+      pushVerifiedAt: null,
+      AND: [
+        { OR: [{ merchizeIsDeleted: null }, { merchizeIsDeleted: false }] },
+        { OR: [{ lastLookupAt: null }, { lastLookupAt: { lte: cutoff } }] },
+        { OR: [{ productionGateStatus: null }, { productionGateStatus: { not: 'push_verified' } }] },
+        { OR: [{ deliveryStatus: null }, { deliveryStatus: { notIn: [...TERMINAL_DELIVERY_STATUSES] } }] },
+      ],
+    },
+    orderBy: [{ lastLookupAt: { sort: 'asc', nulls: 'first' } }, { id: 'asc' }],
+    take: batchSize,
+    select: holdLookupSelect,
+  });
+  const holdSync = { candidates: pendingRelease.length, saved: 0, unavailable: 0 };
+  if (!dryRun && pendingRelease.length) {
+    try {
+      const observations = await reconcileMerchizeOrderHolds(pendingRelease, {
+        read: listMerchizeExternalOrdersDetail,
+        save: async (order, data) => {
+          const write = await prisma.merchizeFulfillmentOrder.updateMany({
+            where: { ...holdLookupVersion(order), duplicateDetectedAt: null },
+            data,
+          });
+          return write.count === 1;
+        },
+      });
+      holdSync.saved = observations.filter((observation) => observation.saved).length;
+      holdSync.unavailable = observations.filter((observation) => !observation.state).length;
+    } catch {
+      holdSync.unavailable = pendingRelease.length;
+    }
+  }
   const rows = await prisma.merchizeFulfillmentOrder.findMany({
     where: {
       merchizeOrderId: { not: null },
-      merchizeIsDeleted: { not: true },
       productionGateStatus: MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFIED,
       AND: [
+        { OR: [{ merchizeIsDeleted: null }, { merchizeIsDeleted: false }] },
         { OR: [{ lastProgressSyncAt: null }, { lastProgressSyncAt: { lte: cutoff } }] },
         {
           OR: [
@@ -182,6 +229,16 @@ export async function runMerchizeFulfillmentLifecycleScanner(
     for (const candidate of candidates) {
       try {
         const detailSync = await syncMerchizeFulfillmentOrder(candidate.orderToken);
+        if (detailSync.ok && detailSync.fulfillmentCanceled) {
+          results.push({
+            orderToken: candidate.orderToken,
+            ok: true,
+            attempted: ['canonical_order_detail'],
+            failedActions: [],
+            readinessStatus: 'cancelled',
+          });
+          continue;
+        }
         const readiness = await runMerchizeProductionReadinessChecks(candidate.orderToken);
         const snapshots = await syncMerchizeFulfillmentOperationalSnapshots(candidate.orderToken, {
           includeInvoice: false,
@@ -204,6 +261,12 @@ export async function runMerchizeFulfillmentLifecycleScanner(
               blockers: readiness.readiness.blockers,
             })
           : false;
+        if (detailSync.ok && readiness.ok) {
+          if (readiness.readiness.providerPushState === 'pushed') {
+            await reconcileVerifiedFulfillmentRelease(candidate.orderToken);
+          }
+          await notifyMerchizeLifecycle(candidate.orderToken, scannedAt);
+        }
         results.push({
           orderToken: candidate.orderToken,
           ok: detailSync.ok && readiness.ok && snapshots.ok,
@@ -226,7 +289,7 @@ export async function runMerchizeFulfillmentLifecycleScanner(
   }
 
   return {
-    ok: results.every((result) => result.ok),
+    ok: holdSync.unavailable === 0 && results.every((result) => result.ok),
     enabled: true,
     dryRun,
     scannedAt: scannedAt.toISOString(),
@@ -234,5 +297,6 @@ export async function runMerchizeFulfillmentLifecycleScanner(
     batchSize,
     candidates,
     results,
+    holdSync,
   };
 }

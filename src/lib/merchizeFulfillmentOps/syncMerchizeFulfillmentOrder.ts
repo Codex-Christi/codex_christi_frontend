@@ -24,11 +24,19 @@ import {
 } from './lookupPending';
 import { safeLogErrorMessage } from './redaction';
 import {
+  isMerchizeFulfillmentCanceled,
+  MERCHIZE_FULFILLMENT_CANCELED,
   MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_STATUS,
 } from './status';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 import type { MerchizeFulfillmentSyncResult } from './merchizeTypes';
+import {
+  canObserveOrderHold,
+  holdLookupVersion,
+  observedOrderHold,
+  readExternalOrderState,
+} from './merchizeOrderHold';
 
 type SyncAction = 'external_lookup' | 'detail_lookup';
 type SyncMerchizeFulfillmentOrderOptions = {
@@ -198,6 +206,17 @@ export async function syncMerchizeFulfillmentOrder(
     };
   }
 
+  if (order.merchizeOrderId && isMerchizeFulfillmentCanceled(order.deliveryStatus)) {
+    return {
+      ok: true,
+      orderToken,
+      merchizeExternalOrderNumber: order.merchizeExternalOrderNumber,
+      merchizeOrderId: order.merchizeOrderId,
+      itemCount: order.itemCount,
+      fulfillmentCanceled: true,
+    };
+  }
+
   let activeAttemptId: string | null = null;
   let activeAction: SyncAction = 'external_lookup';
   let merchizeOrderId = order.merchizeOrderId;
@@ -225,6 +244,7 @@ export async function syncMerchizeFulfillmentOrder(
     });
     activeAttemptId = lookupAttempt.id;
 
+    const lookupStartedAt = new Date();
     const { lookup, retryCount, providerProcessingPending } =
       await lookupExternalOrderWithProviderProcessingBackoff({
         merchizeExternalOrderNumber: order.merchizeExternalOrderNumber,
@@ -251,7 +271,6 @@ export async function syncMerchizeFulfillmentOrder(
               syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.LOOKUP_NOT_FOUND,
               lastSyncErrorCode: 'MERCHIZE_LOOKUP_NOT_FOUND',
               lastSyncErrorMessage: message,
-              lastLookupAt: new Date(),
             },
           });
 
@@ -278,7 +297,6 @@ export async function syncMerchizeFulfillmentOrder(
             syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.LOOKUP_PENDING,
             lastSyncErrorCode: MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_ERROR_CODE,
             lastSyncErrorMessage: MERCHIZE_LOOKUP_PENDING_PROVIDER_PROCESSING_MESSAGE,
-            lastLookupAt: new Date(),
           },
         });
 
@@ -310,7 +328,6 @@ export async function syncMerchizeFulfillmentOrder(
           syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.LOOKUP_NOT_FOUND,
           lastSyncErrorCode: 'MERCHIZE_LOOKUP_NOT_FOUND',
           lastSyncErrorMessage: message,
-          lastLookupAt: new Date(),
         },
       });
 
@@ -330,21 +347,49 @@ export async function syncMerchizeFulfillmentOrder(
       });
     }
 
-    await prisma.merchizeFulfillmentOrder.update({
-      where: { id: order.id },
+    if (order.merchizeOrderId && order.merchizeOrderId !== merchizeOrderId) {
+      throw new MerchizeApiError('Merchize lookup returned a different order identity.', {
+        code: 'MERCHIZE_LOOKUP_IDENTITY_MISMATCH',
+      });
+    }
+    const orderState = lookup?.success === true
+      ? readExternalOrderState({ ...order, merchizeOrderId }, lookup.data)
+      : null;
+    const observedState =
+      orderState && canObserveOrderHold(order, lookupStartedAt) ? orderState : null;
+    const lookupWrite = await prisma.merchizeFulfillmentOrder.updateMany({
+      where: holdLookupVersion(order),
       data: {
         merchizeOrderId,
         merchizeExternalLookupPayload: toOptionalPrismaJson(lookup),
         syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.LOOKUP_FOUND,
-        lastLookupAt: new Date(),
+        ...(observedState
+          ? observedOrderHold(order, observedState, lookupStartedAt)
+          : {}),
       },
     });
+    if (lookupWrite.count !== 1) {
+      throw new MerchizeApiError('Another check updated this Merchize order during lookup.', {
+        code: 'MERCHIZE_LOOKUP_SUPERSEDED',
+      });
+    }
 
     await finishSyncAttempt({
       attemptId: activeAttemptId,
       status: MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.SUCCEEDED,
       responseSummary: lookup,
     });
+
+    if (observedState === MERCHIZE_FULFILLMENT_CANCELED) {
+      return refreshProjectionAndReturn({
+        ok: true,
+        orderToken,
+        merchizeOrderId,
+        merchizeExternalOrderNumber: order.merchizeExternalOrderNumber,
+        itemCount: order.itemCount,
+        fulfillmentCanceled: true,
+      });
+    }
 
     if (retryCount > 0) {
       console.info('[merchize.fulfillment_ops.lookup_recovered_after_provider_processing]', {
@@ -384,7 +429,7 @@ export async function syncMerchizeFulfillmentOrder(
         data: {
           merchizeOrderId,
           merchizeOrderCode: snapshot.merchizeOrderCode ?? order.merchizeOrderCode,
-          merchizeIdentifier: snapshot.merchizeIdentifier,
+          merchizeIdentifier: snapshot.merchizeIdentifier ?? order.merchizeIdentifier,
           merchizeStatus: snapshot.merchizeStatus,
           merchizeSubStatus: snapshot.merchizeSubStatus,
           merchizeIsEnqueued: snapshot.merchizeIsEnqueued,
@@ -393,7 +438,6 @@ export async function syncMerchizeFulfillmentOrder(
           itemCount: snapshot.itemCount,
           totalQuantity: snapshot.totalQuantity,
           orderCurrency: snapshot.orderCurrency,
-          merchizeExternalLookupPayload: toOptionalPrismaJson(lookup),
           merchizeInDepthOrderDetailPayload: toOptionalPrismaJson(detail),
           syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.DETAIL_SYNCED,
           lastSyncErrorCode: null,
@@ -452,9 +496,7 @@ export async function syncMerchizeFulfillmentOrder(
         syncStatus,
         lastSyncErrorCode: syncError.code,
         lastSyncErrorMessage: syncError.message,
-        ...(activeAction === 'external_lookup'
-          ? { lastLookupAt: new Date() }
-          : { lastDetailSyncAt: new Date() }),
+        ...(activeAction === 'detail_lookup' ? { lastDetailSyncAt: new Date() } : {}),
       },
     });
 

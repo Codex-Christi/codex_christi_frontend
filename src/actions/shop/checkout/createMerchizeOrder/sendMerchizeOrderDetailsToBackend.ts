@@ -4,8 +4,10 @@ import { decryptForPostProcessingServerAction } from '@/lib/utils/shop/checkout/
 import { parseDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import { postDjangoOrder } from '@/lib/paypal/txLedger/djangoOrderRequest';
 import { djangoOrderFailure } from '@/lib/paypal/txLedger/djangoOrderContract';
+import type { CatalogImportDesignFields } from '@/lib/merchizeFulfillmentOps/catalogImportArtwork';
+import { redactMerchizeArtworkSources } from '@/lib/merchizeFulfillmentOps/redaction';
 
-interface OrderProcessingItem {
+interface OrderProcessingItem extends CatalogImportDesignFields {
   product_id: string;
   sku: string;
   merchize_sku: string;
@@ -107,9 +109,11 @@ export const sendMerchizeOrderDetailsToBackend = async (encProps: string) => {
     // payment-save custom ID returned by /orders/order-payment.
     dispatched = true;
     const response = parseDjangoFulfillmentProcessResponse(
-      await postDjangoOrder(
-        `/orders/process/${encodeURIComponent(djangoPaymentSaveCustomId)}`,
-        payload,
+      redactMerchizeArtworkSources(
+        await postDjangoOrder(
+          `/orders/process/${encodeURIComponent(djangoPaymentSaveCustomId)}`,
+          payload,
+        ),
       ),
       {
         customId: djangoPaymentSaveCustomId,
@@ -132,9 +136,13 @@ export const sendMerchizeOrderDetailsToBackend = async (encProps: string) => {
 
     return { ...response, ok: true as const };
   } catch (error) {
+    const failure = djangoOrderFailure(error, dispatched ? 'uncertain' : 'not_sent');
     return {
       ok: false as const,
-      error: djangoOrderFailure(error, dispatched ? 'uncertain' : 'not_sent'),
+      error: {
+        ...failure,
+        responsePayload: redactMerchizeArtworkSources(failure.responsePayload),
+      },
     };
   }
 };

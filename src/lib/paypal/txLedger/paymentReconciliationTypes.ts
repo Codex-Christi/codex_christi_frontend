@@ -8,6 +8,7 @@ export type PaymentLedgerRow = {
   canonicalOrderSnapshot: unknown | null;
   canonicalOrderSnapshotVersion: string | null;
   canonicalOrderSnapshotHash: string | null;
+  shippingSnapshot?: unknown;
   authorizePayload: unknown;
   capturePayload: unknown;
   status: string;

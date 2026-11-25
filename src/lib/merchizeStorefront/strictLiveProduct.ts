@@ -29,7 +29,7 @@ function normalizeProductLookup(value: string) {
   return lookup;
 }
 
-async function fetchStrictLiveStorefrontProduct(productLookup: string, signal?: AbortSignal) {
+export async function fetchStrictLiveStorefrontProduct(productLookup: string, signal?: AbortSignal) {
   const lookup = normalizeProductLookup(productLookup);
   const { baseUrl, apiKey } = getStorefrontCredentials();
   const response = await fetchMerchizeJson<BasicProductInterface>(

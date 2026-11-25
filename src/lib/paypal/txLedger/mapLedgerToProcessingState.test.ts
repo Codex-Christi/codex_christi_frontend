@@ -16,7 +16,10 @@ test('a downloadable receipt is done while fulfillment remains pending', () => {
   const state = mapLedgerToProcessingState(receipt);
 
   assert.equal(state.flowStatus, 'processing');
-  assert.deepEqual(state.steps.map((step) => step.status), ['success', 'success', 'idle']);
+  assert.deepEqual(
+    state.steps.map((step) => step.status),
+    ['success', 'success', 'idle'],
+  );
   assert.equal(state.receiptLink, receipt.receiptLink);
   assert.equal(state.receiptFileName, receipt.receiptFile);
 });
@@ -26,7 +29,10 @@ test('receipt preparation stays in progress if either download field is missing'
     const state = mapLedgerToProcessingState({ ...receipt, [missing]: null });
 
     assert.equal(state.flowStatus, 'processing');
-    assert.deepEqual(state.steps.map((step) => step.status), ['success', 'pending', 'idle']);
+    assert.deepEqual(
+      state.steps.map((step) => step.status),
+      ['success', 'pending', 'idle'],
+    );
   }
 });
 
@@ -40,7 +46,10 @@ test('stalled processing after receipt upload keeps the receipt done and request
 
   assert.equal(state.flowStatus, 'error');
   assert.equal(state.needsManualReview, true);
-  assert.deepEqual(state.steps.map((step) => step.status), ['success', 'success', 'error']);
+  assert.deepEqual(
+    state.steps.map((step) => step.status),
+    ['success', 'success', 'error'],
+  );
   assert.equal(state.steps[2].errorMessage, reason);
 });
 
@@ -48,13 +57,16 @@ test('stalled processing after payment save requests review instead of staying i
   const state = mapLedgerToProcessingState({
     ...receipt,
     status: 'payment_saved',
-    djangoPaymentSaveCustomId: 'saved-payment',
+    paymentSaved: true,
     customerRecoveryStatus: 'paid_unresolved',
   });
 
   assert.equal(state.flowStatus, 'error');
   assert.equal(state.needsManualReview, true);
-  assert.deepEqual(state.steps.map((step) => step.status), ['success', 'success', 'error']);
+  assert.deepEqual(
+    state.steps.map((step) => step.status),
+    ['success', 'success', 'error'],
+  );
 });
 
 test('an error takes precedence over normal receipt and payment checkpoints', () => {
@@ -66,7 +78,10 @@ test('an error takes precedence over normal receipt and payment checkpoints', ()
     });
 
     assert.equal(state.flowStatus, 'error');
-    assert.deepEqual(state.steps.map((step) => step.status), ['success', 'success', 'error']);
+    assert.deepEqual(
+      state.steps.map((step) => step.status),
+      ['success', 'success', 'error'],
+    );
     assert.equal(state.steps[2].errorMessage, 'Processing stopped.');
   }
 });
@@ -79,15 +94,43 @@ test('an unfinished receipt needs attention when paid processing stalls', () => 
   });
 
   assert.equal(state.flowStatus, 'error');
-  assert.deepEqual(state.steps.map((step) => step.status), ['success', 'error', 'idle']);
+  assert.deepEqual(
+    state.steps.map((step) => step.status),
+    ['success', 'error', 'idle'],
+  );
 });
 
 test('completed and missing records retain their terminal states', () => {
   const completed = mapLedgerToProcessingState({ ...receipt, status: 'completed' });
-  const missing = mapLedgerToProcessingState({ orderToken: receipt.orderToken, status: 'not_found' });
+  const missing = mapLedgerToProcessingState({
+    orderToken: receipt.orderToken,
+    status: 'not_found',
+  });
 
   assert.equal(completed.flowStatus, 'completed');
-  assert.deepEqual(completed.steps.map((step) => step.status), ['success', 'success', 'success']);
+  assert.deepEqual(
+    completed.steps.map((step) => step.status),
+    ['success', 'success', 'success'],
+  );
   assert.equal(missing.flowStatus, 'idle');
-  assert.deepEqual(missing.steps.map((step) => step.status), ['idle', 'idle', 'idle']);
+  assert.deepEqual(
+    missing.steps.map((step) => step.status),
+    ['idle', 'idle', 'idle'],
+  );
+});
+
+test('receipt availability uses the explicit customer flag when present', () => {
+  const state = mapLedgerToProcessingState({ ...receipt, receiptReady: false });
+  assert.equal(state.receiptLink, undefined);
+  assert.equal(state.receiptFileName, undefined);
+  assert.equal(state.steps[1].status, 'pending');
+});
+
+test('order support reference and record update time do not depend on internal IDs', () => {
+  const updatedAt = '2026-11-21T14:32:00.000Z';
+  const state = mapLedgerToProcessingState({ ...receipt, updatedAt });
+  assert.equal(state.supportReference, receipt.orderToken);
+  assert.equal(state.shortSupportReference, receipt.orderToken.slice(0, 8));
+  assert.equal(state.updatedAt, updatedAt);
+  assert.equal('orderCustomId' in state, false);
 });

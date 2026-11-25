@@ -1,3 +1,7 @@
+import { MERCHIZE_ORDER_ON_HOLD } from './status';
+import { readSupplierInvoice } from './supplierInvoice';
+import type { ExternalOrderProgressReference } from './externalOrderProgress';
+
 export type MerchizeReadinessCategory =
   'address' | 'items' | 'artwork' | 'cost' | 'attention' | 'order' | 'provider' | 'age';
 
@@ -40,9 +44,12 @@ type ReadinessPayloads = {
   addressSuggestion: unknown;
   unfulfilledItems: unknown;
   fulfillmentInvoice: unknown;
+  invoiceReference?: ExternalOrderProgressReference;
   requireAttention: unknown;
   sendToFulfillment: unknown;
   buyerAddressMismatchFields?: string[] | null;
+  buyerAddressCountryCode?: string | null;
+  providerOrderOnHold?: boolean;
   now?: Date;
   allowStaleOrderManualRelease?: boolean;
 };
@@ -86,8 +93,6 @@ const FAILED_ITEM_STATUSES = new Set([
   'rejected',
 ]);
 const STALE_ORDER_DAYS = 7;
-type ExternalInvoiceState = 'available' | 'paid' | 'placeholder' | 'provider_error';
-
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -119,6 +124,11 @@ export function getMerchizeAddressValidationEvidence(
 
 export function canManuallyConfirmMerchizeAddressStatus(status: string) {
   return BUYER_CONFIRMABLE_ADDRESS_STATUSES.has(status.toLowerCase());
+}
+
+export function hasConfirmedInvalidMerchizeAddress(detail: unknown) {
+  const evidence = getMerchizeAddressValidationEvidence(detail);
+  return !evidence.markedValid && INVALID_ADDRESS_STATUSES.has(evidence.status);
 }
 
 function getDataArray(payload: unknown) {
@@ -192,28 +202,11 @@ function isDirectItemUnmapped(item: Record<string, unknown>) {
   return Boolean(product && !hasResolvedCatalogVariant(item) && hasFailedMappingStatus(product));
 }
 
-function classifyExternalInvoice(payload: unknown): ExternalInvoiceState {
-  const root = asRecord(payload);
-  if (root?.success !== true || !Array.isArray(root.data)) return 'provider_error';
-
-  const row = asRecord(getDataArray(payload)[0]);
-  const fulfillmentCost = row?.fulfillment_cost;
-  if (typeof fulfillmentCost === 'number') {
-    return fulfillmentCost > 0 ? 'available' : 'placeholder';
-  }
-
-  const costRecord = asRecord(fulfillmentCost);
-  if (!costRecord || Object.keys(costRecord).length === 0) return 'placeholder';
-
-  return asString(costRecord.status)?.toLowerCase() === 'paid' ? 'paid' : 'available';
-}
-
 function classifyProviderPushState(detail: unknown, sendToFulfillment: unknown) {
   const detailData = getDataRecord(detail);
   const sendData = getDataRecord(sendToFulfillment);
   const progress = asString(detailData?.push_to_fulfillment_progress)?.toLowerCase() ?? null;
-  const sent =
-    asBoolean(sendData?.pushed) === true || asBoolean(sendData?.is_pushed) === true;
+  const sent = asBoolean(sendData?.pushed) === true || asBoolean(sendData?.is_pushed) === true;
   const sendFailed = asBoolean(sendData?.is_failed);
 
   if (progress === 'pushed' || sent) {
@@ -234,29 +227,61 @@ export function classifyMerchizeProductionReadiness({
   addressSuggestion,
   unfulfilledItems,
   fulfillmentInvoice,
+  invoiceReference,
   requireAttention,
   sendToFulfillment,
   buyerAddressMismatchFields,
+  buyerAddressCountryCode,
+  providerOrderOnHold,
   now = new Date(),
   allowStaleOrderManualRelease = false,
 }: ReadinessPayloads): MerchizeProductionReadiness {
   const blockers: MerchizeReadinessBlocker[] = [];
+  if (providerOrderOnHold) {
+    addBlocker(blockers, {
+      code: MERCHIZE_ORDER_ON_HOLD,
+      message: 'Merchize reports the order is on hold. Verify its resume before release.',
+      category: 'order',
+      retryable: false,
+    });
+  }
   const detailData = getDataRecord(detail);
   const addressEvidence = getMerchizeAddressValidationEvidence(detail);
   const validationStatus = addressEvidence.status;
   const markValidAddress = addressEvidence.markedValid;
   const push = classifyProviderPushState(detail, sendToFulfillment);
+  const normalizedBuyerCountryCode = asString(buyerAddressCountryCode)?.toUpperCase() ?? null;
+  const isUsAddress = normalizedBuyerCountryCode === 'US';
+  const isNonUsAddress = Boolean(normalizedBuyerCountryCode && !isUsAddress);
 
   let addressReviewStatus = 'unknown';
-  if (
-    validationStatus === 'valid' ||
-    validationStatus === 'ignore' ||
-    validationStatus === 'ignored' ||
-    NON_US_ADDRESS_STATUSES.has(validationStatus)
-  ) {
-    addressReviewStatus = 'ready';
-  } else if (markValidAddress && BUYER_CONFIRMABLE_ADDRESS_STATUSES.has(validationStatus)) {
+  if (markValidAddress) {
     addressReviewStatus = 'buyer_confirmed';
+  } else if (validationStatus === 'valid' && isUsAddress) {
+    addressReviewStatus = 'ready';
+  } else if (NON_US_ADDRESS_STATUSES.has(validationStatus) && isNonUsAddress) {
+    addressReviewStatus = 'ready';
+  } else if (
+    (validationStatus === 'valid' && isNonUsAddress) ||
+    (NON_US_ADDRESS_STATUSES.has(validationStatus) && isUsAddress)
+  ) {
+    addressReviewStatus = 'blocked';
+    addBlocker(blockers, {
+      code: 'MERCHIZE_ADDRESS_VALIDATION_COUNTRY_CONFLICT',
+      message:
+        'Merchize address-validation status does not match the effective fulfillment country.',
+      category: 'address',
+      retryable: false,
+    });
+  } else if (validationStatus === 'ignore' || validationStatus === 'ignored') {
+    addressReviewStatus = 'blocked';
+    addBlocker(blockers, {
+      code: 'MERCHIZE_ADDRESS_VALIDATION_UNSUPPORTED',
+      message:
+        'Merchize returned an undocumented ignored address-validation state without an explicit seller confirmation.',
+      category: 'address',
+      retryable: false,
+    });
   } else if (validationStatus === 'pending') {
     addressReviewStatus = 'pending';
     addBlocker(blockers, {
@@ -301,7 +326,16 @@ export function classifyMerchizeProductionReadiness({
         ? 'mismatch'
         : 'matched';
 
-  if (addressReadbackStatus === 'mismatch') {
+  if (addressReadbackStatus === 'not_checked' && push.state !== 'pushed') {
+    addressReviewStatus = 'blocked';
+    addBlocker(blockers, {
+      code: 'MERCHIZE_PROVIDER_ADDRESS_NOT_CHECKED',
+      message:
+        'The effective fulfillment address is incomplete or was not compared with Merchize buyer details.',
+      category: 'address',
+      retryable: false,
+    });
+  } else if (addressReadbackStatus === 'mismatch') {
     addressReviewStatus = 'blocked';
     addBlocker(blockers, {
       code: 'MERCHIZE_PROVIDER_ADDRESS_MISMATCH',
@@ -352,8 +386,6 @@ export function classifyMerchizeProductionReadiness({
       const product = asRecord(item.product);
       return product?.no_need_artworks === true || item.no_need_artworks === true;
     });
-  const allItemsUseStoredCatalogVariants =
-    itemRecords.length > 0 && itemRecords.every(hasResolvedCatalogVariant);
   const artworkStatus = asString(detailData?.artwork_status)?.toLowerCase();
   let artworkReviewStatus = 'ready';
   if (
@@ -361,17 +393,11 @@ export function classifyMerchizeProductionReadiness({
     allProductsExplicitlySkipArtwork
   ) {
     artworkReviewStatus = 'not_required';
-  } else if (
-    (artworkStatus === 'missing' || artworkStatus === 'incomplete') &&
-    allItemsUseStoredCatalogVariants
-  ) {
-    artworkReviewStatus = 'catalog_managed';
   } else if (artworkStatus === 'missing' || artworkStatus === 'incomplete') {
     artworkReviewStatus = 'blocked';
     addBlocker(blockers, {
       code: 'MERCHIZE_ARTWORK_MISSING',
-      message:
-        'Merchize reports required production artwork is missing or incomplete for an item without a resolved stored catalog variant.',
+      message: 'Merchize reports missing or incomplete production artwork. Verify the artwork in Merchize before release.',
       category: 'artwork',
       retryable: false,
     });
@@ -387,7 +413,7 @@ export function classifyMerchizeProductionReadiness({
     artworkReviewStatus = 'unknown';
   }
 
-  const invoiceState = classifyExternalInvoice(fulfillmentInvoice);
+  const invoiceState = readSupplierInvoice(fulfillmentInvoice, invoiceReference).state;
   const costReviewStatus =
     invoiceState === 'placeholder'
       ? push.state === 'pushed'

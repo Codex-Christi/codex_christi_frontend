@@ -1,5 +1,11 @@
 import 'server-only';
 
+import {
+  customerAddressCorrectionState,
+  CUSTOMER_ADDRESS_CORRECTION_ACTOR,
+  CUSTOMER_ADDRESS_CORRECTION_REQUESTED,
+} from '@/lib/shop/checkout/customerAddressCorrection';
+
 import { formatDistanceToNowStrict } from 'date-fns';
 
 import { formatAdminSystemTimestamp } from '@/lib/admin/formatAdminSystemTimestamp';
@@ -20,6 +26,7 @@ import {
   isMerchizeFulfillmentOpsDatabaseConfigured,
 } from '@/lib/prisma/shop/merchizeFulfillmentOps/merchizeFulfillmentOpsPrisma';
 import {
+  isMerchizeFulfillmentCanceled,
   MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_STATUS,
 } from '@/lib/merchizeFulfillmentOps/status';
@@ -430,6 +437,8 @@ function buildTimeline(row: {
   merchizeFulfillmentOpsLastDetailSyncAt?: string | null;
   merchizeFulfillmentOpsProductionGateStatus?: string | null;
   merchizeFulfillmentOpsReleasedToProductionAt?: string | null;
+  merchizeFulfillmentOpsDeliveryStatus?: string | null;
+  merchizeFulfillmentOpsLastLookupAt?: string | null;
 }) {
   const created = formatTimelineDate(row.createdAt);
   const updated = formatTimelineDate(row.updatedAt);
@@ -451,7 +460,15 @@ function buildTimeline(row: {
     },
   ];
 
-  if (
+  if (isMerchizeFulfillmentCanceled(row.merchizeFulfillmentOpsDeliveryStatus)) {
+    items.push({
+      label: 'Fulfillment canceled',
+      time: row.merchizeFulfillmentOpsLastLookupAt
+        ? `Observed ${row.merchizeFulfillmentOpsLastLookupAt}`
+        : 'Time not recorded',
+      state: 'canceled',
+    });
+  } else if (
     needsProviderDetailSync(
       row.merchizeFulfillmentResponsePayload,
       row.merchizeFulfillmentOpsSyncStatus,
@@ -831,6 +848,7 @@ function buildActivity(row: {
   djangoPaymentSaveCustomId: string | null;
   fulfillmentAddressOverriddenAt: Date | null;
   fulfillmentAddressOverrideReason: string | null;
+  fulfillmentAddressOverriddenBy: string | null;
   processingCompletedAt: Date | null;
   processingTriggeredAt?: Date | null;
   processingTriggerDetail?: string | null;
@@ -906,7 +924,9 @@ function buildActivity(row: {
 
   if (row.fulfillmentAddressOverriddenAt) {
     activity.push({
-      label: 'Fulfillment address overridden',
+      label: row.fulfillmentAddressOverriddenBy === CUSTOMER_ADDRESS_CORRECTION_ACTOR
+        ? 'Buyer submitted a corrected address'
+        : 'Fulfillment address overridden',
       description:
         row.fulfillmentAddressOverrideReason ?? 'Admin saved a fulfillment address override.',
       time: formatLongDate(row.fulfillmentAddressOverriddenAt),
@@ -1136,6 +1156,7 @@ function buildDetail(
   );
 
   return {
+    buyerAddressCorrectionState: customerAddressCorrectionState(row),
     customerName: row.customerName,
     customerEmail: row.customerEmail,
     createdAt: formatLongDate(row.createdAt),
@@ -1147,6 +1168,7 @@ function buildDetail(
     addressCorrectionProviderApplied: Boolean(
       overrideAddress &&
       row.merchizeFulfillmentOps?.providerAddressUpdatedAt &&
+      row.lastErrorCode !== CUSTOMER_ADDRESS_CORRECTION_REQUESTED &&
       row.merchizeFulfillmentOps.addressReviewStatus !== 'provider_update_failed',
     ),
     addressOverrideReason: row.fulfillmentAddressOverrideReason,
@@ -1387,6 +1409,8 @@ export async function getAdminPaidOrderRecoveryDetail(orderToken: string) {
       merchizeFulfillmentOpsLastDetailSyncAt: merchizeOpsSummary?.lastDetailSyncAt,
       merchizeFulfillmentOpsProductionGateStatus: merchizeOpsSummary?.productionGateStatus,
       merchizeFulfillmentOpsReleasedToProductionAt: merchizeOpsSummary?.releasedToProductionAt,
+      merchizeFulfillmentOpsDeliveryStatus: merchizeOpsSummary?.deliveryStatus,
+      merchizeFulfillmentOpsLastLookupAt: merchizeOpsSummary?.lastLookupAt,
     }),
     notifications,
     customerNotifications,

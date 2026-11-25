@@ -1,5 +1,5 @@
 import { type CartVariant, useCartStore } from '@/stores/shop_stores/cartStore';
-import { type FC, useState } from 'react';
+import { type FC, useRef, useState } from 'react';
 import Image from 'next/image';
 import SizeAndColorElem from './SizeAndColor';
 import { ItemQuantityComponent } from './ItemQuantityComponent';
@@ -30,6 +30,12 @@ const CartItems: FC<{
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const removeTrigger = useRef<HTMLElement | null>(null);
+
+  const requestRemove = (variantId: string, trigger: HTMLElement) => {
+    removeTrigger.current = trigger;
+    setPendingRemoveId(variantId);
+  };
 
   const handleConfirmRemove = async () => {
     if (!pendingRemoveId) return;
@@ -56,7 +62,7 @@ const CartItems: FC<{
       name='Remove item from cart'
       disabled={removingId === variantId}
       className='flex min-h-11 shrink-0 items-center gap-1 border-red-400 bg-transparent px-3 font-semibold text-red-400 hover:bg-destructive/30 hover:text-red-200'
-      onClick={() => setPendingRemoveId(variantId)}
+      onClick={(event) => requestRemove(variantId, event.currentTarget)}
     >
       <Trash2 className='h-4 w-4' />
       <span>Remove</span>
@@ -91,7 +97,7 @@ const CartItems: FC<{
         return (
           <div
             key={cartItem.variantId}
-            className={`my-3 grid w-full min-w-0 max-w-full select-none grid-cols-[76px_minmax(0,1fr)] gap-x-3 gap-y-4 bg-transparent sm:grid-cols-[90px_minmax(0,1fr)] sm:gap-x-4
+            className={`my-3 grid w-full min-w-0 max-w-full select-none grid-cols-[76px_minmax(0,1fr)] gap-x-3 gap-y-4 bg-transparent sm:grid-cols-[90px_minmax(0,1fr)] sm:gap-x-4 [@container(min-width:36rem)]:grid-cols-[90px_minmax(0,1fr)_auto] [@container(min-width:36rem)]:gap-y-2
             ${isUnavailable || isUnverified ? 'rounded-xl border border-amber-300/40 py-3' : ''}`}
           >
             {image ? (
@@ -108,7 +114,7 @@ const CartItems: FC<{
               <div aria-hidden='true' className='aspect-square rounded-xl bg-white/5' />
             )}
 
-            <section className='flex min-w-0 flex-col justify-between gap-2 text-left [overflow-wrap:anywhere]'>
+            <section className='flex min-w-0 flex-col gap-2 text-left [overflow-wrap:anywhere]'>
               <CustomShopLink href={productHref}>
                 <h3 className='min-w-0 text-base font-semibold leading-snug underline-offset-4 hover:underline sm:text-lg'>
                   {title}
@@ -148,26 +154,25 @@ const CartItems: FC<{
                 )}{' '}
                 (each)
               </h4>
-            </section>
-
-            <div className='col-span-2 flex min-w-0 max-w-full flex-wrap items-end justify-between gap-3'>
               <SizeAndColorElem
                 options={options}
                 className='min-w-0 max-w-full text-sm [overflow-wrap:anywhere]'
               />
-              <div className='ml-auto flex min-w-0 max-w-full flex-col items-end gap-2'>
-                <div className='flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2'>
-                  <ItemQuantityComponent
-                    className='flex'
-                    cartItem={cartItem}
-                    disableIncrement={isUnavailable}
-                  />
-                  {renderRemoveButton(cartItem.variantId)}
-                </div>
-                <p className='max-w-full text-right text-base font-semibold [overflow-wrap:anywhere]'>
-                  Total: {lineTotal}
-                </p>
+            </section>
+
+            <div className='col-span-2 ml-auto flex min-w-0 max-w-full flex-col items-end gap-2 [@container(min-width:36rem)]:contents'>
+              <div className='flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2 [@container(min-width:36rem)]:col-start-3 [@container(min-width:36rem)]:row-start-1 [@container(min-width:36rem)]:self-center'>
+                <ItemQuantityComponent
+                  className='flex'
+                  cartItem={cartItem}
+                  disableIncrement={isUnavailable}
+                  onRequestRemove={(trigger) => requestRemove(cartItem.variantId, trigger)}
+                />
+                {renderRemoveButton(cartItem.variantId)}
               </div>
+              <p className='max-w-full text-right text-base font-semibold [overflow-wrap:anywhere] [@container(min-width:36rem)]:col-start-3 [@container(min-width:36rem)]:row-start-2'>
+                Total: {lineTotal}
+              </p>
             </div>
           </div>
         );
@@ -179,7 +184,15 @@ const CartItems: FC<{
           if (!open) setPendingRemoveId(null);
         }}
       >
-        <AlertDialogContent className='bg-black/70 backdrop-blur-xl backdrop-saturate-150 border border-white/10 text-white shadow-2xl shadow-black/70 rounded-2xl max-w-md w-[90vw]'>
+        <AlertDialogContent
+          className='bg-black/70 backdrop-blur-xl backdrop-saturate-150 border border-white/10 text-white shadow-2xl shadow-black/70 rounded-2xl max-w-md w-[90vw]'
+          onCloseAutoFocus={(event) => {
+            if (removeTrigger.current?.isConnected) {
+              event.preventDefault();
+              removeTrigger.current.focus();
+            }
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Remove item?</AlertDialogTitle>
             <AlertDialogDescription className='text-gray-200'>

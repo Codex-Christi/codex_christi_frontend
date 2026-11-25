@@ -10,6 +10,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isMerchizeFulfillmentCanceled } from '@/lib/merchizeFulfillmentOps/status';
+import { getMerchizeReleaseReview } from '@/lib/paypal/txLedger/fulfillmentRetryPolicy';
 import AdminCopyValueButton from './AdminCopyValueButton';
 import AdminGlassPanel from './AdminGlassPanel';
 import PaidOrderRecoveryFulfillmentEvidencePanel from './PaidOrderRecoveryFulfillmentEvidencePanel';
@@ -175,7 +177,11 @@ export function PaidOrderRecoveryCaseSummary({
         <dl className='grid gap-4 border-t border-white/10 pt-4 sm:grid-cols-2'>
           <div>
             <dt className='text-xs font-medium text-slate-400'>Current stage</dt>
-            <dd className='mt-1 text-base font-medium leading-6 text-slate-100'>{recovery.step}</dd>
+            <dd className='mt-1 text-base font-medium leading-6 text-slate-100'>
+              {isMerchizeFulfillmentCanceled(detail.merchizeFulfillmentOps?.deliveryStatus)
+                ? 'Fulfillment canceled'
+                : recovery.step}
+            </dd>
           </div>
           <div>
             <dt className='text-xs font-medium text-slate-400'>Last updated</dt>
@@ -301,6 +307,18 @@ export function PaidOrderRecoveryBlockerPanel({
   recovery: PaidOrderRecoveryRow;
   detail: PaidOrderRecoveryDetail;
 }) {
+  if (isMerchizeFulfillmentCanceled(detail.merchizeFulfillmentOps?.deliveryStatus)) {
+    return (
+      <AdminGlassPanel className='space-y-2 p-4 sm:p-5'>
+        <h3 className='text-base font-semibold text-white'>Fulfillment canceled</h3>
+        <p className='text-sm leading-6 text-slate-300'>
+          Merchize canceled fulfillment. This does not change the payment record. Do not retry or
+          release this order.
+        </p>
+      </AdminGlassPanel>
+    );
+  }
+
   const checks = getPaidOrderReadinessChecks(detail.merchizeFulfillmentOps);
   const unresolved = checks.filter((check) => check.state !== 'ready');
   const recommendedAction = getRecommendedAction(recovery, detail, unresolved);
@@ -438,7 +456,9 @@ export function PaidOrderRecoveryPostPaymentPipeline({
   timeline: TimelineItem[];
   detail: PaidOrderRecoveryDetail;
 }) {
-  const checks = getPaidOrderReadinessChecks(detail.merchizeFulfillmentOps);
+  const checks = isMerchizeFulfillmentCanceled(detail.merchizeFulfillmentOps?.deliveryStatus)
+    ? []
+    : getPaidOrderReadinessChecks(detail.merchizeFulfillmentOps);
   const blockerCount = checks.filter((check) => check.state === 'blocked').length;
   const pendingCount = checks.filter((check) => check.state === 'pending').length;
 
@@ -484,12 +504,16 @@ export function PaidOrderRecoveryFulfillmentEvidenceSection({
 }: {
   detail: PaidOrderRecoveryDetail;
 }) {
+  if (isMerchizeFulfillmentCanceled(detail.merchizeFulfillmentOps?.deliveryStatus)) return null;
+
   return <PaidOrderRecoveryFulfillmentEvidencePanel summary={detail.merchizeFulfillmentOps} />;
 }
 
 function PipelineRow({ item, isLast }: { item: TimelineItem; isLast: boolean }) {
   const stateLabel =
-    item.state === 'done' ? 'Complete' : item.state === 'failed' ? 'Blocked' : 'Pending';
+    item.state === 'canceled'
+      ? 'Canceled'
+      : item.state === 'done' ? 'Complete' : item.state === 'failed' ? 'Blocked' : 'Pending';
 
   return (
     <li className='relative grid grid-cols-[28px_minmax(0,1fr)] gap-3 pb-5 last:pb-0'>
@@ -500,13 +524,14 @@ function PipelineRow({ item, isLast }: { item: TimelineItem; isLast: boolean }) 
         className={cn(
           'relative z-10 mt-0.5 grid h-7 w-7 place-items-center rounded-full border',
           item.state === 'done' && 'border-emerald-300/30 bg-emerald-300/15 text-emerald-100',
-          item.state === 'failed' && 'border-rose-300/30 bg-rose-300/15 text-rose-100',
+            (item.state === 'failed' || item.state === 'canceled') &&
+              'border-rose-300/30 bg-rose-300/15 text-rose-100',
           item.state === 'pending' && 'border-amber-300/30 bg-amber-300/15 text-amber-100',
         )}
       >
         {item.state === 'done' ? (
           <CheckCircle2 size={15} />
-        ) : item.state === 'failed' ? (
+        ) : item.state === 'failed' || item.state === 'canceled' ? (
           <AlertTriangle size={14} />
         ) : (
           <Clock3 size={14} />
@@ -589,6 +614,20 @@ function getRecommendedAction(
     return 'No recovery action is required. Review the audit trail and close the case.';
   }
 
+  if (getMerchizeReleaseReview(detail.merchizeFulfillmentOps).verificationPending) {
+    return 'Refresh Merchize state to verify release. Do not send another push request yet.';
+  }
+
+  if (detail.buyerAddressCorrectionState === 'required') {
+    return 'Wait for the buyer to submit a corrected address from their order page.';
+  }
+  if (detail.buyerAddressCorrectionState === 'checking') {
+    return 'Wait for the delivery address check. Refresh Merchize state to see the latest result.';
+  }
+  if (detail.buyerAddressCorrectionState === 'review') {
+    return 'A master admin must review the address before the order can continue.';
+  }
+
   if (detail.needsProviderDetailSync) {
     return 'Refresh Merchize state before retrying the fulfillment handoff.';
   }
@@ -602,7 +641,7 @@ function getRecommendedAction(
   }
 
   if (detail.requiresManualRelease) {
-    return 'Non-bypassable readiness checks are clear. A master admin can now review the seven-day age override.';
+    return 'A master admin can review whether this order is eligible for manual release.';
   }
 
   if (recovery.status === 'recovery') {

@@ -414,10 +414,10 @@ their recorded source checkpoints.
   absent or blank. Its final push guard runs after Django handoff/provider registration, so this
   setting does not make sandbox capture safe under the no-order instruction. Deployment and
   explicit configuration acceptance remain separate.
-- Current code includes inline final-order review, server-persisted acknowledgement,
-  and owner/grant checks for payment and confirmation status. Do not describe these controls as
-  absent. P0.4/P0.5 acceptance is still open; this trace does not establish the full emailed,
-  long-lived, rotatable/revocable cross-device viewing contract.
+- Current code includes inline order review and owner/grant checks for payment and confirmation
+  status. The [P0.4 checkpoint](#p04-make-final-order-acknowledgement-real) records the November 21
+  local fixes and offline checks. Live P0.4 acceptance and the full P0.5 emailed-access contract
+  remain open.
 - Only the preparing/push-verified customer email is implemented. The other five lifecycle messages
   are not complete.
 - Most footer policy links are placeholders. The existing Shipping and POD policy overstates some
@@ -682,8 +682,9 @@ Sources: [zone mapping](../src/lib/datasetSearchers/merchize/dest-map.ts),
   blocks. Current per-option shipping evidence remains the actual quote gate.
 - State/region is stored and forwarded, but is not used to select shipping rates or limit the US
   surcharge. An unused state-surcharge helper does not change this behavior. Required state and
-  postal-code fields predate this pass; there are no country-specific address rules. Form validity
-  and email/address binding do not establish provider address acceptance.
+  postal-code fields predate this pass. The later November 21 state-field update validates U.S.
+  state choices in checkout and saved shipping addresses; other countries still use free text.
+  Form validity and email/address binding do not establish provider address acceptance.
 - Shipping-country labels are matched as exact ISO2 tokens, `rest…`, or generic/all. This is not a
   general parser for supplier restrictions. Positive scoped evidence can lag supplier changes by
   the configured TTL (normally 48 hours); static supplemental surcharge data has no live renewal
@@ -756,6 +757,91 @@ and provider calls were not run. P0.2 deployed E2E remains pending.
 
 ### P0.4 Make final-order acknowledgement real
 
+Status, 2026-11-21: **local fixes and offline checks complete; live acceptance pending**.
+The P0.4 and state-picker changes are committed in `6e97392c`, based on `a90536f1`.
+This is not a deployment. P0.2 deployed E2E remains pending.
+Orders, payments, provider changes, and migrations remain off-limits during this verification.
+
+The current local changes close these review gaps:
+
+- The preview uses the existing canonical order resolver and returns customer-safe item details
+  with its totals. The final review and summary display those checked titles, every selected
+  option, quantities, and unit/line amounts. The full item list appears before the checkbox on
+  small screens too; it does not depend on opening the separate summary.
+- A stable item hash binds the review to product/variant IDs, titles, options, quantities, amounts,
+  and currency. A changed design, size, or title requires another review even if the total stays
+  the same. Reordering unchanged rows/options does not invalidate it. Supplier IDs/SKUs and image
+  URLs are excluded from this customer-facing projection.
+- New intents require the matching item hash and reviewed totals before creating a ledger row or
+  PayPal order. Bound retries validate the saved snapshot and review before reuse or retry writes.
+  `checkout-review-v2` records the item hash, canonical snapshot hash, time, quote, and request
+  fingerprint in existing ledger JSON. Owner and checkout surface remain recorded.
+- Reopening an original purchase keeps its GET read-only. A separate POST on the same resume path
+  saves the renewed review of that exact purchase before its existing PayPal order can reopen.
+  Access, origin, current review key, and a concurrent-change check are required. It creates no new
+  purchase and makes no provider call. Missing old acknowledgement can be renewed this way;
+  complete v1 records remain compatible, while malformed v2 records cannot fall back to v1.
+- Authorization and capture check the saved acknowledgement. When PayPal supplies a shipping
+  address, reconciliation compares it with the original checked address. A material difference
+  pauses capture and fulfillment, stays recorded across later matching replies, and clears the
+  browser confirmation with a customer-safe message. No extra provider request is added. The
+  authorization response may already represent a payment hold; this check does not claim to
+  prevent that hold. Responses that normally omit shipping do not prove an address match.
+
+The country picker also uses its data source's Country type, removing a duplicate type that failed
+the current TypeScript check. Its country choices and filters are unchanged.
+
+Checkout Contact & delivery and the saved shipping address editor now share a local U.S. state
+field. It uses a searchable combobox built from the existing Popover and Command components,
+with a dark, scrollable menu and keyboard controls. Users can search by state name or postal code.
+It displays full names and saves postal codes such as `CA`; existing saved names and codes load
+correctly. The local list retains all states, DC, and the existing postal territories/military
+regions. Other countries keep free text. Country changes clear the old state in both the form and
+the saved checkout draft, and profile autofill does not import a state from another country.
+Saved-address server validation applies the same normalization. These form changes do not alter
+payment, fulfillment, destination coverage, or shipping prices. Focused offline checks cover both
+real form components, legacy values, submitted codes, invalid U.S. entries, and country changes.
+The open menu was checked on the local test copy at port 3001 at 1280 × 720 and 390 × 844;
+it stayed within the screen. Name/code search and keyboard selection worked. No checkout or
+saved-address form was submitted during those browser checks. The subsequent
+[UI cleanup checkpoint](#ui-library-and-shared-component-cleanup--2026-11-21) records the corrected
+library pairing and shared-component changes.
+
+An earlier broader run passed 393 offline tests with live `fetch` blocked. Coverage includes real React
+rendering with sample data and an injected payment control; changed item facts, payment gating,
+saved review validation, renewed original review, retry races, address differences, and existing
+payment/receipt/recovery checks. The searchable combobox then passed 19 focused offline form/state
+tests, whole-workspace TypeScript, and scoped ESLint. Its checks include partial names, postal
+codes, no matches, Escape, keyboard choices, labels, and forwarded focus. No integration fixture
+or schema command was run.
+
+The in-app browser reached Contact & delivery with a populated cart at
+`http://localhost:3001/shop/checkout`. The `/en/shop/checkout` path returned 404; localhost's checked
+route is `/shop/checkout`. Full review interaction used offline sample data, not a live order.
+Responsive payment/review checks, real PayPal replies, and deployed payment-to-fulfillment behavior
+remain unverified. P0.2 deployed E2E and the live release checklist below stay unchecked.
+
+Commit verification, 2026-11-21: 425 offline checks passed in a separate copy containing only this
+chat's P0.4 and state-picker changes: 372 checkout, 37 canonical-snapshot, 12 shared-UI, and 4
+generated-CSS checks. Requests and sockets were blocked. The prepared copy used a frozen lockfile
+installation with setup scripts disabled. TypeScript, scoped lint, formatting, and diff checks
+also passed. Concurrent recovery, profile, fulfillment, and deployment changes were excluded.
+
+The final address comparison recognizes equivalent U.S. names and codes, including older saved
+values such as `California` and returned values such as `CA`. Different or missing states still
+stop the comparison. Six route tests also confirm that missing, malformed, or changed saved
+reviews stop authorization/capture with no payment calls or ledger writes. No real orders,
+provider actions, schema commands, or migrations ran during these checks.
+
+Implementation references: [preview](../src/actions/shop/checkout/getOrderFinalDetails.ts),
+[review lines/hash](../src/lib/shop/checkout/checkoutReviewLines.ts),
+[review UI](../src/components/UI/Shop/Checkout/PaymentSection.tsx),
+[saved review checks](../src/lib/shop/checkout/checkoutReview.ts),
+[original review](../src/lib/shop/checkout/originalCheckoutServer.ts),
+[PayPal address comparison](../src/lib/paypal/txLedger/payPalReviewAddress.ts).
+
+The acceptance contract remains:
+
 Before PayPal controls become active, show the exact:
 
 - recipient;
@@ -811,6 +897,238 @@ All confirmation reads:
 The status endpoint must reject requests without authenticated ownership or a valid viewing
 capability. Current guards are present; the full contract above remains subject to
 P0.5 acceptance.
+
+#### Read-only gap check — 2026-11-21
+
+Status: **the initial source trace is complete; its first three fixes are implemented locally**.
+The full P0.5 contract is not complete. The initial audit baseline was `6e97392c` and changed guides
+only. The implementation checkpoint below records the later code changes. P0.2 deployed E2E and
+live P0.4 acceptance remain pending.
+
+Already implemented:
+
+- [Access grants](../src/lib/shop/checkout/checkoutProof.ts) are encrypted, purpose-bound browser
+  cookies with a 30-day expiry. They check the exact order and owner; a status grant cannot pay.
+  The [access guard](../src/lib/shop/checkout/serverAccess.ts) also accepts the signed-in order
+  owner. [Logout](../src/lib/auth/logout-cookies.ts) clears checkout access, proof, and browser
+  cookies; guest access surviving actual logout is not a confirmed gap.
+- [Email recovery codes](../src/lib/shop/checkout/checkoutRecovery/recoveryChallenges.ts) are
+  hashed, single-use, valid for 10 minutes, and protected by a 60-second resend cooldown, three
+  active challenges, five attempts, and serialized updates. A known order reference plus its
+  verified checkout email can recover any order with completed capture evidence, including a
+  resolved order. [Email-only discovery](../src/lib/shop/checkout/checkoutRecovery/findEmailRecoveryCheckouts.ts)
+  returns unresolved orders. Do not describe all recovery as limited to unresolved orders.
+- [Verification](../src/app/api/shop/checkout/recovery/verify/route.ts) issues status access rather
+  than payment permission. For an account-owned order, a different signed-in viewer who proves
+  the checkout email receives access bound to that viewer; this does not transfer ownership.
+  [Guest-order linking](../src/lib/shop/orderHistory/guestLink.ts) is a separate explicit operation
+  requiring a fresh session and scoped code before conditionally claiming an unowned paid order.
+- [Receipt reads](../src/app/api/shop/orders/[orderToken]/receipt/route.ts) recheck access, use
+  private/no-store responses, validate the stored receipt reference, and sign a download lasting
+  60 seconds. They do not claim ownership or grant payment access. The confirmation page's
+  [`view=details`](../src/app/shop/checkout/confirmation/[orderToken]/page.tsx) path suppresses
+  ownership claims and cart/draft cleanup, and hides an earlier account's payload after switching
+  accounts.
+- The [status response](../src/app/api/paypal/tx-ledger/payments/[orderToken]/status/route.ts)
+  already lists its fields explicitly. It does not return a full ledger row, contact details, or
+  street address. Raw provider errors are replaced with fixed customer messages, and the paid
+  amount requires completed capture evidence. A missing response allowlist or exposed full
+  address is not an established bug.
+
+Gaps recorded before the local fixes below:
+
+1. The [preparing-email link](../src/lib/shop/email/templates.ts) is an ordinary protected
+   confirmation URL with `view=details`. It contains no contact details or provider identifier,
+   but it is not the proposed signed viewing credential. At the audit baseline it was omitted
+   when no receipt was available; the local email-button fix below removes that restriction.
+   Styled templates do not establish the full viewing-link contract or all six
+   P0.8 notification triggers.
+2. Browser grants have expiry but no issued-at field, viewing-token version, or implemented
+   per-order replacement/disable check. The [audited ledger schema](../prisma/shop/paypal/paypalTXLedger.schema.prisma)
+   has no dedicated viewing-token hash/version/revocation record. Its short-lived recovery-code
+   table and email-outbox payload are not an implemented durable viewing-link store. Storage
+   design remains open; this trace does not prove that a migration is necessary. The guide's
+   90-day lifetime remains a recommendation, not a change to the existing 30-day cookies.
+3. At `6e97392c`, the status response included `lastEventType`, `error.code`, and
+   `djangoPaymentSaveCustomId`. The client used the Django value for the completed-order reference
+   and receipt-readiness inference. The local fixes replace those uses before removing the fields.
+   Contact/street fields remain omitted; a masked confirmation-details summary is a separate
+   page-detail choice rather than a repair for a proven address leak.
+4. The confirmation view covered payment, receipt, handoff, manual review, and refund outcomes,
+   but did not display the returned `updatedAt`. That record-update time is now displayed locally.
+   Full production/tracking/shipped/delivered/cancelled evidence remains P0.10 work. Internal
+   completion does not establish shipment or delivery.
+
+Implementation order and remaining scope, without orders or migrations:
+
+1. **Implemented locally:** [customer status mapping](../src/lib/shop/checkout/customerOrderStatus.ts)
+   and its consumers share one public response type. Internal event/error codes and the Django
+   payment-save ID no longer leave the status response. The existing local order reference and
+   explicit `receiptReady`, `paymentSaved`, and `paymentProgressed` flags replace their uses.
+   Progress or uncertain saved evidence does not prove payment. A separate-checkout choice requires
+   explicit `paymentProgressed: false`; missing flags cannot clear the earlier purchase.
+   For older browser clients, an intent with saved activity or uncertain evidence is returned
+   as public `pending`, so removed internal fields cannot make it appear untouched. The stored
+   ledger status and server payment/recovery decisions are unchanged.
+2. **Implemented locally:** [confirmation wording and update time](../src/components/UI/Shop/Checkout/CheckoutConfirmationView.tsx)
+   use saved facts and the local reference. “Last updated” is a fixed UTC record timestamp, omitted
+   without access/data or for invalid dates. Paid delays, manual review, refunds, and confirmed
+   internal processing have distinct wording. No production, shipment, or delivery is inferred.
+3. **Implemented locally:** existing response/receipt tests were extended, with focused rendered
+   view/page checks. They cover internal/nested field exclusion, valid paid evidence, missing
+   progress flags, expired/tampered/wrong-purpose/order receipt access, and an unpaid receipt.
+   The actual details page makes no ownership claim or cart/draft cleanup, and hides old paid
+   data immediately on account switch, including while the next response is pending.
+4. **Proposal recorded; implementation pending:** use the [viewing-link access and storage proposal](#viewing-link-access-and-storage-proposal--2026-11-21)
+   for issuance, redemption, expiry, renewal, replacement, and disabling. The email-button fix below
+   offers “View order” without a receipt using the existing protected link. It does not issue the
+   proposed credential, send an email, or change notification triggers. Do not repurpose
+   provider-response JSON, review JSON, or email-outbox payloads as access storage merely to avoid
+   a migration.
+
+The other checkout chat's uncommitted optional `verifyPayPal`/`paypalRecoveryState` lookup and
+payment-resume work were inspected only to separate ownership. They are not P0.5 acceptance
+evidence. Coordinate any later shared status-route changes with that owner. Merchize readiness,
+full notification triggers, and full lifecycle evidence stay with P0.6–P0.10 and their owners.
+
+Initial audit verification: 34 existing proof, recovery-code/policy/summary, and guest-link tests passed with
+fetch, HTTP(S), sockets, TLS, and DNS blocked. They used in-memory or mocked dependencies. This is
+focused offline evidence, not live confirmation, email delivery, viewing-token revocation, or
+full P0.5 acceptance. No real emails, orders, payment/provider actions, schema commands, or
+migrations ran. That initial read-only pass edited no application code or other chats' work.
+
+#### Local customer-status implementation — 2026-11-21
+
+The first three fixes above were prepared against `6e97392c`. The status response is rebuilt from
+approved fields, including nested cart/error data; raw contact details, PayPal/Django identifiers,
+event names, and error codes are excluded. The cart variant keys needed for existing cart cleanup
+remain. Receipt readiness comes from checked download fields rather than
+the presence of a Django ID. Payment-received wording still requires completed capture evidence.
+No viewing-token, access-storage, database, authorization/capture, fulfillment, or notification-trigger
+change is included.
+
+Verification passed in an isolated copy containing only this chat's changes: 389 checkout checks,
+37 canonical-snapshot checks, 12 shared-UI checks, and 4 generated-CSS checks (442 total). Requests,
+sockets, TLS, HTTP(S), and DNS were blocked. The copy used a frozen-lockfile installation with
+setup scripts disabled. TypeScript, scoped ESLint, formatting, and diff checks passed. No real
+emails, orders, provider actions, schema commands, or migrations ran. No demo route or new test
+dependency was added.
+
+The optional PayPal recovery lookup and its state type remain the other chat's work. They were
+preserved in shared working files and excluded from this commit candidate and its acceptance
+claims. Changes to the shared status response, client mapper, and separate-checkout guard were
+prepared separately so those unfinished changes are not committed by this chat. Full P0.5,
+P0.2 deployed E2E, and live P0.4 acceptance remain pending.
+
+#### Local preparing-email button fix — 2026-11-21
+
+The [preparing-email template](../src/lib/shop/email/templates.ts) now always offers the existing
+protected confirmation URL with `view=details`. Its label is “View order” while the receipt is
+unavailable and “View order & receipt” when it is ready. Both HTML and plain text retain the
+notice that viewing may require access verification. The link contains only the encoded local
+order reference and the details-view option; it is not an emailed access credential.
+
+The change affects rendering only. Recipient selection, sending, notification triggers, payment
+evidence, receipt authorization, and order ownership stay with their existing callers. No new
+preview route, fixture file, dependency, or database field is added.
+
+Verification: 39 focused offline tests passed: 8 email-rendering tests and 31 existing proof,
+recovery, and guest-link tests. The new pending-receipt assertion fails against the old renderer
+and passes with the fix. Checks used an isolated source copy over `bed79421`, existing local
+dependencies, and existing generated type files copied read-only. TypeScript, scoped ESLint,
+source formatting, guide-link, and diff checks passed. Fetch, HTTP(S), sockets, TLS, and DNS were
+blocked for the tests. No emails, orders, provider actions, schema commands, or migrations ran.
+Full P0.5, P0.2 deployed E2E, and live P0.4 acceptance remain pending.
+
+#### Viewing-link access and storage proposal — 2026-11-21
+
+**Proposal only:** these rules describe the next implementation; they do not change current
+30-day browser grants or issue a new kind of link. The button fix above works with current access.
+Final lifetime and storage approval remain open. No schema or migration file is part of this work.
+
+Access rules:
+
+- Issue a viewing credential only after saved completed-capture evidence exists. A PayPal status
+  label, accepted handoff, or ready receipt alone does not prove payment. Receipt preparation or a
+  fulfillment delay must not prevent a paid customer from viewing status.
+- Protect purpose (`order-view`), local `orderToken`, issued-at, expiry, token-format version,
+  signing-key identifier, and a random generation identifier against alteration. Use at least
+  32 random bytes for the generation. Include no email, name, address, PayPal id, or provider id.
+  Reuse the existing server cryptography with a separate purpose if it meets this envelope/key
+  contract; a new token library is not required by this proposal. Signing secrets stay outside
+  the database and client bundle.
+- Grant status and authorized receipt viewing only. The credential must never authorize payment,
+  checkout resumption, address changes, order claiming, or cart/draft cleanup. Retain `view=details`
+  and the existing signed-in owner path. Binding a link-derived cookie to the current owner/viewer
+  must preserve account-switch and guest-linking protections. Anyone holding a forwarded link can
+  use its viewing permission until expiry or disabling; explain that in the future email copy.
+- Recommend 90 days from issuance for the emailed credential, subject to confirmation. A cookie
+  derived from it should expire no later than the earlier of 30 days or the credential's expiry.
+  Page visits, polling, and delivery retries must not extend either lifetime.
+- Missing or expired access offers the existing checkout-email code flow. For a known paid order,
+  successful verification may issue a replacement even when fulfillment is resolved. Email-only
+  order discovery keeps its existing unresolved-order limit. No order details are returned before
+  access is verified.
+
+Recommended storage: one dedicated current viewing-access record per order in the **existing
+PayPal ledger database**, rather than a separate database or a provider JSON field. Proposed
+fields and their purpose:
+
+| Stored value                         | Purpose                                                           |
+| ------------------------------------ | ----------------------------------------------------------------- |
+| Unique `orderToken`                  | Bind one current record to the local order                        |
+| Random `generationId`                | Match the current link and its derived browser cookies            |
+| `formatVersion`, `keyId`             | Validate the expected envelope and select an allowed server key   |
+| `issuedAt`, `expiresAt`              | Enforce fixed dates independently of browser state                |
+| `ownerIdAtIssue`                     | Reject a stale binding after an order-owner change                |
+| `disabledAt`, fixed `disabledReason` | Stop access from this generation without deleting payment history |
+| `createdAt`, `updatedAt`             | Record when access state changed                                  |
+
+The generation identifier is not a usable credential without its valid cryptographic protection.
+The record need not store a raw emailed credential. Delivery work can reconstruct an envelope for
+the same stored generation and expiry; retries must not replace it or start a fresh lifetime.
+The email outbox may reference the intended generation, but it is not the access authority.
+Recovery-code rows remain short-lived code records. The current audited schema has no record with
+this contract; a dedicated model/columns change would require a later reviewed migration. Do not
+add or run one under the current restrictions, or hide the state in unrelated JSON to avoid it.
+
+Replacement and disabling:
+
+- One generation may be current per order. Multiple devices may use it until it expires. An
+  explicit renewal/replacement invalidates the previous generation on every device; include this
+  consequence in the final product decision.
+- Serialize initial issuance and replacement with a transaction or conditional update. Concurrent
+  requests must not leave two current generations. Tie replacement and queued delivery together
+  so a failed send can retry the intended generation, without holding a database transaction open
+  during sending. Skip a superseded generation before dispatch; an email already in flight may
+  still arrive later, but its old credential must fail the current-generation access check.
+- Check generation, dates, owner binding, and disabled state on **every status and receipt read**,
+  including reads made with a cookie derived from a link. Reject link-derived access if its
+  storage is unavailable; do not fall back to accepting the signature alone. Checking only the
+  emailed URL would leave previously issued cookies usable after replacement.
+- Keep link-derived viewing cookies distinguishable from current payment and email-code grants.
+  Disabling this link does not disable signed-in ownership or freeze future email-code recovery.
+  Freezing all recovery would be a separate policy, not an implied effect of link replacement.
+  Existing payment grants and current code-recovery behavior remain unchanged by this proposal.
+
+Proposed link opening: use a small same-origin landing page, preferably with the credential in the
+URL fragment so it is not sent in ordinary server request URLs. Require an explicit same-origin
+POST, with origin checks and no cross-origin access, to exchange it for a view-only HttpOnly cookie.
+Opening a GET must not consume, renew, replace, disable, or claim anything; email link scanners must
+not invalidate customer access. Remove the credential from browser history before loading analytics
+or external content, then open a fixed clean local details URL. Use private/no-store and no-referrer
+responses. Do not log the credential, expose it in errors, or put it through email click tracking.
+Fragment delivery and email-client compatibility still need acceptance checks before choosing the
+final transport. The ordinary protected button added above does not carry a credential.
+
+Before implementation, confirm the 90-day lifetime, one-generation replacement behavior, link
+transport, and reviewed storage change. Then implement and test issuance/redemption/renewal with
+fake storage and blocked networking before connecting live routes or email delivery. The future
+offline matrix must cover absent/expired/altered/wrong-purpose/wrong-order credentials, date
+boundaries, owner/account changes, replaced/disabled links **and derived cookies**, failed storage,
+concurrent renewal, delivery retries, and read-only receipt access. These future credential checks
+are a plan, not tests passed by the email-button change. Real cross-device delivery/access and full
+P0.5 acceptance remain pending.
 
 ### P0.6 Complete pre-push readiness and address policy
 

@@ -212,3 +212,31 @@ test('preserves the provided PayPal shipping address and local order token', () 
     emailAddress: 'customer@example.com',
   });
 });
+
+test('the PayPal button sends only PayPal with the merchant-provided shipping address', () => {
+  const input = buildInput();
+  const payPalOnly = buildPayPalOrderCreatePayload({ ...input, paymentSource: 'paypal' });
+  const existing = buildPayPalOrderCreatePayload(input);
+  const { paymentSource: previousSources, ...expectedBody } = existing.body;
+
+  assert.deepEqual(payPalOnly, {
+    ...existing,
+    body: {
+      ...expectedBody,
+      paymentSource: {
+        paypal: {
+          experienceContext: {
+            shippingPreference: 'SET_PROVIDED_ADDRESS',
+            brandName: 'Codex Christi',
+          },
+        },
+      },
+    },
+  });
+  assert.deepEqual(Object.keys(previousSources ?? {}).sort(), ['card', 'paypal', 'venmo']);
+  assert.equal(previousSources?.card?.attributes?.verification?.method, 'SCA_WHEN_REQUIRED');
+  assert.equal(
+    previousSources?.venmo?.experienceContext?.shippingPreference,
+    'SET_PROVIDED_ADDRESS',
+  );
+});

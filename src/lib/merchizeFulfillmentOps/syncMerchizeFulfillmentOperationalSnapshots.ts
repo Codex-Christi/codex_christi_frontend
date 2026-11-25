@@ -18,15 +18,18 @@ import {
 } from './merchizeClient';
 import {
   asRecord,
-  getPath,
   summarizeProviderRequest,
   summarizeProviderResponse,
   toOptionalPrismaJson,
 } from './merchizeMapper';
 import { safeLogErrorMessage } from './redaction';
 import { MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS } from './status';
+import { readSupplierInvoice } from './supplierInvoice';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
-import { stampShipmentSnapshot } from './customerTracking';
+import {
+  externalOrderLifecycleReference,
+  externalOrderLifecycleWriter,
+} from './saveExternalOrderLifecycle';
 
 type SnapshotAction =
   | 'external_order_progress'
@@ -51,55 +54,6 @@ type SnapshotOptions = {
 
 function asString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-function getFirstDataRecord(payload: unknown) {
-  const data = getPath(payload, ['data']);
-  if (Array.isArray(data)) return asRecord(data[0]);
-  return asRecord(data);
-}
-
-function summarizeProgressStatus(payload: unknown) {
-  const data = getFirstDataRecord(payload);
-  const progress = data?.order_progress;
-  if (!Array.isArray(progress)) return asString(data?.status);
-
-  const pending = progress.find((event) => {
-    const status = asString(asRecord(event)?.status)?.toLowerCase();
-    return status && status !== 'done';
-  });
-  const pendingRecord = asRecord(pending);
-  if (pendingRecord) {
-    const event = asString(pendingRecord.event);
-    const status = asString(pendingRecord.status);
-    return [event, status].filter(Boolean).join(':') || status || event;
-  }
-
-  return 'done';
-}
-
-function summarizeDeliveryStatus(payload: unknown) {
-  const data = getFirstDataRecord(payload);
-  if (!data) return null;
-
-  const packageStatus = asString(data.status);
-  if (packageStatus) return packageStatus;
-
-  const packageProgresses = data.package_progresses;
-  if (!Array.isArray(packageProgresses)) return null;
-
-  for (const packageProgress of packageProgresses) {
-    const progress = asRecord(packageProgress)?.progress;
-    if (!Array.isArray(progress)) continue;
-    const current = progress.find((event) => {
-      const status = asString(asRecord(event)?.status)?.toLowerCase();
-      return status && status !== 'done';
-    });
-    const event = asString(asRecord(current)?.event);
-    if (event) return event;
-  }
-
-  return null;
 }
 
 function getSnapshotError(error: unknown) {
@@ -194,10 +148,10 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
   const attempted: SnapshotAction[] = [];
   const failed: SnapshotResult['failed'] = [];
 
-  async function runSnapshot(
+  async function runSnapshot<T>(
     action: SnapshotAction,
     request: () => Promise<unknown>,
-    persist: (payload: unknown) => Promise<void>,
+    persist: (payload: unknown) => Promise<T>,
   ) {
     attempted.push(action);
     const attempt = await prisma.merchizeFulfillmentSyncAttempt.create({
@@ -222,7 +176,7 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
           },
         );
       }
-      await persist(payload);
+      const result = await persist(payload);
       await prisma.merchizeFulfillmentSyncAttempt.update({
         where: { id: attempt.id },
         data: {
@@ -231,6 +185,7 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
           finishedAt: new Date(),
         },
       });
+      return result;
     } catch (error) {
       const snapshotError = getSnapshotError(error);
       failed.push({
@@ -248,6 +203,7 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
           finishedAt: new Date(),
         },
       });
+      return null;
     }
   }
 
@@ -258,8 +214,13 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
           'external_order_invoice',
           () => getMerchizeExternalOrderInvoice(reference),
           async (payload) => {
-            await prisma.merchizeFulfillmentOrder.update({
-              where: { id: orderRow.id },
+            if (readSupplierInvoice(payload, orderRow).state === 'provider_error') {
+              throw new MerchizeApiError('Could not verify the supplier invoice for this order.', {
+                code: 'MERCHIZE_EXTERNAL_ORDER_INVOICE_UNVERIFIED',
+              });
+            }
+            await prisma.merchizeFulfillmentOrder.updateMany({
+              where: { id: orderRow.id, duplicateDetectedAt: null },
               data: {
                 merchizeFulfillmentCostPayload: toOptionalPrismaJson(payload),
                 lastCostCheckAt: new Date(),
@@ -268,34 +229,19 @@ export async function syncMerchizeFulfillmentOperationalSnapshots(
           },
         );
 
+  const lifecycleReference = externalOrderLifecycleReference(orderRow);
+  const writer = externalOrderLifecycleWriter(prisma, orderRow);
+  const progressSnapshot = runSnapshot(
+    'external_order_progress',
+    () => getMerchizeExternalOrderProgress(lifecycleReference),
+    writer.saveProgress,
+  );
   await Promise.all([
-    runSnapshot(
-      'external_order_progress',
-      () => getMerchizeExternalOrderProgress(reference),
-      async (payload) => {
-        await prisma.merchizeFulfillmentOrder.update({
-          where: { id: orderRow.id },
-          data: {
-            merchizeProgressPayload: toOptionalPrismaJson(stampShipmentSnapshot(payload)),
-            progressStatus: summarizeProgressStatus(payload),
-            lastProgressSyncAt: new Date(),
-          },
-        });
-      },
-    ),
+    progressSnapshot,
     runSnapshot(
       'external_order_tracking',
-      () => getMerchizeExternalOrderTracking(reference),
-      async (payload) => {
-        await prisma.merchizeFulfillmentOrder.update({
-          where: { id: orderRow.id },
-          data: {
-            merchizeTrackingPayload: toOptionalPrismaJson(stampShipmentSnapshot(payload)),
-            deliveryStatus: summarizeDeliveryStatus(payload),
-            lastTrackingSyncAt: new Date(),
-          },
-        });
-      },
+      () => getMerchizeExternalOrderTracking(lifecycleReference),
+      (payload) => writer.saveTracking(payload, progressSnapshot),
     ),
     runSnapshot(
       'external_order_tickets',

@@ -11,6 +11,10 @@ import { normalizeCountryToIso2 } from '@/lib/utils/shop/checkout/normalizeCount
 import type { CanonicalOrderSnapshot } from '@/lib/paypal/orderSnapshot/types';
 import { parseCanonicalOrderSnapshot } from '@/lib/paypal/orderSnapshot/canonicalize';
 import { getCanonicalFulfillmentItems } from '@/lib/paypal/orderSnapshot/consumerData';
+import {
+  CatalogImportArtworkError,
+  resolveCatalogImportArtwork,
+} from '@/lib/merchizeFulfillmentOps/catalogImportArtwork';
 import { DjangoOrderError, djangoOrderFailure } from './djangoOrderContract';
 
 export type MerchizeFulfillmentOrderArgs = {
@@ -25,6 +29,7 @@ export type MerchizeFulfillmentOrderArgs = {
   customerPhone?: string | null;
   countryIso2?: string | null;
   fulfillmentAddress: PaymentSavingActionProps['delivery_address'];
+  assertProcessingLease?: () => Promise<void>;
 };
 
 type OrderProcessingItem = {
@@ -221,8 +226,11 @@ export async function sendMerchizeFulfillmentOrder(args: MerchizeFulfillmentOrde
   let encodedProps: string;
   try {
     // Canonical orders never consult the browser cart. Legacy rows retain their original mapping.
-    const items = args.canonicalOrderSnapshot
-      ? getCanonicalFulfillmentItems(parseCanonicalOrderSnapshot(args.canonicalOrderSnapshot))
+    const snapshot = args.canonicalOrderSnapshot
+      ? parseCanonicalOrderSnapshot(args.canonicalOrderSnapshot)
+      : null;
+    const items = snapshot
+      ? getCanonicalFulfillmentItems(snapshot)
       : mapCartToProcessingItems(args.cartSnapshot, args.currency);
     requestPayload = buildFulfillmentPayload(args, items);
     const validationIssues = getFulfillmentPayloadIssues(requestPayload);
@@ -231,13 +239,32 @@ export async function sendMerchizeFulfillmentOrder(args: MerchizeFulfillmentOrde
       throw new FulfillmentPayloadValidationError(validationIssues, requestPayload);
     }
 
+    let dispatchPayload = requestPayload;
+    if (snapshot) {
+      try {
+        const artwork = await resolveCatalogImportArtwork(snapshot.lines);
+        // Do not put the short-lived links in the request copy returned to the ledger.
+        dispatchPayload = {
+          ...requestPayload,
+          items: items.map((item, index) => ({ ...item, ...artwork[index] })),
+        };
+      } catch (error) {
+        if (!(error instanceof CatalogImportArtworkError)) throw error;
+        throw new FulfillmentPayloadValidationError(
+          [{ field: 'items.artwork', message: error.message }],
+          requestPayload,
+        );
+      }
+    }
+
     const payload = {
       djangoPaymentSaveCustomId: args.djangoPaymentSaveCustomId,
       djangoOrderIntentUuid: args.djangoOrderIntentUuid,
       djangoOrderIntentOrderId: args.djangoOrderIntentOrderId,
-      payload: requestPayload,
+      payload: dispatchPayload,
     } satisfies MerchizeFulfillmentProcessProps;
     encodedProps = encryptForPostProcessingServerAction(JSON.stringify(payload), 'fulfillment');
+    if (snapshot) await args.assertProcessingLease?.();
   } catch (error) {
     if (error instanceof DjangoOrderError) throw error;
     throw new DjangoOrderError(djangoOrderFailure(error, 'not_sent'));

@@ -14,6 +14,42 @@ import {
 } from './payPalAuthorizationLedgerTransition';
 import { PAYPAL_LEDGER_STATUS } from './status';
 
+test('a later matching authorization cannot replace a saved changed-address incident', () => {
+  const current = canonicalRow();
+  current.shippingSnapshot = {
+    shipping_address_line_1: '12 Example Street',
+    shipping_address_line_2: '',
+    shipping_city: 'Example City',
+    shipping_state: 'CA',
+    zip_code: '90001',
+    shipping_country: 'USA',
+  };
+  const changed = {
+    amount: { value: '25.00', currencyCode: 'USD' },
+    shipping: {
+      address: {
+        addressLine1: '99 Changed Street',
+        adminArea2: 'Example City',
+        adminArea1: 'CA',
+        postalCode: '90001',
+        countryCode: 'US',
+      },
+    },
+  };
+  const rejected = buildPayPalAuthorizationLedgerTransition(current, changed);
+  assert.equal(rejected.reconciliation.errorCode, 'PAYPAL_REVIEW_ADDRESS_CHANGED');
+  const retained = buildPayPalAuthorizationLedgerTransition(
+    {
+      ...current,
+      ...rejected.data,
+      authorizePayload: rejected.data.authorizePayload,
+    } as PayPalAuthorizationTransitionRow,
+    { amount: { value: '25.00', currencyCode: 'USD' } },
+  );
+  assert.equal(retained.reconciliation.errorCode, 'PAYPAL_REVIEW_ADDRESS_CHANGED');
+  assert.deepEqual(retained.data.authorizePayload, changed);
+});
+
 function canonicalRow(): PayPalAuthorizationTransitionRow {
   const snapshot = finalizeCanonicalOrderSnapshot({
     version: CANONICAL_ORDER_SNAPSHOT_VERSION,
@@ -87,8 +123,7 @@ test('a CAS retry preserves a concurrently committed authorization mismatch', as
   const committed = await commitOptimisticLedgerTransition({
     load: async () => (loadCount++ === 0 ? initial : mismatch),
     build: (row) => buildPayPalAuthorizationLedgerTransition(row, matchingOrderResponse),
-    commit: async (_row, transition) =>
-      transition.data.status === PAYPAL_LEDGER_STATUS.ERROR,
+    commit: async (_row, transition) => transition.data.status === PAYPAL_LEDGER_STATUS.ERROR,
   });
 
   assert.equal(committed.attempts, 2);
@@ -97,10 +132,10 @@ test('a CAS retry preserves a concurrently committed authorization mismatch', as
     committed.transition.reconciliationFailure?.errorCode,
     'PAYPAL_AUTHORIZATION_AMOUNT_MISMATCH',
   );
-  assert.deepEqual(
-    getPayPalAuthorizationMoney(committed.transition.data.authorizePayload),
-    { value: '24.99', currency: 'USD' },
-  );
+  assert.deepEqual(getPayPalAuthorizationMoney(committed.transition.data.authorizePayload), {
+    value: '24.99',
+    currency: 'USD',
+  });
 });
 
 test('a stale route failure cannot erase mismatched evidence before a matching resync', () => {
@@ -109,10 +144,7 @@ test('a stale route failure cannot erase mismatched evidence before a matching r
     id: 'authorization-id',
     amount: { value: '24.99', currencyCode: 'USD' },
   };
-  const mismatch = buildPayPalAuthorizationLedgerTransition(
-    initial,
-    mismatchedAuthorization,
-  );
+  const mismatch = buildPayPalAuthorizationLedgerTransition(initial, mismatchedAuthorization);
   const afterMismatch = {
     ...initial,
     ...mismatch.data,
@@ -145,17 +177,14 @@ test('a stale route failure cannot erase mismatched evidence before a matching r
   });
 
   assert.equal(staleFailure.data.status, PAYPAL_LEDGER_STATUS.ERROR);
-  assert.equal(
-    staleFailure.data.lastErrorCode,
-    'PAYPAL_AUTHORIZATION_AMOUNT_MISMATCH',
-  );
+  assert.equal(staleFailure.data.lastErrorCode, 'PAYPAL_AUTHORIZATION_AMOUNT_MISMATCH');
   assert.equal(matchingResync.data.status, PAYPAL_LEDGER_STATUS.ERROR);
   assert.equal(
     matchingResync.reconciliationFailure?.errorCode,
     'PAYPAL_AUTHORIZATION_AMOUNT_MISMATCH',
   );
-  assert.deepEqual(
-    getPayPalAuthorizationMoney(matchingResync.data.authorizePayload),
-    { value: '24.99', currency: 'USD' },
-  );
+  assert.deepEqual(getPayPalAuthorizationMoney(matchingResync.data.authorizePayload), {
+    value: '24.99',
+    currency: 'USD',
+  });
 });

@@ -8,12 +8,19 @@ import {
 } from 'next/dist/server/app-render/work-async-storage.external';
 import { workUnitAsyncStorage } from 'next/dist/server/app-render/work-unit-async-storage.external';
 import type { PrismaClient } from '@/lib/prisma/shop/paypal/txLedger/generated/paypalTxLedger/client';
-import { finalizeCanonicalOrderSnapshot } from '@/lib/paypal/orderSnapshot/canonicalize';
+import {
+  finalizeCanonicalOrderSnapshot,
+  parseCanonicalOrderSnapshotFromLedger,
+} from '@/lib/paypal/orderSnapshot/canonicalize';
 import { buildAuthSessionCookies } from '@/lib/session/session-cookies';
-import { GET as resume } from '@/app/api/shop/checkout/[orderToken]/resume/route';
+import {
+  GET as resume,
+  POST as acknowledge,
+} from '@/app/api/shop/checkout/[orderToken]/resume/route';
 import { checkoutAddressHash, checkoutGrantCookieName, createCheckoutGrant } from './checkoutProof';
 import { toOriginalCheckout, type OriginalCheckoutRow } from './originalCheckoutServer';
 import { CheckoutRequestError } from './serverRequest';
+import { requireSavedCheckoutReview } from './checkoutReview';
 
 function originalCheckoutRow(): OriginalCheckoutRow {
   const snapshot = finalizeCanonicalOrderSnapshot({
@@ -68,6 +75,8 @@ function originalCheckoutRow(): OriginalCheckoutRow {
         addressHash: checkoutAddressHash(address),
       },
     },
+    djangoOrderIntentVerifyPayload: { verified: true, retained: 'existing verification' },
+    updatedAt: new Date('2026-11-21T12:00:00.000Z'),
     customerName: 'Original Customer',
     customerEmail: 'customer@example.com',
     countryIso2: 'US',
@@ -263,9 +272,21 @@ test('unsafe image links are omitted and unsafe numeric quotes cannot be resumed
   });
 });
 
-function inRequest(cookie: string, orderToken = 'original-order') {
-  const req = new NextRequest(`http://localhost:3000/next-api/shop/checkout/${orderToken}/resume`, {
-    headers: { cookie },
+function inRequest(
+  cookie: string,
+  orderToken = 'original-order',
+  body?: unknown,
+  origin = 'http://localhost:3001',
+) {
+  const req = new NextRequest(`http://localhost:3001/next-api/shop/checkout/${orderToken}/resume`, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: {
+      cookie,
+      ...(body === undefined
+        ? {}
+        : { origin, host: 'localhost:3001', 'content-type': 'application/json' }),
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const store = createRequestStoreForAPI(
     req,
@@ -276,7 +297,11 @@ function inRequest(cookie: string, orderToken = 'original-order') {
     undefined,
   );
   return workAsyncStorage.run({ route: '/test' } as WorkStore, () =>
-    workUnitAsyncStorage.run(store, () => resume(req, { params: Promise.resolve({ orderToken }) })),
+    workUnitAsyncStorage.run(store, () =>
+      (body === undefined ? resume : acknowledge)(req, {
+        params: Promise.resolve({ orderToken }),
+      }),
+    ),
   );
 }
 
@@ -333,5 +358,105 @@ test('resume requires payment ownership and never claims, creates, reprices or c
   const unsafe = await inRequest(await accountCookie('owner-a'));
   assert.equal(unsafe.status, 409);
   assert.equal((await unsafe.json()).code, 'ORIGINAL_CHECKOUT_REVIEW_REQUIRED');
+  assert.equal(network.mock.callCount(), 0);
+});
+
+test('renewed original-purchase review saves only matching evidence with payment access', async (t) => {
+  const previousClient = global.__paypalTxLedger__;
+  const previousSecret = process.env.SESSION_SECRET;
+  const previousEnvironment = process.env.NODE_ENV;
+  process.env.SESSION_SECRET = 'original-checkout-test-secret-of-at-least-32-bytes';
+  Reflect.set(process.env, 'NODE_ENV', 'development');
+  t.after(() => {
+    global.__paypalTxLedger__ = previousClient;
+    if (previousSecret === undefined) delete process.env.SESSION_SECRET;
+    else process.env.SESSION_SECRET = previousSecret;
+    if (previousEnvironment === undefined) Reflect.deleteProperty(process.env, 'NODE_ENV');
+    else Reflect.set(process.env, 'NODE_ENV', previousEnvironment);
+  });
+  const network = t.mock.method(globalThis, 'fetch', async () => assert.fail('No provider call'));
+  let row = originalCheckoutRow();
+  const writes: Array<{ where: Record<string, unknown>; data: Record<string, unknown> }> = [];
+  let savedCount = 1;
+  global.__paypalTxLedger__ = {
+    paypalIntent: {
+      findUnique: async () => row,
+      updateMany: async (input: (typeof writes)[number]) => {
+        writes.push(input);
+        return { count: savedCount };
+      },
+      create: async () => assert.fail('Review must not create another order'),
+    },
+  } as unknown as PrismaClient;
+  const cookie = `${checkoutGrantCookieName(row.orderToken)}=${createCheckoutGrant(row, 'payment')}`;
+  const reviewed = toOriginalCheckout(row);
+  const body = { acknowledged: true, reviewKey: reviewed.reviewKey };
+  assert.equal((await inRequest('', row.orderToken, body)).status, 403);
+  assert.equal(
+    (await inRequest(cookie, row.orderToken, { ...body, acknowledged: false })).status,
+    409,
+  );
+  assert.equal(
+    (await inRequest(cookie, row.orderToken, { ...body, reviewKey: 'changed' })).status,
+    409,
+  );
+  assert.equal(
+    (await inRequest(cookie, row.orderToken, body, 'https://another-site.invalid')).status,
+    403,
+  );
+  assert.equal(writes.length, 0);
+  const result = await inRequest(cookie, row.orderToken, body);
+  assert.equal(result.status, 200);
+  assert.equal(result.headers.get('cache-control'), 'private, no-store');
+  assert.equal(result.headers.get('set-cookie'), null);
+  assert.deepEqual(await result.json(), {
+    ok: true,
+    reviewKey: reviewed.reviewKey,
+    paypalOrderId: reviewed.paypalOrderId,
+  });
+  assert.equal(writes.length, 1);
+  assert.deepEqual(writes[0].where, {
+    orderToken: row.orderToken,
+    userId: null,
+    status: 'intent_created',
+    updatedAt: row.updatedAt,
+    canonicalOrderSnapshotHash: row.canonicalOrderSnapshotHash,
+  });
+  assert.deepEqual(Object.keys(writes[0].data), ['djangoOrderIntentVerifyPayload']);
+  const saved = writes[0].data.djangoOrderIntentVerifyPayload as {
+    retained: string;
+    review: {
+      version: string;
+      acknowledgedAt: string;
+      originalReviewKey: string;
+      canonicalSnapshotHash: string;
+      itemsHash: string;
+      requestFingerprint: string;
+      quote: unknown;
+    };
+  };
+  assert.equal(saved.retained, 'existing verification');
+  assert.equal(saved.review.version, 'checkout-review-v2');
+  assert.equal(saved.review.originalReviewKey, reviewed.reviewKey);
+  assert.equal(saved.review.canonicalSnapshotHash, row.canonicalOrderSnapshotHash);
+  assert.match(saved.review.itemsHash, /^[a-f0-9]{64}$/u);
+  assert.match(saved.review.requestFingerprint, /^[a-f0-9]{64}$/u);
+  assert.ok(Number.isFinite(Date.parse(saved.review.acknowledgedAt)));
+  assert.deepEqual(saved.review.quote, reviewed.quote);
+  requireSavedCheckoutReview(parseCanonicalOrderSnapshotFromLedger(row).snapshot, saved);
+  row = { ...row, djangoOrderIntentVerifyPayload: null };
+  assert.equal((await inRequest(cookie, row.orderToken, body)).status, 200);
+  requireSavedCheckoutReview(
+    parseCanonicalOrderSnapshotFromLedger(row).snapshot,
+    writes[1].data.djangoOrderIntentVerifyPayload,
+  );
+  savedCount = 0;
+  const changed = await inRequest(cookie, row.orderToken, body);
+  assert.equal(changed.status, 409);
+  assert.equal((await changed.json()).code, 'CHECKOUT_REVIEW_CHANGED');
+  row = { ...row, capturePayload: { status: 'COMPLETED' } };
+  const countBefore = writes.length;
+  assert.equal((await inRequest(cookie, row.orderToken, body)).status, 409);
+  assert.equal(writes.length, countBefore);
   assert.equal(network.mock.callCount(), 0);
 });

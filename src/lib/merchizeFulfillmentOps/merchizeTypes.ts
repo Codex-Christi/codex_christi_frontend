@@ -67,6 +67,7 @@ export type MerchizeFulfillmentSyncResult =
       merchizeExternalOrderNumber: string;
       merchizeOrderId: string;
       itemCount: number;
+      fulfillmentCanceled?: boolean;
     }
   | {
       ok: false;

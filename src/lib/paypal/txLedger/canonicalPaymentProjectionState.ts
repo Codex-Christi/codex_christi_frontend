@@ -1,6 +1,8 @@
-import type { CanonicalOrderSnapshotLedgerEnvelope } from '@/lib/paypal/orderSnapshot/canonicalize';
 import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
-import { reconcileCanonicalPayPalPaymentChain } from '@/lib/paypal/txLedger/canonicalPaymentReconciliation';
+import {
+  reconcileCanonicalPayPalPaymentChain,
+  type CanonicalPaymentLedgerEnvelope,
+} from '@/lib/paypal/txLedger/canonicalPaymentReconciliation';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
 
 const PAYMENT_CHAIN_REQUIRED_STATUSES = new Set<string>([
@@ -20,7 +22,7 @@ const PAYMENT_CHAIN_REQUIRED_STATUSES = new Set<string>([
  * ledger has entered a post-capture state.
  */
 export function getCanonicalPaymentProjectionState(
-  envelope: CanonicalOrderSnapshotLedgerEnvelope & {
+  envelope: CanonicalPaymentLedgerEnvelope & {
     status: string;
     authorizePayload: unknown;
     capturePayload: unknown;

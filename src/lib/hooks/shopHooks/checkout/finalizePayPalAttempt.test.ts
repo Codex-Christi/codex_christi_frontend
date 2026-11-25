@@ -9,7 +9,7 @@ import {
   usePayPalIntentStore,
 } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 import { deferred } from '@/lib/cart/test-support';
-import { finalizePayPalAttempt } from './finalizePayPalAttempt';
+import { finalizePayPalAttempt, PayPalCheckoutError } from './finalizePayPalAttempt';
 
 usePayPalIntentStore.persist.setOptions({
   storage: { getItem: async () => null, setItem: async () => {}, removeItem: async () => {} },
@@ -25,6 +25,36 @@ const authorized = () =>
     purchaseUnits: [{ payments: { authorizations: [{ id: 'authorization-one' }] } }],
   });
 const captured = () => Response.json({ status: 'COMPLETED' });
+
+test('a returned-address rejection asks for review and never dispatches capture', async () => {
+  const attempt = setup('address-review');
+  let requests = 0;
+  await assert.rejects(
+    finalizePayPalAttempt(attempt, attempt.paypalOrderId!, {
+      request: async () => {
+        requests += 1;
+        return Response.json(
+          {
+            error: {
+              code: 'PAYPAL_REVIEW_ADDRESS_CHANGED',
+              message: 'SECRET_ADDRESS_INTERNAL_DETAIL',
+            },
+          },
+          { status: 409 },
+        );
+      },
+      onCompleted: () => assert.fail('Changed-address payment must not complete'),
+    }),
+    (error: unknown) =>
+      error instanceof PayPalCheckoutError &&
+      error.code === 'PAYPAL_REVIEW_ADDRESS_CHANGED' &&
+      /different delivery address/.test(error.message) &&
+      !error.message.includes('SECRET'),
+  );
+  assert.equal(requests, 1);
+  assert.equal(usePayPalIntentStore.getState().activeCheckout?.stage, 'paypal_approved');
+  assert.equal(isCurrentCheckoutAttempt(attempt), true);
+});
 
 test('immutable checkout setup reuses one UUID after reload, while changed input invalidates earlier responses', async () => {
   const first = setup('A');

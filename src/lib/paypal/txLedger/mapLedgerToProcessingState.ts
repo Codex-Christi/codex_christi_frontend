@@ -1,20 +1,7 @@
-import type { CartPurchase } from '@/lib/cart/types';
+import type { CustomerOrderStatus } from '@/lib/shop/checkout/customerOrderStatus';
 
-export type PayPalTxPaymentStatusResponse = {
-  orderToken: string;
-  status: string;
-  lastEventType?: string | null;
-  receiptLink?: string | null;
-  receiptFile?: string | null;
-  djangoPaymentSaveCustomId?: string | null;
-  processingCompletedAt?: string | null;
-  paidAmountLabel?: string | null;
-  cartPurchase?: CartPurchase | null;
-  customerRecoveryStatus?: 'paid_unresolved' | null;
-  recoveryReason?: string | null;
-  updatedAt?: string | null;
-  error?: { code?: string | null; message?: string | null } | null;
-};
+export type PayPalTxPaymentStatusResponse = Pick<CustomerOrderStatus, 'orderToken' | 'status'> &
+  Partial<Omit<CustomerOrderStatus, 'orderToken' | 'status'>>;
 
 type ProcessingStep = {
   key: 'receiptUpload' | 'paymentSave' | 'orderPush';
@@ -30,10 +17,14 @@ export type MappedProcessingState = {
   steps: ProcessingStep[];
   receiptLink?: string;
   receiptFileName?: string;
-  orderCustomId?: string;
+  updatedAt?: string;
   paidAmountLabel?: string;
   errorMessage?: string;
   supportReference: string;
+  recoveryReason?: string;
+  postPurchaseStage?: CustomerOrderStatus['postPurchaseStage'];
+  fulfillmentOnHold?: boolean;
+  fulfillmentCheckedAt?: string;
   shortSupportReference: string;
   needsManualReview: boolean;
 };
@@ -41,17 +32,17 @@ export type MappedProcessingState = {
 const createSteps = (): ProcessingStep[] => [
   {
     key: 'receiptUpload',
-    label: 'Payment Recorded',
+    label: 'Payment',
     status: 'idle',
   },
   {
     key: 'paymentSave',
-    label: 'Receipt Prepared',
+    label: 'Receipt',
     status: 'idle',
   },
   {
     key: 'orderPush',
-    label: 'Order Sent to Fulfillment',
+    label: 'Order confirmation',
     status: 'idle',
   },
 ];
@@ -74,33 +65,33 @@ function buildErrorSteps(data: PayPalTxPaymentStatusResponse) {
   const message = isPaidUnresolved
     ? (data.recoveryReason ?? 'Post-payment processing needs review before fulfillment.')
     : isFulfillmentReview
-    ? 'Our team is reviewing the fulfillment handoff before your order moves forward.'
-    : (data.error?.message ?? 'Payment processing failed');
+      ? 'Our team is reviewing the fulfillment handoff before your order moves forward.'
+      : (data.error?.message ?? 'Payment processing failed');
 
-  const receiptReady = Boolean(
-    data.djangoPaymentSaveCustomId || (data.receiptLink && data.receiptFile),
-  );
-  const failedStepIndex = receiptReady ? 2 : isPaidUnresolved ? 1 : 0;
+  const receiptReady = data.receiptReady ?? Boolean(data.receiptLink && data.receiptFile);
+  const failedStepIndex = data.paymentSaved || receiptReady ? 2 : isPaidUnresolved ? 1 : 0;
 
-  return createSteps().map(
-    (step, index): ProcessingStep => ({
-      ...step,
-      status: index < failedStepIndex ? 'success' : index === failedStepIndex ? 'error' : 'idle',
-      ...(index === failedStepIndex ? { errorMessage: message } : {}),
-    }),
-  );
+  return createSteps().map((step, index): ProcessingStep => ({
+    ...step,
+    status: index < failedStepIndex ? 'success' : index === failedStepIndex ? 'error' : 'idle',
+    ...(index === failedStepIndex ? { errorMessage: message } : {}),
+  }));
 }
 
 export function mapLedgerToProcessingState(
   data: PayPalTxPaymentStatusResponse,
 ): MappedProcessingState {
   const shared = {
-    receiptLink: data.receiptLink ?? undefined,
-    receiptFileName: data.receiptFile ?? undefined,
-    orderCustomId: data.djangoPaymentSaveCustomId ?? undefined,
+    receiptLink: data.receiptReady === false ? undefined : (data.receiptLink ?? undefined),
+    receiptFileName: data.receiptReady === false ? undefined : (data.receiptFile ?? undefined),
+    updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : undefined,
     paidAmountLabel: data.paidAmountLabel ?? undefined,
     errorMessage: data.error?.message ?? undefined,
     supportReference: data.orderToken,
+    recoveryReason: data.recoveryReason ?? undefined,
+    postPurchaseStage: data.postPurchaseStage,
+    fulfillmentOnHold: data.fulfillmentOnHold,
+    fulfillmentCheckedAt: data.fulfillmentCheckedAt ?? undefined,
     shortSupportReference: data.orderToken.slice(0, 8),
     needsManualReview:
       data.customerRecoveryStatus === 'paid_unresolved' ||
@@ -160,7 +151,7 @@ export function mapLedgerToProcessingState(
     steps = withStepStatus(
       steps,
       'paymentSave',
-      data.receiptLink && data.receiptFile ? 'success' : 'pending',
+      (data.receiptReady ?? Boolean(data.receiptLink && data.receiptFile)) ? 'success' : 'pending',
     );
 
     return {

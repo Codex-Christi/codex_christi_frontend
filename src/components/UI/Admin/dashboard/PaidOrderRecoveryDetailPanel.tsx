@@ -1,5 +1,6 @@
 import { ChevronDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isMerchizeFulfillmentCanceled } from '@/lib/merchizeFulfillmentOps/status';
 import { getAdminGlassPanelClassName, default as AdminGlassPanel } from './AdminGlassPanel';
 import AdminNotificationHistoryPanel from './AdminNotificationHistoryPanel';
 import AdminPaidOrderRecoveryActionsPanel from './AdminPaidOrderRecoveryActionsPanel';
@@ -27,6 +28,7 @@ import type {
   TimelineItem,
 } from './adminShopDashboardTypes';
 import type { ShopOpsDataTargetView } from '@/lib/prisma/shop/shopOpsDataTarget';
+import { getMerchizeReleaseReview } from '@/lib/paypal/txLedger/fulfillmentRetryPolicy';
 import ShopOpsDataTargetBadge from './ShopOpsDataTargetBadge';
 
 type PaidOrderRecoveryDetailPanelProps = {
@@ -166,12 +168,17 @@ function RecoveryActionsPanel({
   manualReleaseReadinessWarning: string | null;
   shopOpsDataTarget: ShopOpsDataTargetView;
 }) {
+  if (isMerchizeFulfillmentCanceled(detail.merchizeFulfillmentOps?.deliveryStatus)) return null;
+
   const addressReviewStatus = detail.merchizeFulfillmentOps?.addressReviewStatus;
+  const releaseVerificationPending =
+    recovery.status !== 'completed' &&
+    getMerchizeReleaseReview(detail.merchizeFulfillmentOps).verificationPending;
   const canConfirmProviderAddress =
     Boolean(detail.merchizeFulfillmentOps?.merchizeOrderId) &&
-    ['blocked', 'pending', 'provider_update_pending_validation'].includes(
-      addressReviewStatus ?? '',
-    );
+    detail.buyerAddressCorrectionState !== 'checking' &&
+    (detail.buyerAddressCorrectionState === 'review' ||
+      ['blocked', 'pending', 'provider_update_pending_validation'].includes(addressReviewStatus ?? ''));
 
   return (
     <AdminGlassPanel className='overflow-hidden'>
@@ -187,9 +194,10 @@ function RecoveryActionsPanel({
           isCompleted={recovery.status === 'completed'}
           needsProviderDetailSync={detail.needsProviderDetailSync}
           requiresManualRelease={detail.requiresManualRelease}
+          releaseVerificationPending={releaseVerificationPending}
           canConfirmProviderAddress={canConfirmProviderAddress}
           manualReleaseReadinessWarning={manualReleaseReadinessWarning}
-          retryMode={detail.retryMode}
+          retryMode={detail.buyerAddressCorrectionState ? 'none' : detail.retryMode}
           shopOpsDataTarget={shopOpsDataTarget}
         />
       </div>

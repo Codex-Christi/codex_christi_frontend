@@ -6,11 +6,30 @@ import {
 } from '@/stores/shop_stores/checkoutStore/paypalIntentStore';
 import type { OrderAuthorizeResponse, OrdersCapture } from '@paypal/paypal-server-sdk';
 import { boundedCheckoutRequest, CheckoutRequestTimeoutError } from './boundedCheckoutRequest';
+import { readCheckoutSetupFailure } from '@/components/UI/Shop/Checkout/checkoutSetupFailure';
 
 const finalizing = new Map<string, Promise<'completed' | 'superseded'>>();
 export const isPayPalAttemptFinalizing = (attempt: CheckoutAttempt) =>
   finalizing.has(attempt.attemptId);
-export class PayPalCheckoutError extends Error {}
+export class PayPalCheckoutError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
+
+async function responseFailure(response: Response, fallback: string) {
+  const failure = readCheckoutSetupFailure(await response.json().catch(() => null));
+  if (
+    failure.code === 'PAYPAL_REVIEW_ADDRESS_CHANGED' ||
+    failure.code === 'CHECKOUT_REVIEW_REQUIRED' ||
+    failure.code === 'CHECKOUT_REVIEW_CHANGED'
+  )
+    return new PayPalCheckoutError(failure.message, failure.code);
+  return new PayPalCheckoutError(fallback);
+}
 
 /** Bind approval to the provider order and stop old attempts at every asynchronous boundary. */
 export function finalizePayPalAttempt(
@@ -51,7 +70,8 @@ export function finalizePayPalAttempt(
       });
       if (!isCurrentCheckoutAttempt(attempt)) return null;
       if (!response.ok)
-        throw new PayPalCheckoutError(
+        throw await responseFailure(
+          response,
           'Payment authorization could not be confirmed. Check its status before trying again.',
         );
       return (await response.json()) as OrderAuthorizeResponse;
@@ -70,7 +90,8 @@ export function finalizePayPalAttempt(
       });
       if (!isCurrentCheckoutAttempt(attempt)) return null;
       if (!response.ok)
-        throw new PayPalCheckoutError(
+        throw await responseFailure(
+          response,
           'Payment status could not be confirmed. Check your payment before trying again.',
         );
       return (await response.json()) as OrdersCapture;

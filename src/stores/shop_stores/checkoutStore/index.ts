@@ -1,6 +1,8 @@
 import { UserProfileDataInterface } from '@/lib/types/user-profile/main-user-profile';
 import type { IUserShopProfile } from '@/lib/types/user-shop-interface';
 import { normalizeCountryToIso3 } from '@/lib/utils/shop/checkout/normalizeCountryToIso3';
+import { normalizeShippingState, stateAfterCountryChange } from '@/lib/shop/address/usStates';
+import { emailSchema } from '@/lib/formSchemas/auth-fields';
 import { useUserMainProfileStore } from '@/stores/userMainProfileStore';
 import { create } from 'zustand';
 import { persist, type StorageValue } from 'zustand/middleware';
@@ -8,6 +10,8 @@ import { createCheckoutObfuscatedStorage } from './storage';
 
 type CheckoutPickType = Pick<UserProfileDataInterface, 'first_name' | 'last_name' | 'email'>;
 export interface ShopCheckoutStoreInterface extends CheckoutPickType {
+  emailIsCustom: boolean;
+  draftEmail: string | null;
   payment_method: {
     payment_method: 'credit_card' | '';
     name: string;
@@ -31,10 +35,11 @@ export interface ShopCheckoutState extends ShopCheckoutStoreInterface {
   setFirstName: (first_name: ShopCheckoutStoreInterface['first_name']) => void;
   setLastName: (last_name: ShopCheckoutStoreInterface['last_name']) => void;
   setEmail: (email: ShopCheckoutStoreInterface['email']) => void;
+  setDraftEmail: (value: string) => void;
   setPaymentMethod: (payment_method: ShopCheckoutStoreInterface['payment_method']) => void;
   setDeliveryAddress: (delivery_address: ShopCheckoutStoreInterface['delivery_address']) => void;
   setShippingCountryISO3: (iso3: string | null) => void; // <-- NEW: single writer for country
-  hydrateFromShopProfile: (profile: IUserShopProfile, fallbackEmail?: string | null) => void;
+  hydrateFromShopProfile: (profile: IUserShopProfile) => void;
   clearCheckout: () => void;
   resetCheckoutToStoreDefaults: () => void;
   resetCheckoutToInitial: () => void;
@@ -42,13 +47,15 @@ export interface ShopCheckoutState extends ShopCheckoutStoreInterface {
 
 type ShopCheckoutPersistedState = Pick<
   ShopCheckoutStoreInterface,
-  'first_name' | 'last_name' | 'email' | 'delivery_address'
+  'first_name' | 'last_name' | 'email' | 'emailIsCustom' | 'draftEmail' | 'delivery_address'
 >;
 
 const initialObj = {
   first_name: '',
   last_name: '',
   email: '',
+  emailIsCustom: false,
+  draftEmail: null,
   payment_method: null,
   delivery_address: {
     shipping_address_line_1: null,
@@ -71,6 +78,11 @@ function stringOr<Fallback extends '' | null>(
   return typeof value === 'string' ? value : fallback;
 }
 
+function readDraftEmail(value: unknown) {
+  const parsed = emailSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 function sanitizeCheckoutStorageValue(
   value: StorageValue<ShopCheckoutPersistedState>,
 ): StorageValue<ShopCheckoutPersistedState> {
@@ -85,6 +97,8 @@ function sanitizeCheckoutStorageValue(
       first_name: stringOr(state.first_name, ''),
       last_name: stringOr(state.last_name, ''),
       email: stringOr(state.email, ''),
+      emailIsCustom: state.emailIsCustom === true,
+      draftEmail: readDraftEmail(state.draftEmail),
       delivery_address: Object.fromEntries(
         Object.keys(initialObj.delivery_address).map((key) => [key, stringOr(address[key], null)]),
       ) as ShopCheckoutStoreInterface['delivery_address'],
@@ -105,29 +119,50 @@ function getProfileBackedCheckoutDefaults(): ShopCheckoutStoreInterface {
 
 export const useShopCheckoutStore = create<ShopCheckoutState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...getProfileBackedCheckoutDefaults(),
       setFirstName: (first_name) => set({ first_name }),
       setLastName: (last_name) => set({ last_name }),
-      setEmail: (email) => set({ email }),
+      setEmail: (email) => set({ email, emailIsCustom: Boolean(email?.trim()) }),
+      setDraftEmail: (value) => {
+        const { email, draftEmail } = get();
+        const validEmail = readDraftEmail(value);
+        const next = validEmail?.toLowerCase() === email?.trim().toLowerCase() ? null : validEmail;
+        if (next !== draftEmail) set({ draftEmail: next });
+      },
       setPaymentMethod: (payment_method) => set({ payment_method }),
       setDeliveryAddress: (delivery_address) => set({ delivery_address }),
       setShippingCountryISO3: (iso3) =>
         set((state) => ({
-          delivery_address: { ...state.delivery_address, shipping_country: iso3 },
+          delivery_address: {
+            ...state.delivery_address,
+            shipping_country: iso3,
+            shipping_state: stateAfterCountryChange(
+              state.delivery_address.shipping_country,
+              iso3,
+              state.delivery_address.shipping_state,
+            ),
+          },
         })),
-      hydrateFromShopProfile: (profile, fallbackEmail) => {
+      hydrateFromShopProfile: (profile) => {
         const data = profile.data;
         set((state) => ({
           first_name: state.first_name || data.first_name || '',
           last_name: state.last_name || data.last_name || '',
-          email: state.email || fallbackEmail || '',
           delivery_address: {
             shipping_address_line_1:
               state.delivery_address.shipping_address_line_1 || data.shipping_address || '',
             shipping_address_line_2: state.delivery_address.shipping_address_line_2 ?? '',
             shipping_city: state.delivery_address.shipping_city || data.shipping_city || '',
-            shipping_state: state.delivery_address.shipping_state || data.shipping_state || '',
+            shipping_state: normalizeShippingState(
+              state.delivery_address.shipping_country ?? data.shipping_country,
+              state.delivery_address.shipping_state ||
+                stateAfterCountryChange(
+                  data.shipping_country,
+                  state.delivery_address.shipping_country ?? data.shipping_country,
+                  data.shipping_state,
+                ),
+            ),
             // Preserve the checkout/currency-selected country when it already exists.
             shipping_country:
               state.delivery_address.shipping_country ??
@@ -150,6 +185,8 @@ export const useShopCheckoutStore = create<ShopCheckoutState>()(
         first_name: state.first_name,
         last_name: state.last_name,
         email: state.email,
+        emailIsCustom: state.emailIsCustom,
+        draftEmail: state.draftEmail,
         delivery_address: state.delivery_address,
       }),
       skipHydration: true,

@@ -2,12 +2,17 @@ import en from 'react-phone-number-input/locale/en';
 import { normalizeCountryToIso2 } from '../utils/shop/checkout/normalizeCountryToIso3';
 import { shippingAddressSchema } from '../types/shipping-address-schema';
 import { profileTextUpdateSchema, profilePhotoSchema } from '../formSchemas/profile-fields';
+import { normalizeShippingState } from '@/lib/shop/address/usStates';
 
 export function shippingAddressPayload(input: unknown) {
   const parsed = shippingAddressSchema.strict().parse(input);
   const code = normalizeCountryToIso2(parsed.shipping_country);
   if (!code || !en[code as keyof typeof en]) throw new Error('Choose a valid shipping country.');
-  return { ...parsed, shipping_country: en[code as keyof typeof en] };
+  return {
+    ...parsed,
+    shipping_state: normalizeShippingState(code, parsed.shipping_state),
+    shipping_country: en[code as keyof typeof en],
+  };
 }
 
 export async function profileUpdateForm(input: FormData) {

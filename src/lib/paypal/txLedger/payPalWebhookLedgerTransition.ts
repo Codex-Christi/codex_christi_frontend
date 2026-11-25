@@ -1,9 +1,9 @@
-import type { CanonicalOrderSnapshotLedgerEnvelope } from '@/lib/paypal/orderSnapshot/canonicalize';
 import {
   getDurableCanonicalPayPalCaptureMismatch,
   reconcileCanonicalPayPalAuthorization,
   reconcileCanonicalPayPalPaymentChain,
   type CanonicalPaymentReconciliationResult,
+  type CanonicalPaymentLedgerEnvelope,
 } from '@/lib/paypal/txLedger/canonicalPaymentReconciliation';
 import { getPayPalCaptureCompletion } from '@/lib/paypal/txLedger/captureCompletion';
 import {
@@ -32,7 +32,7 @@ const AUTHORIZATION_ADVANCE_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.AUTHORIZED,
 ]);
 
-export type PayPalWebhookTransitionRow = CanonicalOrderSnapshotLedgerEnvelope & {
+export type PayPalWebhookTransitionRow = CanonicalPaymentLedgerEnvelope & {
   status: string;
   authorizePayload: unknown;
   capturePayload: unknown;
@@ -155,7 +155,10 @@ export function buildPayPalWebhookLedgerTransition(
       const directAuthorizationId = asString(asRecord(webhookResource)?.id);
       const directEvidence = jsonEvidence(webhookResource);
       const durableAuthorizePayload =
-        attachPayPalAuthorizationEvidence(row.authorizePayload, webhookResource) ?? directEvidence;
+        !reconciliation.ok && reconciliation.errorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED'
+          ? directEvidence
+          : (attachPayPalAuthorizationEvidence(row.authorizePayload, webhookResource) ??
+            directEvidence);
       const hasCompletedCapture = getPayPalCaptureCompletion(row.capturePayload).ok;
       const preservesAdvancedState =
         !AUTHORIZATION_ADVANCE_STATUSES.has(row.status) ||

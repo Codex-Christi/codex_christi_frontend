@@ -5,6 +5,8 @@ import {
   readCheckoutBody,
 } from '@/lib/shop/checkout/serverRequest';
 import { requireCheckoutAccess } from '@/lib/shop/checkout/serverAccess';
+import { requireSavedCheckoutReview } from '@/lib/shop/checkout/checkoutReview';
+import { parseCanonicalOrderSnapshotFromLedger } from '@/lib/paypal/orderSnapshot/canonicalize';
 // POST /api/paypal/authorize
 import { randomUUID } from 'crypto';
 import {
@@ -112,7 +114,10 @@ export async function POST(req: Request) {
     routeError({
       status: 409,
       code: result.errorCode ?? 'PAYPAL_AUTHORIZATION_AMOUNT_MISMATCH',
-      stage: 'reconcile_authorization_amount',
+      stage:
+        result.errorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED'
+          ? 'review_paypal_address'
+          : 'reconcile_authorization_amount',
       message: result.reason,
     });
   const fail = async ({
@@ -247,6 +252,10 @@ export async function POST(req: Request) {
       });
     }
 
+    requireSavedCheckoutReview(
+      parseCanonicalOrderSnapshotFromLedger(intent).snapshot,
+      intent.djangoOrderIntentVerifyPayload,
+    );
     const orders = new OrdersController(getPayPalClient());
     const { result } = await orders.authorizeOrder({
       id: orderID,

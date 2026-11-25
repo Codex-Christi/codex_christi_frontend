@@ -1,6 +1,6 @@
-import type { CanonicalOrderSnapshotLedgerEnvelope } from '@/lib/paypal/orderSnapshot/canonicalize';
 import {
   reconcileCanonicalPayPalAuthorization,
+  type CanonicalPaymentLedgerEnvelope,
   type CanonicalPaymentReconciliationResult,
 } from '@/lib/paypal/txLedger/canonicalPaymentReconciliation';
 import {
@@ -16,7 +16,7 @@ const AUTHORIZATION_ADVANCE_STATUSES = new Set<string>([
   PAYPAL_LEDGER_STATUS.ERROR,
 ]);
 
-export type PayPalAuthorizationTransitionRow = CanonicalOrderSnapshotLedgerEnvelope & {
+export type PayPalAuthorizationTransitionRow = CanonicalPaymentLedgerEnvelope & {
   status: string;
   paypalAuthorizationId: string | null;
   authorizePayload: unknown;
@@ -31,7 +31,7 @@ export type PayPalAuthorizationLedgerTransition = {
 };
 
 export function getDurableAuthorizationMismatch(
-  row: CanonicalOrderSnapshotLedgerEnvelope & { authorizePayload: unknown },
+  row: CanonicalPaymentLedgerEnvelope & { authorizePayload: unknown },
 ) {
   // A fresh canonical intent has no authorization payload yet, so its expected "amount missing"
   // result is not an incident. Once provider evidence is stored, derive the durable mismatch from
@@ -40,7 +40,8 @@ export function getDurableAuthorizationMismatch(
 
   const reconciliation = reconcileCanonicalPayPalAuthorization(row, row.authorizePayload);
   return !reconciliation.ok &&
-    reconciliation.errorCode === 'PAYPAL_AUTHORIZATION_AMOUNT_MISMATCH'
+    (reconciliation.errorCode === 'PAYPAL_AUTHORIZATION_AMOUNT_MISMATCH' ||
+      reconciliation.errorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED')
     ? reconciliation
     : null;
 }
@@ -61,9 +62,7 @@ export function buildPayPalAuthorizationLedgerTransition(
     return {
       data: {
         status: PAYPAL_LEDGER_STATUS.ERROR,
-        ...(row.paypalAuthorizationId
-          ? { paypalAuthorizationId: row.paypalAuthorizationId }
-          : {}),
+        ...(row.paypalAuthorizationId ? { paypalAuthorizationId: row.paypalAuthorizationId } : {}),
         authorizePayload: safeJson(row.authorizePayload),
         lastErrorCode: durableMismatch.errorCode,
         lastErrorMessage: row.lastErrorMessage ?? durableMismatch.reason,
@@ -109,9 +108,7 @@ export function buildPayPalAuthorizationFailureLedgerTransition(
     return {
       data: {
         status: PAYPAL_LEDGER_STATUS.ERROR,
-        ...(row.paypalAuthorizationId
-          ? { paypalAuthorizationId: row.paypalAuthorizationId }
-          : {}),
+        ...(row.paypalAuthorizationId ? { paypalAuthorizationId: row.paypalAuthorizationId } : {}),
         authorizePayload: safeJson(row.authorizePayload),
         lastErrorCode: durableMismatch.errorCode,
         lastErrorMessage: row.lastErrorMessage ?? durableMismatch.reason,

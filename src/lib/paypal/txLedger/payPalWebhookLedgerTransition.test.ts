@@ -17,6 +17,36 @@ import {
 } from './payPalWebhookLedgerTransition';
 import { PAYPAL_LEDGER_STATUS } from './status';
 
+test('capture webhooks do not release a paid order whose authorization address changed', () => {
+  const current = row();
+  current.shippingSnapshot = {
+    shipping_address_line_1: '12 Example Street',
+    shipping_city: 'Example City',
+    shipping_state: 'CA',
+    zip_code: '90001',
+    shipping_country: 'USA',
+  };
+  current.authorizePayload = {
+    amount: { value: '25.00', currencyCode: 'USD' },
+    shipping: {
+      address: {
+        addressLine1: '99 Changed Street',
+        adminArea2: 'Example City',
+        adminArea1: 'CA',
+        postalCode: '90001',
+        countryCode: 'US',
+      },
+    },
+  };
+  const result = buildPayPalWebhookLedgerTransition(current, 'PAYMENT.CAPTURE.COMPLETED', {
+    id: 'capture-id',
+    status: 'COMPLETED',
+    amount: { value: '25.00', currencyCode: 'USD' },
+  });
+  assert.equal(result.data?.lastErrorCode, 'PAYPAL_REVIEW_ADDRESS_CHANGED');
+  assert.equal(result.shouldScheduleFulfillment, false);
+});
+
 function row(): PayPalWebhookTransitionRow {
   const snapshot = finalizeCanonicalOrderSnapshot({
     version: CANONICAL_ORDER_SNAPSHOT_VERSION,
@@ -116,14 +146,10 @@ test('a signed authorization mismatch remains blocking when a later capture matc
 
 test('a later matching authorization and capture cannot erase a durable mismatch', () => {
   const original = row();
-  const mismatch = buildPayPalWebhookLedgerTransition(
-    original,
-    'PAYMENT.AUTHORIZATION.CREATED',
-    {
-      id: 'authorization-id',
-      amount: { value: '24.99', currencyCode: 'USD' },
-    },
-  );
+  const mismatch = buildPayPalWebhookLedgerTransition(original, 'PAYMENT.AUTHORIZATION.CREATED', {
+    id: 'authorization-id',
+    amount: { value: '24.99', currencyCode: 'USD' },
+  });
   const afterMismatch = {
     ...original,
     ...mismatch.data,
@@ -190,11 +216,10 @@ test('an out-of-order pending event cannot regress a completed capture', () => {
     status: PAYPAL_LEDGER_STATUS.RECEIPT_UPLOADED,
     capturePayload: matchingCapture,
   };
-  const transition = buildPayPalWebhookLedgerTransition(
-    captured,
-    'PAYMENT.CAPTURE.PENDING',
-    { id: 'capture-id', status: 'PENDING' },
-  );
+  const transition = buildPayPalWebhookLedgerTransition(captured, 'PAYMENT.CAPTURE.PENDING', {
+    id: 'capture-id',
+    status: 'PENDING',
+  });
 
   assert.deepEqual(transition.data, { lastEventType: 'PAYMENT.CAPTURE.PENDING' });
   assert.equal(transition.shouldScheduleFulfillment, false);
@@ -234,11 +259,7 @@ test('a pending capture CAS retry cannot overwrite a concurrently completed capt
   const committed = await commitOptimisticLedgerTransition({
     load: async () => (loadCount++ === 0 ? initial : completed),
     build: (latest) =>
-      buildPayPalWebhookLedgerTransition(
-        latest,
-        'PAYMENT.CAPTURE.PENDING',
-        pendingResource,
-      ),
+      buildPayPalWebhookLedgerTransition(latest, 'PAYMENT.CAPTURE.PENDING', pendingResource),
     commit: async (latest) => latest.status === PAYPAL_LEDGER_STATUS.CAPTURED,
   });
   const finalRow = { ...committed.row, ...committed.transition.data };
@@ -311,9 +332,6 @@ test('generic capture failure preserves evidence-derived mismatch diagnostics', 
   );
   const captureTransition = buildPayPalCaptureFailureLedgerTransition(captureMismatch, failure);
 
-  assert.equal(
-    authorizationTransition.data.lastErrorCode,
-    'PAYPAL_AUTHORIZATION_AMOUNT_MISMATCH',
-  );
+  assert.equal(authorizationTransition.data.lastErrorCode, 'PAYPAL_AUTHORIZATION_AMOUNT_MISMATCH');
   assert.equal(captureTransition.data.lastErrorCode, 'PAYPAL_CAPTURE_AMOUNT_MISMATCH');
 });

@@ -5,6 +5,8 @@ import {
   readCheckoutBody,
 } from '@/lib/shop/checkout/serverRequest';
 import { requireCheckoutAccess } from '@/lib/shop/checkout/serverAccess';
+import { requireSavedCheckoutReview } from '@/lib/shop/checkout/checkoutReview';
+import { parseCanonicalOrderSnapshotFromLedger } from '@/lib/paypal/orderSnapshot/canonicalize';
 import { randomUUID } from 'crypto';
 import { after } from 'next/server';
 import { PaymentsController, type CapturedPayment } from '@paypal/paypal-server-sdk';
@@ -261,7 +263,10 @@ export async function POST(req: Request) {
         return routeError({
           status: 409,
           code: paymentChain.reconciliation.errorCode,
-          stage: `reconcile_stored_${paymentChain.failedAt}_amount`,
+          stage:
+            paymentChain.reconciliation.errorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED'
+              ? 'review_paypal_address'
+              : `reconcile_stored_${paymentChain.failedAt}_amount`,
           message: paymentChain.reconciliation.reason,
         });
       }
@@ -307,12 +312,20 @@ export async function POST(req: Request) {
       return routeError({
         status: 409,
         code: authorizationReconciliation.errorCode,
-        stage: 'reconcile_authorization_amount',
+        stage:
+          authorizationReconciliation.errorCode === 'PAYPAL_REVIEW_ADDRESS_CHANGED'
+            ? 'review_paypal_address'
+            : 'reconcile_authorization_amount',
         message: authorizationReconciliation.reason,
       });
     }
 
-    // Main Paymnet Capture from SDK
+    requireSavedCheckoutReview(
+      parseCanonicalOrderSnapshotFromLedger(intent).snapshot,
+      intent.djangoOrderIntentVerifyPayload,
+    );
+
+    // Main payment capture from SDK.
     const payments = new PaymentsController(getPayPalClient());
     const { result } = await payments.captureAuthorizedPayment({
       authorizationId,
