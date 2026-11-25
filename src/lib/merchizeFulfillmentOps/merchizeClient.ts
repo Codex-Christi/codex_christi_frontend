@@ -13,6 +13,7 @@ type MerchizeRequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH';
   body?: unknown;
   timeoutMs?: number;
+  redirect?: 'error';
 };
 
 export type MerchizeExternalOrderReference =
@@ -204,6 +205,7 @@ async function merchizeRequest<T>(path: string, options: MerchizeRequestOptions 
       headers: buildHeaders(config),
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       signal: controller.signal,
+      redirect: options.redirect,
       next: { revalidate: 0 },
     });
 
@@ -238,6 +240,14 @@ async function merchizeRequest<T>(path: string, options: MerchizeRequestOptions 
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function getMerchizeProductArtwork(productId: string) {
+  if (!process.env.MERCHIZE_API_KEY) {
+    throw new MerchizeApiError('The Merchize artwork lookup requires the server API key.');
+  }
+  const params = new URLSearchParams({ product: productId });
+  return merchizeRequest<unknown>(`/artwork/artworks?${params}`, { redirect: 'error' });
 }
 
 export async function getMerchizeOrderByExternalNumber(

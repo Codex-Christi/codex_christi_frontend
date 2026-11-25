@@ -820,6 +820,7 @@ export async function runPaidFulfillmentProcessing(
             customerName: row.customerName,
             countryIso2: row.countryIso2,
             fulfillmentAddress,
+            assertProcessingLease: processingLease.assertOwned,
           }),
         response: ({ ok, status, success, message, data }) => ({
           ok,
