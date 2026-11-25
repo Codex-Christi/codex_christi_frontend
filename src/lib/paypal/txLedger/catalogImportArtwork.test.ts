@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
+import { resolveCatalogImportArtwork } from '@/lib/merchizeFulfillmentOps/catalogImportArtwork';
 import { finalizeCanonicalOrderSnapshot } from '../orderSnapshot/canonicalize';
 import { DjangoOrderError } from './djangoOrderContract';
 import { isAcceptedDjangoFulfillmentProcessResponse } from './fulfillmentProcessResponse';
@@ -10,7 +11,8 @@ import {
 
 const productId = 'fixture-product';
 const anotherProductId = 'other-product';
-const variantId = 'fixture-large';
+const variantId = 'fixture-2xl';
+const smallVariantId = 'fixture-small';
 const merchizeBase = 'https://merchize.example.test';
 const djangoBase = 'https://django.example.test';
 
@@ -164,11 +166,19 @@ function designs(item: Record<string, unknown>) {
   return Object.fromEntries(Object.entries(item).filter(([key]) => key.startsWith('design_')));
 }
 
-test('catalog handoff sends only verified sides and deduplicates artwork lookups by product', async (t) => {
+test('catalog handoff sends distinct S and 2XL artwork with one lookup per product', async (t) => {
   const defaultFront = artwork('front');
-  const largeFront = artwork('front', {
+  const twoXlFront = artwork('front', {
     variant_id: variantId,
-    origin_url: origin('large-front'),
+    origin_url: origin('2xl-front'),
+    width: 12000,
+    height: 6000,
+  });
+  const smallFront = artwork('front', {
+    variant: { _id: smallVariantId },
+    origin_url: origin('small-front'),
+    width: 10000,
+    height: 5000,
   });
   const back = artwork('back');
   const sleeve = artwork('sleeve');
@@ -179,7 +189,7 @@ test('catalog handoff sends only verified sides and deduplicates artwork lookups
   });
   const { lookups, productReads, writes, requests } = mockProviders(t, {
     [productId]: { rows: [
-      defaultFront, largeFront, back, sleeve, hood,
+      defaultFront, twoXlFront, smallFront, back, sleeve, hood,
       artwork('not-a-supported-side', { is_deleted: true }),
       artwork('not-a-supported-side', { variant: { _id: 'unselected' } }),
     ] },
@@ -187,7 +197,7 @@ test('catalog handoff sends only verified sides and deduplicates artwork lookups
   });
   const result = await sendMerchizeFulfillmentOrder(order([
     { productId, variantId },
-    { productId, variantId: 'fixture-small' },
+    { productId, variantId: smallVariantId },
     { productId: anotherProductId, variantId: 'fixture-one-size' },
   ]));
 
@@ -196,13 +206,13 @@ test('catalog handoff sends only verified sides and deduplicates artwork lookups
   assert.equal(requests.mock.callCount(), 3);
   assert.equal(writes.length, 1);
   const expected = {
-    design_front: largeFront.origin_url,
+    design_front: twoXlFront.origin_url,
     design_back: back.origin_url,
     design_sleeve: sleeve.origin_url,
     design_hood: hood.origin_url,
   };
   assert.deepEqual(designs(writes[0].items[0]), expected);
-  assert.deepEqual(designs(writes[0].items[1]), { ...expected, design_front: defaultFront.origin_url });
+  assert.deepEqual(designs(writes[0].items[1]), { ...expected, design_front: smallFront.origin_url });
   assert.deepEqual(designs(writes[0].items[2]), { design_front: capFront.origin_url });
   assert.equal(writes[0].items[0].sku, 'FIXTURE-SELLER-SKU');
   assert.equal(writes[0].items[0].merchize_sku, 'FIXTURE-SUPPLIER-SKU');
@@ -210,6 +220,44 @@ test('catalog handoff sends only verified sides and deduplicates artwork lookups
   assert.deepEqual(designs(result.requestPayload.items[0]), {});
   assert.doesNotMatch(JSON.stringify(result), /Signature=|fixture%2Bsignature/);
   assert.match(JSON.stringify(result.data?.response_data), /redacted-artwork-url/);
+});
+
+test('repeated lines reuse their exact product and variant artwork decision', async (t) => {
+  const firstFront = artwork('front');
+  const otherFront = artwork('front', {
+    product: anotherProductId,
+    origin_url: origin('front', anotherProductId),
+  });
+  const { lookups, productReads, writes } = mockProviders(t, {
+    [productId]: { rows: [firstFront] },
+    [anotherProductId]: { rows: [otherFront] },
+  });
+  const decisions = await resolveCatalogImportArtwork([
+    { productId, variantId },
+    { productId: anotherProductId, variantId },
+    { productId, variantId },
+  ]);
+
+  assert.deepEqual(decisions, [
+    { design_front: firstFront.origin_url },
+    { design_front: otherFront.origin_url },
+    { design_front: firstFront.origin_url },
+  ]);
+  assert.strictEqual(decisions[0], decisions[2]);
+  assert.deepEqual(lookups, [productId, anotherProductId]);
+  assert.deepEqual(productReads, []);
+  assert.deepEqual(writes, []);
+});
+
+test('a size with no matched artwork cannot use the print file from a different size', async (t) => {
+  const { writes } = mockProviders(t, {
+    [productId]: { rows: [artwork('front', { variant_id: variantId })] },
+  });
+  await assert.rejects(() => sendMerchizeFulfillmentOrder(order([
+    { productId, variantId },
+    { productId, variantId: smallVariantId },
+  ])), FulfillmentPayloadValidationError);
+  assert.deepEqual(writes, []);
 });
 
 test('artwork failure is marked not sent, before any Django request', async (t) => {

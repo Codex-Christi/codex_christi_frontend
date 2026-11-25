@@ -88,7 +88,7 @@ async function readProductArtwork(productId: string) {
   });
 }
 
-/** Resolve one artwork list per selected product. No artwork URLs are written to the ledger. */
+/** Read one list per product and decide once per selected variant, in checkout line order. */
 export async function resolveCatalogImportArtwork(
   lines: readonly SelectedVariant[],
 ): Promise<CatalogImportDesignFields[]> {
@@ -102,7 +102,7 @@ export async function resolveCatalogImportArtwork(
 
   const exemptions = new Map<string, Promise<boolean>>();
   const now = Date.now();
-  return Promise.all(lines.map(async ({ productId, variantId }) => {
+  async function decideVariantArtwork({ productId, variantId }: SelectedVariant) {
     const candidates = (artworkByProduct.get(productId) ?? []).filter(
       (artwork) => artwork.variantId === null || artwork.variantId === variantId,
     );
@@ -137,5 +137,16 @@ export async function resolveCatalogImportArtwork(
     }
     if (await exemption) return fields;
     return unavailable('No verified artwork matches the selected Merchize variant.');
+  }
+
+  const decisions = new Map<string, Promise<CatalogImportDesignFields>>();
+  return Promise.all(lines.map((line) => {
+    const key = JSON.stringify([line.productId, line.variantId]);
+    let decision = decisions.get(key);
+    if (!decision) {
+      decision = decideVariantArtwork(line);
+      decisions.set(key, decision);
+    }
+    return decision;
   }));
 }
