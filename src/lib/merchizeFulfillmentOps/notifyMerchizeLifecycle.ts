@@ -11,7 +11,6 @@ import {
 } from '@/lib/paypal/txLedger/adminNotificationOutbox';
 import {
   enqueueCustomerFulfillmentMilestoneNotification,
-  sendPendingCustomerNotificationsForOrder,
 } from '@/lib/paypal/txLedger/customerNotificationOutbox';
 import type { ShopFulfillmentNotice } from '@/lib/shop/email/templates';
 import { shipmentSummary, VERIFIED_MERCHIZE_DELIVERY_STATUS } from './customerTracking';
@@ -124,7 +123,6 @@ export async function notifyMerchizeLifecycle(orderToken: string, scanStartedAt:
     });
     if (alert.created > 0) await sendPendingAdminRecoveryNotificationsForOrder(orderToken);
   } else if (notice) {
-    const queued = await enqueueCustomerFulfillmentMilestoneNotification(notice, contact);
-    if (queued.created > 0) await sendPendingCustomerNotificationsForOrder(orderToken, notice);
+    await enqueueCustomerFulfillmentMilestoneNotification(notice, contact);
   }
 }

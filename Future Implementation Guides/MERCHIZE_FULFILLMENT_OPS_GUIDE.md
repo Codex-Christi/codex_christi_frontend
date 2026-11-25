@@ -1449,14 +1449,29 @@ it does not charge the buyer, top up the store, or push the order. Rejected or m
 invoices leave the last good invoice snapshot and check time intact. The saved internal order
 code takes precedence over an external-number alias when reading progress and packages.
 
-The customer outbox sends the most advanced, freshly confirmed production, shipment, or
+The app queues **Order received** when the verified capture and Django payment record are
+followed by an accepted Django fulfillment handoff. The accepted 201 with missing details
+qualifies; release, supplier payment, and tracking are not prerequisites. The app saves the
+handoff and queues the email together, then attempts delivery as soon as the transaction
+commits. It does not resend for an existing accepted handoff or backfill older orders.
+The same immediate send applies when the app saves an actionable address issue and queues
+**Check your delivery address**. Pending validation alone does not trigger that email.
+
+The customer outbox queues the most advanced, freshly confirmed production, shipment, or
 delivery notice once per order and milestone. It requires matching paid ledger evidence and a
 verified release. The milestone must have a completed actual time on or after our release
 verification and within the last 24 hours; this path does not backfill older emails. Full
 delivery requires matching package evidence. Pending milestones, estimates, and a label alone
 do not qualify. The email links to verified order access instead of embedding a tracking number
-or supplier details. Failed sends remain available for admin resend; a send with an unknown
-outcome must be reviewed before another attempt.
+or supplier details.
+
+With `PAYPAL_TX_LEDGER_RECOVERY_SCANNER_ENABLED=true`, the existing authenticated recovery
+job sends other customer updates in batches and picks up urgent notices still waiting
+or eligible for retry. Both paths claim the same queue row so only one can send it.
+There is no new schedule. An open checkout or Order History page is not needed.
+The worker can retry a confirmed connection failure after 15 minutes, up to three automatic
+attempts. Admins can retry a failed notice. If submission is uncertain, check ZeptoMail;
+the app blocks resending that notice to avoid a duplicate.
 
 The mocked scheduled job and test inbox covered a placeholder invoice, an unpaid invoice and
 admin alert, funding clearing without a push, a mismatched read, production, a USPS label before
@@ -1464,6 +1479,10 @@ shipment, a failed shipment email and concurrent resend, and partial versus comp
 The test also checked the saved progress and package evidence that drives customer status.
 This does not prove production scheduler health, live mail delivery, or a real release for
 the latest checkout. Those are still required before live PayPal.
+
+The urgent email tests use mock mail, database clients, and provider responses. They cover an
+accepted handoff, a confirmed address issue, a race with the scheduled sender, a deferred retry,
+and an unknown response that must not be resent.
 
 ##### Read-only follow-up: release not confirmed
 

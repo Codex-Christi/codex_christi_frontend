@@ -110,6 +110,10 @@ export function buildShopFulfillmentEmail({
 }
 
 const lifecycleCopy = {
+  received: {
+    heading: 'Order received',
+    message: 'We received your order and payment. We’ll email you when your order moves forward. You do not need to pay again.',
+  },
   production: {
     heading: 'Your order is in production',
     message: 'Production has started. You can check your order page for shipment updates.',

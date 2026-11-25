@@ -48,8 +48,9 @@ import {
 } from '@/lib/paypal/txLedger/adminNotificationOutbox';
 import {
   enqueueCustomerAddressCorrectionNotification,
+  enqueueCustomerFulfillmentMilestoneNotification,
   enqueueCustomerFulfillmentPushVerifiedNotification,
-  sendPendingCustomerNotificationsForOrder,
+  trySendQueuedUrgentCustomerNotification,
 } from '@/lib/paypal/txLedger/customerNotificationOutbox';
 import { isAcceptedDjangoFulfillmentProcessResponse } from '@/lib/paypal/txLedger/fulfillmentProcessResponse';
 import { PAYPAL_LEDGER_STATUS } from '@/lib/paypal/txLedger/status';
@@ -205,21 +206,30 @@ async function clearLock(orderToken: string, lockId: string) {
   if (result.count > 0) await refreshPaidOrderRecoveryProjectionSafely(orderToken);
 }
 
-async function updateLockedRow(
+async function updateLockedRow<T>(
   orderToken: string,
   lockId: string,
   data: Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data'],
+  enqueue?: (tx: Pick<typeof paypalTxLedger, 'customerNotificationOutbox'>) => Promise<T>,
 ) {
-  const result = await paypalTxLedger.paypalIntent.updateMany({
-    where: {
-      orderToken,
-      postProcessingLockId: lockId,
-      postProcessingLockExpiresAt: { gt: new Date() },
-    },
-    data,
-  });
-  requireProcessingLease(result);
+  async function save(db: Pick<typeof paypalTxLedger, 'paypalIntent'>) {
+    requireProcessingLease(await db.paypalIntent.updateMany({
+      where: {
+        orderToken,
+        postProcessingLockId: lockId,
+        postProcessingLockExpiresAt: { gt: new Date() },
+      },
+      data,
+    }));
+  }
+  const queued = enqueue
+    ? await paypalTxLedger.$transaction(async (tx) => {
+        await save(tx);
+        return enqueue(tx);
+      })
+    : await save(paypalTxLedger);
   await refreshPaidOrderRecoveryProjectionSafely(orderToken);
+  return queued;
 }
 
 async function markFulfillmentFailedAndNotify(args: {
@@ -312,7 +322,7 @@ async function markFulfillmentAttentionRequiredAndNotify(args: {
   merchizeProviderOrderId?: string | null;
   merchizeProviderOrderCode?: string | null;
 }) {
-  const buyerNoticeCreated = await paypalTxLedger.$transaction(async (tx) => {
+  const queued = await paypalTxLedger.$transaction(async (tx) => {
     const updated = await tx.paypalIntent.updateMany({
       where: {
         orderToken: args.orderToken,
@@ -351,36 +361,32 @@ async function markFulfillmentAttentionRequiredAndNotify(args: {
       severity: ADMIN_NOTIFICATION_SEVERITY.WARNING,
     });
     if (args.notifyBuyerToCorrectAddress) {
-      const notice = await enqueueCustomerAddressCorrectionNotification({
+      return enqueueCustomerAddressCorrectionNotification({
         db: tx,
         orderToken: args.orderToken,
         paypalOrderId: args.row.paypalOrderId,
         customerName: args.row.customerName,
         customerEmail: args.row.customerEmail,
       });
-      return notice.created === 1;
     }
-    return false;
   });
-  await refreshPaidOrderRecoveryProjectionSafely(args.orderToken);
+  const sendAddressNotice = trySendQueuedUrgentCustomerNotification(queued);
+  try {
+    await refreshPaidOrderRecoveryProjectionSafely(args.orderToken);
 
-  await sendPendingAdminRecoveryNotificationsForOrder(args.orderToken).catch(
-    (notificationError) => {
-      console.error('[AdminNotificationOutbox] failed to send fulfillment attention alert', {
-        orderToken: args.orderToken,
-        error:
-          notificationError instanceof Error
-            ? notificationError.message
-            : String(notificationError),
-      });
-    },
-  );
-  if (buyerNoticeCreated) {
-    await sendPendingCustomerNotificationsForOrder(args.orderToken).catch(() => {
-      console.error('[CustomerNotificationOutbox] address correction notice could not be sent', {
-        orderToken: args.orderToken,
-      });
-    });
+    await sendPendingAdminRecoveryNotificationsForOrder(args.orderToken).catch(
+      (notificationError) => {
+        console.error('[AdminNotificationOutbox] failed to send fulfillment attention alert', {
+          orderToken: args.orderToken,
+          error:
+            notificationError instanceof Error
+              ? notificationError.message
+              : String(notificationError),
+        });
+      },
+    );
+  } finally {
+    await sendAddressNotice;
   }
 }
 
@@ -459,20 +465,6 @@ async function notifyFulfillmentPushVerified(args: {
   merchizeOrderId?: string | null;
   merchizeOrderCode?: string | null;
 }) {
-  await enqueueCustomerFulfillmentPushVerifiedNotification({
-    orderToken: args.orderToken,
-    paypalOrderId: args.row.paypalOrderId,
-    customerName: args.row.customerName,
-    customerEmail: args.row.customerEmail,
-    receiptLink: args.row.receiptLink,
-  }).catch((notificationError) => {
-    console.error('[CustomerNotificationOutbox] failed to enqueue fulfillment success alert', {
-      orderToken: args.orderToken,
-      error:
-        notificationError instanceof Error ? notificationError.message : String(notificationError),
-    });
-  });
-
   await enqueueAdminFulfillmentPushVerifiedNotification({
     orderToken: args.orderToken,
     paypalOrderId: args.row.paypalOrderId,
@@ -490,26 +482,13 @@ async function notifyFulfillmentPushVerified(args: {
     });
   });
 
-  await Promise.all([
-    sendPendingCustomerNotificationsForOrder(args.orderToken).catch((notificationError) => {
-      console.error('[CustomerNotificationOutbox] failed to send fulfillment success alert', {
-        orderToken: args.orderToken,
-        error:
-          notificationError instanceof Error
-            ? notificationError.message
-            : String(notificationError),
-      });
-    }),
-    sendPendingAdminRecoveryNotificationsForOrder(args.orderToken).catch((notificationError) => {
-      console.error('[AdminNotificationOutbox] failed to send fulfillment success alert', {
-        orderToken: args.orderToken,
-        error:
-          notificationError instanceof Error
-            ? notificationError.message
-            : String(notificationError),
-      });
-    }),
-  ]);
+  await sendPendingAdminRecoveryNotificationsForOrder(args.orderToken).catch((notificationError) => {
+    console.error('[AdminNotificationOutbox] failed to send fulfillment success alert', {
+      orderToken: args.orderToken,
+      error:
+        notificationError instanceof Error ? notificationError.message : String(notificationError),
+    });
+  });
 }
 
 export async function runPaidFulfillmentProcessing(
@@ -556,6 +535,7 @@ export async function runPaidFulfillmentProcessing(
   }
 
   let activeStage: PaidFulfillmentProcessingStage = 'ledger_validation';
+  let sendOrderReceivedNotice: Promise<void> | undefined;
   const processingLease = startProcessingLease(async () => {
     const now = new Date();
     const renewed = await paypalTxLedger.paypalIntent.updateMany({
@@ -849,7 +829,17 @@ export async function runPaidFulfillmentProcessing(
           data,
         }),
         commit: async (result, evidence) => {
-          await updateLockedRow(orderToken, lockId, {
+          const enqueueReceived = isAcceptedDjangoFulfillmentProcessResponse(evidence)
+            ? (db: Pick<typeof paypalTxLedger, 'customerNotificationOutbox'>) =>
+                enqueueCustomerFulfillmentMilestoneNotification('received', {
+                  db,
+                  orderToken,
+                  paypalOrderId: row.paypalOrderId,
+                  customerName: row.customerName,
+                  customerEmail: row.customerEmail,
+                })
+            : undefined;
+          const queued = await updateLockedRow(orderToken, lockId, {
             merchizeFulfillmentRequestPayload: toLedgerJson(result.requestPayload),
             merchizeFulfillmentResponsePayload: toLedgerJson(evidence),
             merchizeFulfillmentProcessingId: result.data.id,
@@ -857,8 +847,9 @@ export async function runPaidFulfillmentProcessing(
             merchizeProviderOrderCode: result.merchizeOrderIdentifiers.merchizeProviderOrderCode,
             lastErrorCode: null,
             lastErrorMessage: null,
-          });
+          }, enqueueReceived);
           row.merchizeFulfillmentResponsePayload = toLedgerJson(evidence);
+          sendOrderReceivedNotice = trySendQueuedUrgentCustomerNotification(queued ?? undefined);
         },
       });
       fulfillmentRequestPayload = fulfillmentSend.requestPayload;
@@ -1148,7 +1139,14 @@ export async function runPaidFulfillmentProcessing(
         postProcessingLockExpiresAt: null,
         lastErrorCode: null,
         lastErrorMessage: null,
-      } as Parameters<typeof paypalTxLedger.paypalIntent.updateMany>[0]['data']);
+      }, (db) => enqueueCustomerFulfillmentPushVerifiedNotification({
+        db,
+        orderToken,
+        paypalOrderId: row.paypalOrderId,
+        customerName: row.customerName,
+        customerEmail: row.customerEmail,
+        receiptLink: row.receiptLink,
+      }));
 
       await syncMerchizeFulfillmentOperationalSnapshots(orderToken).catch((snapshotError) => {
         console.error('[merchize.fulfillment_ops.operational_snapshot_failed]', {
@@ -1270,7 +1268,11 @@ export async function runPaidFulfillmentProcessing(
 
     throw processingError;
   } finally {
-    await processingLease.stop();
-    await clearLock(orderToken, lockId);
+    try {
+      await processingLease.stop();
+      await clearLock(orderToken, lockId);
+    } finally {
+      await sendOrderReceivedNotice;
+    }
   }
 }

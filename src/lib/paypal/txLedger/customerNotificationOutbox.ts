@@ -8,10 +8,17 @@ import {
   type ShopFulfillmentNotice,
 } from '@/lib/shop/email/templates';
 import { customerAddressCorrectionState } from '@/lib/shop/checkout/customerAddressCorrection';
+import { getCanonicalPaymentProjectionState } from './canonicalPaymentProjectionState';
+import { isAcceptedDjangoFulfillmentProcessResponse } from './fulfillmentProcessResponse';
 
 const DEFAULT_PENDING_SEND_LIMIT = 25;
+const MAX_AUTOMATIC_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 15 * 60_000;
+const RETRYABLE_REJECTION = 'The email was not submitted. A scheduled retry may be attempted.';
+const UNKNOWN_DELIVERY = 'Email submission could not be confirmed. Check ZeptoMail before retrying.';
 
 export const CUSTOMER_NOTIFICATION_TYPE = {
+  PAID_ORDER_RECEIVED: 'paid_order_received',
   PAID_ORDER_FULFILLMENT_PUSH_VERIFIED: 'paid_order_fulfillment_push_verified',
   PAID_ORDER_ADDRESS_CORRECTION_REQUIRED: 'paid_order_address_correction_required',
   PAID_ORDER_PRODUCTION_STARTED: 'paid_order_production_started',
@@ -20,6 +27,7 @@ export const CUSTOMER_NOTIFICATION_TYPE = {
 } as const;
 
 const milestoneTypes = {
+  received: CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_RECEIVED,
   production: CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_PRODUCTION_STARTED,
   shipment: CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_SHIPMENT_STARTED,
   delivery: CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_DELIVERED,
@@ -37,6 +45,7 @@ export const CUSTOMER_NOTIFICATION_STATUS = {
   SENDING: 'sending',
   FAILED: 'failed',
   SUPPRESSED: 'suppressed',
+  DELIVERY_UNKNOWN: 'delivery_unknown',
 } as const;
 
 type CustomerNotificationDb = Pick<typeof paypalTxLedger, 'customerNotificationOutbox'>;
@@ -69,6 +78,14 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+function requestDidNotReachMailService(error: unknown) {
+  const cause = error instanceof Error ? error.cause : null;
+  const readCode = (value: unknown) =>
+    value && typeof value === 'object' && 'code' in value ? value.code : null;
+  return ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'UND_ERR_CONNECT_TIMEOUT']
+    .includes(String(readCode(cause) ?? readCode(error)));
+}
+
 export async function enqueueCustomerFulfillmentPushVerifiedNotification(props: EnqueueCustomerFulfillmentPushVerifiedProps) {
   return enqueueCustomerNotification(CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_VERIFIED, props);
 }
@@ -96,7 +113,7 @@ async function enqueueCustomerNotification(type: (typeof CUSTOMER_NOTIFICATION_T
   const recipient = normalizeEmail(customerEmail);
 
   if (!recipient) {
-    return { created: 0, skipped: true as const };
+    return { created: 0, skipped: true as const, queuedKey: null };
   }
 
   if (!outbox) {
@@ -114,6 +131,7 @@ async function enqueueCustomerNotification(type: (typeof CUSTOMER_NOTIFICATION_T
     supportReference: orderToken,
   };
 
+  const dedupeKey = oncePerOrder ? `${type}:${orderToken}` : `${type}:${orderToken}:${recipient}`;
   const result = await outbox.createMany({
     data: [
       {
@@ -121,7 +139,7 @@ async function enqueueCustomerNotification(type: (typeof CUSTOMER_NOTIFICATION_T
         paypalOrderId,
         type,
         status: CUSTOMER_NOTIFICATION_STATUS.PENDING,
-        dedupeKey: oncePerOrder ? `${type}:${orderToken}` : `${type}:${orderToken}:${recipient}`,
+        dedupeKey,
         recipient,
         payload,
       },
@@ -129,7 +147,7 @@ async function enqueueCustomerNotification(type: (typeof CUSTOMER_NOTIFICATION_T
     skipDuplicates: true,
   });
 
-  return { created: result.count, skipped: false as const };
+  return { created: result.count, skipped: false as const, queuedKey: result.count === 1 ? dedupeKey : null };
 }
 
 async function sendCustomerNotificationRow(
@@ -150,45 +168,40 @@ async function sendCustomerNotificationRow(
   }
 
   const payload = row.payload as CustomerFulfillmentPushVerifiedPayload;
+  const claimed = await outbox.updateMany({
+    where: {
+      id: row.id,
+      status: { in: [CUSTOMER_NOTIFICATION_STATUS.PENDING, CUSTOMER_NOTIFICATION_STATUS.FAILED] },
+      attemptCount: row.attemptCount,
+    },
+    data: { status: CUSTOMER_NOTIFICATION_STATUS.SENDING, lastAttemptAt: new Date() },
+  });
+  if (claimed.count !== 1) {
+    return { id: row.id, ok: false as const, error: 'The notice is already being sent or has been handled.' };
+  }
 
+  let submitted = false;
   try {
     const isAddressNotice = row.type === CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_ADDRESS_CORRECTION_REQUIRED;
     const milestone = noticeForType(row.type);
-    if (isAddressNotice) {
-      const current = await paypalTxLedger.paypalIntent.findUnique({
-        where: { orderToken: row.orderToken },
-        select: {
-          status: true, lastErrorCode: true, fulfillmentAddressOverriddenAt: true,
-          fulfillmentAddressOverriddenBy: true, processingCompletedAt: true, customerEmail: true,
-        },
-      });
-      if (!current || current.processingCompletedAt || normalizeEmail(current.customerEmail) !== row.recipient ||
-        customerAddressCorrectionState(current) !== 'required') {
-        await outbox.update({ where: { id: row.id }, data: { status: CUSTOMER_NOTIFICATION_STATUS.SUPPRESSED } });
-        return { id: row.id, ok: false as const, error: 'This order no longer needs an address correction notice.' };
-      }
-    }
-    if (milestone) {
-      const claimed = await outbox.updateMany({
-        where: {
-          id: row.id,
-          status: { in: [CUSTOMER_NOTIFICATION_STATUS.PENDING, CUSTOMER_NOTIFICATION_STATUS.FAILED] },
-          attemptCount: row.attemptCount,
-        },
-        data: { status: CUSTOMER_NOTIFICATION_STATUS.SENDING, lastAttemptAt: new Date() },
-      });
-      if (claimed.count !== 1) {
-        return { id: row.id, ok: false as const, error: 'The notice is already being sent or has been handled.' };
-      }
-      const current = await paypalTxLedger.paypalIntent.findUnique({
-        where: { orderToken: row.orderToken },
-        select: { status: true, processingCompletedAt: true, customerEmail: true },
-      });
-      if (current?.status !== 'completed' || !current.processingCompletedAt ||
-        normalizeEmail(current.customerEmail) !== row.recipient) {
-        await outbox.update({ where: { id: row.id }, data: { status: CUSTOMER_NOTIFICATION_STATUS.SUPPRESSED } });
-        return { id: row.id, ok: false as const, error: 'The paid order or its contact changed after the notice was queued.' };
-      }
+    const current = await paypalTxLedger.paypalIntent.findUnique({
+      where: { orderToken: row.orderToken },
+    });
+    const payment = current && getCanonicalPaymentProjectionState(current);
+    const recognizedType = isAddressNotice || milestone ||
+      row.type === CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_FULFILLMENT_PUSH_VERIFIED;
+    const stillEligible = recognizedType && current && payment?.captureCompletion.ok &&
+      payment.paymentSafeForPostProcessing &&
+      current.status !== 'refunded' &&
+      normalizeEmail(current.customerEmail) === row.recipient &&
+      (isAddressNotice
+        ? !current.processingCompletedAt && customerAddressCorrectionState(current) === 'required'
+        : current.djangoPaymentSaveCustomId &&
+          isAcceptedDjangoFulfillmentProcessResponse(current.merchizeFulfillmentResponsePayload) &&
+          (milestone === 'received' || (current.status === 'completed' && current.processingCompletedAt)));
+    if (!stillEligible) {
+      await outbox.update({ where: { id: row.id }, data: { status: CUSTOMER_NOTIFICATION_STATUS.SUPPRESSED } });
+      return { id: row.id, ok: false as const, error: 'The order no longer qualifies for this notice.' };
     }
     const email = isAddressNotice
       ? buildShopAddressCorrectionEmail(row.orderToken)
@@ -201,7 +214,7 @@ async function sendCustomerNotificationRow(
             receiptAvailable: Boolean(payload.receiptLink),
           });
     const { sendMailFromPrimaryAgent } = await import('@/lib/zeptomail/sendMailFromPrimaryAgent');
-
+    submitted = true;
     await sendMailFromPrimaryAgent({
       emailReceipents: [
         {
@@ -213,26 +226,13 @@ async function sendCustomerNotificationRow(
       ],
       ...email,
     });
-
-    await outbox.update({
-      where: { id: row.id },
-      data: {
-        status: CUSTOMER_NOTIFICATION_STATUS.SENT,
-        attemptCount: { increment: 1 },
-        lastAttemptAt: new Date(),
-        sentAt: new Date(),
-        lastErrorMessage: null,
-      },
-    });
-
-    return { id: row.id, ok: true as const };
   } catch (error) {
-    const message = error instanceof Error ? error.message : JSON.stringify(error);
-
+    const retryable = !submitted || requestDidNotReachMailService(error);
+    const message = retryable ? RETRYABLE_REJECTION : UNKNOWN_DELIVERY;
     await outbox.update({
       where: { id: row.id },
       data: {
-        status: CUSTOMER_NOTIFICATION_STATUS.FAILED,
+        status: retryable ? CUSTOMER_NOTIFICATION_STATUS.FAILED : CUSTOMER_NOTIFICATION_STATUS.DELIVERY_UNKNOWN,
         attemptCount: { increment: 1 },
         lastAttemptAt: new Date(),
         lastErrorMessage: message,
@@ -241,50 +241,70 @@ async function sendCustomerNotificationRow(
 
     return { id: row.id, ok: false as const, error: message };
   }
-}
 
-export async function sendPendingCustomerNotifications(limit = DEFAULT_PENDING_SEND_LIMIT) {
-  const outbox = getCustomerNotificationOutboxDelegate();
-  if (!outbox) return [];
-
-  const rows = await outbox.findMany({
-    where: {
-      status: {
-        in: [CUSTOMER_NOTIFICATION_STATUS.PENDING, CUSTOMER_NOTIFICATION_STATUS.FAILED],
-      },
+  // If recording acceptance fails, leave the claim in place. Resending could duplicate the email.
+  await outbox.update({
+    where: { id: row.id },
+    data: {
+      status: CUSTOMER_NOTIFICATION_STATUS.SENT,
+      attemptCount: { increment: 1 },
+      sentAt: new Date(),
+      lastErrorMessage: null,
     },
-    orderBy: { createdAt: 'asc' },
-    take: limit,
   });
-
-  const results = [];
-
-  for (const row of rows) {
-    results.push(await sendCustomerNotificationRow(row, outbox));
-  }
-
-  return results;
+  return { id: row.id, ok: true as const };
 }
 
-export async function sendPendingCustomerNotificationsForOrder(orderToken: string, milestone?: ShopFulfillmentNotice) {
+// Call after the transaction commits. Cron and this path share the same delivery claim.
+export async function trySendQueuedUrgentCustomerNotification(queued?: { queuedKey: string | null }) {
+  if (!queued?.queuedKey) return;
+
+  try {
+    const outbox = getCustomerNotificationOutboxDelegate();
+    const row = await outbox?.findUnique({ where: { dedupeKey: queued.queuedKey } });
+    if (
+      row?.status === CUSTOMER_NOTIFICATION_STATUS.PENDING &&
+      (row.type === CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_RECEIVED ||
+        row.type === CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_ADDRESS_CORRECTION_REQUIRED)
+    ) {
+      await sendCustomerNotificationRow(row, outbox);
+    }
+  } catch {
+    console.warn('[CustomerNotificationOutbox] Could not complete the immediate email attempt. Check the outbox status.');
+  }
+}
+
+export async function sendPendingCustomerNotifications({
+  limit = DEFAULT_PENDING_SEND_LIMIT, orderToken,
+}: { limit?: number; orderToken?: string } = {}) {
   const outbox = getCustomerNotificationOutboxDelegate();
   if (!outbox) return [];
 
   const rows = await outbox.findMany({
     where: {
       orderToken,
-      ...(milestone ? { type: milestoneTypes[milestone] } : {}),
-      status: {
-        in: [CUSTOMER_NOTIFICATION_STATUS.PENDING, CUSTOMER_NOTIFICATION_STATUS.FAILED],
-      },
+      OR: [
+        { status: CUSTOMER_NOTIFICATION_STATUS.PENDING },
+        {
+          status: CUSTOMER_NOTIFICATION_STATUS.FAILED,
+          attemptCount: { lt: MAX_AUTOMATIC_ATTEMPTS },
+          lastAttemptAt: { lte: new Date(Date.now() - RETRY_DELAY_MS) },
+          lastErrorMessage: RETRYABLE_REJECTION,
+        },
+      ],
     },
-    orderBy: { createdAt: 'asc' },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    take: Math.min(Math.max(1, limit), DEFAULT_PENDING_SEND_LIMIT),
   });
 
   const results = [];
 
   for (const row of rows) {
-    results.push(await sendCustomerNotificationRow(row, outbox));
+    results.push(await sendCustomerNotificationRow(row, outbox).catch(() => ({
+      id: row.id,
+      ok: false as const,
+      error: 'Could not record this email attempt. Check the outbox before resending.',
+    })));
   }
 
   return results;
@@ -302,18 +322,7 @@ export async function resendCustomerNotification(id: string) {
   }
 
   const current = await outbox.findUnique({ where: { id } });
-  if (current && noticeForType(current.type)) {
-    return sendCustomerNotificationRow(current, outbox);
-  }
-  const row = await outbox.update({
-    where: { id },
-    data: {
-      status: CUSTOMER_NOTIFICATION_STATUS.PENDING,
-      lastErrorMessage: null,
-    },
-  });
-
-  return sendCustomerNotificationRow(row, outbox);
+  return sendCustomerNotificationRow(current, outbox);
 }
 
 export async function listCustomerNotificationsForOrder(orderToken: string) {
