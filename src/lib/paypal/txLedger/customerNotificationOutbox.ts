@@ -22,6 +22,7 @@ export const CUSTOMER_NOTIFICATION_TYPE = {
   PAID_ORDER_FULFILLMENT_PUSH_VERIFIED: 'paid_order_fulfillment_push_verified',
   PAID_ORDER_ADDRESS_CORRECTION_REQUIRED: 'paid_order_address_correction_required',
   PAID_ORDER_PRODUCTION_STARTED: 'paid_order_production_started',
+  PAID_ORDER_TRACKING_READY: 'paid_order_tracking_ready',
   PAID_ORDER_SHIPMENT_STARTED: 'paid_order_shipment_started',
   PAID_ORDER_DELIVERED: 'paid_order_delivered',
 } as const;
@@ -29,6 +30,7 @@ export const CUSTOMER_NOTIFICATION_TYPE = {
 const milestoneTypes = {
   received: CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_RECEIVED,
   production: CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_PRODUCTION_STARTED,
+  tracking: CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_TRACKING_READY,
   shipment: CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_SHIPMENT_STARTED,
   delivery: CUSTOMER_NOTIFICATION_TYPE.PAID_ORDER_DELIVERED,
 } as const;
@@ -101,6 +103,39 @@ export async function enqueueCustomerFulfillmentMilestoneNotification(
   return enqueueCustomerNotification(milestoneTypes[notice], props, true);
 }
 
+/** Queue shipment and reserve the tracking notice together when one email covers both. */
+export async function enqueueCustomerShipmentWithTracking(
+  contact: EnqueueCustomerFulfillmentPushVerifiedProps,
+) {
+  const shipmentKey = `${milestoneTypes.shipment}:${contact.orderToken}`;
+  const trackingKey = `${milestoneTypes.tracking}:${contact.orderToken}`;
+  return paypalTxLedger.$transaction(async (tx) => {
+    const outbox = tx.customerNotificationOutbox;
+    const notices = await outbox.findMany({
+      where: { dedupeKey: { in: [shipmentKey, trackingKey] } },
+      select: { dedupeKey: true, status: true },
+    });
+    const shipment = notices.find((notice) => notice.dedupeKey === shipmentKey);
+    const tracking = notices.find((notice) => notice.dedupeKey === trackingKey);
+    if (!shipment) await enqueueCustomerFulfillmentMilestoneNotification('shipment', { ...contact, db: tx });
+    if (shipment?.status === CUSTOMER_NOTIFICATION_STATUS.SENT) {
+      // A number published after the shipment email merits its own update.
+      if (!tracking) await enqueueCustomerFulfillmentMilestoneNotification('tracking', { ...contact, db: tx });
+      return;
+    }
+    if (!tracking) {
+      await enqueueCustomerNotification(milestoneTypes.tracking, { ...contact, db: tx }, true,
+        CUSTOMER_NOTIFICATION_STATUS.SUPPRESSED);
+    }
+    if (!tracking || tracking.status === 'pending' || tracking.status === 'failed') {
+      await outbox.updateMany({
+        where: { dedupeKey: trackingKey, status: { in: ['pending', 'failed'] } },
+        data: { status: CUSTOMER_NOTIFICATION_STATUS.SUPPRESSED, lastErrorMessage: null },
+      });
+    }
+  });
+}
+
 async function enqueueCustomerNotification(type: (typeof CUSTOMER_NOTIFICATION_TYPE)[keyof typeof CUSTOMER_NOTIFICATION_TYPE], {
   db = paypalTxLedger,
   orderToken,
@@ -108,7 +143,9 @@ async function enqueueCustomerNotification(type: (typeof CUSTOMER_NOTIFICATION_T
   customerName,
   customerEmail,
   receiptLink,
-}: EnqueueCustomerFulfillmentPushVerifiedProps, oncePerOrder = false) {
+}: EnqueueCustomerFulfillmentPushVerifiedProps, oncePerOrder = false,
+status: typeof CUSTOMER_NOTIFICATION_STATUS.PENDING | typeof CUSTOMER_NOTIFICATION_STATUS.SUPPRESSED =
+  CUSTOMER_NOTIFICATION_STATUS.PENDING) {
   const outbox = getCustomerNotificationOutboxDelegate(db);
   const recipient = normalizeEmail(customerEmail);
 
@@ -138,7 +175,7 @@ async function enqueueCustomerNotification(type: (typeof CUSTOMER_NOTIFICATION_T
         orderToken,
         paypalOrderId,
         type,
-        status: CUSTOMER_NOTIFICATION_STATUS.PENDING,
+        status,
         dedupeKey,
         recipient,
         payload,

@@ -82,11 +82,12 @@ test('reports a pending Merchize check only after an accepted handoff on a saved
 });
 
 test('distinguishes a new push acknowledgement from a check of an existing release', () => {
-  assert.match(getPushVerificationPendingMessage(true), /acknowledged the push request/u);
-  assert.match(getPushVerificationPendingMessage(false), /did not send a new push request/u);
+  assert.match(getPushVerificationPendingMessage('acknowledged'), /acknowledged the push request/u);
+  assert.match(getPushVerificationPendingMessage('not_sent'), /did not send a new push request/u);
+  assert.match(getPushVerificationPendingMessage('unconfirmed'), /did not confirm receipt/u);
   assert.doesNotMatch(getPushVerificationPendingMessage(), /acknowledged|did not send/u);
-  for (const acknowledged of [true, false, undefined]) {
-    assert.match(getPushVerificationPendingMessage(acknowledged), /Refresh Merchize state/u);
+  for (const outcome of ['acknowledged', 'not_sent', 'unconfirmed', undefined] as const) {
+    assert.match(getPushVerificationPendingMessage(outcome), /Refresh Merchize state/u);
   }
 });
 

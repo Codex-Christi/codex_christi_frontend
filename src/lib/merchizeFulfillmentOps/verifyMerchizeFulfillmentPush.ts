@@ -24,6 +24,7 @@ import {
   MERCHIZE_FULFILLMENT_SYNC_STATUS,
 } from './status';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
+import { confirmedMerchizePushTime, providerTimestamp } from './externalOrderProgress';
 
 const DEFAULT_VERIFICATION_DELAYS_MS = [0, 1_500, 3_000] as const;
 
@@ -47,7 +48,9 @@ function asBoolean(value: unknown) {
 }
 
 function getDataRecord(payload: unknown) {
-  return asRecord(asRecord(payload)?.data) ?? asRecord(payload);
+  const envelope = asRecord(payload);
+  if (envelope?.success === false) return null;
+  return asRecord(envelope?.data) ?? envelope;
 }
 
 function containsManualPushFailure(value: unknown, depth = 0): boolean {
@@ -68,7 +71,28 @@ function containsManualPushFailure(value: unknown, depth = 0): boolean {
     : false;
 }
 
-function classifyEvidence(detail: unknown, sendToFulfillment: unknown, history: unknown) {
+function latestPushFailureIsMissingArtwork(history: unknown) {
+  const envelope = asRecord(history);
+  if (envelope?.success !== true || !Array.isArray(envelope.data)) return false;
+  const failures = envelope.data.flatMap((entry: unknown) => {
+    const event = asRecord(entry);
+    if (event?.event !== 'manual_push_fulfillment_failed' &&
+      event?.event !== 'push_to_fulfillment_failed') return [];
+    const at = providerTimestamp(event.created);
+    return at ? [{ at, description: asString(event.description) }] : [];
+  });
+  failures.sort((left, right) => right.at.localeCompare(left.at));
+  const latest = failures[0];
+  if (!latest || failures[1]?.at === latest.at) return false;
+  return latest.description?.toLowerCase().replace(/\.+$/u, '') ===
+    'order is not eligible because order item does not have artwork';
+}
+
+export function classifyMerchizePushVerificationEvidence(
+  detail: unknown,
+  sendToFulfillment: unknown,
+  history: unknown,
+) {
   const detailData = getDataRecord(detail);
   const sendData = getDataRecord(sendToFulfillment);
   const progress = asString(detailData?.push_to_fulfillment_progress)?.toLowerCase() ?? null;
@@ -139,7 +163,10 @@ export async function verifyMerchizeFulfillmentPush(
   let sendToFulfillment: unknown = null;
   let history: unknown = null;
   let progress: unknown = null;
-  let evidence: ReturnType<typeof classifyEvidence> = { state: 'pending', progress: null };
+  let evidence: ReturnType<typeof classifyMerchizePushVerificationEvidence> = {
+    state: 'pending',
+    progress: null,
+  };
   let lastError: unknown = null;
 
   for (const delayMs of delays) {
@@ -151,7 +178,7 @@ export async function verifyMerchizeFulfillmentPush(
         getMerchizeOrderHistory(order.merchizeOrderId),
         getMerchizeOrderProgress(order.merchizeOrderId),
       ]);
-      evidence = classifyEvidence(detail, sendToFulfillment, history);
+      evidence = classifyMerchizePushVerificationEvidence(detail, sendToFulfillment, history);
       lastError = null;
       if (evidence.state === 'verified') break;
     } catch (error) {
@@ -168,13 +195,14 @@ export async function verifyMerchizeFulfillmentPush(
           syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_VERIFIED,
           productionGateStatus: MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFIED,
           providerPushProgress: evidence.progress,
-          releasedToProductionAt: order.releasedToProductionAt ?? verifiedAt,
+          releasedToProductionAt:
+            confirmedMerchizePushTime(sendToFulfillment, verifiedAt) ??
+            order.releasedToProductionAt ?? verifiedAt,
           pushVerifiedAt: order.pushVerifiedAt ?? verifiedAt,
           merchizeInDepthOrderDetailPayload: toOptionalPrismaJson(detail),
           merchizeSendToFulfillmentPayload: toOptionalPrismaJson(sendToFulfillment),
           merchizeHistoryPayload: toOptionalPrismaJson(history),
-          merchizeProgressPayload: toOptionalPrismaJson(progress),
-          lastProgressSyncAt: verifiedAt,
+          merchizeInternalProgressPayload: toOptionalPrismaJson(progress),
           lastHistorySyncAt: verifiedAt,
           lastSyncErrorCode: null,
           lastSyncErrorMessage: null,
@@ -198,22 +226,25 @@ export async function verifyMerchizeFulfillmentPush(
   }
 
   if (evidence.state === 'failed') {
-    const errorMessage =
-      'Merchize accepted the push command but the provider order entered a failed push state.';
+    const missingArtwork = latestPushFailureIsMissingArtwork(history);
+    const errorCode = missingArtwork ? 'MERCHIZE_ARTWORK_MISSING' : 'MERCHIZE_PUSH_PROVIDER_STATE_FAILED';
+    const errorMessage = missingArtwork
+      ? 'Merchize rejected release because an item has no production artwork. Review the artwork in Merchize before trying again.'
+      : 'Merchize reported that the order did not move into fulfillment.';
     await prisma.$transaction(async (tx) => {
       await tx.merchizeFulfillmentOrder.update({
         where: { id: order.id },
         data: {
           syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_FAILED,
           productionGateStatus: MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_FAILED,
+          artworkReviewStatus: missingArtwork ? 'blocked' : undefined,
           providerPushProgress: evidence.progress,
           merchizeInDepthOrderDetailPayload: toOptionalPrismaJson(detail),
           merchizeSendToFulfillmentPayload: toOptionalPrismaJson(sendToFulfillment),
           merchizeHistoryPayload: toOptionalPrismaJson(history),
-          merchizeProgressPayload: toOptionalPrismaJson(progress),
-          lastProgressSyncAt: verifiedAt,
+          merchizeInternalProgressPayload: toOptionalPrismaJson(progress),
           lastHistorySyncAt: verifiedAt,
-          lastSyncErrorCode: 'MERCHIZE_PUSH_PROVIDER_STATE_FAILED',
+          lastSyncErrorCode: errorCode,
           lastSyncErrorMessage: errorMessage,
         },
       });
@@ -221,7 +252,7 @@ export async function verifyMerchizeFulfillmentPush(
         where: { id: attempt.id },
         data: {
           status: MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.FAILED,
-          errorCode: 'MERCHIZE_PUSH_PROVIDER_STATE_FAILED',
+          errorCode,
           errorMessage,
           responseSummary: summarizeProviderResponse({
             success: false,
@@ -237,7 +268,7 @@ export async function verifyMerchizeFulfillmentPush(
       status: 'failed',
       orderToken,
       providerPushProgress: evidence.progress,
-      errorCode: 'MERCHIZE_PUSH_PROVIDER_STATE_FAILED',
+      errorCode,
       errorMessage,
     };
   }
@@ -249,20 +280,18 @@ export async function verifyMerchizeFulfillmentPush(
     : null;
   const pendingMessage = fetchError
     ? 'Merchize push verification could not read a final provider state yet.'
-    : 'Merchize push is acknowledged but has not reached a final provider state yet.';
+    : 'Merchize has not confirmed that the order was released.';
   await prisma.$transaction(async (tx) => {
     await tx.merchizeFulfillmentOrder.update({
       where: { id: order.id },
       data: {
         syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_VERIFICATION_PENDING,
-        productionGateStatus:
-          MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFICATION_PENDING,
+        productionGateStatus: MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFICATION_PENDING,
         providerPushProgress: evidence.progress,
         merchizeInDepthOrderDetailPayload: toOptionalPrismaJson(detail),
         merchizeSendToFulfillmentPayload: toOptionalPrismaJson(sendToFulfillment),
         merchizeHistoryPayload: toOptionalPrismaJson(history),
-        merchizeProgressPayload: toOptionalPrismaJson(progress),
-        lastProgressSyncAt: verifiedAt,
+        merchizeInternalProgressPayload: toOptionalPrismaJson(progress),
         lastHistorySyncAt: verifiedAt,
         lastSyncErrorCode: 'MERCHIZE_PUSH_VERIFICATION_PENDING',
         lastSyncErrorMessage: null,

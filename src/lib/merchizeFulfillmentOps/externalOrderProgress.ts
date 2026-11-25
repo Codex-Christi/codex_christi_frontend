@@ -8,12 +8,30 @@ export type ExternalOrderProgressReference = {
 
 const customerMilestones = ['delivered', 'shipment_started', 'in_production'] as const;
 
+export function providerTimestamp(value: unknown) {
+  return typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u.test(value) &&
+    Number.isFinite(Date.parse(value))
+    ? new Date(value).toISOString()
+    : null;
+}
+
+export function confirmedMerchizePushTime(payload: unknown, observedAt: Date) {
+  const envelope = object(payload);
+  const data = envelope?.success === true ? object(envelope.data) : null;
+  if (!data || data.is_failed === true || (data.is_pushed !== true && data.pushed !== true)) {
+    return null;
+  }
+  const at = providerTimestamp(data.push_at);
+  return at && Date.parse(at) <= observedAt.getTime() ? new Date(at) : null;
+}
+
 export function knownMerchizeOrderCode(reference: ExternalOrderProgressReference) {
   const code = reference.merchizeOrderCode;
   return code && code !== reference.merchizeExternalOrderNumber ? code : null;
 }
 
-export function readExternalOrderProgress(
+export function matchExternalOrderProgress(
   payload: unknown,
   reference: ExternalOrderProgressReference,
 ) {
@@ -28,20 +46,25 @@ export function readExternalOrderProgress(
         (!reference.merchizeIdentifier || row.identifier === reference.merchizeIdentifier) &&
         (!code || row.code === code),
     );
-  const progress = matches[0]?.order_progress;
-  if (matches.length !== 1 || !Array.isArray(progress) || !progress.length) return null;
+  return matches.length === 1 ? matches[0] : null;
+}
+
+export function readExternalOrderProgress(
+  payload: unknown,
+  reference: ExternalOrderProgressReference,
+) {
+  const progress = matchExternalOrderProgress(payload, reference)?.order_progress;
+  if (!Array.isArray(progress) || !progress.length) return null;
 
   const events = progress.map(object);
   if (events.some((event) => typeof event?.event !== 'string' || typeof event.status !== 'string'))
     return null;
   const completedAt: Partial<Record<(typeof customerMilestones)[number], Date>> = {};
   const completed = customerMilestones.filter((name) => {
-    const matching = events.filter((event) => event?.event === name);
-    if (matching.length !== 1 || matching[0]?.status !== 'done') return false;
-    const actual = matching[0].actual;
-    if (typeof actual === 'string' && /^\d{4}-\d{2}-\d{2}T/u.test(actual) && Number.isFinite(Date.parse(actual))) {
-      completedAt[name] = new Date(actual);
-    }
+    const step = uniqueProgressEvent(events, name);
+    if (step?.status !== 'done') return false;
+    const actual = providerTimestamp(step.actual);
+    if (actual) completedAt[name] = new Date(actual);
     return true;
   });
   const pending = events.find((event) => event?.status !== 'done');
@@ -50,4 +73,10 @@ export function readExternalOrderProgress(
     completedAt,
     status: pending ? `${pending.event}:${pending.status}`.slice(0, 100) : 'done',
   };
+}
+
+export function uniqueProgressEvent(events: unknown, name: string) {
+  if (!Array.isArray(events)) return null;
+  const matching = events.map(object).filter((event) => event?.event === name);
+  return matching.length === 1 ? matching[0] : null;
 }

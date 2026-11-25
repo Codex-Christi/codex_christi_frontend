@@ -19,6 +19,7 @@ import {
   recordMerchizeFulfillmentPushDisabledByConfig,
   MerchizeFulfillmentPushError,
   pushMerchizeFulfillmentOrderToProduction,
+  type MerchizePushRequestOutcome,
 } from '@/lib/merchizeFulfillmentOps/pushMerchizeFulfillmentOrderToProduction';
 import { isMerchizeFulfillmentPushEnabled } from '@/lib/merchizeFulfillmentOps/pushPolicy';
 import { CODEX_CHRISTI_FULFILLMENT_IDENTIFIER } from '@/lib/merchizeFulfillmentOps/fulfillmentIdentifier';
@@ -1001,7 +1002,9 @@ export async function runPaidFulfillmentProcessing(
       }
 
       let pushVerification: Awaited<ReturnType<typeof verifyMerchizeFulfillmentPush>> | null = null;
-      let newPushAcknowledged = false;
+      let pushRequestOutcome: MerchizePushRequestOutcome = 'not_sent';
+      const hasRecordedPush = readinessCheck.hasUnconfirmedPush ||
+        Boolean(readinessCheck.pushAcknowledgedAt || readinessCheck.pushVerifiedAt);
       if (readiness.providerPushState === 'pushed') {
         activeStage = 'merchize_push_verification';
         await processingLease.assertOwned();
@@ -1012,6 +1015,7 @@ export async function runPaidFulfillmentProcessing(
 
       if (
         !pushVerification &&
+        !hasRecordedPush &&
         !options.overrideMerchizeFulfillmentPushDisabled &&
         !isMerchizeFulfillmentPushEnabled()
       ) {
@@ -1047,19 +1051,18 @@ export async function runPaidFulfillmentProcessing(
       if (!pushVerification) {
         const shouldVerifyExistingPush =
           readiness.providerPushState === 'pending' ||
-          Boolean(readinessCheck.pushAcknowledgedAt || readinessCheck.pushVerifiedAt);
+          hasRecordedPush;
 
         if (!shouldVerifyExistingPush) {
           try {
             activeStage = 'merchize_production_push';
             await processingLease.assertOwned();
-            await pushMerchizeFulfillmentOrderToProduction({
+            pushRequestOutcome = await pushMerchizeFulfillmentOrderToProduction({
               orderToken,
               merchizeExternalOrderNumber,
               merchizeOrderCode: merchizeProviderOrderCode,
               identifier: CODEX_CHRISTI_FULFILLMENT_IDENTIFIER,
             });
-            newPushAcknowledged = true;
           } catch (pushError) {
             if (pushError instanceof ProcessingLeaseLostError) throw pushError;
             await processingLease.assertOwned();
@@ -1103,7 +1106,7 @@ export async function runPaidFulfillmentProcessing(
           merchizeProviderOrderId,
           merchizeProviderOrderCode,
         });
-        return { status: 'push_verification_pending' as const, newPushAcknowledged };
+        return { status: 'push_verification_pending' as const, pushRequestOutcome };
       }
 
       if (pushVerification.status === 'failed') {

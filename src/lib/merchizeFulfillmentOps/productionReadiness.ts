@@ -48,6 +48,7 @@ type ReadinessPayloads = {
   requireAttention: unknown;
   sendToFulfillment: unknown;
   buyerAddressMismatchFields?: string[] | null;
+  buyerAddressCountryCode?: string | null;
   providerOrderOnHold?: boolean;
   now?: Date;
   allowStaleOrderManualRelease?: boolean;
@@ -205,8 +206,7 @@ function classifyProviderPushState(detail: unknown, sendToFulfillment: unknown) 
   const detailData = getDataRecord(detail);
   const sendData = getDataRecord(sendToFulfillment);
   const progress = asString(detailData?.push_to_fulfillment_progress)?.toLowerCase() ?? null;
-  const sent =
-    asBoolean(sendData?.pushed) === true || asBoolean(sendData?.is_pushed) === true;
+  const sent = asBoolean(sendData?.pushed) === true || asBoolean(sendData?.is_pushed) === true;
   const sendFailed = asBoolean(sendData?.is_failed);
 
   if (progress === 'pushed' || sent) {
@@ -231,6 +231,7 @@ export function classifyMerchizeProductionReadiness({
   requireAttention,
   sendToFulfillment,
   buyerAddressMismatchFields,
+  buyerAddressCountryCode,
   providerOrderOnHold,
   now = new Date(),
   allowStaleOrderManualRelease = false,
@@ -249,17 +250,38 @@ export function classifyMerchizeProductionReadiness({
   const validationStatus = addressEvidence.status;
   const markValidAddress = addressEvidence.markedValid;
   const push = classifyProviderPushState(detail, sendToFulfillment);
+  const normalizedBuyerCountryCode = asString(buyerAddressCountryCode)?.toUpperCase() ?? null;
+  const isUsAddress = normalizedBuyerCountryCode === 'US';
+  const isNonUsAddress = Boolean(normalizedBuyerCountryCode && !isUsAddress);
 
   let addressReviewStatus = 'unknown';
-  if (
-    validationStatus === 'valid' ||
-    validationStatus === 'ignore' ||
-    validationStatus === 'ignored' ||
-    NON_US_ADDRESS_STATUSES.has(validationStatus)
-  ) {
-    addressReviewStatus = 'ready';
-  } else if (markValidAddress && BUYER_CONFIRMABLE_ADDRESS_STATUSES.has(validationStatus)) {
+  if (markValidAddress) {
     addressReviewStatus = 'buyer_confirmed';
+  } else if (validationStatus === 'valid' && isUsAddress) {
+    addressReviewStatus = 'ready';
+  } else if (NON_US_ADDRESS_STATUSES.has(validationStatus) && isNonUsAddress) {
+    addressReviewStatus = 'ready';
+  } else if (
+    (validationStatus === 'valid' && isNonUsAddress) ||
+    (NON_US_ADDRESS_STATUSES.has(validationStatus) && isUsAddress)
+  ) {
+    addressReviewStatus = 'blocked';
+    addBlocker(blockers, {
+      code: 'MERCHIZE_ADDRESS_VALIDATION_COUNTRY_CONFLICT',
+      message:
+        'Merchize address-validation status does not match the effective fulfillment country.',
+      category: 'address',
+      retryable: false,
+    });
+  } else if (validationStatus === 'ignore' || validationStatus === 'ignored') {
+    addressReviewStatus = 'blocked';
+    addBlocker(blockers, {
+      code: 'MERCHIZE_ADDRESS_VALIDATION_UNSUPPORTED',
+      message:
+        'Merchize returned an undocumented ignored address-validation state without an explicit seller confirmation.',
+      category: 'address',
+      retryable: false,
+    });
   } else if (validationStatus === 'pending') {
     addressReviewStatus = 'pending';
     addBlocker(blockers, {
@@ -304,7 +326,16 @@ export function classifyMerchizeProductionReadiness({
         ? 'mismatch'
         : 'matched';
 
-  if (addressReadbackStatus === 'mismatch') {
+  if (addressReadbackStatus === 'not_checked' && push.state !== 'pushed') {
+    addressReviewStatus = 'blocked';
+    addBlocker(blockers, {
+      code: 'MERCHIZE_PROVIDER_ADDRESS_NOT_CHECKED',
+      message:
+        'The effective fulfillment address is incomplete or was not compared with Merchize buyer details.',
+      category: 'address',
+      retryable: false,
+    });
+  } else if (addressReadbackStatus === 'mismatch') {
     addressReviewStatus = 'blocked';
     addBlocker(blockers, {
       code: 'MERCHIZE_PROVIDER_ADDRESS_MISMATCH',
@@ -355,8 +386,6 @@ export function classifyMerchizeProductionReadiness({
       const product = asRecord(item.product);
       return product?.no_need_artworks === true || item.no_need_artworks === true;
     });
-  const allItemsUseStoredCatalogVariants =
-    itemRecords.length > 0 && itemRecords.every(hasResolvedCatalogVariant);
   const artworkStatus = asString(detailData?.artwork_status)?.toLowerCase();
   let artworkReviewStatus = 'ready';
   if (
@@ -364,17 +393,11 @@ export function classifyMerchizeProductionReadiness({
     allProductsExplicitlySkipArtwork
   ) {
     artworkReviewStatus = 'not_required';
-  } else if (
-    (artworkStatus === 'missing' || artworkStatus === 'incomplete') &&
-    allItemsUseStoredCatalogVariants
-  ) {
-    artworkReviewStatus = 'catalog_managed';
   } else if (artworkStatus === 'missing' || artworkStatus === 'incomplete') {
     artworkReviewStatus = 'blocked';
     addBlocker(blockers, {
       code: 'MERCHIZE_ARTWORK_MISSING',
-      message:
-        'Merchize reports required production artwork is missing or incomplete for an item without a resolved stored catalog variant.',
+      message: 'Merchize reports missing or incomplete production artwork. Verify the artwork in Merchize before release.',
       category: 'artwork',
       retryable: false,
     });

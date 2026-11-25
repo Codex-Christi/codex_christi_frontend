@@ -1354,7 +1354,7 @@ export async function releaseMerchizeFulfillmentToProductionAction({
 
     const pendingMessage =
       processing?.status === 'push_verification_pending'
-        ? getPushVerificationPendingMessage(processing.newPushAcknowledged)
+        ? getPushVerificationPendingMessage(processing.pushRequestOutcome)
         : updated && getPendingFulfillmentRetryMessage({
             status: updated.status,
             lastErrorCode: updated.lastErrorCode,
@@ -1368,7 +1368,7 @@ export async function releaseMerchizeFulfillmentToProductionAction({
         ...targetMetadata,
         pending: true,
         errorCode: updated?.lastErrorCode ?? null,
-        ...(processing ? { newPushAcknowledged: processing.newPushAcknowledged } : {}),
+        ...(processing ? { pushRequestOutcome: processing.pushRequestOutcome } : {}),
       };
       await writeMerchizeFulfillmentAdminAction({
         orderToken,

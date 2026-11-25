@@ -1,5 +1,6 @@
 export type ShipmentPackage = {
   id: string;
+  providerPackageName?: string;
   carrier: string | null;
   trackingNumber: string | null;
   trackingUrl: string | null;
@@ -136,15 +137,20 @@ function parsePackage(value: unknown, fallbackId: string): ShipmentPackage | nul
         });
   const number = text(item.tracking_number ?? item.tracking_code ?? tracking?.tracking_number);
   const url = trackingLink(item.tracking_url ?? tracking?.tracking_url);
+  const providerPackageName = text(item.name);
+  const label = shipmentLabel(shipmentStatus || legacyStatus);
   if (!number && !url && !events.length && !id) return null;
   return {
     id: id ?? fallbackId,
+    ...(providerPackageName ? { providerPackageName } : {}),
     carrier:
       text(item.tracking_company, 80) ??
       text(carrier?.name ?? item.carrier_name ?? item.carrier, 80),
     trackingNumber: number,
     trackingUrl: url,
-    status: delivered ? 'Delivered' : shipmentLabel(shipmentStatus || legacyStatus),
+    status: delivered
+      ? 'Delivered'
+      : label === 'Tracking available' && !number && !url ? 'Tracking not available yet' : label,
     delivered,
   };
 }

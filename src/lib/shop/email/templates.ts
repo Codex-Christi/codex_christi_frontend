@@ -118,6 +118,10 @@ const lifecycleCopy = {
     heading: 'Your order is in production',
     message: 'Production has started. You can check your order page for shipment updates.',
   },
+  tracking: {
+    heading: 'Tracking is ready',
+    message: 'Carrier tracking is available for your order. The carrier may not have received the package yet.',
+  },
   shipment: {
     heading: 'Shipment has started',
     message: 'At least part of your order has shipped. Open your order for the latest package and tracking details.',

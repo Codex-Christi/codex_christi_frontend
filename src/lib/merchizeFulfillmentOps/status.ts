@@ -40,10 +40,22 @@ export type MerchizeFulfillmentSyncStatus =
 
 export const MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS = {
   RUNNING: 'running',
+  UNCONFIRMED: 'unconfirmed',
   SUCCEEDED: 'succeeded',
   FAILED: 'failed',
   SKIPPED: 'skipped',
 } as const;
+
+export const MERCHIZE_PUSH_ACTION = 'push_to_fulfillment';
+export const MERCHIZE_UNCONFIRMED_PUSH_ATTEMPT = {
+  action: MERCHIZE_PUSH_ACTION,
+  status: {
+    in: [
+      MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.RUNNING,
+      MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.UNCONFIRMED,
+    ],
+  },
+};
 
 export const MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS = {
   CHECKING: 'checking',

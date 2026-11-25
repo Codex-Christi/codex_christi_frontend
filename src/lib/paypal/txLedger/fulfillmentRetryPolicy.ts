@@ -50,12 +50,17 @@ export function getMerchizeReadyRefreshFeedback(releaseVerified: boolean, snapsh
   } as const;
 }
 
-export function getPushVerificationPendingMessage(newPushAcknowledged?: boolean) {
+export function getPushVerificationPendingMessage(
+  outcome?: 'acknowledged' | 'unconfirmed' | 'not_sent',
+) {
   const nextStep = 'Refresh Merchize state before trying to release again.';
-  if (newPushAcknowledged === true) {
+  if (outcome === 'acknowledged') {
     return `Merchize acknowledged the push request, but production release is not yet confirmed. ${nextStep}`;
   }
-  if (newPushAcknowledged === false) {
+  if (outcome === 'unconfirmed') {
+    return 'Merchize did not confirm receipt of the push request. Refresh Merchize state without sending another push.';
+  }
+  if (outcome === 'not_sent') {
     return `This action did not send a new push request. Merchize has not confirmed production release. ${nextStep}`;
   }
   return `Merchize has not confirmed production release. ${nextStep}`;

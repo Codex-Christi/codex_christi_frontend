@@ -10,10 +10,12 @@ import {
   trySendQueuedUrgentCustomerNotification,
 } from '@/lib/paypal/txLedger/customerNotificationOutbox';
 import { runPaidFulfillmentProcessing } from '@/lib/paypal/txLedger/runPaidFulfillmentProcessing';
+import { runPayPalRecoveryScanner } from '@/lib/paypal/txLedger/recoveryScanner';
+import { reconcileVerifiedFulfillmentRelease } from '@/lib/paypal/txLedger/reconcileVerifiedFulfillmentRelease';
 import { VERIFIED_MERCHIZE_DELIVERY_STATUS } from './customerTracking';
 import { readExternalOrderProgress } from './externalOrderProgress';
 import { readSupplierInvoice } from './supplierInvoice';
-import { pickCustomerLifecycleNotice } from './notifyMerchizeLifecycle';
+import { notifyMerchizeLifecycle, pickCustomerLifecycleNotice } from './notifyMerchizeLifecycle';
 
 const orderToken = 'fixture-funding-order';
 const reference = {
@@ -53,6 +55,10 @@ test('email requires a fresh matched observation and a completed milestone since
     deliveryStatus: null,
   };
   assert.equal(pickCustomerLifecycleNotice(row, now, now), 'production');
+  assert.equal(pickCustomerLifecycleNotice({ ...row, pushVerifiedAt: now }, now, now), null);
+  assert.equal(pickCustomerLifecycleNotice({
+    ...row, pushVerifiedAt: now, releasedToProductionAt: pushVerifiedAt,
+  }, now, now), 'production', 'late verification must not hide real production');
   assert.equal(pickCustomerLifecycleNotice(row, new Date(+now + 1), now), null);
   for (const payload of [progress('pending', actual), progress('done', '2026-11-23T11:00:00Z'),
     progress('done', '2026-11-23T16:00:00Z'), progress('done', actual, { ...invoiceRow, code: 'OTHER' })]) {
@@ -117,7 +123,9 @@ function fixtureTable(rows: Row[]) {
     }),
     create: async ({ data }: { data: Row }) => insert(data),
     createMany: async ({ data, skipDuplicates }: { data: Row[]; skipDuplicates?: boolean }) => ({
-      count: data.filter((entry) => !skipDuplicates || !find({ dedupeKey: entry.dedupeKey })).map(insert).length,
+      count: data.filter((entry) => !skipDuplicates || !find(
+        entry.id ? { id: entry.id } : { dedupeKey: entry.dedupeKey },
+      )).map(insert).length,
     }),
     count: async ({ where }: { where: Row }) => rows.filter((row) => matches(row, where)).length,
     deleteMany: async () => ({ count: 0 }),
@@ -154,16 +162,18 @@ function isolatedEnvironment(t: TestContext) {
   });
 }
 
-test('scheduled sync observes funding and package milestones without paying, importing, or pushing', async (t) => {
+test('scheduled sync adopts a supplier release, sends mail, and tracks packages without provider writes', async (t) => {
   isolatedEnvironment(t);
   const start = new Date('2026-11-23T10:00:00Z');
   t.mock.timers.enable({ apis: ['Date'], now: start });
   const amount = { value: '40.00', currencyCode: 'USD' };
-  const row = {
-    orderToken, status: 'completed', customerName: 'Test Buyer', customerEmail: 'buyer@example.test',
+  const row: Row = {
+    orderToken, status: 'fulfillment_attention_required', customerName: 'Test Buyer', customerEmail: 'buyer@example.test',
     createdAt: start, updatedAt: start,
     canonicalOrderSnapshot: null, canonicalOrderSnapshotVersion: null, canonicalOrderSnapshotHash: null,
-    paypalOrderId: 'fixture-paypal', processingCompletedAt: start, djangoPaymentSaveCustomId: 'fixture-payment',
+    paypalOrderId: 'fixture-paypal', processingCompletedAt: null, djangoPaymentSaveCustomId: 'fixture-payment',
+    lastErrorCode: 'MERCHIZE_ADDRESS_VALIDATION_PENDING',
+    receiptLink: 'https://payment-receipts.codexchristi.shop/paypal/fixture.pdf',
     authorizePayload: { purchaseUnits: [{ amount }] },
     capturePayload: { id: 'fixture-capture', status: 'COMPLETED', amount },
     merchizeFulfillmentResponsePayload: { status: 201, success: true, data: {
@@ -172,18 +182,20 @@ test('scheduled sync observes funding and package milestones without paying, imp
   };
   const order: Row = {
     ...reference, id: 'fixture-ops', orderToken, djangoPaymentSaveCustomId: row.djangoPaymentSaveCustomId,
-    merchizeOrderId: 'fixture-provider-order', pushVerifiedAt: start, lastLookupAt: start,
+    merchizeOrderId: 'fixture-provider-order', pushVerifiedAt: new Date(+start + 4 * 60_000), lastLookupAt: start,
     productionGateStatus: 'push_verified', updatedAt: start, deliveryStatus: null,
   };
-  const paidRows = [row];
   const adminNotices: Row[] = [], customerNotices: Row[] = [], attempts: Row[] = [];
+  const paidRows = [row];
+  const fulfillmentRows = [order];
   const ledger = {
     paypalIntent: fixtureTable(paidRows),
     paypalWebhookEvent: fixtureTable([]), paidOrderRecoveryProjection: fixtureTable([]),
     adminNotificationOutbox: fixtureTable(adminNotices), customerNotificationOutbox: fixtureTable(customerNotices),
+    $transaction: (run: (tx: unknown) => Promise<unknown>) => run(ledger),
   };
   const ops = {
-    merchizeFulfillmentOrder: fixtureTable([order]), merchizeFulfillmentSyncAttempt: fixtureTable(attempts),
+    merchizeFulfillmentOrder: fixtureTable(fulfillmentRows), merchizeFulfillmentSyncAttempt: fixtureTable(attempts),
     merchizeFulfillmentItem: fixtureTable([]),
     $transaction: (run: (tx: unknown) => Promise<unknown>) => run(ops),
   };
@@ -191,8 +203,18 @@ test('scheduled sync observes funding and package milestones without paying, imp
   global.__merchizeFulfillmentOpsPrisma__ = ops as unknown as NonNullable<typeof global.__merchizeFulfillmentOpsPrisma__>;
 
   const emails: Array<{ subject: string; htmlbody?: string; recipient: string }> = [];
+  let interruptDelivery = false;
   let failShipment = false;
   let receivedError: Error | undefined;
+  let uncertainDelivery = false;
+  const insertNotice = ledger.customerNotificationOutbox.createMany;
+  t.mock.method(ledger.customerNotificationOutbox, 'createMany', async (
+    args: Parameters<typeof insertNotice>[0],
+  ) => {
+    if (interruptDelivery && args.data.some((item) => item.type === 'paid_order_delivered'))
+      throw new Error('Test interruption after saving verified delivery');
+    return insertNotice(args);
+  });
   t.mock.method(SendMailClient.prototype, 'sendMail', async (mail: {
     subject: string; htmlbody?: string; to: Array<{ email_address: { address: string } }>;
   }) => {
@@ -201,6 +223,10 @@ test('scheduled sync observes funding and package milestones without paying, imp
     if (failShipment && mail.subject.startsWith('Shipment has started'))
       throw new Error('Test inbox not reached', { cause: { code: 'EAI_AGAIN' } });
     if (receivedError?.cause && mail.subject.startsWith('Order received')) throw receivedError;
+    if (uncertainDelivery && mail.subject.startsWith('Your order was delivered')) {
+      emails.push({ subject: mail.subject, htmlbody: mail.htmlbody, recipient });
+      throw new Error('Test inbox accepted the email but the response was lost');
+    }
     emails.push({ subject: mail.subject, htmlbody: mail.htmlbody, recipient });
     if (receivedError && mail.subject.startsWith('Order received')) throw receivedError;
     return {};
@@ -212,6 +238,7 @@ test('scheduled sync observes funding and package milestones without paying, imp
   let shipment: string | null = null;
   let delivery: string | null = null;
   let packageStatuses: string[] = [];
+  let carrierPublished = false;
   const requests: string[] = [];
   const blockedRequests: string[] = [];
   t.mock.method(globalThis, 'fetch', async (input: string | URL, init?: RequestInit) => {
@@ -237,33 +264,67 @@ test('scheduled sync observes funding and package milestones without paying, imp
     ] }]);
     if (route === 'tracking') return ok(packageStatuses.map((shipment_status, index) => ({
       ...invoiceRow, _id: `fixture-package-${index}`, package_count: packageStatuses.length,
-      status: 'fulfilled', shipment_status, tracking_company: 'USPS', tracking_number: 'FIXTURE-NUMBER',
-      tracking_url: 'https://tools.usps.com/tracking?test=fixture', has_tracking: true,
+      status: 'fulfilled', shipment_status, has_tracking: true,
+      ...(carrierPublished ? {
+        tracking_company: 'USPS', tracking_number: 'FIXTURE-NUMBER',
+        tracking_url: 'https://tools.usps.com/tracking?test=fixture',
+      } : {}),
     })));
-    if (route === 'send-to-fulfillment-date') return ok({ is_pushed: true, is_failed: false });
+    if (route === 'send-to-fulfillment-date') return ok({ is_pushed: true, is_failed: false, push_at: start.toISOString() });
     if (route === 'unfulfilled') return ok([item]);
     if (['histories', 'address-suggestion', 'require-attention', 'list-orders-ticket', 'transaction-fee', 'fixture-provider-order'].includes(route)) return ok([]);
     return deny();
   });
 
-  const scan = async () => {
-    t.mock.timers.tick(16 * 60_000);
+  const scan = async (expectedCandidates = 1, elapsedMinutes = 16) => {
+    t.mock.timers.tick(elapsedMinutes * 60_000);
     const response = await POST(new NextRequest('http://localhost/api/jobs/paypal-tx-ledger-recovery-scan', {
       method: 'POST', headers: { 'x-cron-secret': 'fixture-job' },
     }));
     const result = await response.json();
     assert.equal(result.paymentRecovery?.results?.length, 0, 'a completed paid order must not restart payment recovery');
-    assert.equal(result.fulfillmentLifecycle?.results?.length, 1, JSON.stringify(result));
-    assert.deepEqual(result.fulfillmentLifecycle.results[0].failedActions, [], JSON.stringify(
-      attempts.filter((attempt) => attempt.status === 'failed').map(({ action, errorCode, errorMessage }) => ({ action, errorCode, errorMessage })),
-    ));
+    assert.equal(result.fulfillmentLifecycle?.results?.length, expectedCandidates, JSON.stringify(result));
+    if (expectedCandidates) {
+      assert.deepEqual(result.fulfillmentLifecycle.results[0].failedActions, [], JSON.stringify(
+        attempts.filter((attempt) => attempt.status === 'failed').map(({ action, errorCode, errorMessage }) => ({ action, errorCode, errorMessage })),
+      ));
+    }
     return result;
   };
   const buyerSubjects = () => emails.filter((mail) => mail.recipient === 'buyer@example.test').map((mail) => mail.subject);
   const savedProgress = () => readExternalOrderProgress(order.merchizeProgressPayload, reference);
+  order.merchizeExternalOrderNumber = 'other-order';
+  assert.equal(await reconcileVerifiedFulfillmentRelease(orderToken), false);
+  order.merchizeExternalOrderNumber = reference.merchizeExternalOrderNumber;
+  order.deliveryStatus = 'cancelled';
+  assert.equal(await reconcileVerifiedFulfillmentRelease(orderToken), false);
+  order.deliveryStatus = null;
+  row.postProcessingLockId = 'fixture-active-worker';
+  row.postProcessingLockExpiresAt = new Date(+start + 60_000);
+  assert.equal(await reconcileVerifiedFulfillmentRelease(orderToken), false);
+  row.postProcessingLockId = null;
+  row.postProcessingLockExpiresAt = null;
+  assert.equal(customerNotices.length, 0);
+  assert.equal(requests.length, 0);
+
+  const contact = {
+    orderToken, customerName: String(row.customerName), customerEmail: String(row.customerEmail),
+  };
+  await enqueueCustomerFulfillmentMilestoneNotification('received', contact);
+  await enqueueCustomerFulfillmentMilestoneNotification('received', contact);
+  assert.equal(customerNotices.length, 1);
   await scan();
   assert.equal(order.costReviewStatus, 'pending');
-  assert.equal(emails.length, 0);
+  assert.equal(row.status, 'completed');
+  assert.equal(row.lastErrorCode, null);
+  assert.deepEqual(order.releasedToProductionAt, start);
+  assert.equal(buyerSubjects().length, 2);
+  assert.match(buyerSubjects()[0] ?? '', /^Order received/u);
+  assert.match(buyerSubjects()[1] ?? '', /^Your order was sent for preparation/u);
+  assert.equal(customerNotices.find((note) => note.type === 'paid_order_received')?.status, 'sent');
+  assert.equal(customerNotices.find((note) => note.type === 'paid_order_fulfillment_push_verified')?.status, 'sent');
+  assert.equal(await reconcileVerifiedFulfillmentRelease(orderToken), false);
+  emails.length = 0;
   invoice = { status: 'pending', currency: 'USD', amount: 20 };
   await scan();
   await scan();
@@ -286,8 +347,14 @@ test('scheduled sync observes funding and package milestones without paying, imp
   assert.match(buyerSubjects()[0] ?? '', /^Your order is in production/u);
   packageStatuses = ['pre_transit'];
   await scan();
+  assert.equal(buyerSubjects().length, 1, 'A flag without a carrier number or link is not enough');
+  carrierPublished = true;
+  await scan();
   assert.equal(order.deliveryStatus, 'tracking_available');
-  assert.equal(buyerSubjects().length, 1);
+  assert.equal(buyerSubjects().length, 2);
+  assert.match(buyerSubjects()[1] ?? '', /^Tracking is ready/u);
+  assert.match(emails.find((mail) => mail.subject.startsWith('Tracking is ready'))?.htmlbody ?? '',
+    /may not have received the package yet/u);
   assert.deepEqual(savedProgress()?.completed, ['in_production']);
   shipment = new Date().toISOString();
   packageStatuses = ['in_transit'];
@@ -296,21 +363,33 @@ test('scheduled sync observes funding and package milestones without paying, imp
   const notice = customerNotices.find((entry) => entry.type === 'paid_order_shipment_started');
   assert.equal(notice?.status, 'failed');
   failShipment = false;
-  const retry = await Promise.all([
-    resendCustomerNotification(String(notice?.id)), resendCustomerNotification(String(notice?.id)),
-  ]);
-  assert.equal(retry.filter((value) => value.ok).length, 1);
-  assert.match(buyerSubjects()[1] ?? '', /^Shipment has started/u);
+  await scan(0, 5);
+  assert.equal(notice?.status, 'failed', 'the backoff still applies');
+  await scan(1, 11);
+  assert.equal(notice?.status, 'sent');
+  assert.match(buyerSubjects()[2] ?? '', /^Shipment has started/u);
   delivery = new Date().toISOString();
   packageStatuses = ['delivered', 'in_transit'];
   await scan();
-  assert.equal(buyerSubjects().length, 2);
+  assert.equal(buyerSubjects().length, 3);
   assert.equal(order.deliveryStatus, 'tracking_available');
   assert.ok(savedProgress()?.completed.includes('shipment_started'));
   packageStatuses = ['delivered', 'delivered'];
-  await scan();
-  assert.match(buyerSubjects()[2] ?? '', /^Your order was delivered/u);
+  interruptDelivery = true;
+  assert.equal((await scan()).customerNotifications.deliveryNoticesDeferred, 1);
+  assert.equal(order.deliveryStatus, VERIFIED_MERCHIZE_DELIVERY_STATUS);
   assert.equal(buyerSubjects().length, 3);
+  assert.equal(attempts.find((item) => item.action === 'customer_delivery_notification')?.status, 'pending');
+  interruptDelivery = false;
+  uncertainDelivery = true;
+  await scan(0, 25 * 60);
+  assert.match(buyerSubjects()[3] ?? '', /^Your order was delivered/u);
+  const deliveryNotice = customerNotices.find((item) => item.type === 'paid_order_delivered');
+  assert.equal(deliveryNotice?.status, 'delivery_unknown');
+  assert.equal(attempts.find((item) => item.action === 'customer_delivery_notification')?.status, 'succeeded');
+  assert.equal((await resendCustomerNotification(String(deliveryNotice?.id))).ok, false);
+  await scan(0);
+  assert.equal(buyerSubjects().length, 4);
   assert.equal(order.deliveryStatus, VERIFIED_MERCHIZE_DELIVERY_STATUS);
   assert.ok(savedProgress()?.completed.includes('delivered'));
   assert.equal(order.productionGateStatus, 'push_verified');
@@ -318,7 +397,53 @@ test('scheduled sync observes funding and package milestones without paying, imp
   assert.deepEqual(blockedRequests, []);
   assert.ok(requests.filter((entry) => entry.startsWith('POST')).every((entry) => entry === 'POST list-orders-ticket'));
 
-  const contact = { orderToken, paypalOrderId: row.paypalOrderId, customerName: row.customerName, customerEmail: row.customerEmail };
+  await enqueueCustomerFulfillmentMilestoneNotification('received', contact);
+  assert.equal(customerNotices.filter((note) => note.type === 'paid_order_received').length, 1);
+  const received = customerNotices.find((note) => note.type === 'paid_order_received');
+  assert.equal((await resendCustomerNotification(String(received?.id))).ok, false);
+  assert.equal(buyerSubjects().length, 4, 'An already sent email cannot be sent a second time');
+
+  for (const scenario of ['together', 'late_tracking', 'tracking_pending'] as const) {
+    const now = new Date();
+    const fixtureToken = `fixture-shipment-${scenario}`;
+    paidRows.push({ ...row, orderToken: fixtureToken });
+    const fixtureOrder = {
+      ...order,
+      orderToken: fixtureToken,
+      deliveryStatus: 'tracking_available',
+      lastProgressSyncAt: now,
+      lastTrackingSyncAt: now,
+      merchizeTrackingPayload: { success: true, data: [{
+        ...invoiceRow, _id: 'fixture-package', tracking_number: 'FIXTURE-NUMBER', has_tracking: true,
+      }] },
+      merchizeProgressPayload: { success: true, data: [{
+        ...invoiceRow, order_progress: [{ event: 'shipment_started', status: 'done', actual: now.toISOString() }],
+      }] },
+    };
+    fulfillmentRows.push(fixtureOrder);
+    const fixtureContact = { ...contact, orderToken: fixtureToken };
+    if (scenario === 'late_tracking') {
+      await enqueueCustomerFulfillmentMilestoneNotification('shipment', fixtureContact);
+      await sendPendingCustomerNotifications({ orderToken: fixtureToken });
+    }
+    if (scenario === 'tracking_pending') {
+      await enqueueCustomerFulfillmentMilestoneNotification('tracking', fixtureContact);
+    }
+
+    const before = buyerSubjects().length;
+    assert.equal(await notifyMerchizeLifecycle(fixtureToken, now), 'succeeded');
+    assert.equal(await notifyMerchizeLifecycle(fixtureToken, now), 'succeeded');
+    const sent = await sendPendingCustomerNotifications({ orderToken: fixtureToken });
+    assert.equal(sent.filter((result) => result.ok).length, 1);
+    assert.equal(buyerSubjects().length, before + 1);
+    assert.match(buyerSubjects().at(-1) ?? '',
+      scenario === 'late_tracking' ? /^Tracking is ready/u : /^Shipment has started/u);
+    const notes = customerNotices.filter((entry) => entry.orderToken === fixtureToken);
+    assert.equal(notes.find((entry) => entry.type === 'paid_order_tracking_ready')?.status,
+      scenario === 'late_tracking' ? 'sent' : 'suppressed');
+    assert.deepEqual(await sendPendingCustomerNotifications({ orderToken: fixtureToken }), []);
+  }
+
   for (const scenario of ['race', 'retry', 'unknown'] as const) {
     const fixtureToken = `fixture-urgent-${scenario}`;
     paidRows.push({ ...row, orderToken: fixtureToken });
@@ -351,123 +476,205 @@ test('scheduled sync observes funding and package milestones without paying, imp
   }
 });
 
-test('a matched invalid US address sends one correction notice without releasing the order', async (t) => {
-  isolatedEnvironment(t);
-  process.env.MERCHIZE_FULFILLMENT_PUSH_ENABLED = 'true';
-  const now = new Date();
-  const address = {
-    address: '1 Example Street', address2: '', city: 'Example City',
-    state: 'CA', postal_code: '90001', country_code: 'US',
-  };
-  const amount = { value: '40.00', currencyCode: 'USD' };
-  const purchase: Row = {
-    orderToken, status: 'payment_saved', paypalOrderId: 'fixture-paypal',
-    customerName: 'Fixture Buyer', customerEmail: 'buyer@example.test',
-    createdAt: now, updatedAt: new Date(+now - 16 * 60_000),
-    canonicalOrderSnapshot: null, canonicalOrderSnapshotVersion: null, canonicalOrderSnapshotHash: null,
-    receiptLink: 'https://payment-receipts.codexchristi.shop/paypal/fixture.pdf', receiptFile: 'fixture',
-    djangoOrderIntentOrderId: reference.merchizeExternalOrderNumber,
-    djangoPaymentSaveCustomId: 'fixture-payment', countryIso2: 'US', countryIso3: 'USA',
-    authorizePayload: { purchaseUnits: [{ amount }] },
-    capturePayload: { id: 'fixture-capture', status: 'COMPLETED', amount },
-    shippingSnapshot: {
-      shipping_address_line_1: address.address, shipping_address_line_2: address.address2,
-      shipping_city: address.city, shipping_state: address.state, zip_code: address.postal_code,
-      shipping_country: 'USA',
-    },
-    cartSnapshot: [],
-    merchizeFulfillmentResponsePayload: {
-      status: 201, success: true, data: {
-        processing_status: 'completed',
-        response_data: { data: { order_id: reference.merchizeExternalOrderNumber } },
+for (const reply of [
+  'invalid_address', 'validating', 'empty', 'unexpected', 'timeout', 'lost_checkpoint', 'acknowledged',
+] as const) {
+  const invalidAddress = reply === 'invalid_address';
+  test(invalidAddress
+    ? 'a matched invalid US address sends one correction notice without releasing the order'
+    : `push reply: ${reply} does not cause a second push or premature buyer email`, async (t) => {
+    isolatedEnvironment(t);
+    process.env.MERCHIZE_FULFILLMENT_PUSH_ENABLED = 'true';
+    const timer = globalThis.setTimeout;
+    t.mock.method(globalThis, 'setTimeout', (callback: () => void, delay?: number) =>
+      timer(callback, delay === 1_500 || delay === 3_000 ? 0 : delay));
+    const now = new Date();
+    const address = {
+      address: '1 Example Street', address2: '', city: 'Example City',
+      state: 'CA', postal_code: '90001', country_code: 'US',
+    };
+    const amount = { value: '40.00', currencyCode: 'USD' };
+    const purchase: Row = {
+      orderToken, status: 'payment_saved', paypalOrderId: 'fixture-paypal',
+      customerName: 'Fixture Buyer', customerEmail: 'buyer@example.test',
+      createdAt: now, updatedAt: new Date(+now - 16 * 60_000),
+      canonicalOrderSnapshot: null, canonicalOrderSnapshotVersion: null, canonicalOrderSnapshotHash: null,
+      receiptLink: 'https://payment-receipts.codexchristi.shop/paypal/fixture.pdf', receiptFile: 'fixture',
+      djangoOrderIntentOrderId: reference.merchizeExternalOrderNumber,
+      djangoPaymentSaveCustomId: 'fixture-payment', countryIso2: 'US', countryIso3: 'USA',
+      authorizePayload: { purchaseUnits: [{ amount }] },
+      capturePayload: { id: 'fixture-capture', status: 'COMPLETED', amount },
+      shippingSnapshot: {
+        shipping_address_line_1: address.address, shipping_address_line_2: address.address2,
+        shipping_city: address.city, shipping_state: address.state, zip_code: address.postal_code,
+        shipping_country: 'USA',
       },
-    },
-  };
-  const providerOrder: Row = {
-    ...reference, id: 'fixture-ops', orderToken, djangoPaymentSaveCustomId: purchase.djangoPaymentSaveCustomId,
-    merchizeOrderId: 'fixture-provider-order', heldAt: null, lastLookupAt: null, duplicateDetectedAt: null,
-    pushAcknowledgedAt: null, pushVerifiedAt: null, updatedAt: now,
-  };
-  const attempts: Row[] = [], customerNotices: Row[] = [];
-  const ledger = {
-    paypalIntent: fixtureTable([purchase]), paypalWebhookEvent: fixtureTable([]),
-    paidOrderRecoveryProjection: fixtureTable([]), adminNotificationOutbox: fixtureTable([]),
-    customerNotificationOutbox: fixtureTable(customerNotices),
-    $transaction: (run: (tx: unknown) => Promise<unknown>) => run(ledger),
-  };
-  const orders = fixtureTable([providerOrder]);
-  const attemptTable = fixtureTable(attempts);
-  const ops = {
-    merchizeFulfillmentOrder: {
-      ...orders,
-      upsert: async () => ({ ...providerOrder }),
-      findFirst: async (query: { where: Row; include?: { syncAttempts?: { where: Row } } }) => {
-        const row = await orders.findFirst(query);
-        const filter = query.include?.syncAttempts?.where;
-        return row && {
-          ...row,
-          ...(filter ? { syncAttempts: attempts.filter((attempt) => matches(attempt, filter)) } : {}),
-        };
+      cartSnapshot: [],
+      merchizeFulfillmentResponsePayload: {
+        status: 201, success: true, data: {
+          processing_status: 'completed',
+          response_data: { data: { order_id: reference.merchizeExternalOrderNumber } },
+        },
       },
-    },
-    merchizeFulfillmentSyncAttempt: attemptTable,
-    merchizeFulfillmentItem: fixtureTable([]),
-    $transaction: (run: (tx: unknown) => Promise<unknown>) => run(ops),
-  };
-  global.__paypalTxLedger__ = ledger as unknown as NonNullable<typeof global.__paypalTxLedger__>;
-  global.__merchizeFulfillmentOpsPrisma__ = ops as unknown as NonNullable<typeof global.__merchizeFulfillmentOpsPrisma__>;
-  const buyerMessages: string[] = [];
-  t.mock.method(SendMailClient.prototype, 'sendMail', async (mail: {
-    subject: string; to: Array<{ email_address: { address: string } }>;
-  }) => {
-    if (mail.to[0]?.email_address.address === purchase.customerEmail) buyerMessages.push(mail.subject);
-    return {};
-  });
-  const unexpected: string[] = [];
-  t.mock.method(globalThis, 'fetch', async (input: string | URL, init?: RequestInit) => {
-    const url = new URL(String(input));
-    const endpoint = url.pathname.split('/').at(-1);
-    const deny = () => { unexpected.push(`${url.hostname} ${endpoint}`); throw Error('Unexpected fixture request'); };
-    const ok = (data: unknown) => Response.json({ success: true, data });
-    if (url.hostname !== 'merchize.example.test') return deny();
-    if (init?.method !== 'GET' && endpoint !== 'list-orders-ticket') return deny();
-    const item = { _id: 'fixture-item', ffm_map_item_status: 'mapped', variant: { is_active: true } };
-    if (endpoint === 'order-detail') return ok({
-      ...invoiceRow, _id: providerOrder.merchizeOrderId,
-      order_status: 'unfulfilled', items: [item],
-    });
-    if (endpoint === providerOrder.merchizeOrderId) return ok({
-      ...invoiceRow, _id: providerOrder.merchizeOrderId, order_status: 'open',
-      validate_shipping_address: 'street_undefined',
-      artwork_status: 'ready', paid_at: now.toISOString(),
-      fulfillment_status: 'unfulfilled',
-      has_push_fulfill: false,
-      estimated_ffm_cost: { total: 21.3 },
-      push_to_fulfillment_progress: '', items: [item],
-    });
-    if (endpoint === 'buyerdetails') {
-      return ok({ shipping_address: address });
+    };
+    const providerOrder: Row = {
+      ...reference, id: 'fixture-ops', orderToken, djangoPaymentSaveCustomId: purchase.djangoPaymentSaveCustomId,
+      merchizeOrderId: 'fixture-provider-order', heldAt: null, lastLookupAt: null, duplicateDetectedAt: null,
+      pushAcknowledgedAt: null, pushVerifiedAt: null, updatedAt: now,
+    };
+    const attempts: Row[] = [], customerNotices: Row[] = [];
+    const ledger = {
+      paypalIntent: fixtureTable([purchase]), paypalWebhookEvent: fixtureTable([]),
+      paidOrderRecoveryProjection: fixtureTable([]), adminNotificationOutbox: fixtureTable([]),
+      customerNotificationOutbox: fixtureTable(customerNotices),
+      $transaction: (run: (tx: unknown) => Promise<unknown>) => run(ledger),
+    };
+    const orders = fixtureTable([providerOrder]);
+    const attemptTable = fixtureTable(attempts);
+    const ops = {
+      merchizeFulfillmentOrder: {
+        ...orders,
+        upsert: async () => ({ ...providerOrder }),
+        findFirst: async (query: { where: Row; include?: { syncAttempts?: { where: Row } } }) => {
+          const row = await orders.findFirst(query);
+          const filter = query.include?.syncAttempts?.where;
+          return row && {
+            ...row,
+            ...(filter ? { syncAttempts: attempts.filter((attempt) => matches(attempt, filter)) } : {}),
+          };
+        },
+      },
+      merchizeFulfillmentSyncAttempt: attemptTable,
+      merchizeFulfillmentItem: fixtureTable([]),
+      $transaction: (run: (tx: unknown) => Promise<unknown>) => run(ops),
+    };
+    global.__paypalTxLedger__ = ledger as unknown as NonNullable<typeof global.__paypalTxLedger__>;
+    global.__merchizeFulfillmentOpsPrisma__ = ops as unknown as NonNullable<typeof global.__merchizeFulfillmentOpsPrisma__>;
+    if (reply === 'lost_checkpoint') {
+      const update = ops.merchizeFulfillmentOrder.updateMany;
+      t.mock.method(ops.merchizeFulfillmentOrder, 'updateMany', async (args: Parameters<typeof update>[0]) => {
+        if (args.data.pushAcknowledgedAt) throw new Error('Fixture outcome write failed');
+        return update(args);
+      });
     }
-    if (endpoint === 'order-invoice') return ok([{ ...invoiceRow, fulfillment_cost: 0 }]);
-    if (endpoint === 'send-to-fulfillment-date') return ok({ is_pushed: false, is_failed: false });
-    if (endpoint === 'order-progress') return ok([{ ...invoiceRow, order_progress: [{
-      event: 'pushed_order', status: 'pending', actual: new Date().toISOString(),
-    }] }]);
-    if (endpoint === 'unfulfilled') return ok([item]);
-    if (endpoint === 'histories') return ok([{ event: 'map_item' }, { event: 'order_imported' }]);
-    if (['address-suggestion', 'require-attention', 'tracking', 'transaction-fee',
-      'list-orders-ticket'].includes(endpoint ?? '')) return ok([]);
-    return deny();
-  });
+    const buyerMessages: string[] = [];
+    t.mock.method(SendMailClient.prototype, 'sendMail', async (mail: {
+      subject: string; to: Array<{ email_address: { address: string } }>;
+    }) => {
+      if (mail.to[0]?.email_address.address === purchase.customerEmail) buyerMessages.push(mail.subject);
+      return {};
+    });
+    let pushCount = 0;
+    let providerConfirmsRelease = false;
+    let pushProgress = reply === 'validating' ? 'validating' : '';
+    const unexpected: string[] = [];
+    t.mock.method(globalThis, 'fetch', async (input: string | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      const endpoint = url.pathname.split('/').at(-1);
+      const deny = () => { unexpected.push(`${url.hostname} ${endpoint}`); throw Error('Unexpected fixture request'); };
+      const ok = (data: unknown) => Response.json({ success: true, data });
+      if (url.hostname !== 'merchize.example.test') return deny();
+      if (endpoint === 'push') {
+        if (invalidAddress) return deny();
+        assert.equal(init?.method, 'POST');
+        pushCount++;
+        assert.ok(attempts.some((entry) => entry.action === 'push_to_fulfillment' && entry.status === 'running'));
+        assert.deepEqual(JSON.parse(String(init?.body)), {
+          order: { code: '', external_number: reference.merchizeExternalOrderNumber, identifier: reference.merchizeIdentifier },
+        });
+        if (reply === 'timeout')
+          throw new DOMException('Fixture timeout after dispatch', 'AbortError');
+        if (reply === 'empty') return new Response(null, { status: 200 });
+        if (reply === 'unexpected') return Response.json({ message: 'Unexpected fixture envelope' });
+        return ok(true);
+      }
+      if (init?.method !== 'GET' && endpoint !== 'list-orders-ticket') return deny();
+      const item = { _id: 'fixture-item', ffm_map_item_status: 'mapped', variant: { is_active: true } };
+      if (endpoint === 'order-detail') return ok({
+        ...invoiceRow, _id: providerOrder.merchizeOrderId,
+        order_status: providerConfirmsRelease ? 'fulfilled' : 'unfulfilled', items: [item],
+      });
+      if (endpoint === providerOrder.merchizeOrderId) return ok({
+        ...invoiceRow, _id: providerOrder.merchizeOrderId, order_status: 'open',
+        validate_shipping_address: invalidAddress ? 'street_undefined' : 'valid',
+        artwork_status: 'ready', paid_at: now.toISOString(),
+        fulfillment_status: providerConfirmsRelease ? 'fulfilled' : 'unfulfilled',
+        has_push_fulfill: providerConfirmsRelease,
+        push_to_fulfillment_progress: providerConfirmsRelease ? 'pushed' : pushProgress, items: [item],
+      });
+      if (endpoint === 'buyerdetails') {
+        await new Promise<void>((resolve) => timer(resolve, 2));
+        return ok({ shipping_address: address });
+      }
+      if (endpoint === 'order-invoice') return ok([{ ...invoiceRow, fulfillment_cost: 0 }]);
+      if (endpoint === 'send-to-fulfillment-date') return ok({ is_pushed: providerConfirmsRelease, is_failed: false });
+      if (endpoint === 'order-progress') return ok([{ ...invoiceRow, order_progress: [{
+        event: 'pushed_order', status: providerConfirmsRelease ? 'done' : 'pending', actual: new Date().toISOString(),
+      }] }]);
+      if (endpoint === 'unfulfilled') return ok([item]);
+      if (endpoint === 'histories') return ok([{ event: 'map_item' }, { event: 'order_imported' }]);
+      if (['address-suggestion', 'require-attention', 'tracking', 'transaction-fee',
+        'list-orders-ticket'].includes(endpoint ?? '')) return ok([]);
+      return deny();
+    });
 
-  await runPaidFulfillmentProcessing(orderToken, { executionScope: 'merchize_fulfillment_only' });
-  assert.equal(purchase.lastErrorCode, 'MERCHIZE_ADDRESS_INVALID');
-  assert.equal(purchase.status, 'fulfillment_attention_required');
-  assert.deepEqual(customerNotices.map(({ type, status }) => ({ type, status })), [
-    { type: 'paid_order_address_correction_required', status: 'sent' },
-  ]);
-  assert.deepEqual(await sendPendingCustomerNotifications(), []);
-  assert.equal(buyerMessages.length, 1);
-  assert.match(buyerMessages[0], /^Check your delivery address/u);
-  assert.deepEqual(unexpected, []);
-});
+    const result = await runPaidFulfillmentProcessing(orderToken, {
+      executionScope: 'merchize_fulfillment_only',
+    });
+    if (invalidAddress) {
+      assert.equal(purchase.lastErrorCode, 'MERCHIZE_ADDRESS_INVALID');
+      assert.equal(purchase.status, 'fulfillment_attention_required');
+      assert.deepEqual(customerNotices.map(({ type, status }) => ({ type, status })), [
+        { type: 'paid_order_address_correction_required', status: 'sent' },
+      ]);
+      assert.deepEqual(await sendPendingCustomerNotifications(), []);
+      assert.equal(buyerMessages.length, 1);
+      assert.match(buyerMessages[0], /^Check your delivery address/u);
+      assert.equal(pushCount, 0);
+      assert.deepEqual(unexpected, []);
+      return;
+    }
+    if (reply === 'validating') {
+      assert.equal(result?.pushRequestOutcome, 'not_sent');
+      assert.equal(purchase.lastErrorCode, 'MERCHIZE_PUSH_VERIFICATION_PENDING');
+      assert.equal(pushCount, 0);
+      assert.deepEqual(unexpected, []);
+      assert.deepEqual(await sendPendingCustomerNotifications(), []);
+      assert.deepEqual(buyerMessages, []);
+      return;
+    }
+    assert.equal(result?.pushRequestOutcome, reply === 'acknowledged' ? 'acknowledged' : 'unconfirmed');
+    assert.equal(pushCount, 1);
+    const pushAttempt = attempts.find((entry) => entry.action === 'push_to_fulfillment' && entry.status !== 'skipped');
+    assert.equal(pushAttempt?.status, reply === 'acknowledged' ? 'succeeded'
+      : reply === 'lost_checkpoint' ? 'running' : 'unconfirmed');
+    assert.equal(Boolean(providerOrder.pushAcknowledgedAt), reply === 'acknowledged');
+    assert.equal(purchase.status, 'payment_saved');
+    assert.deepEqual(customerNotices, []);
+    assert.deepEqual(await sendPendingCustomerNotifications(), []);
+    assert.deepEqual(buyerMessages, []);
+    await runPayPalRecoveryScanner();
+    assert.equal(pushCount, 1, 'a blank, not-pushed read must not allow another POST');
+    assert.equal(purchase.lastErrorCode, 'MERCHIZE_PUSH_VERIFICATION_PENDING');
+    assert.deepEqual(await sendPendingCustomerNotifications(), []);
+
+    pushProgress = 'validating';
+    process.env.MERCHIZE_FULFILLMENT_PUSH_ENABLED = 'false';
+    await runPayPalRecoveryScanner();
+    assert.equal(purchase.lastErrorCode, 'MERCHIZE_PUSH_VERIFICATION_PENDING', 'the push switch must not prevent verification');
+    assert.equal(pushCount, 1);
+    assert.deepEqual(customerNotices, []);
+
+    providerConfirmsRelease = true;
+    await runPayPalRecoveryScanner();
+    assert.equal(purchase.status, 'completed');
+    assert.equal(pushCount, 1);
+    assert.ok(providerOrder.pushVerifiedAt instanceof Date);
+    assert.deepEqual(buyerMessages, [], 'the preparation email waits for the scheduled sender');
+    await sendPendingCustomerNotifications();
+    await sendPendingCustomerNotifications();
+    assert.equal(buyerMessages.length, 1);
+    assert.match(buyerMessages[0], /^Your order was sent for preparation/u);
+    assert.deepEqual(unexpected, [], 'no PayPal, Django, import, or unexpected provider requests');
+  });
+}

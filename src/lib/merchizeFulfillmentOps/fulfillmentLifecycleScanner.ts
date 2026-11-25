@@ -17,6 +17,7 @@ import { safeLogErrorMessage } from './redaction';
 import { VERIFIED_MERCHIZE_DELIVERY_STATUS } from './customerTracking';
 import { notifyMerchizeLifecycle } from './notifyMerchizeLifecycle';
 import { paypalTxLedger } from '@/lib/prisma/shop/paypal/paypalTxLedger';
+import { reconcileVerifiedFulfillmentRelease } from '@/lib/paypal/txLedger/reconcileVerifiedFulfillmentRelease';
 import {
   ADMIN_NOTIFICATION_SEVERITY,
   enqueueAdminRecoveryNotification,
@@ -261,6 +262,9 @@ export async function runMerchizeFulfillmentLifecycleScanner(
             })
           : false;
         if (detailSync.ok && readiness.ok) {
+          if (readiness.readiness.providerPushState === 'pushed') {
+            await reconcileVerifiedFulfillmentRelease(candidate.orderToken);
+          }
           await notifyMerchizeLifecycle(candidate.orderToken, scannedAt);
         }
         results.push({

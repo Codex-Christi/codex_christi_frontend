@@ -22,11 +22,13 @@ import {
   toPrismaJson,
 } from './merchizeMapper';
 import { classifyMerchizeProductionReadiness } from './productionReadiness';
+import { confirmedMerchizePushTime } from './externalOrderProgress';
 import { safeLogErrorMessage } from './redaction';
 import {
   MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_STATUS,
+  MERCHIZE_UNCONFIRMED_PUSH_ATTEMPT,
 } from './status';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 import {
@@ -46,6 +48,7 @@ export type MerchizeProductionReadinessCheckResult =
       merchizeOrderId: string;
       pushAcknowledgedAt: Date | null;
       pushVerifiedAt: Date | null;
+      hasUnconfirmedPush: boolean;
       providerAddressUpdatedAt: Date | null;
       readiness: ReturnType<typeof classifyMerchizeProductionReadiness>;
     }
@@ -91,6 +94,13 @@ export async function runMerchizeProductionReadinessChecks(
   const order = await prisma.merchizeFulfillmentOrder.findFirst({
     where: { orderToken },
     orderBy: { updatedAt: 'desc' },
+    include: {
+      syncAttempts: {
+        where: MERCHIZE_UNCONFIRMED_PUSH_ATTEMPT,
+        select: { id: true },
+        take: 1,
+      },
+    },
   });
 
   if (!order?.merchizeOrderId) {
@@ -105,6 +115,7 @@ export async function runMerchizeProductionReadinessChecks(
   const providerReleaseAlreadyVerified =
     order.productionGateStatus === MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFIED ||
     Boolean(order.pushVerifiedAt);
+  const hasUnconfirmedPush = Boolean(order.syncAttempts?.length);
   const invoiceReference = {
     externalNumber: order.merchizeExternalOrderNumber,
     identifier: order.merchizeIdentifier,
@@ -120,7 +131,8 @@ export async function runMerchizeProductionReadinessChecks(
         merchizeOrderId: order.merchizeOrderId,
         invoiceReference,
         allowStaleOrderManualRelease: options.allowStaleOrderManualRelease === true,
-        buyerAddressReadbackRequired: Boolean(options.expectedBuyerAddress),
+        buyerAddressReadbackRequired: true,
+        buyerAddressExpectationAvailable: Boolean(options.expectedBuyerAddress),
       }),
     },
   });
@@ -131,7 +143,9 @@ export async function runMerchizeProductionReadinessChecks(
       syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.READINESS_CHECKING,
       productionGateStatus: providerReleaseAlreadyVerified
         ? MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFIED
-        : MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.CHECKING,
+        : hasUnconfirmedPush
+          ? MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFICATION_PENDING
+          : MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.CHECKING,
       lastSyncErrorCode: null,
       lastSyncErrorMessage: null,
     },
@@ -169,23 +183,30 @@ export async function runMerchizeProductionReadinessChecks(
       requireAttention,
       sendToFulfillment,
       buyerAddressMismatchFields,
+      buyerAddressCountryCode: options.expectedBuyerAddress?.country_code ?? null,
       providerOrderOnHold: Boolean(order.heldAt),
       allowStaleOrderManualRelease: options.allowStaleOrderManualRelease,
     });
     const checkedAt = new Date();
+    const providerPushedAt = confirmedMerchizePushTime(sendToFulfillment, checkedAt);
     const productionGateStatus =
       providerReleaseAlreadyVerified || readiness.status === 'already_pushed'
         ? MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFIED
-        : readiness.status === 'ready'
+        : hasUnconfirmedPush
+          ? MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFICATION_PENDING
+          : readiness.status === 'ready'
           ? MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.READY
           : readiness.status === 'manual_release_required'
             ? MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.MANUAL_RELEASE_REQUIRED
             : MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.BLOCKED;
-    const syncStatus = readiness.ready
-      ? readiness.status === 'already_pushed'
+    const syncStatus =
+      productionGateStatus === MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFIED
         ? MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_VERIFIED
-        : MERCHIZE_FULFILLMENT_SYNC_STATUS.READINESS_READY
-      : MERCHIZE_FULFILLMENT_SYNC_STATUS.READINESS_BLOCKED;
+        : hasUnconfirmedPush
+          ? MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_VERIFICATION_PENDING
+          : readiness.ready
+            ? MERCHIZE_FULFILLMENT_SYNC_STATUS.READINESS_READY
+            : MERCHIZE_FULFILLMENT_SYNC_STATUS.READINESS_BLOCKED;
     const readinessSummary = {
       status: readiness.status,
       blockers: readiness.blockers,
@@ -232,7 +253,7 @@ export async function runMerchizeProductionReadinessChecks(
           merchizeProductionReadinessPayload: toPrismaJson(readinessSummary),
           ...(readiness.status === 'already_pushed'
             ? {
-                releasedToProductionAt: order.releasedToProductionAt ?? checkedAt,
+                releasedToProductionAt: providerPushedAt ?? order.releasedToProductionAt ?? checkedAt,
                 pushVerifiedAt: order.pushVerifiedAt ?? checkedAt,
               }
             : {}),
@@ -267,6 +288,7 @@ export async function runMerchizeProductionReadinessChecks(
       merchizeOrderId: order.merchizeOrderId,
       pushAcknowledgedAt: order.pushAcknowledgedAt,
       pushVerifiedAt: order.pushVerifiedAt,
+      hasUnconfirmedPush,
       providerAddressUpdatedAt: order.providerAddressUpdatedAt,
       readiness,
     };
@@ -280,10 +302,14 @@ export async function runMerchizeProductionReadinessChecks(
         data: {
           syncStatus: providerReleaseAlreadyVerified
             ? MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_VERIFIED
-            : MERCHIZE_FULFILLMENT_SYNC_STATUS.READINESS_BLOCKED,
+            : hasUnconfirmedPush
+              ? MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_VERIFICATION_PENDING
+              : MERCHIZE_FULFILLMENT_SYNC_STATUS.READINESS_BLOCKED,
           productionGateStatus: providerReleaseAlreadyVerified
             ? MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFIED
-            : MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.BLOCKED,
+            : hasUnconfirmedPush
+              ? MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFICATION_PENDING
+              : MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.BLOCKED,
           lastReadinessCheckAt: failedAt,
           lastSyncErrorCode: readinessError.code,
           lastSyncErrorMessage: readinessError.message,

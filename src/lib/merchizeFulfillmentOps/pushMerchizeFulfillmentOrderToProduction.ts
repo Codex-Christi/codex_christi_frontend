@@ -8,11 +8,9 @@ import {
   getMerchizeOrderByExternalNumber,
   MerchizeApiError,
   pushMerchizeExternalOrderToFulfillment,
-  type MerchizeExternalOrderMutationResponse,
   type MerchizeExternalOrderReference,
 } from './merchizeClient';
 import { asRecord, summarizeProviderRequest, summarizeProviderResponse } from './merchizeMapper';
-import { safeLogErrorMessage } from './redaction';
 import {
   isMerchizeFulfillmentCanceled,
   MERCHIZE_FULFILLMENT_CANCELED_CODE,
@@ -20,6 +18,8 @@ import {
   MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS,
   MERCHIZE_FULFILLMENT_SYNC_STATUS,
   MERCHIZE_ORDER_ON_HOLD,
+  MERCHIZE_PUSH_ACTION,
+  MERCHIZE_UNCONFIRMED_PUSH_ATTEMPT,
 } from './status';
 import { refreshPaidOrderRecoveryProjectionSafely } from '@/lib/paypal/txLedger/paidOrderRecoveryProjection';
 import {
@@ -28,8 +28,6 @@ import {
   observedOrderHold,
   readExternalOrderState,
 } from './merchizeOrderHold';
-
-const PUSH_ACTION = 'push_to_fulfillment';
 
 export class MerchizeFulfillmentPushError extends Error {
   code: string;
@@ -59,12 +57,7 @@ type PushInput = {
   identifier?: string | null;
 };
 
-type PushResult = {
-  ok: true;
-  orderToken: string;
-  merchizeExternalOrderNumber: string | null;
-  response: MerchizeExternalOrderMutationResponse;
-};
+export type MerchizePushRequestOutcome = 'acknowledged' | 'unconfirmed' | 'not_sent';
 
 function buildReference(input: PushInput): MerchizeExternalOrderReference {
   if (input.merchizeExternalOrderNumber?.trim()) {
@@ -98,52 +91,13 @@ function buildRequestSummary(reference: MerchizeExternalOrderReference) {
   };
 }
 
-function getProviderFailure(response: MerchizeExternalOrderMutationResponse) {
+export function classifyMerchizePushReply(response: unknown) {
   const record = asRecord(response);
-  if (!record) return null;
-
-  if (record.success === false) {
-    return typeof record.message === 'string' && record.message.trim()
-      ? record.message.trim()
-      : 'Merchize push-to-fulfillment was not accepted.';
-  }
-
-  if (record.data === false) {
-    return typeof record.message === 'string' && record.message.trim()
-      ? record.message.trim()
-      : 'Merchize push-to-fulfillment returned data=false.';
-  }
-
-  const error = record.error;
-  if (error) {
-    return typeof error === 'string' ? error : 'Merchize push-to-fulfillment returned an error.';
-  }
-
-  return null;
-}
-
-function getPushError(error: unknown) {
-  if (error instanceof MerchizeFulfillmentPushError) {
-    return {
-      code: error.code,
-      message: error.message,
-      responseSummary: error.responseSummary,
-    };
-  }
-
-  if (error instanceof MerchizeApiError) {
-    return {
-      code: error.code,
-      message: error.message,
-      responseSummary: error.responseSummary,
-    };
-  }
-
-  return {
-    code: 'MERCHIZE_PUSH_FAILED',
-    message: safeLogErrorMessage(error),
-    responseSummary: null,
-  };
+  if (record?.success === true && record.data !== false && !record.error)
+    return 'acknowledged';
+  if (record?.success === false || (record?.success !== true && record?.data === false))
+    return 'rejected';
+  return 'unconfirmed';
 }
 
 export async function recordMerchizeFulfillmentPushDisabledByConfig(input: PushInput) {
@@ -185,7 +139,7 @@ export async function recordMerchizeFulfillmentPushDisabledByConfig(input: PushI
       data: {
         merchizeFulfillmentOrderId: order.id,
         orderToken: input.orderToken,
-        action: PUSH_ACTION,
+        action: MERCHIZE_PUSH_ACTION,
         status: MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.SKIPPED,
         requestSummary: summarizeProviderRequest(requestSummary),
         responseSummary: summarizeProviderResponse({
@@ -206,7 +160,7 @@ export async function recordMerchizeFulfillmentPushDisabledByConfig(input: PushI
 
 export async function pushMerchizeFulfillmentOrderToProduction(
   input: PushInput,
-): Promise<PushResult> {
+): Promise<MerchizePushRequestOutcome> {
   const reference = buildReference(input);
   const requestSummary = buildRequestSummary(reference);
   const prisma = isMerchizeFulfillmentOpsDatabaseConfigured()
@@ -247,27 +201,29 @@ export async function pushMerchizeFulfillmentOrderToProduction(
       code: 'MERCHIZE_PUSH_STATE_UNVERIFIED',
     });
   }
-  const write = await prisma.merchizeFulfillmentOrder.updateMany({
-    where: {
-      ...holdLookupVersion(order),
-      duplicateDetectedAt: null,
-      heldAt: null,
-      pushAcknowledgedAt: null,
-      pushVerifiedAt: null,
-    },
-    data: {
-      ...observedOrderHold(order, state, now),
-      ...(state === 'unfulfilled'
-        ? {
-            syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_PENDING,
-            productionGateStatus: MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_PENDING,
-            lastSyncErrorCode: null,
-            lastSyncErrorMessage: null,
-          }
-        : {}),
-    },
-  });
-  if (write.count !== 1 || state !== 'unfulfilled') {
+  const saveObservedState = (db: Pick<typeof prisma, 'merchizeFulfillmentOrder'>) =>
+    db.merchizeFulfillmentOrder.updateMany({
+      where: {
+        ...holdLookupVersion(order),
+        duplicateDetectedAt: null,
+        heldAt: null,
+        pushAcknowledgedAt: null,
+        pushVerifiedAt: null,
+      },
+      data: {
+        ...observedOrderHold(order, state, now),
+        ...(state === 'unfulfilled'
+          ? {
+              syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_PENDING,
+              productionGateStatus: MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_PENDING,
+              lastSyncErrorCode: null,
+              lastSyncErrorMessage: null,
+            }
+          : {}),
+      },
+    });
+  if (state !== 'unfulfilled') {
+    await saveObservedState(prisma);
     throw new MerchizeFulfillmentPushError('Merchize did not confirm this order was available for release.', {
       code: isMerchizeFulfillmentCanceled(state)
         ? MERCHIZE_FULFILLMENT_CANCELED_CODE
@@ -275,103 +231,95 @@ export async function pushMerchizeFulfillmentOrderToProduction(
     });
   }
 
-  let attemptId: string | null = null;
-
-  if (prisma && order) {
-    const attempt = await prisma.merchizeFulfillmentSyncAttempt.create({
+  const attempt = await prisma.$transaction(async (tx) => {
+    const write = await saveObservedState(tx);
+    const earlier = await tx.merchizeFulfillmentSyncAttempt.findFirst({
+      where: { orderToken: input.orderToken, ...MERCHIZE_UNCONFIRMED_PUSH_ATTEMPT },
+      select: { id: true },
+    });
+    if (earlier) return null;
+    if (write.count !== 1) {
+      throw new MerchizeFulfillmentPushError('The order changed before the push could be requested.', {
+        code: 'MERCHIZE_PUSH_STATE_UNVERIFIED',
+      });
+    }
+    // Save the attempt under the order write lock before any request can leave this process.
+    return tx.merchizeFulfillmentSyncAttempt.create({
       data: {
         merchizeFulfillmentOrderId: order.id,
         orderToken: input.orderToken,
-        action: PUSH_ACTION,
+        action: MERCHIZE_PUSH_ACTION,
         status: MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.RUNNING,
         requestSummary: summarizeProviderRequest(requestSummary),
         startedAt: now,
       },
     });
-    attemptId = attempt.id;
-  }
+  });
+  if (!attempt) return 'unconfirmed';
 
+  let outcome: ReturnType<typeof classifyMerchizePushReply> = 'unconfirmed';
+  let response: unknown = null;
   try {
-    const response = await pushMerchizeExternalOrderToFulfillment(reference);
-    const providerFailure = getProviderFailure(response);
-
-    if (providerFailure) {
-      throw new MerchizeFulfillmentPushError(providerFailure, {
-        code: 'MERCHIZE_PUSH_REJECTED',
-        requestSummary,
-        responseSummary: response,
-      });
-    }
-
-    if (prisma && order) {
-      await prisma.$transaction(async (tx) => {
-        await tx.merchizeFulfillmentOrder.update({
-          where: { id: order.id },
-          data: {
-            syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_ACKNOWLEDGED,
-            productionGateStatus:
-              MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_ACKNOWLEDGED,
-            pushAcknowledgedAt: new Date(),
-            lastSyncErrorCode: null,
-            lastSyncErrorMessage: null,
-          },
-        });
-
-        if (attemptId) {
-          await tx.merchizeFulfillmentSyncAttempt.update({
-            where: { id: attemptId },
-            data: {
-              status: MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.SUCCEEDED,
-              responseSummary: summarizeProviderResponse(response),
-              finishedAt: new Date(),
-            },
-          });
-        }
-      });
-      await refreshPaidOrderRecoveryProjectionSafely(input.orderToken);
-    }
-
-    return {
-      ok: true,
-      orderToken: input.orderToken,
-      merchizeExternalOrderNumber: input.merchizeExternalOrderNumber ?? null,
-      response,
-    };
+    response = await pushMerchizeExternalOrderToFulfillment(reference);
+    outcome = classifyMerchizePushReply(response);
   } catch (error) {
-    const pushError = getPushError(error);
-
-    if (prisma && order) {
-      await prisma.$transaction(async (tx) => {
-        await tx.merchizeFulfillmentOrder.update({
-          where: { id: order.id },
-          data: {
-            syncStatus: MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_FAILED,
-            productionGateStatus: MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_FAILED,
-            lastSyncErrorCode: pushError.code,
-            lastSyncErrorMessage: pushError.message,
-          },
-        });
-
-        if (attemptId) {
-          await tx.merchizeFulfillmentSyncAttempt.update({
-            where: { id: attemptId },
-            data: {
-              status: MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.FAILED,
-              errorCode: pushError.code,
-              errorMessage: pushError.message,
-              responseSummary: summarizeProviderResponse(pushError.responseSummary),
-              finishedAt: new Date(),
-            },
-          });
-        }
+    // A transport or HTTP error does not prove the supplier did not receive the request.
+    response = error instanceof MerchizeApiError ? error.responseSummary : null;
+  }
+  const acknowledged = outcome === 'acknowledged';
+  const rejected = outcome === 'rejected';
+  const rejectionCode = 'MERCHIZE_PUSH_REJECTED';
+  const rejectionMessage = 'Merchize rejected the push request.';
+  const errorCode = acknowledged ? null : rejected ? rejectionCode : 'MERCHIZE_PUSH_REPLY_UNCONFIRMED';
+  const message = acknowledged ? null : rejected
+    ? rejectionMessage
+    : 'Merchize did not confirm receipt of the push request. Verify the order before retrying.';
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.merchizeFulfillmentOrder.updateMany({
+        where: { id: order.id, pushVerifiedAt: null },
+        data: {
+          syncStatus: acknowledged
+            ? MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_ACKNOWLEDGED
+            : rejected
+              ? MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_FAILED
+              : MERCHIZE_FULFILLMENT_SYNC_STATUS.PUSH_VERIFICATION_PENDING,
+          productionGateStatus: acknowledged
+            ? MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_ACKNOWLEDGED
+            : rejected
+              ? MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_FAILED
+              : MERCHIZE_FULFILLMENT_PRODUCTION_GATE_STATUS.PUSH_VERIFICATION_PENDING,
+          pushAcknowledgedAt: acknowledged ? new Date() : undefined,
+          lastSyncErrorCode: errorCode,
+          lastSyncErrorMessage: message,
+        },
       });
-      await refreshPaidOrderRecoveryProjectionSafely(input.orderToken);
-    }
-
-    throw new MerchizeFulfillmentPushError(pushError.message, {
-      code: pushError.code,
+      await tx.merchizeFulfillmentSyncAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          status: acknowledged
+            ? MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.SUCCEEDED
+            : rejected
+              ? MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.FAILED
+              : MERCHIZE_FULFILLMENT_SYNC_ATTEMPT_STATUS.UNCONFIRMED,
+          responseSummary: summarizeProviderResponse(response),
+          errorCode,
+          errorMessage: message,
+          finishedAt: new Date(),
+        },
+      });
+    });
+  } catch {
+    // The running attempt remains durable if the response could not be recorded.
+    return 'unconfirmed';
+  }
+  await refreshPaidOrderRecoveryProjectionSafely(input.orderToken);
+  if (rejected) {
+    throw new MerchizeFulfillmentPushError(rejectionMessage, {
+      code: rejectionCode,
       requestSummary,
-      responseSummary: pushError.responseSummary,
+      responseSummary: summarizeProviderResponse(response),
     });
   }
+  return acknowledged ? 'acknowledged' : 'unconfirmed';
 }
